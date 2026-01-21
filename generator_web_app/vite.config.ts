@@ -19,6 +19,6 @@ export default defineConfig({
     target: 'esnext'
   },
   server: {
-    allowedHosts: ['pronghorn-count-dev.arcc.uwyo.edu', 'annotation_software_web-app-dev_1']
+    allowedHosts: ['pronghorn-count-dev.arcc.uwyo.edu', 'annotation_software_web-app-dev_1', '127.0.0.1:5173']
   }
 })

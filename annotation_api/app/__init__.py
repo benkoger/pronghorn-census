@@ -11,11 +11,10 @@ from app.extensions import login_manager, cache, session_manager, base
 def create_app():
 	app = Flask(__name__)
 	app.config.from_object(FlaskConfig)
-
 	CORS(app, resources={
 		r'/api/*': {
 			'origins': [
-				app.config['ORIGIN_URL']
+				app.config['ORIGIN_URL'],
 			],
 			'supports_credentials': True     
 		}
