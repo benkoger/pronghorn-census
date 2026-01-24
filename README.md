@@ -67,6 +67,13 @@ At this early stage in development parts of the set up process remains manual. F
 
 This folder (annotation_software) contains a set of *container files* and *YAML Compose* files that are designed to *hopefully* automate most of the deployment process. Each major component gets it's own container managed using any OCI compliant container orchestration tool. Before composing our containers we must provide the nessacary *secrets* to the orchestration tool. *Be sure to have read the major components section to understand exactly what it is that you are deploying.*
 
+### Local dev server setup guide
+Included in the repo is a container compose.yml named development.compose.yml that sets up containers configured for local developent work.
+
+For winndows and mac you will need to use a podman / docker virtual machine
+
+(note for windows instead of --f just use -f, switch from CLFR to LF research needed)
+
 ### Requirements
 
 * **Some Computer, Somewhere:** Thanks to our microservice architecture, this tool can be hosted on one bigger computer, or a few smaller computers. This guide assumes you will be using one big computer. It will be up to the user to alter the compose files if they wish to alter the configuration. There are no plans for any sort of install utility as of now.
@@ -147,6 +154,3 @@ The user module is planned to be another module that has slightly different cont
 
 ### Settings
 The settings module is the eventual home for all configurable options for a user's account. Its pretty standard.
-
-
-hello from pronghorn-dev server!
