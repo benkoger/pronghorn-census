@@ -1,7 +1,7 @@
 # Psycopg3 database abstraction layer for crop generator_api
 # Author: Michael B. Lance
 # Created: November 17, 2024
-# Updated: October 28, 2025
+# Updated: January 29, 2025
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from datetime import datetime
@@ -51,7 +51,7 @@ class Database:
 
 		setattr(app, app_attribute_name, self)
 
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~# 
 
 	def create_pool(self, min_size: int=2, max_size: int=4):
 		if self._pool is not None: # dispose of existing pool
@@ -984,7 +984,14 @@ class Database:
 	# Project Management - Models
 	
 	@connect
-	def _create_model(self, cursor: psycopg.Cursor[Model], name: str) -> Model:
+	def _create_model(
+		self, 
+		cursor: psycopg.Cursor[Model], 
+		name: str,
+		project_id: int | UUID,
+		schema_id: int | UUID,
+		survey_ids: List[int] | List[UUID]
+		) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -993,6 +1000,9 @@ class Database:
 		model = cursor.fetchone()
 		if model is None:
 			raise Exception('Failed to create model')
+
+		
+
 		return model 
 
 	def create_model(self, name: str) -> Model:
