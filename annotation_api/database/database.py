@@ -990,28 +990,43 @@ class Database:
 		name: str,
 		project_id: int | UUID,
 		schema_id: int | UUID,
-		survey_ids: List[int] | List[UUID]
+		survey_ids: List[Union[int, UUID]]
 		) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
 		cursor.row_factory=class_row(Model)
-		cursor.execute(' INSERT into projectmanagement.models (name) VALUES (%s)  RETURNING *; ', (name,))
-		model = cursor.fetchone()
-		if model is None:
-			raise Exception('Failed to create model')
 
+		project = self._get_project(project_id)
+		schema = self._get_schema(schema_id)
+
+		query_1 = sql.SQL(' INSERT into projectmanagement.models (name) VALUES (%s)  RETURNING *; ')
 		
+		cursor.execute(query_1, (name,))
+		model = cursor.fetchone()
+		if not model:
+			raise Exception('Failed to create model')
+		elif not project:
+			raise Exception('Projection not found')
+		elif not schema:
+			raise Exception('Schema not found')
+
+		query_2 = sql.SQL(' INSERT INTO  ')
 
 		return model 
 
-	def create_model(self, name: str) -> Model:
+	def create_model(self, 
+		name: str,
+		project_id: int | UUID,
+		schema_id: int | UUID,
+		survey_ids: List[Union[int, UUID]]
+	) -> Model:
 		''' Insert a new model object into the database
 
 		Args:
 			name: the model name 
 		'''
-		return self._create_model(name = name)
+		return self._create_model(name, project_id, schema_id, survey_ids)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

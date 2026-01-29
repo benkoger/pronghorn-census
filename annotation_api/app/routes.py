@@ -175,18 +175,18 @@ def get_survey_herdunits(survey_id: str):
 #---------------------------------------------------------------------------------------------------------------------------#
 # Model Crud
 
-@bp.route('/api/v1/create/model', methods=['POST'])
-@login_required
-def create_model():
-	'''
+# @bp.route('/api/v1/create/model', methods=['POST'])
+# @login_required
+# def create_model():
+# 	'''
 	
-	'''
-	data = request.get_json()
-	try:
-		model = base.create_model(data['name'])
-	except Exception:
-		abort(500)
-	return model.serialize(), 201
+# 	'''
+# 	data = request.get_json()
+# 	try:
+# 		model = base.create_model(data['name'])
+# 	except Exception:
+# 		abort(500)
+# 	return model.serialize(), 201
 	
 @bp.route('/api/v1/request/projects/<string:project_id>/models/all', methods=['GET'])
 @login_required

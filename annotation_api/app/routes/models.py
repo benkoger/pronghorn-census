@@ -12,6 +12,8 @@ from flask_login import (
 	current_user,
 	login_required,
 ) 
+from typing import cast, Union, List
+from uuid import UUID
 
 modelBp = Blueprint('training', __name__, url_prefix='/api/v1/models')
 
@@ -133,8 +135,37 @@ def create():
 	'''
 
 	'''
+	name = request.args.get('model_name')
 	project_id = request.args.get('project_id', 0)
-	return ''
+	schema_id = request.args.get('schema_id', 0)
+	survey_ids = request.args.getlist('survey_id')
+
+	if not name:
+		abort(400, 'Error creating model! No name provided.')
+	elif not project_id:
+		abort(400, 'Error creating model! Models must be associated with at least one project.')
+	elif not schema_id:
+		abort(400, 'Error creating model! No schema provided.')
+
+	project_id = project_id if isinstance(project_id, int) else UUID(project_id)
+	schema_id = schema_id if isinstance(schema_id, int) else UUID(schema_id)
+	survey_ids = [
+		cast(int, survey_id) if isinstance(survey_id, int) else UUID(survey_id)
+		for survey_id in survey_ids
+		]
+	try:
+		model = base.create_model(
+			name,
+			project_id,
+			schema_id,
+			survey_ids
+		)
+	except:
+		abort(500)
+
+	return model.serialize(), 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @modelBp.post('/<string:model_id>/train')
 @login_required
