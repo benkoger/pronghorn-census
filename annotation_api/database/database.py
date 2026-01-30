@@ -4,10 +4,10 @@
 # Updated: January 29, 2025
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from datetime import datetime
+from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, Optional, cast, Union, List
+from typing import Any, Callable, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
 
@@ -59,12 +59,12 @@ class Database:
 			
 		self.pool_uuid = uuid.uuid4()
 		self._pool = ConnectionPool(
-		kwargs = self._config,
-		min_size = min_size,
-		max_size = max_size,
-		open = True,
-		max_lifetime = 290,
-		check=ConnectionPool.check_connection 
+			kwargs = self._config,
+			min_size = min_size,
+			max_size = max_size,
+			open = True,
+			max_lifetime = 290,
+			check=ConnectionPool.check_connection 
 		)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -990,7 +990,8 @@ class Database:
 		name: str,
 		project_id: int | UUID,
 		schema_id: int | UUID,
-		survey_ids: List[Union[int, UUID]]
+		#TODO: update this parameter to support UUIDs
+		survey_ids: List[int] # UUIDs not supported for now
 		) -> Model:
 		''' Internal helper function, do not call directly
 		
@@ -1000,9 +1001,9 @@ class Database:
 		project = self._get_project(project_id)
 		schema = self._get_schema(schema_id)
 
-		query_1 = sql.SQL(' INSERT into projectmanagement.models (name) VALUES (%s)  RETURNING *; ')
+		query_1 = sql.SQL(' INSERT into projectmanagement.models (name, schema_id) VALUES (%s, %s) RETURNING *; ')
 		
-		cursor.execute(query_1, (name,))
+		cursor.execute(query_1, (name, schema.schema_id))
 		model = cursor.fetchone()
 		if not model:
 			raise Exception('Failed to create model')
@@ -1011,7 +1012,8 @@ class Database:
 		elif not schema:
 			raise Exception('Schema not found')
 
-		query_2 = sql.SQL(' INSERT INTO  ')
+		query_2 = sql.SQL(' INSERT INTO projectmanagement.projects_models (project_id, model_id) VALUES (%s, %s); ')
+		cursor.execute(query_2, (project.project_id, model.model_id))
 
 		return model 
 
@@ -1117,6 +1119,17 @@ class Database:
 			model_id: either a model object, a database id, or a universally unique identifier
 		'''
 		return self._delete_model(model_ids = model_ids)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def _get_model_training_data(
+		self, 
+		cursor:psycopg.Cursor,
+		surveys: List[int],
+		date_range: Tuple[date] | None,
+		score_range: Tuple[float] | None,
+		):
+		''
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Project Management - Surveys

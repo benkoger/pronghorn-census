@@ -129,38 +129,36 @@ def get_training_set():
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
 
-@modelBp.post('')
+@modelBp.post('/new')
 @login_required
 def create():
 	'''
 
 	'''
-	name = request.args.get('model_name')
-	project_id = request.args.get('project_id', 0)
-	schema_id = request.args.get('schema_id', 0)
-	survey_ids = request.args.getlist('survey_id')
+	data = request.get_json()
 
-	if not name:
+	if not data['name']:
 		abort(400, 'Error creating model! No name provided.')
-	elif not project_id:
+	elif not data['project_id']:
 		abort(400, 'Error creating model! Models must be associated with at least one project.')
-	elif not schema_id:
+	elif not data['schema_id']:
 		abort(400, 'Error creating model! No schema provided.')
 
-	project_id = project_id if isinstance(project_id, int) else UUID(project_id)
-	schema_id = schema_id if isinstance(schema_id, int) else UUID(schema_id)
+	project_id = data['project_id'] if isinstance(data['project_id'], int) else UUID(data['project_id'])
+	schema_id = data['schema_id'] if isinstance(data['schema_id'], int) else UUID(data['schema_id'])
 	survey_ids = [
 		cast(int, survey_id) if isinstance(survey_id, int) else UUID(survey_id)
-		for survey_id in survey_ids
+		for survey_id in data['survey_ids']
 		]
 	try:
 		model = base.create_model(
-			name,
+			data['name'],
 			project_id,
 			schema_id,
 			survey_ids
 		)
-	except:
+	except Exception as e:
+		print(e)
 		abort(500)
 
 	return model.serialize(), 201

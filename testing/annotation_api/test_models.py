@@ -1,0 +1,43 @@
+from annotation_api.app import create_app
+import pytest 
+from annotation_api.app.extensions import base
+
+
+class TestModels:
+    @pytest.fixture
+    def app(self):
+        app = create_app()
+        #Important! The host must be overwritten prior to connection
+        base._config['host'] = 'localhost'
+        base.create_pool()
+        app.config.update({
+            'TESTING': True,
+            'SESSION_COOKIE_SECURE': False,   
+            'SESSION_COOKIE_DOMAIN': None,    
+            'SESSION_COOKIE_HTTPONLY': False, 
+            'SERVER_NAME': "localhost",
+            'LOGIN_DISABLED': True,        
+        })
+        yield app
+
+        base.close_pool()
+    
+    @pytest.fixture
+    def client(self, app): 
+        with app.test_client() as client:
+            yield client
+    
+    @pytest.fixture
+    def runner(self, app):
+        return app.test_cli_runner()
+
+    def test_create_model(self, client):
+        body = {
+            'name' : 'test_model',
+            'project_id' : 1,
+            'schema_id' : 1, 
+            'survey_ids' : [1],
+        }
+        response = client.post('/api/v1/models/new', json=body)
+        print(f"Response: {response}")
+        assert response.status_code == 201

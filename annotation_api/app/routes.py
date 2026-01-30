@@ -3,7 +3,7 @@
 # because I have never done this before
 # Author: Michael B. Lance
 # Created: April 7, 2025
-# Updated: November 11, 2025
+# Updated: January 29, 2025
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -14,8 +14,7 @@ import cv2
 from flask import Blueprint, Response, abort, jsonify, request, session, current_app
 from cropgenerator import auto_crop, create_subcrop
 from cropgenerator.generatorobjects import Prediction, User, ReviewedArea, Annotation
-from app.extensions import login_manager, cache, base 
-from app import pathfinder
+from app.extensions import login_manager, cache, base, s3 
 from database import Database
 from typing import cast
 from flask_login import (
@@ -25,10 +24,7 @@ from flask_login import (
 	logout_user,
 ) 
 
-
 bp = Blueprint('app', __name__)
-
-
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # User session management
@@ -277,7 +273,7 @@ def get_presigned_url():
 	'''
 	data = request.get_json()
 	try: 
-		response = pathfinder.generate_presigned_url(
+		response = s3.generate_presigned_url(
 		ClientMethod='upload_part', 
 		Params = {
 		'Bucket': current_app.config['BUCKET_NAME'],
@@ -305,7 +301,7 @@ def create_multipart_upload():
 
 	data = request.get_json()
 	try: 
-		response = pathfinder.create_multipart_upload(
+		response = s3.create_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			ContentType = 'image/jpeg',
@@ -326,7 +322,7 @@ def complete_upload():
 	'''
 	data = request.get_json()
 	try:
-		response = pathfinder.complete_multipart_upload(
+		response = s3.complete_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			MultipartUpload={
@@ -348,7 +344,7 @@ def abort_upload():
 	'''
 	data = request.get_json()
 	try:
-		response = pathfinder.abort_multipart_upload(
+		response = s3.abort_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			UploadId = data['upload_id'],
@@ -398,7 +394,7 @@ def create_prediction_crops():
 
 	if not img_data:
 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
-		img_data = pathfinder.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
+		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
 
 	image.setImage(img_data)
@@ -452,7 +448,7 @@ def create_reviewed_area_and_annotations():
 
 	if not img_data:
 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
-		img_data = pathfinder.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
+		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
 	image.setImage(img_data)
 
@@ -499,7 +495,7 @@ def create_reviewed_area_and_annotations():
 			print(e)
 			abort(500, e)
 
-		pathfinder.put_object(
+		s3.put_object(
 			Bucket=current_app.config['BUCKET_NAME'],
 			Key=ra_key,
 			Body=io.BytesIO(img_bytes),  #type: ignore
@@ -563,7 +559,7 @@ def create_ra_presigned_get():
 	'''
 	data = request.get_json()
 	try:
-		response = pathfinder.generate_presigned_url(
+		response = s3.generate_presigned_url(
 			'get_object',
 			Params={'Bucket': current_app.config['BUCKET_NAME'],
 					'Key': data['ra_key']

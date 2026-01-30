@@ -19,12 +19,11 @@ def create_app():
 			'supports_credentials': True     
 		}
 	})
-	global pathfinder
-	pathfinder = client(
+	setattr(app, 's3', client(
         's3',
         config=s3_config,
         endpoint_url=os.environ.get('AWS_ENDPOINT_URL_S3')
-    )
+    ) )
 
 	cache.init_app(app, cache_config)
 	login_manager.init_app(app)
@@ -36,5 +35,8 @@ def create_app():
 
 	from app.routes import bp
 	app.register_blueprint(bp)
+
+	from app.routers.models import modelBp
+	app.register_blueprint(modelBp)
 	return app
 
