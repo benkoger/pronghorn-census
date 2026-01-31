@@ -1179,7 +1179,7 @@ class Database:
 					ra.modified,
 					ra.uuid, -- Changed period to comma
 					json_agg(
-						json_build_object( -- Fixed spelling (added underscore)
+						json_build_object( 
 							'annotation_id', a.annotation_id,
 							'label_id', a.label_id,
 							'image_id', a.image_id,
@@ -1197,7 +1197,7 @@ class Database:
 					) AS annotations
 				FROM core.reviewed_area ra
 				INNER JOIN core.annotations_reviewed_area a_ra ON ra.reviewed_area_id = a_ra.reviewed_area_id
-				INNER JOIN core.annotations a ON a.annotation_id = a_ra.annotation_id -- Fixed spelling (annoation_id)
+				INNER JOIN core.annotations a ON a.annotation_id = a_ra.annotation_id
 				WHERE ra.image_id IN (SELECT image_id FROM SelectedImageIds)
 					AND a.label_id =  ANY(%(label_ids)s)
 				GROUP BY ra.reviewed_area_id
