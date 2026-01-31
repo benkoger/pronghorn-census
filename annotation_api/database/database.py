@@ -7,7 +7,7 @@
 from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
 
@@ -1122,14 +1122,111 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+	@connect
 	def _get_model_training_data(
-		self, 
-		cursor:psycopg.Cursor,
-		surveys: List[int],
-		date_range: Tuple[date] | None,
-		score_range: Tuple[float] | None,
+			self, 
+			cursor: psycopg.Cursor[dict],
+			label_ids: List[int],
+			date_range: Tuple[date, date] | None,
+			survey_ids: List[int] | None,
+			herd_unit_ids: List[int] | None
 		):
-		''
+		'''
+		'''
+		cursor.row_factory = dict_row
+
+		params_1 = []
+		placeholders: Dict[str, Union[List[int], date]] = {
+			'label_ids': label_ids
+		}
+
+		if survey_ids is not None:
+			params_1.append(sql.SQL('i.survey_id = ANY(%(survey_ids)s)'))
+			placeholders['survey_ids'] = survey_ids
+
+		if herd_unit_ids is not None:
+			params_1.append(sql.SQL('i.herd_unit_id = ANY(%(herd_unit_ids)s)'))
+			placeholders['herd_unit_ids'] = herd_unit_ids
+
+		if date_range is not None:
+			params_1.append(sql.SQL('i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s'))
+			placeholders['date_range_lower'] = date_range[0]
+			placeholders['date_range_upper'] = date_range[1]
+
+		image_params = sql.SQL(' AND ').join(params_1)
+
+		query = sql.SQL('''
+			WITH SelectedImageIds AS (
+				SELECT DISTINCT i.image_id 
+				FROM core.images i
+				WHERE {image_args}
+			)
+			SELECT json_agg(row_to_json(crops)) 
+			FROM (
+				SELECT
+					ra.reviewed_area_id,
+					ra.image_id,
+					ra.name, 
+					ra.ra_key,
+					ra.area_tx,
+					ra.area_ty,
+					ra.area_bx,
+					ra.area_by,
+					ra.reviewed_area_length_px,
+					ra.reviewed_area_width_px,
+					ra.reviewed_by_user_id,
+					ra.created,
+					ra.modified,
+					ra.uuid, -- Changed period to comma
+					json_agg(
+						json_build_object( -- Fixed spelling (added underscore)
+							'annotation_id', a.annotation_id,
+							'label_id', a.label_id,
+							'image_id', a.image_id,
+							'pred_id', a.pred_id,
+							'herd_unit_id', a.herd_unit_id,
+							'box_tx', a.box_tx,
+							'box_ty', a.box_ty,
+							'box_bx', a.box_bx,
+							'box_by', a.box_by,
+							'created_by_user_id', a.created_by_user_id,
+							'created', a.created,
+							'modified', a.modified, 
+							'uuid', a.uuid -- Removed trailing comma
+						)
+					) AS annotations
+				FROM core.reviewed_area ra
+				INNER JOIN core.annotations_reviewed_area a_ra ON ra.reviewed_area_id = a_ra.reviewed_area_id
+				INNER JOIN core.annotations a ON a.annotation_id = a_ra.annotation_id -- Fixed spelling (annoation_id)
+				WHERE ra.image_id IN (SELECT image_id FROM SelectedImageIds)
+					AND a.label_id =  ANY(%(label_ids)s)
+				GROUP BY ra.reviewed_area_id
+			) AS crops
+		''')
+		
+		try:
+			cursor.execute(query.format(image_args = image_params), placeholders)
+		except Exception as e:
+			print(e)
+		results = cursor.fetchone()
+
+		return results
+
+	def get_model_training_data(
+		self,
+		label_ids: List[int],
+		date_range: Tuple[date, date] | None,
+		survey_ids: List[int] | None,
+		herd_unit_ids: List[int] | None
+	):
+		'''
+		'''
+		return self._get_model_training_data(
+			label_ids,
+			date_range,
+			survey_ids,
+			herd_unit_ids
+		)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Project Management - Surveys

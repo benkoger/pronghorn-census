@@ -1,7 +1,7 @@
 from annotation_api.app import create_app
 import pytest 
 from annotation_api.app.extensions import base
-
+import urllib.parse
 
 class TestModels:
     @pytest.fixture
@@ -41,3 +41,14 @@ class TestModels:
         response = client.post('/api/v1/models/new', json=body)
         print(f"Response: {response}")
         assert response.status_code == 201
+
+    def test_get_model_training(self, client):
+        params = {
+            'survey': 1,
+            'herd_unit': 1,
+            'label': 2, 
+        }
+        query_string= urllib.parse.urlencode(params)
+
+        response = client.get(f'/api/v1/models/training?{query_string}')
+        assert response.status_code == 200

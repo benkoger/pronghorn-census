@@ -1,18 +1,17 @@
 # Endpoints for managing models in the API 
 # Author: Michael B. Lance
 # Created: Janaury 28, 2025
-# Updated: Janaury 29, 2025
+# Updated: Janaury 30, 2025
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from flask import Blueprint, Response, abort, jsonify, request, session, current_app
-from app.extensions import login_manager, cache, base 
-from database import Database
+from flask import Blueprint,  abort, request
+from app.extensions import base 
+from datetime import date, datetime
 from flask_login import (
-	current_user,
 	login_required,
 ) 
-from typing import cast, Union, List
+from typing import cast, List
 from uuid import UUID
 
 modelBp = Blueprint('training', __name__, url_prefix='/api/v1/models')
@@ -117,14 +116,29 @@ def get_training_set():
 	'''
 	'''
 	date_range = request.args.get('date_range', None)
-	score_range = request.args.get('score_range', None)
-	surveys = request.args.getlist('survey')
-	labels = request.args.getlist('labels')
-	herd_units = request.args.getlist('herd_unit')
-	
-	# call db method passing the params. method will handle null parameters 
+	surveys = request.args.getlist('survey', type=int)
+	labels = request.args.getlist('labels', type=int)
+	herd_units = request.args.getlist('herd_unit', type=int)
+	format_pattern = "%m/%d/%Y %H:%M:%S"
 
-	return ''
+	if date_range is not None:
+		date_range = (
+			datetime.strptime(date_range[0], format_pattern), 
+			datetime.strptime(date_range[1], format_pattern)
+		)
+	
+	# call db method passing the params. method will handle null parameters
+	try:
+
+		data = base.get_model_training_data(
+			labels,
+			date_range,
+			surveys,
+			herd_units
+		)
+	except Exception as e:
+		abort(404, 'bro what?')
+	return data, 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
