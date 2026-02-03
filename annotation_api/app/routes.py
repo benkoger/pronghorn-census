@@ -167,22 +167,6 @@ def get_survey_herdunits(survey_id: str):
 	if serialized_herd_units is None:
 		abort(404, 'No Herd Units Found')
 	return jsonify(serialized_herd_units), 201
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Model Crud
-
-# @bp.route('/api/v1/create/model', methods=['POST'])
-# @login_required
-# def create_model():
-# 	'''
-	
-# 	'''
-# 	data = request.get_json()
-# 	try:
-# 		model = base.create_model(data['name'])
-# 	except Exception:
-# 		abort(500)
-# 	return model.serialize(), 201
 	
 @bp.route('/api/v1/request/projects/<string:project_id>/models/all', methods=['GET'])
 @login_required
@@ -276,12 +260,12 @@ def get_presigned_url():
 		response = s3.generate_presigned_url(
 		ClientMethod='upload_part', 
 		Params = {
-		'Bucket': current_app.config['BUCKET_NAME'],
-		'Key': data['image_key'], 
-		'UploadId': data['upload_id'],
-		'PartNumber': data['part_number'],
-		'ContentLength': data['chunk_size'],
-		'ContentMD5' : data['chunk_md5'],
+			'Bucket': current_app.config['BUCKET_NAME'],
+			'Key': data['image_key'], 
+			'UploadId': data['upload_id'],
+			'PartNumber': data['part_number'],
+			'ContentLength': data['chunk_size'],
+			'ContentMD5' : data['chunk_md5'],
 		},
 		ExpiresIn=3600,
 		)

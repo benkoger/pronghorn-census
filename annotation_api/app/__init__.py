@@ -38,5 +38,9 @@ def create_app():
 
 	from app.routers.models import modelBp
 	app.register_blueprint(modelBp)
+
+	from app.routers.images import imageBp
+	app.register_blueprint(imageBp)
+
 	return app
 

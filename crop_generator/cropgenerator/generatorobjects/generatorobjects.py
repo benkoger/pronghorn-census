@@ -129,6 +129,7 @@ class Model(CgOBJ):
 	def serialize(self):
 		return {
 			'model_id': self.model_id,
+			'schema_id': self.schema_id,
 			'name': self.name,
 			'created': self.created,
 			'modified': self.modified,

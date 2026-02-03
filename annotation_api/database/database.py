@@ -1056,35 +1056,55 @@ class Database:
 			model_id: either the models's internal database id or its universally unique identifier
 		'''
 		return self._get_model(model_id = model_id)
-	
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _update_model(self, cursor: psycopg.Cursor[Model], model_id: Model | int | UUID, name: str | None = None) -> bool:
+	def _update_model(self, cursor: psycopg.Cursor[Model], model_id: int | UUID, parameters: dict) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
-		query = sql.SQL(''' UPDATE projectmanagement.models SET name = %s, modified = CURRENT_TIMESTAMP 
-							WHERE {id_field} = %s; ''')
+		cursor.row_factory = class_row(Model)
+		query = sql.SQL(''' UPDATE projectmanagement.models SET {augmented_field}, modified = CURRENT_TIMESTAMP 
+							WHERE {id_field} = %s RETURNING *; ''')
+		kw_augmented_field = sql.SQL(',').join(
+			[
+				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
+				for key, value, in parameters.items() 
+				if key in set(['survey_id', 'survey_date', 'name', 'additional_info'])
+				and value is not None
+			]
+		) 
 		match model_id:
-			case Model():
-				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (model_id.name, model_id.model_id))
 			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (name, model_id))
+				cursor.execute(query.format(
+					augmented_field = kw_augmented_field,
+					id_field = sql.Identifier('model_id')
+				), (model_id,)
+						)
 			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (name, model_id))
+				cursor.execute(query.format(
+					augmented_field = kw_augmented_field,
+					id_field = sql.Identifier('uuid')
+				), (model_id,))
 			case _:
-				raise TypeError('model_id MUST be an integer, UUID or Herd_Unit type, and name must be a string')
-		return True if cursor.rowcount > 0 else False
+				raise TypeError('model_id MUST be an integer, or UUID')
+		
+		model = cursor.fetchone()
+
+		if model:
+			return model 
+		else:
+			raise Exception('failed to update the model')
 	
-	def update_model(self, model_id: Model | int | UUID, name: str | None = None) -> bool:
+	def update_model(self, model_id: int | UUID, parameters: dict) -> Model:
 		''' Augment a model in the database by providing a modified Model object or a valid id and a new name
 		
 		Args:
 			model: either a Model object, a database id, or a universally unique identifier 
 			name: the new name for the model
 		'''
-		return self._update_model(model_id = model_id, name = name)
+		return self._update_model(model_id, parameters)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1395,7 +1415,7 @@ class Database:
 			raise Exception('Could not find image')
 		return image 
 	
-	def getImage(self, image_id: int | UUID) -> Image:
+	def get_image(self, image_id: int | UUID) -> Image:
 		'''
 		
 		'''

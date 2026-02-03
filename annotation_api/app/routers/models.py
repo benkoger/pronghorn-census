@@ -1,7 +1,7 @@
 # Endpoints for managing models in the API 
 # Author: Michael B. Lance
-# Created: Janaury 28, 2025
-# Updated: Janaury 30, 2025
+# Created: Janaury 28, 2026
+# Updated: February 3, 2026
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -14,7 +14,9 @@ from flask_login import (
 from typing import cast, List
 from uuid import UUID
 
-modelBp = Blueprint('training', __name__, url_prefix='/api/v1/models')
+modelBp = Blueprint('models', __name__, url_prefix='/api/v1/models')
+
+#TODO: These endpoints require propper organizational and project checking
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # GET
@@ -35,6 +37,13 @@ def get_by_id(model_id: str):
 	'''
 
 	'''
+	model = base.get_model(UUID(model_id))
+
+	if model is not None:
+		return model.serialize()
+	else:
+		abort(404, f'Model with ID {model_id} was not found!')
+	
 	return ''
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -289,7 +298,18 @@ def update(model_id: str):
 	'''
 
 	'''
-	return ''
+	data = request.get_json()
+	
+	try:
+		model = base.update_model(
+			UUID(model_id),
+			data
+		)
+	except Exception as e:
+		print(f'error: {e}')
+		abort(500)
+
+	return model.serialize(), 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # DELETE

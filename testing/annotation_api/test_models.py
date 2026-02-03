@@ -52,3 +52,11 @@ class TestModels:
 
         response = client.get(f'/api/v1/models/training?{query_string}')
         assert response.status_code == 200
+
+    def test_update_model(self, client):
+        body = {
+            'model_id': 1,
+            'name' : 'testName'
+        }
+        response = client.patch(f'/api/v1/models/f5f4caad-1fd4-46a7-982e-21d396a36d48', json=body)
+        assert response.status_code == 200
