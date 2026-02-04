@@ -894,7 +894,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], herd_unit_id: int | UUID) -> HerdUnit | None:
+	def _get_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], herd_unit_id: int | UUID) -> HerdUnit:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -908,9 +908,13 @@ class Database:
 			case _:
 				raise TypeError('herd_unit_id MUST be an integer or a UUID')
 		herd_unit = cursor.fetchone()
-		return herd_unit if isinstance(herd_unit, HerdUnit) else None
+
+		if not herd_unit:
+			raise Exception('uh oh spaghettios')
+
+		return herd_unit
 	
-	def get_herd_unit(self, herd_unit_id: int | UUID) -> HerdUnit | None:
+	def get_herd_unit(self, herd_unit_id: int | UUID) -> HerdUnit:
 		''' Query the database for a herd unit 
 
 			Args:
@@ -1377,22 +1381,38 @@ class Database:
 	# Core - Images	
 
 	@connect
-	def _create_image(self, cursor: psycopg.Cursor[Image], name: str, herd_unit_id: int | UUID, survey_id: int | UUID, img_key: str, image_length: int, image_width: int) -> Image | None:
+	def _create_image(self, cursor: psycopg.Cursor[Image], parameters: dict) -> Image:
 		'''
 		
 		'''
 		cursor.row_factory = class_row(Image)
-		herd_unit_id = herd_unit_id if isinstance(herd_unit_id, int) else self._get_herd_unit(herd_unit_id).herd_unit_id
-		survey_id = survey_id if isinstance(survey_id, int) else self._get_survey(survey_id).survey_id
-		cursor.execute(sql.SQL(' INSERT INTO core.images (herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px) VALUES (%s, %s, %s, %s, %s, %s) RETURNING *; '), (herd_unit_id, survey_id, name, img_key, image_length, image_width))
-		image = cursor.fetchone()	
-		return image if isinstance(image, Image) else None 
 
-	def create_image(self, name: str, herd_unit_id: int | UUID, survey_id: int | UUID, img_key: str, image_length: int, image_width: int) -> Image | None:
+		query = sql.SQL(''' 
+			INSERT INTO core.images (
+				herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px,
+				area, viewshed_polygon, has_detection, dem_name, bbox_wsen
+			) 
+			VALUES (
+				%(herd_unit_id)s, %(survey_id)s, %(name)s, %(img_key)s, %(image_length_px)s, 
+				%(image_width_px)s, %(area)s, %(viewshed_polygon)s, %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
+			) 
+			RETURNING *; 
+		''')
+		
+		cursor.execute(query, parameters)
+
+		image = cursor.fetchone()
+
+		if not image: 
+			raise Exception('Image creation failed')
+
+		return image
+
+	def create_image(self, parameters: dict) -> Image:
 		'''
 		
 		'''
-		return self._create_image(name = name, herd_unit_id = herd_unit_id, survey_id=survey_id, img_key = img_key, image_length = image_length, image_width = image_width)
+		return self._create_image(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1425,7 +1445,7 @@ class Database:
 
 	#TODO: finish KW arg population
 	@connect 
-	def _update_image(self, cursor: psycopg.Cursor, image_id: Image | int | UUID, name: str | None, img_key: str | None, opened_by_user_id: int | None) -> bool:
+	def _update_image(self, cursor: psycopg.Cursor, image_id: int | UUID, parameters) -> bool:
 		''' Not fully implemented, do
 		
 		'''
@@ -1434,18 +1454,16 @@ class Database:
 		kw_augmented_field = sql.SQL(',').join(
 			[
 				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-				for key, value, in locals().items() 
-				if key in set(['name', 'img_key', 'image_length_px', 'image_width_px', 'herd_unit_id', 'survey_id', 'opened_by_user_id'])
+				for key, value, in parameters.items() 
+				if key in set([
+					'name', 'img_key', 'image_length_px', 'image_width_px', 'herd_unit_id', 'survey_id', 
+					'opened_by_user_id' 'area', 'polygon', 'has_detection', 'dem_name', 'bbox_wsen' 
+					])
 				and value is not None
 			]
 		) 
 
 		match image_id:
-			case Image():
-				cursor.execute(query.format(
-					augmented_field = sql.SQL(f"name = '{image_id.name}', herd_unit_id = '{image_id.herd_unit_id}', image_length_px = '{image_id.image_length_px}', image_width_px = '{image_id.image_width_px}'"), # type: ignore
-					id_field = sql.Identifier('image_id')
-				), (image_id.image_id,))
 			case int():
 				cursor.execute(query.format(
 					augmented_field = kw_augmented_field,
@@ -1457,7 +1475,7 @@ class Database:
 					id_field = sql.Identifier('uuid')
 				), (image_id,))
 			case _:
-				raise TypeError('image_id must be an Image, int, or UUID')
+				raise TypeError('image_id must be an integer, or UUID')
 		return True
 	
 	def update_image(self, image_id: Image | int | UUID, name: str | None=None, img_key: str | None=None, opened_by_user_id: int | None=None) -> bool:

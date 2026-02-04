@@ -208,14 +208,14 @@ def upload_image_to_db():
 	'''
 	'''
 	data = request.get_json()
-	image = base.create_image(data['name'], UUID(data['herd_unit_id']), UUID(data['survey_id']), data['img_key'], data['image_length'], data['image_width'])
+	image = base.create_image(data)
 	if image is None:
 		abort(500)
 	return image.serialize(), 201
 
 # @bp.route('/app/v1/get/image', methods=['GET'])
 # @login_required
-# def getImage():
+# def get_image():
 # 	'''
 	
 # 	'''
@@ -373,7 +373,7 @@ def create_prediction_crops():
 	
 	'''
 	data = request.get_json()
-	image = base.getImage(UUID(data['image_id']))
+	image = base.get_image(UUID(data['image_id']))
 	img_data = cache.get(image.uuid)
 
 	if not img_data:
@@ -386,7 +386,7 @@ def create_prediction_crops():
 	serialized_pred_crops = [] 
 
 	for crop in pred_crops: # Save crop image data into the session cache
-		cache.set(crop.uuid,  crop.getImage(), 3600)
+		cache.set(crop.uuid,  crop.get_image(), 3600)
 		serialized_pred_crops.append(crop.serialize())
 	
 	json_pred_crop_data = jsonify(serialized_pred_crops)
@@ -427,7 +427,7 @@ def create_reviewed_area_and_annotations():
 	'''
 	data = request.get_json()
 	# Request image object from data in request
-	image = base.getImage(UUID(data['image_uuid']))
+	image = base.get_image(UUID(data['image_uuid']))
 	img_data = cache.get(image.uuid)
 
 	if not img_data:

@@ -1,18 +1,18 @@
 # Endpoints for managing images in the API 
 # Author: Michael B. Lance
 # Created: February 3, 2026
-# Updated: February 3, 2026
+# Updated: February 4, 2026
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint,  abort, request, current_app
+from .image_validators import CreateImage
 from app.extensions import base, s3 
 from botocore.exceptions import ClientError
-from datetime import date, datetime
+from flask_pydantic import validate
 from flask_login import (
 	login_required,
 ) 
-from typing import cast, List
 from uuid import UUID
 
 imageBp = Blueprint('images', __name__, url_prefix='/api/v1/images')
@@ -35,10 +35,16 @@ def get_all():
 
 @imageBp.get('/<string:image_id>')
 @login_required
-def get_by_id(image_id: str):
-	'''
-
-	'''
+def get_by_id(body: CreateImage, image_id: str):
+	"""
+    Test Endpoint
+    ---
+    responses:
+      200:
+        description: A valid response  # Must be indented under 200
+      404:
+        description: Not found
+    """
 	image = base.get_image(UUID(image_id))
 
 	if image is not None:
@@ -52,6 +58,22 @@ def get_by_id(image_id: str):
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #POST
+
+@imageBp.post('')
+@validate()
+@login_required
+def new(body):
+    '''
+
+    '''
+    
+    data = request.get_json()
+
+
+
+    return ''
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @imageBp.post('/presigned_url')
 @login_required

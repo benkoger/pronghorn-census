@@ -38,7 +38,7 @@ class TestModels:
             'schema_id' : 1, 
             'survey_ids' : [1],
         }
-        response = client.post('/api/v1/models/new', json=body)
+        response = client.post('/api/v1/models', json=body)
         print(f"Response: {response}")
         assert response.status_code == 201
 
