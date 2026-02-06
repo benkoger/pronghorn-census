@@ -4,7 +4,7 @@
 import { defineComponent } from "vue";
 import { ref } from "vue";
 import { HerdUnit, Project, Survey, Model, Schema } from "@/types/generatorobjects";
-import { abortMultipartUpload, createImage, createMultiPartUpload, getImagePresignedPostUrl, completeMultiPartUpload } from "@/modules/apiV1Methods";
+import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/apiV1Methods";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { mapState } from "pinia";
 import { Md5 } from "ts-md5";
@@ -152,7 +152,7 @@ export default defineComponent({
 							);
 
 							// Request pre-signed url for chuck
-							const presigned_url = await getImagePresignedPostUrl(
+							const presigned_url = await get_imagePresignedPostUrl(
 								upload_id,
 								partNumber,
 								image_key,

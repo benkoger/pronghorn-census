@@ -62,16 +62,17 @@ def get_by_id(body: CreateImage, image_id: str):
 @imageBp.post('')
 @validate()
 @login_required
-def new(body):
+def create(body: CreateImage):
     '''
 
     '''
-    
-    data = request.get_json()
+    try:
+        image = base.create_image(body.model_dump())
+    except Exception as e:
+        print(e)
+        abort(500)
 
-
-
-    return ''
+    return image.serialize(), 201
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

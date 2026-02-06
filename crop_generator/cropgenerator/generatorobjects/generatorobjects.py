@@ -296,7 +296,7 @@ class Image(CgOBJ):
 			self, image_id: int, herd_unit_id: int, survey_id: int, name: str, img_key: str,
 			in_training: bool, crops_generated: int, opened_by_user_id: int,
 			created: datetime, modified: datetime, image_length_px: int, image_width_px: int,
-			area: float, polygon: List[List[float]], has_detection: bool, dem_name: str, 
+			area: float, viewshed_polygon: List[List[float]], has_detection: bool, dem_name: str, 
 			bbox_wsen: List[int], uuid: UUID
 		):
 		self.image_id = image_id
@@ -313,14 +313,14 @@ class Image(CgOBJ):
 		self.image_width_px = image_width_px
 		self.area = area
 		#TODO: Change to use shapely.polygon class
-		self.polygon = polygon
+		self.viewshed_polygon = viewshed_polygon
 		self.has_detections = has_detection
 		self.dem_name = dem_name 
 		self.bbox_wsen = bbox_wsen
 		self.uuid = uuid
 		self.image = None
 
-	def setImage(self, imageData: np.ndarray):
+	def set_image(self, imageData: np.ndarray):
 		if isinstance(imageData, bytes):
 			try:
 				pilImage = PillowImage.open(io.BytesIO(imageData))
@@ -335,7 +335,7 @@ class Image(CgOBJ):
 			print(f"Unsupported type: {type(imageData)}")
 			self.image = None
 
-	def getImage(self) -> Optional[np.ndarray]:
+	def get_image(self) -> Optional[np.ndarray]:
 		if self.image is not None:
 			return self.image
 
@@ -344,7 +344,7 @@ class Image(CgOBJ):
 
 	def serve(self, img_format: str):
 		if self.image is not None:
-			_, self.img_encoded = cv2.imencode(img_format, self.getImage(), [cv2.IMWRITE_JPEG_QUALITY, 100]) #type: ignore
+			_, self.img_encoded = cv2.imencode(img_format, self.get_image(), [cv2.IMWRITE_JPEG_QUALITY, 100]) #type: ignore
 		else:
 			raise Exception(f'{self.name} has no image data')
 		return self.img_encoded.tobytes()

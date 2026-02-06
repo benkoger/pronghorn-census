@@ -384,7 +384,7 @@ export async function createMultiPartUpload(image_key: string): Promise<string |
 	}
 }
 
-export async function getImagePresignedPostUrl(upload_id: string, part_number: number, image_key: string, chunk_size: number, chunk_md5: string): Promise<string | undefined> {
+export async function get_imagePresignedPostUrl(upload_id: string, part_number: number, image_key: string, chunk_size: number, chunk_md5: string): Promise<string | undefined> {
 	try {
 		const response = await fetch(`${api_url}/create/image/presigned-put-url`, {
 			method: 'POST',

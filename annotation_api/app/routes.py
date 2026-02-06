@@ -200,26 +200,6 @@ def get_project_surveys(project_id: str):
 	return jsonify(serialized_surveys), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
-# Image Crud
-
-@bp.route('/api/v1/create/image', methods=['POST'])
-@login_required
-def upload_image_to_db():
-	'''
-	'''
-	data = request.get_json()
-	image = base.create_image(data)
-	if image is None:
-		abort(500)
-	return image.serialize(), 201
-
-# @bp.route('/app/v1/get/image', methods=['GET'])
-# @login_required
-# def get_image():
-# 	'''
-	
-# 	'''
-#---------------------------------------------------------------------------------------------------------------------------#
 # Prediction Crud
 
 @bp.route('/api/v1/create/prediction', methods=['POST'])
@@ -381,7 +361,7 @@ def create_prediction_crops():
 		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
 
-	image.setImage(img_data)
+	image.set_image(img_data)
 	pred_crops = create_subcrop(image, data['predictions'])
 	serialized_pred_crops = [] 
 
@@ -434,7 +414,7 @@ def create_reviewed_area_and_annotations():
 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
 		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
-	image.setImage(img_data)
+	image.set_image(img_data)
 
 	# get label - id for schema
 	label_ids = { lbl['label'] : lbl['label_id'] for lbl in data['labels'] }
@@ -533,7 +513,7 @@ def get_ra_batch():
 
 	# set image open 
 	user_id = cast(User, current_user).user_id
-	base.update_image(ra.image_id, opened_by_user_id=user_id)
+	#base.update_image(ra.image_id, {'opened_by_user_id':0})
 	return ra.serialize(), 201
 
 @bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
@@ -616,7 +596,7 @@ def approve_annotations():
 	res_1 = base.update_reviewed_area(reviewed_area['reviewed_area_id'], reviewed_by_user_id = cast(User, current_user).user_id)
 
 	# set image closed
-	res_2 = base.update_image(reviewed_area['image_id'], opened_by_user_id=0)
+	res_2 = base.update_image(reviewed_area['image_id'], {'opened_by_user_id':0})
 
 	if res_1 == False or res_2 == False:
 		abort(500, 'failed to set image crop reviewed and image closed')

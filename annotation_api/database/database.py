@@ -988,26 +988,31 @@ class Database:
 	# Project Management - Models
 	
 	@connect
-	def _create_model(
-		self, 
-		cursor: psycopg.Cursor[Model], 
-		name: str,
-		project_id: int | UUID,
-		schema_id: int | UUID,
-		#TODO: update this parameter to support UUIDs
-		survey_ids: List[int] # UUIDs not supported for now
-		) -> Model:
+	def _create_model(self, cursor: psycopg.Cursor[Model], parameters: dict) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
 		cursor.row_factory=class_row(Model)
 
-		project = self._get_project(project_id)
-		schema = self._get_schema(schema_id)
+		project = self.get_project(parameters['project_id'])
+		schema = self.get_schema(parameters['schema_id'])
 
-		query_1 = sql.SQL(' INSERT into projectmanagement.models (name, schema_id) VALUES (%s, %s) RETURNING *; ')
+		survey_ids = [
+			cast(int, survey_id) if isinstance(survey_id, int) else UUID(survey_id)
+			for survey_id in parameters['survey_ids']
+		]
+
+		query_1 = sql.SQL(''' 
+			INSERT into projectmanagement.models (
+				name, schema_id
+			)
+			VALUES (
+				%(name)s, %(schema_id)s
+			)
+			RETURNING *; 
+		''')
 		
-		cursor.execute(query_1, (name, schema.schema_id))
+		cursor.execute(query_1, parameters)
 		model = cursor.fetchone()
 		if not model:
 			raise Exception('Failed to create model')
@@ -1016,23 +1021,37 @@ class Database:
 		elif not schema:
 			raise Exception('Schema not found')
 
-		query_2 = sql.SQL(' INSERT INTO projectmanagement.projects_models (project_id, model_id) VALUES (%s, %s); ')
+		query_2 = sql.SQL(''' 
+			INSERT INTO projectmanagement.projects_models (
+				project_id, model_id
+			) 
+			VALUES (
+				%s, %s
+			); 
+		''')
+
 		cursor.execute(query_2, (project.project_id, model.model_id))
+
+		query_3 = sql.SQL('''
+			INSERT INTO projectmanagement.surveys_models (
+				survey_id, model_id
+			)
+			VALUES (
+				%s, %s	
+			)
+		''')
+
+		cursor.executemany(query_3, [(survey_id, model.model_id) for survey_id in survey_ids])
 
 		return model 
 
-	def create_model(self, 
-		name: str,
-		project_id: int | UUID,
-		schema_id: int | UUID,
-		survey_ids: List[Union[int, UUID]]
-	) -> Model:
+	def create_model(self, parameters: dict) -> Model:
 		''' Insert a new model object into the database
 
 		Args:
 			name: the model name 
 		'''
-		return self._create_model(name, project_id, schema_id, survey_ids)
+		return self._create_model(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1462,7 +1481,7 @@ class Database:
 				and value is not None
 			]
 		) 
-
+		print(kw_augmented_field)
 		match image_id:
 			case int():
 				cursor.execute(query.format(
@@ -1478,11 +1497,11 @@ class Database:
 				raise TypeError('image_id must be an integer, or UUID')
 		return True
 	
-	def update_image(self, image_id: Image | int | UUID, name: str | None=None, img_key: str | None=None, opened_by_user_id: int | None=None) -> bool:
+	def update_image(self, image_id: int | UUID, parameters: dict) -> bool:
 		'''
 		
 		'''
-		return self._update_image(image_id = image_id, name=name, img_key=img_key, opened_by_user_id=opened_by_user_id)
+		return self._update_image(image_id, parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Predictions

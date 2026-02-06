@@ -38,3 +38,16 @@ class TestImages:
         response = client.post('/api/v1/images/presigned_url', json=body)
 
         assert response.status_code == 201
+
+    def test_create_image(self, client):
+        body = {
+            'name': 'cool_pronghorn.jpg',
+            'herd_unit_id': 1,
+            'survey_id': 1,
+            'img_key': 's3://image/something',
+            'image_length_px': 67,
+            'image_width_px': 67
+        }
+        response = client.post('/api/v1/images', json=body)
+
+        assert response.status_code == 201

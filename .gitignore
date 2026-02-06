@@ -1,7 +1,3 @@
-/annotations/
-models/
-/notebooks/environment/checkpoints/
-/notebooks/environment/assets/
 .env
 .env[]Zone.Identifier
 .directory

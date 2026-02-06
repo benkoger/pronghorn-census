@@ -7,6 +7,8 @@
 
 from flask import Blueprint,  abort, request
 from app.extensions import base 
+from flask_pydantic import validate
+from .model_validators import CreateModel
 from datetime import date, datetime
 from flask_login import (
 	login_required,
@@ -154,32 +156,13 @@ def get_training_set():
 
 @modelBp.post('')
 @login_required
-def create():
+@validate()
+def create(body: CreateModel):
 	'''
 
 	'''
-	data = request.get_json()
-
-	if not data['name']:
-		abort(400, 'Error creating model! No name provided.')
-	elif not data['project_id']:
-		abort(400, 'Error creating model! Models must be associated with at least one project.')
-	elif not data['schema_id']:
-		abort(400, 'Error creating model! No schema provided.')
-
-	project_id = data['project_id'] if isinstance(data['project_id'], int) else UUID(data['project_id'])
-	schema_id = data['schema_id'] if isinstance(data['schema_id'], int) else UUID(data['schema_id'])
-	survey_ids = [
-		cast(int, survey_id) if isinstance(survey_id, int) else UUID(survey_id)
-		for survey_id in data['survey_ids']
-		]
 	try:
-		model = base.create_model(
-			data['name'],
-			project_id,
-			schema_id,
-			survey_ids
-		)
+		model = base.create_model(body.model_dump())
 	except Exception as e:
 		print(e)
 		abort(500)

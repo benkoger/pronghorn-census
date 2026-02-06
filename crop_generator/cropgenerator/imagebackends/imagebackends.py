@@ -61,7 +61,7 @@ class MatplotBackend(ImageBackend):
                 continue 
 
     def evaluate_crop(crops: list[PredictionCrop], class_name, drawBox:bool=False):
-        img = image.getImage()
+        img = image.get_image()
         scale_factor = 2
         crop_size = 2
         max_cols = 6
