@@ -328,18 +328,17 @@ export async function getProjectSurveys(project_id: string | undefined): Promise
 //---------------------------------------------------------------------------------------------------------------------------//
 // Image Crud
 
-export async function createImage(project_id: string | undefined, survey_id: string | undefined,
+export async function createImage(survey_id: string | undefined,
 	herd_unit_id: string | undefined, name: string, img_key: string, image_length: number, image_width: number
 ): Promise<Image | undefined> {
 	try {
-		const response = await fetch(`${api_url}/create/image`, {
+		const response = await fetch(`${api_url}/images`, {
 			method: 'POST',
 			credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				'project_id': project_id,
 				'survey_id': survey_id,
 				'herd_unit_id': herd_unit_id,
 				'img_key': img_key,

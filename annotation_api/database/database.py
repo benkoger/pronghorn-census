@@ -1462,7 +1462,6 @@ class Database:
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	#TODO: finish KW arg population
 	@connect 
 	def _update_image(self, cursor: psycopg.Cursor, image_id: int | UUID, parameters) -> bool:
 		''' Not fully implemented, do
@@ -1476,12 +1475,12 @@ class Database:
 				for key, value, in parameters.items() 
 				if key in set([
 					'name', 'img_key', 'image_length_px', 'image_width_px', 'herd_unit_id', 'survey_id', 
-					'opened_by_user_id' 'area', 'polygon', 'has_detection', 'dem_name', 'bbox_wsen' 
+					'opened_by_user_id', 'area', 'polygon', 'has_detection', 'dem_name', 'bbox_wsen' 
 					])
 				and value is not None
 			]
 		) 
-		print(kw_augmented_field)
+		print(kw_augmented_field.as_string(cursor))
 		match image_id:
 			case int():
 				cursor.execute(query.format(

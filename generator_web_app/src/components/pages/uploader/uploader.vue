@@ -107,7 +107,6 @@ export default defineComponent({
 
 					// Create Image object in database
 					const image = await createImage(
-						project_id,
 						survey_id,
 						herd_unit_id,
 						file.name,

@@ -513,7 +513,8 @@ def get_ra_batch():
 
 	# set image open 
 	user_id = cast(User, current_user).user_id
-	#base.update_image(ra.image_id, {'opened_by_user_id':0})
+
+	base.update_image(ra.image_id, {'opened_by_user_id':user_id})
 	return ra.serialize(), 201
 
 @bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
