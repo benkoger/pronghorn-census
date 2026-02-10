@@ -35,8 +35,8 @@ def get_all():
 
 @imageBp.get('/<string:image_id>')
 @login_required
-def get_by_id(body: CreateImage, image_id: str):
-	"""
+def get_by_id(image_id: str):
+	'''
     Test Endpoint
     ---
     responses:
@@ -44,7 +44,7 @@ def get_by_id(body: CreateImage, image_id: str):
         description: A valid response  # Must be indented under 200
       404:
         description: Not found
-    """
+    '''
 	image = base.get_image(UUID(image_id))
 
 	if image is not None:
@@ -55,6 +55,19 @@ def get_by_id(body: CreateImage, image_id: str):
 	return ''
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.get('/<string:image_id>/crops')
+@login_required
+def get_image_crops(image_id: str):
+    '''
+    
+    '''
+    crops = base.get_image_crops(UUID(image_id))
+
+    if len(crops) == 0:
+        abort(404, 'No crops found')
+
+    return [crop.serialize() for crop in crops]
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #POST
@@ -76,21 +89,20 @@ def create(body: CreateImage):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.post('/presigned_url')
+@imageBp.post('/<string:image_id>/presigned_url')
 @login_required
-def create_image_presigned_get():
+def create_image_presigned_get(image_id: str):
     '''
     '''
     data = request.get_json()
-
-    print(data['ra_key'])
+    image = base.get_image(UUID(image_id))
 
     try:
         response = s3.generate_presigned_url(
             'get_object',
             Params = {
                 'Bucket': current_app.config['BUCKET_NAME'],
-                'Key': data['ra_key']
+                'Key': image.img_key
             },
             ExpiresIn = data['expires_in']
         )
@@ -106,3 +118,19 @@ def create_image_presigned_get():
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #DELETE
+
+@imageBp.delete('/<string:image_id>')
+@login_required
+def delete_image(image_id: str):
+    '''
+    
+    '''
+    try:
+        res = base.delete_image(UUID(image_id))
+    except:
+        abort(500)
+
+    if res:
+        return '', 204
+    else:
+        abort(404, 'Could not find the image to delete')

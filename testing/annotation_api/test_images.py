@@ -32,16 +32,18 @@ class TestImages:
 
     def test_create_presigned_get(self, client):
         body = {
-            'ra_key': "images/survey/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd_unit/4317a307-9595-4116-be11-c7584561dd8d/image/pr527_by2023_survey1_flight1_00001_20240627_115303.JPG",
             'expires_in': 3600
         }
-        response = client.post('/api/v1/images/presigned_url', json=body)
+        response = client.post(
+            '/api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/presigned_url', 
+            json=body
+            )
 
         assert response.status_code == 201
 
     def test_create_image(self, client):
         body = {
-            'name': 'cool_pronghorn.jpg',
+            'name': 'cool_pronghorn69.jpg',
             'herd_unit_id': 1,
             'survey_id': 1,
             'img_key': 's3://image/something',
@@ -51,3 +53,8 @@ class TestImages:
         response = client.post('/api/v1/images', json=body)
 
         assert response.status_code == 201
+
+    def test_get_image_crops(self, client):
+        response = client.get('/api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/crops')
+
+        assert response.status_code == 200

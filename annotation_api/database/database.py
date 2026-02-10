@@ -7,7 +7,7 @@
 from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Reversible, Tuple, Union, cast
 from uuid import UUID
 import uuid
 
@@ -1463,8 +1463,34 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
+	def _get_image_crops(self, cursor: psycopg.Cursor[ReviewedArea], image_id: int | UUID) -> List[ReviewedArea]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(ReviewedArea)
+		query = sql.SQL(''' SELECT * FROM core.reviewed_area WHERE image_id = %s; ''')
+
+		match image_id: 
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute(query, (db_id,))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID')
+		
+		return cursor.fetchall()
+
+	def get_image_crops(self, image_id: int | UUID) -> List[ReviewedArea]:
+		'''
+		'''
+		return self._get_image_crops(image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
 	def _update_image(self, cursor: psycopg.Cursor, image_id: int | UUID, parameters) -> bool:
-		''' Not fully implemented, do
+		'''
 		
 		'''
 		query = sql.SQL(''' UPDATE core.images SET {augmented_field}, modified = CURRENT_TIMESTAMP
@@ -1501,6 +1527,30 @@ class Database:
 		
 		'''
 		return self._update_image(image_id, parameters)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _delete_image(self, cursor: psycopg.Cursor, image_id: int | UUID) -> bool:
+		'''
+
+		'''
+		query = sql.SQL(''' DELETE FROM core.images WHERE {id_field} = %s; ''')
+		match image_id:
+			case int():
+				cursor.execute(query.format(id_field = sql.Identifier('image_id')), (image_id,))
+			case UUID():
+				cursor.execute(query.format(id))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID')
+
+		return True if cursor.rowcount > 0 else False
+
+	def delete_image(self, image_id: int | UUID) -> bool:
+		'''
+		
+		'''
+		return self._delete_image(image_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Predictions
