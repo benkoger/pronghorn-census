@@ -1468,7 +1468,7 @@ class Database:
 
 		'''
 		cursor.row_factory = class_row(ReviewedArea)
-		query = sql.SQL(''' SELECT * FROM core.reviewed_area WHERE image_id = %s; ''')
+		query = sql.SQL(' SELECT * FROM core.reviewed_area WHERE image_id = %s; ')
 
 		match image_id: 
 			case int():
@@ -1477,7 +1477,7 @@ class Database:
 				db_id = self.get_image(image_id).image_id
 				cursor.execute(query, (db_id,))
 			case _:
-				raise TypeError('image_id must be an integer, or UUID')
+				raise TypeError('image_id must be an integer, or UUID!')
 		
 		return cursor.fetchall()
 
@@ -1488,13 +1488,65 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+	@connect
+	def _get_image_predictions(self, cursor: psycopg.Cursor[Prediction], image_id: int | UUID) -> List[Prediction]:
+		'''
+		'''
+		cursor.row_factory = class_row(Prediction)
+		query = sql.SQL(' SELECT * FROM core.predictions WHERE image_id = %s; ')
+
+		match image_id:
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute(query, (db_id,))
+			case _:
+				raise TypeErorr('image_id must be an integer, or UUID!')
+
+		return cursor.fetchall()
+
+	def get_image_predictions(self, image_id: int | UUID) -> List[Prediction]:
+		'''
+		'''
+		return self._get_image_predictions(image_id = image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_image_annotations(self, cursor: psycopg.Cursor[Annotation], image_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		cursor.row_factory = class_row(Annotation)
+		query = sql.SQL(' SELECT * FROM core.annotations WHERE image_id = %s; ')
+
+		match image_id:
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute((query), (db_id,))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID!')
+		
+		return cursor.fetchall()
+
+	def get_image_annotations(self, image_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		return self._get_image_annotations(image_id = image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
 	@connect 
-	def _update_image(self, cursor: psycopg.Cursor, image_id: int | UUID, parameters) -> bool:
+	def _update_image(self, cursor: psycopg.Cursor[Image], image_id: int | UUID, parameters) -> Image:
 		'''
 		
 		'''
+		cursor.row_factory = class_row(Image)
 		query = sql.SQL(''' UPDATE core.images SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; ''')
+							WHERE {id_field} = %s
+							RETURNING *; ''')
 		kw_augmented_field = sql.SQL(',').join(
 			[
 				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
@@ -1506,7 +1558,6 @@ class Database:
 				and value is not None
 			]
 		) 
-		print(kw_augmented_field.as_string(cursor))
 		match image_id:
 			case int():
 				cursor.execute(query.format(
@@ -1520,9 +1571,14 @@ class Database:
 				), (image_id,))
 			case _:
 				raise TypeError('image_id must be an integer, or UUID')
-		return True
+		image = cursor.fetchone()
+
+		if image is None:
+			raise Exception('Failed to update image!')
+
+		return image
 	
-	def update_image(self, image_id: int | UUID, parameters: dict) -> bool:
+	def update_image(self, image_id: int | UUID, parameters: dict) -> Image:
 		'''
 		
 		'''
@@ -1540,7 +1596,7 @@ class Database:
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('image_id')), (image_id,))
 			case UUID():
-				cursor.execute(query.format(id))
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (image_id,))
 			case _:
 				raise TypeError('image_id must be an integer, or UUID')
 
@@ -1550,7 +1606,7 @@ class Database:
 		'''
 		
 		'''
-		return self._delete_image(image_id)
+		return self._delete_image(image_id=image_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Predictions
