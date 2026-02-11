@@ -40,12 +40,16 @@ def get_by_id(image_id: str):
     Request an image object from the database using its UUID
     ---
     parameters:
-      - image_id: string 
+        - name: image_id
+          in: path
+          type: string
+          required: true
+
     responses:
-      200:
-        description: A valid response  # Must be indented under 200
-      404:
-        description: Not found
+        200:
+            description: The requested image was found
+        404:
+            description: Not found
     '''
 	image = base.get_image(UUID(image_id))
 
@@ -149,7 +153,7 @@ def create_presigned_get(image_id: str):
 
 @imageBp.patch('/<string:image_id>')
 @login_required
-def update(image_id: str):
+def update(image_id: str, body:UpdateImage):
     '''
 
     '''
@@ -166,7 +170,7 @@ def update(image_id: str):
 
 @imageBp.delete('/<string:image_id>')
 @login_required
-def delete_image(image_id: str, body:UpdateImage):
+def delete_image(image_id: str):
     '''
     
     '''
