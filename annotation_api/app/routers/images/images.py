@@ -152,8 +152,9 @@ def create_presigned_get(image_id: str):
 #PATCH
 
 @imageBp.patch('/<string:image_id>')
+@validate()
 @login_required
-def update(image_id: str, body:UpdateImage):
+def update(body: UpdateImage, image_id: str):
     '''
 
     '''
