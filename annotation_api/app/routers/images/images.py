@@ -6,7 +6,7 @@
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint,  abort, request, current_app
-from .image_validators import CreateImage
+from .image_validators import CreateImage, UpdateImage
 from app.extensions import base, s3 
 from botocore.exceptions import ClientError
 from flask_pydantic import validate
@@ -35,16 +35,22 @@ def get_all():
 
 @imageBp.get('/<string:image_id>')
 @login_required
-def get_by_id(body: CreateImage, image_id: str):
-	"""
-    Test Endpoint
+def get_by_id(image_id: str):
+	'''
+    Request an image object from the database using its UUID
     ---
+    parameters:
+        - name: image_id
+          in: path
+          type: string
+          required: true
+
     responses:
-      200:
-        description: A valid response  # Must be indented under 200
-      404:
-        description: Not found
-    """
+        200:
+            description: The requested image was found
+        404:
+            description: Not found
+    '''
 	image = base.get_image(UUID(image_id))
 
 	if image is not None:
@@ -55,6 +61,48 @@ def get_by_id(body: CreateImage, image_id: str):
 	return ''
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.get('/<string:image_id>/crops')
+@login_required
+def get_crops(image_id: str):
+    '''
+    
+    '''
+    crops = base.get_image_crops(UUID(image_id))
+
+    if len(crops) == 0:
+        abort(404, 'No crops found')
+
+    return [crop.serialize() for crop in crops], 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.get('/<string:image_id>/predictions')
+@login_required
+def get_predictions(image_id: str):
+    '''
+
+    '''
+    predictions = base.get_image_predictions(UUID(image_id))
+
+    if len(predictions) == 0:
+        abort(404, 'No predictions found')
+
+    return [pred.serialize() for pred in predictions], 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.get('/<string:image_id>/annotations')
+@login_required
+def get_annotations(image_id: str):
+    '''
+    '''
+    annotations = base.get_image_annotations(UUID(image_id))
+
+    if len(annotations) == 0:
+        abort(404, 'No annotations found')
+    
+    return [annot.serialize() for annot in annotations], 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #POST
@@ -76,21 +124,20 @@ def create(body: CreateImage):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.post('/presigned_url')
+@imageBp.post('/<string:image_id>/presigned_url')
 @login_required
-def create_image_presigned_get():
+def create_presigned_get(image_id: str):
     '''
     '''
     data = request.get_json()
-
-    print(data['ra_key'])
+    image = base.get_image(UUID(image_id))
 
     try:
         response = s3.generate_presigned_url(
             'get_object',
             Params = {
                 'Bucket': current_app.config['BUCKET_NAME'],
-                'Key': data['ra_key']
+                'Key': image.img_key
             },
             ExpiresIn = data['expires_in']
         )
@@ -104,5 +151,35 @@ def create_image_presigned_get():
 #---------------------------------------------------------------------------------------------------------------------------#
 #PATCH
 
+@imageBp.patch('/<string:image_id>')
+@validate()
+@login_required
+def update(body: UpdateImage, image_id: str):
+    '''
+
+    '''
+    data = request.get_json()
+    try: 
+        image = base.update_image(UUID(image_id), data)
+    except:
+        abort(500)
+
+    return image.serialize(), 200
+
 #---------------------------------------------------------------------------------------------------------------------------#
 #DELETE
+
+@imageBp.delete('/<string:image_id>')
+@login_required
+def delete_image(image_id: str):
+    '''
+    
+    '''
+    try:
+        res = base.delete_image(UUID(image_id))
+    except:
+        abort(500)
+    if res:
+        return '', 204
+    else:
+        abort(404, 'Could not find the image to delete')

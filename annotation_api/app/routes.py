@@ -40,6 +40,8 @@ def unathorizated_callback():
 
 @bp.route('/api/v1/authenticate', methods=['POST'])
 def authenticate():
+	'''
+	'''
 	req_data = request.get_json()
 	if not req_data or 'external-id' not in req_data:
 		abort(400, 'malformed request')
