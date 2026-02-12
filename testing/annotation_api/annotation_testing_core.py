@@ -5,7 +5,7 @@ from annotation_api.app import create_app
 
 class APITester:
     @pytest.fixture
-    def app(self):
+    def app(self): 
         app = create_app()
         #Important! The host must be overwritten prior to connection
         base._config['host'] = 'localhost'

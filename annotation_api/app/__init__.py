@@ -48,5 +48,8 @@ def create_app():
 	from app.routers.images import imageBp
 	app.register_blueprint(imageBp)
 
+	from app.routers.surveys import surveyBp
+	app.register_blueprint(surveyBp)
+
 	return app
 
