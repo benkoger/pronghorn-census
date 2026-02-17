@@ -1497,6 +1497,31 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
+	def _get_survey_herd_units(self, cursor: psycopg.Cursor[HerdUnit], survey_id: int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		cursor.row_factory = class_row(HerdUnit)
+		survey = self._get_survey(survey_id)
+		query = sql.SQL('''
+			SELECT H.* FROM projectmanagement.herd_units as H JOIN
+			projectmanagement.surveys_herd_units AS SHU ON SHU.herd_unit_id = H.herd_unit_id
+			WHERE SHU.survey_id = %s; ''')
+		cursor.execute(query, (survey.survey_id,))
+		herd_units = cursor.fetchall()
+		if herd_units is None:
+			raise Exception('No herd units found')
+		return herd_units
+
+	def get_survey_herd_units(self, survey_id: int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		return self._get_cropping_herd_units(survey_id = survey_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
 	def _update_survey(self, cursor: psycopg.Cursor[Survey], survey_id: int | UUID, parameters: dict) -> Survey:
 		''' Internal helper function, do not call directly
 		
@@ -2677,7 +2702,6 @@ class Database:
 		survey = self._get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
 		herd_unit = self._get_herd_unit(herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
 		schema = self._get_schema(schema_id) if not isinstance(schema_id, Schema) else schema_id
-		y = class_row(Model)
 		cursor.row_factory = class_row(Model)
 		query = sql.SQL(''' SELECT models.model_id, name, created, modified, uuid, schema_id FROM projectmanagement.models AS models
 							JOIN projectmanagement.surveys_models AS surveys_models ON surveys_models.model_id = models.model_id

@@ -48,15 +48,30 @@ def get_by_id(survey_id: str):
 
 @surveyBp.get('/<string:survey_id>/annotations')
 @login_required
-def get_survey_annotations(survey_id: str):
+def get_annotations(survey_id: str):
 	'''
 	'''
 	annotations = base.get_survey_annotations(UUID(survey_id))
 
 	if len(annotations) == 0:
-		abort(404, 'no annotaitons found')
+		abort(404, f'no annotaitons found for survey {survey_id}')
 	
 	return [annotation.serialize() for annotation in annotations], 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@surveyBp.get('/<string:survey_id>/herd-units')
+@login_required 
+def get_herd_units(survey_id: str):
+	'''
+	'''
+	
+	herd_units = base.get_survey_herd_units(UUID(survey_id))
+
+	if len(herd_units) == 0:
+		abort(404, f'no herd units found for survey {survey_id}')
+
+	return [herd_unit.serialize() for herd_unit in herd_units]
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

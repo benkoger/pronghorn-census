@@ -28,6 +28,11 @@ class TestSurveys(APITester):
         
         assert resposne.status_code == 200
 
+    def test_get_survey_herd_units(self, auth_client):
+        resposne = auth_client.get('/api/v1/surveys/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd-units')
+        
+        assert resposne.status_code == 200
+
     def test_get_survey_annotated_images(self, auth_client):
         params = {
             'herd_unit': 1,
