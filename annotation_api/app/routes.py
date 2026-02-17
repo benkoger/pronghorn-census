@@ -151,7 +151,7 @@ def get_schema_labels(project_id: str, schema_id: str):
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Herd Unit Crud
-
+# TODO: move this endpoint to project router 
 @bp.route('/api/v1/request/projects/<string:project_id>/herd_units/all', methods=['GET'])
 @login_required
 def get_project_herdunits(project_id: str):
@@ -161,6 +161,7 @@ def get_project_herdunits(project_id: str):
 		abort(404, 'No Herd Units Found')
 	return jsonify(serialized_herd_units), 201
 
+# TODO: remove this enpdoint, replaced by /surveys/id/herd_unit in survey router
 @bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/all', methods=['GET'])
 @login_required
 def get_survey_herdunits(survey_id: str):
@@ -170,6 +171,7 @@ def get_survey_herdunits(survey_id: str):
 		abort(404, 'No Herd Units Found')
 	return jsonify(serialized_herd_units), 201
 	
+# TODO: move this endpoint to projects router
 @bp.route('/api/v1/request/projects/<string:project_id>/models/all', methods=['GET'])
 @login_required
 def get_project_models(project_id: str):
@@ -180,6 +182,7 @@ def get_project_models(project_id: str):
 	serialized_models = [model.serialize() for model in models]
 	return jsonify(serialized_models), 201
 
+# TODO: Move this endpoint to models router
 @bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/<string:herd_unit_id>/schemas/<string:schema_id>/models/all', methods=['GET'])
 @login_required
 def get_cropper_models(survey_id: str, herd_unit_id: str, schema_id: str):
@@ -192,6 +195,7 @@ def get_cropper_models(survey_id: str, herd_unit_id: str, schema_id: str):
 #---------------------------------------------------------------------------------------------------------------------------#
 # Survey Crud
 
+#TODO: replace with get all surveys with query parameters
 @bp.route('/api/v1/request/projects/<string:project_id>/surveys/all', methods=['GET'])
 @login_required
 def get_project_surveys(project_id: str):
@@ -598,7 +602,7 @@ def approve_annotations():
 	# set crop reviewed 
 	res_1 = base.update_reviewed_area(reviewed_area['reviewed_area_id'], reviewed_by_user_id = cast(User, current_user).user_id)
 
-	# set image closed
+	# set image closedp rout
 	res_2 = base.update_image(reviewed_area['image_id'], {'opened_by_user_id':0})
 
 	if res_1 == False or res_2 == False:
