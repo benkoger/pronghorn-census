@@ -1,6 +1,6 @@
-from werkzeug.datastructures import auth
 from annotation_testing_core import APITester
 from datetime import datetime
+import urllib.parse
 
 class TestSurveys(APITester):
     def test_create_survey(self, auth_client):
@@ -27,3 +27,13 @@ class TestSurveys(APITester):
         resposne = auth_client.get('/api/v1/surveys/f4c0b5e0-af30-46fa-a276-6169932b6a34/annotations')
         
         assert resposne.status_code == 200
+
+    def test_get_survey_annotated_images(self, auth_client):
+        params = {
+            'herd_unit': 1,
+            'label': 3, 
+        }
+        query_string = urllib.parse.urlencode(params)
+
+        response = auth_client.get(f'/api/v1/surveys/f4c0b5e0-af30-46fa-a276-6169932b6a34/annotated_images?{query_string}')
+        assert response.status_code == 200
