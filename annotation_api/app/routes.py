@@ -3,7 +3,7 @@
 # because I have never done this before
 # Author: Michael B. Lance
 # Created: April 7, 2025
-# Updated: January 29, 2025
+# Updated: November 11, 2025
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -14,7 +14,8 @@ import cv2
 from flask import Blueprint, Response, abort, jsonify, request, session, current_app
 from cropgenerator import auto_crop, create_subcrop
 from cropgenerator.generatorobjects import Prediction, User, ReviewedArea, Annotation
-from app.extensions import login_manager, cache, base, s3 
+from app.extensions import login_manager, cache, base 
+from app import pathfinder
 from database import Database
 from typing import cast
 from flask_login import (
@@ -24,7 +25,10 @@ from flask_login import (
 	logout_user,
 ) 
 
+
 bp = Blueprint('app', __name__)
+
+
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # User session management
@@ -40,8 +44,6 @@ def unathorizated_callback():
 
 @bp.route('/api/v1/authenticate', methods=['POST'])
 def authenticate():
-	'''
-	'''
 	req_data = request.get_json()
 	if not req_data or 'external-id' not in req_data:
 		abort(400, 'malformed request')
@@ -151,7 +153,7 @@ def get_schema_labels(project_id: str, schema_id: str):
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Herd Unit Crud
-# TODO: move this endpoint to project router 
+
 @bp.route('/api/v1/request/projects/<string:project_id>/herd_units/all', methods=['GET'])
 @login_required
 def get_project_herdunits(project_id: str):
@@ -161,7 +163,6 @@ def get_project_herdunits(project_id: str):
 		abort(404, 'No Herd Units Found')
 	return jsonify(serialized_herd_units), 201
 
-# TODO: remove this enpdoint, replaced by /surveys/id/herd_unit in survey router
 @bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/all', methods=['GET'])
 @login_required
 def get_survey_herdunits(survey_id: str):
@@ -170,8 +171,23 @@ def get_survey_herdunits(survey_id: str):
 	if serialized_herd_units is None:
 		abort(404, 'No Herd Units Found')
 	return jsonify(serialized_herd_units), 201
+
+#---------------------------------------------------------------------------------------------------------------------------#
+# Model Crud
+
+@bp.route('/api/v1/create/model', methods=['POST'])
+@login_required
+def create_model():
+	'''
 	
-# TODO: move this endpoint to projects router
+	'''
+	data = request.get_json()
+	try:
+		model = base.create_model(data['name'])
+	except Exception:
+		abort(500)
+	return model.serialize(), 201
+	
 @bp.route('/api/v1/request/projects/<string:project_id>/models/all', methods=['GET'])
 @login_required
 def get_project_models(project_id: str):
@@ -182,7 +198,6 @@ def get_project_models(project_id: str):
 	serialized_models = [model.serialize() for model in models]
 	return jsonify(serialized_models), 201
 
-# TODO: Move this endpoint to models router
 @bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/<string:herd_unit_id>/schemas/<string:schema_id>/models/all', methods=['GET'])
 @login_required
 def get_cropper_models(survey_id: str, herd_unit_id: str, schema_id: str):
@@ -195,7 +210,6 @@ def get_cropper_models(survey_id: str, herd_unit_id: str, schema_id: str):
 #---------------------------------------------------------------------------------------------------------------------------#
 # Survey Crud
 
-#TODO: replace with get all surveys with query parameters
 @bp.route('/api/v1/request/projects/<string:project_id>/surveys/all', methods=['GET'])
 @login_required
 def get_project_surveys(project_id: str):
@@ -205,6 +219,26 @@ def get_project_surveys(project_id: str):
 		abort(404)
 	return jsonify(serialized_surveys), 201
 
+#---------------------------------------------------------------------------------------------------------------------------#
+# Image Crud
+
+@bp.route('/api/v1/create/image', methods=['POST'])
+@login_required
+def upload_image_to_db():
+	'''
+	'''
+	data = request.get_json()
+	image = base.create_image(data['name'], UUID(data['herd_unit_id']), UUID(data['survey_id']), data['img_key'], data['image_length'], data['image_width'])
+	if image is None:
+		abort(500)
+	return image.serialize(), 201
+
+# @bp.route('/app/v1/get/image', methods=['GET'])
+# @login_required
+# def getImage():
+# 	'''
+	
+# 	'''
 #---------------------------------------------------------------------------------------------------------------------------#
 # Prediction Crud
 
@@ -243,15 +277,15 @@ def get_presigned_url():
 	'''
 	data = request.get_json()
 	try: 
-		response = s3.generate_presigned_url(
+		response = pathfinder.generate_presigned_url(
 		ClientMethod='upload_part', 
 		Params = {
-			'Bucket': current_app.config['BUCKET_NAME'],
-			'Key': data['image_key'], 
-			'UploadId': data['upload_id'],
-			'PartNumber': data['part_number'],
-			'ContentLength': data['chunk_size'],
-			'ContentMD5' : data['chunk_md5'],
+		'Bucket': current_app.config['BUCKET_NAME'],
+		'Key': data['image_key'], 
+		'UploadId': data['upload_id'],
+		'PartNumber': data['part_number'],
+		'ContentLength': data['chunk_size'],
+		'ContentMD5' : data['chunk_md5'],
 		},
 		ExpiresIn=3600,
 		)
@@ -271,7 +305,7 @@ def create_multipart_upload():
 
 	data = request.get_json()
 	try: 
-		response = s3.create_multipart_upload(
+		response = pathfinder.create_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			ContentType = 'image/jpeg',
@@ -292,7 +326,7 @@ def complete_upload():
 	'''
 	data = request.get_json()
 	try:
-		response = s3.complete_multipart_upload(
+		response = pathfinder.complete_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			MultipartUpload={
@@ -314,7 +348,7 @@ def abort_upload():
 	'''
 	data = request.get_json()
 	try:
-		response = s3.abort_multipart_upload(
+		response = pathfinder.abort_multipart_upload(
 			Bucket = current_app.config['BUCKET_NAME'],
 			Key = data['image_key'],
 			UploadId = data['upload_id'],
@@ -359,20 +393,20 @@ def create_prediction_crops():
 	
 	'''
 	data = request.get_json()
-	image = base.get_image(UUID(data['image_id']))
+	image = base.getImage(UUID(data['image_id']))
 	img_data = cache.get(image.uuid)
 
 	if not img_data:
 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
-		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
+		img_data = pathfinder.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
 
-	image.set_image(img_data)
+	image.setImage(img_data)
 	pred_crops = create_subcrop(image, data['predictions'])
 	serialized_pred_crops = [] 
 
 	for crop in pred_crops: # Save crop image data into the session cache
-		cache.set(crop.uuid,  crop.get_image(), 3600)
+		cache.set(crop.uuid,  crop.getImage(), 3600)
 		serialized_pred_crops.append(crop.serialize())
 	
 	json_pred_crop_data = jsonify(serialized_pred_crops)
@@ -413,14 +447,14 @@ def create_reviewed_area_and_annotations():
 	'''
 	data = request.get_json()
 	# Request image object from data in request
-	image = base.get_image(UUID(data['image_uuid']))
+	image = base.getImage(UUID(data['image_uuid']))
 	img_data = cache.get(image.uuid)
 
 	if not img_data:
 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
-		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
+		img_data = pathfinder.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
 		cache.set(image.uuid, img_data, 360) 
-	image.set_image(img_data)
+	image.setImage(img_data)
 
 	# get label - id for schema
 	label_ids = { lbl['label'] : lbl['label_id'] for lbl in data['labels'] }
@@ -465,7 +499,7 @@ def create_reviewed_area_and_annotations():
 			print(e)
 			abort(500, e)
 
-		s3.put_object(
+		pathfinder.put_object(
 			Bucket=current_app.config['BUCKET_NAME'],
 			Key=ra_key,
 			Body=io.BytesIO(img_bytes),  #type: ignore
@@ -519,8 +553,7 @@ def get_ra_batch():
 
 	# set image open 
 	user_id = cast(User, current_user).user_id
-
-	base.update_image(ra.image_id, {'opened_by_user_id':user_id})
+	base.update_image(ra.image_id, opened_by_user_id=user_id)
 	return ra.serialize(), 201
 
 @bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
@@ -530,7 +563,7 @@ def create_ra_presigned_get():
 	'''
 	data = request.get_json()
 	try:
-		response = s3.generate_presigned_url(
+		response = pathfinder.generate_presigned_url(
 			'get_object',
 			Params={'Bucket': current_app.config['BUCKET_NAME'],
 					'Key': data['ra_key']
@@ -602,8 +635,8 @@ def approve_annotations():
 	# set crop reviewed 
 	res_1 = base.update_reviewed_area(reviewed_area['reviewed_area_id'], reviewed_by_user_id = cast(User, current_user).user_id)
 
-	# set image closedp rout
-	res_2 = base.update_image(reviewed_area['image_id'], {'opened_by_user_id':0})
+	# set image closed
+	res_2 = base.update_image(reviewed_area['image_id'], opened_by_user_id=0)
 
 	if res_1 == False or res_2 == False:
 		abort(500, 'failed to set image crop reviewed and image closed')

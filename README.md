@@ -72,10 +72,10 @@ This folder (annotation_software) contains a set of *container files* and *YAML 
 * **Some Computer, Somewhere:** Thanks to our microservice architecture, this tool can be hosted on one bigger computer, or a few smaller computers. This guide assumes you will be using one big computer. It will be up to the user to alter the compose files if they wish to alter the configuration. There are no plans for any sort of install utility as of now.
   
 * **Podman and Podman-Compose **OR** Docker and Compose Version:**
-	* *podman: 5.7.1*
-  	* *podman-compose: 1.5.0*
-  	* *docker: 28.3.3* -- Needs checked 
-  	* *docker compose: 2.39.1* -- needs checked
+	* *podman: 4.3.1*
+  	* *podman-compose: 1.4.0*
+  	* *docker: 28.3.3*
+  	* *docker compose: 2.39.1*
 
 ### Secrets
 
@@ -103,74 +103,9 @@ Below is a list of *secrets* that must be provided to the application in order f
 
 * **AWS_SECRET_ACCESS_KEY** -- This is another key provided by your S3 compliant storage provider. 
 
-## Local development mode set up
+## Build Process
 
-Our software is designed to be ran in an enterprise environment consisting of multiple servers, this is largely due to the sheer volume of data its designed to handle. In order to scale out who can test and contribute to our software we have produced a set of containers built to be ran on a single host. Note that an internet connection is still required as we determined virtualizing a ceph cluster on the average laptop would somewhat- entirely futile. To get around this we have made a publicly accessible sampleset of imagery and a directory archive of a database relevant to those images available publicly. 
-
-To run the local dev environment you must have a container orchestration tool installed on your system. The reccomended container orchestration platform is Podman with Podman-Compose. However, note that there currently is an issue on intel based macbooks that cause the podman machine to hang indefinitey, so intel mac users are reccomended to use docker. The commands are the same for both tool. Note that for both windows and macOS users a virtualization capable computer is required since those operating systems still do not support native containerization. 
-
-After cloning down the repository the first thing you must do is create a .env file in the root of the directory. See [secrets](https://github.com/benkoger/pronghorn-census/edit/devel/README.md#secrets) for information on how to populate this. Please note that parameters relating to ssl should not be set for the local dev server, unless you have a set of certificates handy and wish to go the extra mile. 
-
-Once you have a propperly populated .env file standing up the environmnet should go off without a hitch. 
-
-### Linux & Applie Silicon Mac systems running Podman
-
-```sh
-	podman compose --f development.compose.yml up -d
-```
-
-### Intel based Mac systems running Docker
-
-```sh
-	docker compose --f development.compose.yml up -d
-```
-
-### Windows system 
-
-**Important:** _Windows may automatically convert the restore.sh script in the local_db directory to use **CRLF** insead of **LF** ensure that this file is restored to use **LF** or never converted at all. Additional for some reason Windows podman's file flag uses one dash instead of two. _
-
-```powershell
-	podman compose -f production.compose.yml up -d
-```
-
-### Post orchestration reccomendations 
-
-It is reccomended for development purposes to maintain a python virtual environment on your development system built from the included requirements.txt if you are using a python LSP like Pylane or Pyright. 
-
-
-### Linux & MacOs (traditional venvv)
-
-```sh
-	# create a virtual environment (please don't push this to our repo)
-	python -m venv .venv
-
-	# active the virtual environment
-	source .venv/bin/activate
-
-	# install requirements
-	pip install -r requirements.txt
-```
-
-### Windows
-
-```powershell
-	# create a virtual environment (please don't push this to our repo)
-	python -m venv .venv
-
-	# active the virtual environment
-	.\\venv\\Scripts\\Activate.ps1
-
-	# install requirements
-	pip install -r requirements.txt
-```
-
-_Don't forget to point your LSP to this new environent for code completion._
-It is also reccomended that you 
-
-
-## Production set up
-
-This section is out of date and needs rewritten. (Michael)
+Setting the secrets *(and building your database)* is hopefully the hardest part of the process. The build process is controlled by your container management tool. This is a good time to note that this software comes with absolutely no warranty, especially if you modify the orchestration script. Good luck. 
 
 ### Podman
 In the same directory as production.compose.yml, run this command
@@ -212,3 +147,6 @@ The user module is planned to be another module that has slightly different cont
 
 ### Settings
 The settings module is the eventual home for all configurable options for a user's account. Its pretty standard.
+
+
+hello from pronghorn-dev server!

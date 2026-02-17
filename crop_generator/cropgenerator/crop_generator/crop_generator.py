@@ -157,7 +157,7 @@ def auto_crop(image: Image, predictions: list[Prediction], labels_ids: dict[int,
 	points = []
 	centers = []
 	crops = [] # Structure to be returned
-	img = image.get_image()
+	img = image.getImage()
 	if img is None:
 		raise Exception('could not get image')
 
@@ -220,7 +220,7 @@ def auto_crop(image: Image, predictions: list[Prediction], labels_ids: dict[int,
 			reviewed_area_length_px = abs(y_start - y_end),
 			reviewed_area_width_px= abs(x_start - x_end)
 		)
-		crop.set_image(img[y_start:y_end, x_start:x_end].copy())
+		crop.setImage(img[y_start:y_end, x_start:x_end].copy())
 		annotations = []
 
 		for p_index, pred in enumerate(predictions):
@@ -253,7 +253,7 @@ def auto_crop(image: Image, predictions: list[Prediction], labels_ids: dict[int,
 
 def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: int=150, drawBox: bool=False) -> list[PredictionCrop]:
 		crops = []
-		img = image.get_image()
+		img = image.getImage()
 		if len(predictions) == 0:        
 			raise Exception('Predictions cannot be zero')
 		
@@ -296,7 +296,7 @@ def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: i
 				boundingBox = Box((int(box[0] - xmin), int(box[1] - ymin)), (int(box[2] - xmin), int(box[3] - ymin))),
 				uuid = pred['uuid']
 			)
-			crop.set_image(img[ymin:ymax, xmin:xmax].copy())
+			crop.setImage(img[ymin:ymax, xmin:xmax].copy())
 			crops.append(crop)
 
 			if drawBox:
@@ -332,6 +332,6 @@ def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: i
 #---------------------------------------------------------------------------------------------------------------------------#
 
 # def save_crop(crop: Crop, save_folder: str):
-# 		cv2.imwrite(f'{save_folder}/{crop.name}.jpg', cv2.cvtColor(crop.get_image(), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 100])
+# 		cv2.imwrite(f'{save_folder}/{crop.name}.jpg', cv2.cvtColor(crop.getImage(), cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 100])
 
 #---------------------------------------------------------------------------------------------------------------------------#
