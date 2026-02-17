@@ -1,7 +1,7 @@
 # Class definition for objects used in the crop_generator module and database
 # Author: Michael B. Lance
 # created: April 4, 2025
-# updated: October 28, 2025
+# updated: February 3, 2026
 #---------------------------------------------------------------------------------------------------------------------------#
 
 import numpy as np
@@ -14,7 +14,7 @@ import PIL.Image as PillowImage
 from dataclasses import dataclass
 from uuid import UUID
 from flask_login import UserMixin 
-from typing import Optional 
+from typing import Optional, List 
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # ABC for easy serialization of child classes
@@ -129,6 +129,7 @@ class Model(CgOBJ):
 	def serialize(self):
 		return {
 			'model_id': self.model_id,
+			'schema_id': self.schema_id,
 			'name': self.name,
 			'created': self.created,
 			'modified': self.modified,
@@ -291,10 +292,13 @@ class Box(CgOBJ):
 
 @dataclass
 class Image(CgOBJ):
-	def __init__(self, image_id: int, herd_unit_id: int, survey_id: int, name: str, img_key: str,
-				in_training: bool, crops_generated: int, opened_by_user_id: int,
-				created: datetime, modified: datetime, image_length_px: int, image_width_px: int,
-				uuid: UUID):
+	def __init__(
+			self, image_id: int, herd_unit_id: int, survey_id: int, name: str, img_key: str,
+			in_training: bool, crops_generated: int, opened_by_user_id: int,
+			created: datetime, modified: datetime, image_length_px: int, image_width_px: int,
+			area: float, viewshed_polygon: List[List[float]], has_detection: bool, dem_name: str, 
+			bbox_wsen: List[int], uuid: UUID
+		):
 		self.image_id = image_id
 		self.herd_unit_id = herd_unit_id
 		self.survey_id = survey_id
@@ -307,10 +311,16 @@ class Image(CgOBJ):
 		self.modified = modified
 		self.image_length_px = image_length_px
 		self.image_width_px = image_width_px
+		self.area = area
+		#TODO: Change to use shapely.polygon class
+		self.viewshed_polygon = viewshed_polygon
+		self.has_detections = has_detection
+		self.dem_name = dem_name 
+		self.bbox_wsen = bbox_wsen
 		self.uuid = uuid
 		self.image = None
 
-	def setImage(self, imageData: np.ndarray):
+	def set_image(self, imageData: np.ndarray):
 		if isinstance(imageData, bytes):
 			try:
 				pilImage = PillowImage.open(io.BytesIO(imageData))
@@ -325,7 +335,7 @@ class Image(CgOBJ):
 			print(f"Unsupported type: {type(imageData)}")
 			self.image = None
 
-	def getImage(self) -> Optional[np.ndarray]:
+	def get_image(self) -> Optional[np.ndarray]:
 		if self.image is not None:
 			return self.image
 
@@ -334,7 +344,7 @@ class Image(CgOBJ):
 
 	def serve(self, img_format: str):
 		if self.image is not None:
-			_, self.img_encoded = cv2.imencode(img_format, self.getImage(), [cv2.IMWRITE_JPEG_QUALITY, 100]) #type: ignore
+			_, self.img_encoded = cv2.imencode(img_format, self.get_image(), [cv2.IMWRITE_JPEG_QUALITY, 100]) #type: ignore
 		else:
 			raise Exception(f'{self.name} has no image data')
 		return self.img_encoded.tobytes()

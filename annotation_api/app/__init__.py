@@ -1,31 +1,35 @@
 import os
-from config import s3_config
+
 from boto3 import client
+from flasgger import Swagger
 from flask import Flask
 from flask_cors import CORS
-import app.errors as errors
 from werkzeug.exceptions import HTTPException
-from config import FlaskConfig, s3_config, cache_config
-from app.extensions import login_manager, cache, session_manager, base
+
+import app.errors as errors
+from app.extensions import base, cache, login_manager, session_manager
+from config import s3_config
+from config import FlaskConfig, cache_config, s3_config
+
 
 def create_app():
 	app = Flask(__name__)
 	app.config.from_object(FlaskConfig)
+	swagger = Swagger(app)
 
 	CORS(app, resources={
 		r'/api/*': {
 			'origins': [
-				app.config['ORIGIN_URL']
+				app.config['ORIGIN_URL'],
 			],
 			'supports_credentials': True     
 		}
 	})
-	global pathfinder
-	pathfinder = client(
+	setattr(app, 's3', client(
         's3',
         config=s3_config,
         endpoint_url=os.environ.get('AWS_ENDPOINT_URL_S3')
-    )
+    ) )
 
 	cache.init_app(app, cache_config)
 	login_manager.init_app(app)
@@ -37,5 +41,15 @@ def create_app():
 
 	from app.routes import bp
 	app.register_blueprint(bp)
+
+	from app.routers.models import modelBp
+	app.register_blueprint(modelBp)
+
+	from app.routers.images import imageBp
+	app.register_blueprint(imageBp)
+
+	from app.routers.surveys import surveyBp
+	app.register_blueprint(surveyBp)
+
 	return app
 

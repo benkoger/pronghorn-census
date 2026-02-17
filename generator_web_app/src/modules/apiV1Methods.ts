@@ -12,7 +12,8 @@ import type { PredictionIntf, User_intf, ImageIntf, PredictionCrop_intf, Reviewe
 import { useToast } from 'vue-toastification'
 
 
-const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count-dev.arcc.uwyo.edu/api/v1';
+const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
+
 const api_url: URL = new URL(api_url_base);
 
 const toast = useToast()
@@ -327,18 +328,17 @@ export async function getProjectSurveys(project_id: string | undefined): Promise
 //---------------------------------------------------------------------------------------------------------------------------//
 // Image Crud
 
-export async function createImage(project_id: string | undefined, survey_id: string | undefined,
+export async function createImage(survey_id: string | undefined,
 	herd_unit_id: string | undefined, name: string, img_key: string, image_length: number, image_width: number
 ): Promise<Image | undefined> {
 	try {
-		const response = await fetch(`${api_url}/create/image`, {
+		const response = await fetch(`${api_url}/images`, {
 			method: 'POST',
 			credentials: 'include',
 			headers: {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				'project_id': project_id,
 				'survey_id': survey_id,
 				'herd_unit_id': herd_unit_id,
 				'img_key': img_key,
@@ -383,7 +383,7 @@ export async function createMultiPartUpload(image_key: string): Promise<string |
 	}
 }
 
-export async function getImagePresignedPostUrl(upload_id: string, part_number: number, image_key: string, chunk_size: number, chunk_md5: string): Promise<string | undefined> {
+export async function get_imagePresignedPostUrl(upload_id: string, part_number: number, image_key: string, chunk_size: number, chunk_md5: string): Promise<string | undefined> {
 	try {
 		const response = await fetch(`${api_url}/create/image/presigned-put-url`, {
 			method: 'POST',

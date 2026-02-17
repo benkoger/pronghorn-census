@@ -1,13 +1,12 @@
 # Psycopg3 database abstraction layer for crop generator_api
 # Author: Michael B. Lance
-# Created: November 17, 2024
-# Updated: October 28, 2025
+
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from datetime import datetime
+from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, Optional, cast, Union, List
+from typing import Any, Callable, Dict, List, Optional, Reversible, Tuple, Union, cast
 from uuid import UUID
 import uuid
 
@@ -51,7 +50,7 @@ class Database:
 
 		setattr(app, app_attribute_name, self)
 
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~# 
 
 	def create_pool(self, min_size: int=2, max_size: int=4):
 		if self._pool is not None: # dispose of existing pool
@@ -59,12 +58,12 @@ class Database:
 			
 		self.pool_uuid = uuid.uuid4()
 		self._pool = ConnectionPool(
-		kwargs = self._config,
-		min_size = min_size,
-		max_size = max_size,
-		open = True,
-		max_lifetime = 290,
-		check=ConnectionPool.check_connection 
+			kwargs = self._config,
+			min_size = min_size,
+			max_size = max_size,
+			open = True,
+			max_lifetime = 290,
+			check=ConnectionPool.check_connection 
 		)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -83,6 +82,12 @@ class Database:
 		'''
 		@wraps(fn)
 		def wrapper(self, *args, **kwargs):
+
+			has_cursor = 'cursor' in kwargs or (len(args) > 0 and args[0].__class__.__name__ == 'Cursor')
+        
+			if has_cursor:
+				return fn(self, *args, **kwargs)
+
 			if not self._pool:
 				self.create_pool()
 			with self._pool.connection() as conn:
@@ -874,27 +879,57 @@ class Database:
 	# Project Management - Herd Units
 
 	@connect
-	def _create_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], name: str) -> HerdUnit | None:
+	def _create_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], parameters: dict) -> HerdUnit:
 		''' Internal helper function, do not call directly
 		
 		'''
+		
+		project = self._get_project(cursor, parameters['project_id'])
+
+		if not project:
+			raise Exception('Project not found')
+
+		query_1 = sql.SQL('''
+			INSERT INTO projectmanagement.herd_units (
+				name
+			) 
+			VALUES (
+				%(name)s
+			)
+			RETURNING *; ''')
+		
 		cursor.row_factory = class_row(HerdUnit)
-		cursor.execute(sql.SQL(' INSERT INTO projectmanagement.herd_units (name) VALUES (%s) RETURNING *; '), (name,))
+		cursor.execute(query_1, parameters)
+
 		herd_unit = cursor.fetchone()
-		return herd_unit if isinstance(herd_unit, HerdUnit) else None
-	
-	def create_herd_unit(self, name: str):
+		if not herd_unit:
+			raise Exception('Failed to create survey')
+
+		query_2 = sql.SQL('''
+			INSERT INTO projectmanagement.projects_herd_units (
+				project_id, survey_id 
+			)
+			VALUES (
+				%s, %s
+			);
+		''')
+
+		cursor.execute(query_2, (project.project_id, herd_unit.herd_unit_id))
+
+		return herd_unit
+
+	def create_herd_unit(self, parameters: dict) -> HerdUnit:
 		''' Insert a new herd unit object into the database
 
 		Args:
 			name: the herd unit name 
 		'''
-		return self._create_herd_unit(name=name)
+		return self._create_herd_unit(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], herd_unit_id: int | UUID) -> HerdUnit | None:
+	def _get_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], herd_unit_id: int | UUID) -> HerdUnit:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -908,9 +943,13 @@ class Database:
 			case _:
 				raise TypeError('herd_unit_id MUST be an integer or a UUID')
 		herd_unit = cursor.fetchone()
-		return herd_unit if isinstance(herd_unit, HerdUnit) else None
+
+		if not herd_unit:
+			raise Exception('uh oh spaghettios')
+
+		return herd_unit
 	
-	def get_herd_unit(self, herd_unit_id: int | UUID) -> HerdUnit | None:
+	def get_herd_unit(self, herd_unit_id: int | UUID) -> HerdUnit:
 		''' Query the database for a herd unit 
 
 			Args:
@@ -984,24 +1023,72 @@ class Database:
 	# Project Management - Models
 	
 	@connect
-	def _create_model(self, cursor: psycopg.Cursor[Model], name: str) -> Model:
+	def _create_model(self, cursor: psycopg.Cursor[Model], parameters: dict) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
+		project = self._get_project(cursor, parameters['project_id'])
+		schema = self._get_schema(cursor, parameters['schema_id'])
+
+		# TODO: create method to get list of surveys
+		survey_ids = [
+			survey_id if isinstance(survey_id, int) else UUID(survey_id)
+			for survey_id in parameters['survey_ids']
+		]
+
+
+		if not schema:
+			raise Exception('Schema not found')
+		if len(survey_ids) == 0:
+			raise Exception('no surveys were found')
+
+		query_1 = sql.SQL(''' 
+			INSERT into projectmanagement.models (
+				name, schema_id
+			)
+			VALUES (
+				%(name)s, %(schema_id)s
+			)
+			RETURNING *; 
+		''')
+		
+		cursor.execute(query_1, parameters)
 		cursor.row_factory=class_row(Model)
-		cursor.execute(' INSERT into projectmanagement.models (name) VALUES (%s)  RETURNING *; ', (name,))
 		model = cursor.fetchone()
-		if model is None:
+		if not model:
 			raise Exception('Failed to create model')
+
+		query_2 = sql.SQL(''' 
+			INSERT INTO projectmanagement.projects_models (
+				project_id, model_id
+			) 
+			VALUES (
+				%s, %s
+			); 
+		''')
+
+		cursor.execute(query_2, (project.project_id, model.model_id))
+
+		query_3 = sql.SQL('''
+			INSERT INTO projectmanagement.surveys_models (
+				survey_id, model_id
+			)
+			VALUES (
+				%s, %s	
+			);
+		''')
+
+		cursor.executemany(query_3, [(survey_id, model.model_id) for survey_id in survey_ids])
+
 		return model 
 
-	def create_model(self, name: str) -> Model:
+	def create_model(self, parameters: dict) -> Model:
 		''' Insert a new model object into the database
 
 		Args:
 			name: the model name 
 		'''
-		return self._create_model(name = name)
+		return self._create_model(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1029,35 +1116,55 @@ class Database:
 			model_id: either the models's internal database id or its universally unique identifier
 		'''
 		return self._get_model(model_id = model_id)
-	
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _update_model(self, cursor: psycopg.Cursor[Model], model_id: Model | int | UUID, name: str | None = None) -> bool:
+	def _update_model(self, cursor: psycopg.Cursor[Model], model_id: int | UUID, parameters: dict) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
-		query = sql.SQL(''' UPDATE projectmanagement.models SET name = %s, modified = CURRENT_TIMESTAMP 
-							WHERE {id_field} = %s; ''')
+		cursor.row_factory = class_row(Model)
+		query = sql.SQL(''' UPDATE projectmanagement.models SET {augmented_field}, modified = CURRENT_TIMESTAMP 
+							WHERE {id_field} = %s RETURNING *; ''')
+		kw_augmented_field = sql.SQL(',').join(
+			[
+				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
+				for key, value, in parameters.items() 
+				if key in set(['survey_id', 'survey_date', 'name', 'additional_info'])
+				and value is not None
+			]
+		) 
 		match model_id:
-			case Model():
-				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (model_id.name, model_id.model_id))
 			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (name, model_id))
+				cursor.execute(query.format(
+					augmented_field = kw_augmented_field,
+					id_field = sql.Identifier('model_id')
+				), (model_id,)
+						)
 			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (name, model_id))
+				cursor.execute(query.format(
+					augmented_field = kw_augmented_field,
+					id_field = sql.Identifier('uuid')
+				), (model_id,))
 			case _:
-				raise TypeError('model_id MUST be an integer, UUID or Herd_Unit type, and name must be a string')
-		return True if cursor.rowcount > 0 else False
+				raise TypeError('model_id MUST be an integer, or UUID')
+		
+		model = cursor.fetchone()
+
+		if model:
+			return model 
+		else:
+			raise Exception('failed to update the model')
 	
-	def update_model(self, model_id: Model | int | UUID, name: str | None = None) -> bool:
+	def update_model(self, model_id: int | UUID, parameters: dict) -> Model:
 		''' Augment a model in the database by providing a modified Model object or a valid id and a new name
 		
 		Args:
 			model: either a Model object, a database id, or a universally unique identifier 
 			name: the new name for the model
 		'''
-		return self._update_model(model_id = model_id, name = name)
+		return self._update_model(model_id, parameters)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1094,19 +1201,176 @@ class Database:
 		return self._delete_model(model_ids = model_ids)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_model_training_data(
+			self, 
+			cursor: psycopg.Cursor[dict],
+			label_ids: List[int],
+			date_range: Tuple[date, date] | None,
+			survey_ids: List[int] | None,
+			herd_unit_ids: List[int] | None
+		):
+		'''
+		'''
+		cursor.row_factory = dict_row
+
+		params_1 = []
+		placeholders: Dict[str, Union[List[int], date]] = {
+			'label_ids': label_ids
+		}
+
+		if survey_ids is not None:
+			params_1.append(sql.SQL('i.survey_id = ANY(%(survey_ids)s)'))
+			placeholders['survey_ids'] = survey_ids
+
+		if herd_unit_ids is not None:
+			params_1.append(sql.SQL('i.herd_unit_id = ANY(%(herd_unit_ids)s)'))
+			placeholders['herd_unit_ids'] = herd_unit_ids
+
+		if date_range is not None:
+			params_1.append(sql.SQL('i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s'))
+			placeholders['date_range_lower'] = date_range[0]
+			placeholders['date_range_upper'] = date_range[1]
+
+		image_params = sql.SQL(' AND ').join(params_1)
+
+		query = sql.SQL('''
+			WITH SelectedImageIds AS (
+				SELECT DISTINCT i.image_id 
+				FROM core.images i
+				WHERE {image_args}
+			)
+			SELECT json_agg(row_to_json(crops)) 
+			FROM (
+				SELECT
+					ra.reviewed_area_id,
+					ra.image_id,
+					ra.name, 
+					ra.ra_key,
+					ra.area_tx,
+					ra.area_ty,
+					ra.area_bx,
+					ra.area_by,
+					ra.reviewed_area_length_px,
+					ra.reviewed_area_width_px,
+					ra.reviewed_by_user_id,
+					ra.created,
+					ra.modified,
+					ra.uuid,
+					json_agg(
+						json_build_object( 
+							'annotation_id', a.annotation_id,
+							'label_id', a.label_id,
+							'image_id', a.image_id,
+							'pred_id', a.pred_id,
+							'herd_unit_id', a.herd_unit_id,
+							'box_tx', a.box_tx,
+							'box_ty', a.box_ty,
+							'box_bx', a.box_bx,
+							'box_by', a.box_by,
+							'created_by_user_id', a.created_by_user_id,
+							'created', a.created,
+							'modified', a.modified, 
+							'uuid', a.uuid
+						)
+					) AS annotations
+				FROM core.reviewed_area ra
+				INNER JOIN core.annotations_reviewed_area a_ra ON ra.reviewed_area_id = a_ra.reviewed_area_id
+				INNER JOIN core.annotations a ON a.annotation_id = a_ra.annotation_id
+				WHERE ra.image_id IN (SELECT image_id FROM SelectedImageIds)
+					AND a.label_id =  ANY(%(label_ids)s)
+				GROUP BY ra.reviewed_area_id
+			) AS crops
+		''')
+		
+		try:
+			cursor.execute(query.format(image_args = image_params), placeholders)
+		except Exception as e:
+			print(e)
+		results = cursor.fetchone()
+
+		return results
+
+	def get_model_training_data(
+		self,
+		label_ids: List[int],
+		date_range: Tuple[date, date] | None,
+		survey_ids: List[int] | None,
+		herd_unit_ids: List[int] | None
+	):
+		'''
+		'''
+		return self._get_model_training_data(
+			label_ids,
+			date_range,
+			survey_ids,
+			herd_unit_ids
+		)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Project Management - Surveys
 
 	@connect
-	def _create_survey(self, cursor: psycopg.Cursor[Survey], survey_date: datetime, name: str, additional_info: str) -> Survey | None:
+	def _create_survey(self, cursor: psycopg.Cursor[Survey], parameters: dict) -> Survey:
 		''' Internal helper function, do not call directly
 		
 		'''
+
+		project = self._get_project(cursor, parameters['project_id'])
+		
+		# TODO: create method to get list of herd units
+		herd_unit_ids = [
+			herd_unit_id if isinstance(herd_unit_id, int) else UUID(herd_unit_id)
+			for herd_unit_id in parameters['herd_unit_ids']
+		]
+
+		# TODO: Remove this after methods get updated for these objects
+		if not project:
+			raise Exception('Project not found')
+		if len(herd_unit_ids) == 0:
+			raise Exception('no herd units were found')
+
+		query_1 = sql.SQL(''' 
+			INSERT into projectmanagement.surveys (
+				survey_date, name, additional_info
+			) 
+			VALUES (
+				%(survey_date)s, %(name)s, %(additional_info)s
+			) 
+			RETURNING *; ''')
+
 		cursor.row_factory = class_row(Survey)
-		cursor.execute(sql.SQL(' INSERT into projectmanagement.surveys (survey_date, name, additional_info) VALUES (%s, %s, %s) RETURNING *; '), (survey_date, name, additional_info))
+		cursor.execute(query_1, parameters)
 		survey = cursor.fetchone()
-		return survey if isinstance(survey, Survey) else None
+		if not survey:
+			raise Exception('Failed to create survey')
+
+		query_2 = sql.SQL('''
+			INSERT INTO projectmanagement.projects_surveys (
+				project_id, survey_id
+			)
+			VALUES (
+				%s, %s
+			);
+		''')
+
+		cursor.execute(query_2, (project.project_id, survey.survey_id))
+
+		query_3 = sql.SQL('''
+			INSERT INTO projectmanagement.surveys_herd_units (
+				survey_id, herd_unit_id
+			)
+			VALUES (
+				%s, %s
+			);
+		''')
+
+		cursor.executemany(query_3, [(survey.survey_id, herd_id) for herd_id in herd_unit_ids])
+
+		return survey
 	
-	def create_survey(self, survey_date: datetime, name: str, additional_info: str | None = None) -> Survey | None:
+	def create_survey(self, parameters: dict) -> Survey:
 		''' Insert a new survey object into the database
 
 		Args:
@@ -1114,12 +1378,12 @@ class Database:
 			name: the survey name 
 			additional_info: any information that may be important regarding the survey (can be null)
 		'''
-		return self._create_survey(survey_date=survey_date, name=name, additional_info=additional_info)
+		return self._create_survey(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_survey(self, cursor: psycopg.Cursor[Survey], survey_id: int | UUID) -> Survey | None:
+	def _get_survey(self, cursor: psycopg.Cursor[Survey], survey_id: int | UUID) -> Survey:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -1133,9 +1397,13 @@ class Database:
 			case _:
 				raise TypeError('survey_id MUST be an integer or a UUID')
 		survey = cursor.fetchone()
-		return survey if isinstance(survey, Survey) else None
+		if survey is None:
+			raise Exception('Could not find survey')
+		else:
+			return survey
 
-	def get_survey(self, survey_id: int | UUID) -> Survey | None:
+
+	def get_survey(self, survey_id: int | UUID) -> Survey:
 		''' Query the database for a survey
 		
 		Args:
@@ -1144,21 +1412,167 @@ class Database:
 		return self._get_survey(survey_id = survey_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	
+	@connect
+	def _get_survey_annotations(self, cursor: psycopg.Cursor[Annotation], survey_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		cursor.row_factory = class_row(Annotation)
+		query = sql.SQL('''
+			SELECT A.* FROM core.annotations A
+			JOIN core.images I ON I.image_id = A.image_id
+			WHERE I.survey_id = %s;
+		''')
+
+		match survey_id:
+			case int():
+				cursor.execute(query, (survey_id,))
+			case UUID():
+				db_id = self.get_survey(survey_id).survey_id
+				cursor.execute(query, (db_id,))
+
+		return cursor.fetchall()
+
+	def get_survey_annotations(self, survey_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		return self._get_survey_annotations(survey_id) 
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_survey_annotated_images(
+		self,
+		cursor: psycopg.Cursor[dict],
+		label_ids: List[int],
+		date_range: Tuple[date, date] | None,
+		survey_ids: List[int] | None,
+		herd_unit_ids: List[int] | None
+		):
+		'''
+		'''
+		cursor.row_factory = dict_row
+
+		params_1 = []
+		placeholders: Dict[str, Union[List[int], date]] = {
+			'label_ids': label_ids
+		}
+
+		if survey_ids is not None:
+			params_1.append(sql.SQL('i.survey_id = ANY(%(survey_ids)s)'))
+			placeholders['survey_ids'] = survey_ids
+
+		if herd_unit_ids is not None:
+			params_1.append(sql.SQL('i.herd_unit_id = ANY(%(herd_unit_ids)s)'))
+			placeholders['herd_unit_ids'] = herd_unit_ids
+
+		if date_range is not None:
+			params_1.append(sql.SQL('i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s'))
+			placeholders['date_range_lower'] = date_range[0]
+			placeholders['date_range_upper'] = date_range[1]
+
+		image_params = sql.SQL(' AND ').join(params_1)
+
+		query = sql.SQL('''
+			SELECT json_agg(row_to_json(images))
+			FROM (
+				SELECT
+					I.*,
+					json_agg(
+						json_build_object(
+							'annotation_id', a.annotation_id,
+							'label_id', a.label_id,
+							'image_id', a.image_id,
+							'pred_id', a.pred_id,
+							'herd_unit_id', a.herd_unit_id,
+							'box_tx', a.box_tx,
+							'box_ty', a.box_ty,
+							'box_bx', a.box_bx,
+							'box_by', a.box_by,
+							'created_by_user_id', a.created_by_user_id,
+							'created', a.created,
+							'modified', a.modified, 
+							'uuid', a.uuid
+						)
+					) as annotations
+				FROM core.images I
+				INNER JOIN core.annotations A ON A.image_id = I.image_id
+				WHERE {image_args}
+					AND A.label_id = ANY(%(label_ids)s)
+				GROUP BY I.image_id
+			) as images
+		''')
+
+		try:
+			cursor.execute(query.format(image_args = image_params), placeholders)
+		except Exception as e:
+			print(e)
+		results = cursor.fetchall()
+		print(len(results))
+		return results
+
+	def get_survey_annotated_images(
+		self,
+		label_ids: List[int],
+		date_range: Tuple[date, date] | None,
+		survey_ids: List[int] | None,
+		herd_unit_ids: List[int] | None
+	):
+		'''
+		'''
+		return self._get_survey_annotated_images(
+			label_ids,
+			date_range,
+			survey_ids,
+			herd_unit_ids
+		)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _update_survey(self, cursor: psycopg.Cursor[Survey], survey_id: Survey | int | UUID, survey_date: datetime | None = None, name: str | None = None, additional_info: str | None = None) -> bool:
+	def _get_survey_herd_units(self, cursor: psycopg.Cursor[HerdUnit], survey_id: int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		cursor.row_factory = class_row(HerdUnit)
+		survey = self._get_survey(survey_id)
+		query = sql.SQL('''
+			SELECT H.* FROM projectmanagement.herd_units as H JOIN
+			projectmanagement.surveys_herd_units AS SHU ON SHU.herd_unit_id = H.herd_unit_id
+			WHERE SHU.survey_id = %s; ''')
+		cursor.execute(query, (survey.survey_id,))
+		herd_units = cursor.fetchall()
+		if herd_units is None:
+			raise Exception('No herd units found')
+		return herd_units
+
+	def get_survey_herd_units(self, survey_id: int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		return self._get_cropping_herd_units(survey_id = survey_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _update_survey(self, cursor: psycopg.Cursor[Survey], survey_id: int | UUID, parameters: dict) -> Survey:
 		''' Internal helper function, do not call directly
 		
 		'''
+		cursor.row_factory = class_row(Survey)
 		query = sql.SQL(''' UPDATE projectmanagement.surveys SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; ''')
-		kw_augmented_field = sql.SQL(',').join([sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key)) for key, value in locals().items() if key in set(['survey_date', 'name', 'additional_info',]) and value is not None])
+							WHERE {id_field} = %s
+							RETURNING *; ''')
+		kw_augmented_field = sql.SQL(',').join(
+			[
+				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key)) 
+				for key, value in parameters.items() 
+				if key in set(['survey_date', 'name', 'additional_info',
+				]) 
+				and value is not None
+			]
+		)
 		match survey_id:
-			case Survey():
-				cursor.execute(query.format(
-					augmented_field = sql.SQL(f"survey_date = '{survey_id.survey_date}', name = '{survey_id.name}', additional_info = '{survey_id.additional_info}'"), #type: ignore
-					id_field = sql.Identifier('survey_id')
-				), (survey_id.survey_id,))
 			case int():
 				cursor.execute(query.format(
 					augmented_field = kw_augmented_field,
@@ -1170,11 +1584,16 @@ class Database:
 					id_field = sql.Identifier('uuid')
 				), (survey_id,))
 			case _:
-				raise TypeError('survey_id must be a Label, int, uuid, string')
-		return True if cursor.rowcount > 0 else False
+				raise TypeError('survey_id must be an integer, or uuid')
 		
+		survey = cursor.fetchone()
 
-	def update_survey(self, survey_id: Survey | int | UUID, survey_date: datetime | None = None, name: str | None = None, additional_info: str | None = None):
+		if survey is None:
+			raise Exception('Failed to update sruvey!')
+
+		return survey		
+
+	def update_survey(self, survey_id: int | UUID, parameters: dict):
 		''' Augment a survey in the database by providing a modified Survey object or a valid id and a new name, and or survey_date, and or additional_info
 		
 		Args:
@@ -1183,61 +1602,70 @@ class Database:
 			name: the new name for the survey
 			additional_info: a link to an additional info regarding the survey
 		'''
-		return self._update_survey(survey_id = survey_id, survey_date = survey_date, name = name, additional_info = additional_info)
+		return self._update_survey(survey_id = survey_id, parameters=parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _delete_survey(self, cursor: psycopg.Cursor[Survey], survey_ids: Survey | int | UUID) -> bool:
+	def _delete_survey(self, cursor: psycopg.Cursor[Survey], survey_id: int | UUID) -> bool:
 		''' Internal helper function, do not call directly
 		
 		'''
 		query = sql.SQL(' DELETE FROM projectmanagement.surveys WHERE {id_field} = %s; ')
-		match survey_ids:
-			case list() if isinstance(survey_ids[0], Survey):
-				cursor.executemany(query.format(id_field = sql.Identifier('survey_id')), [(survey.survey_id,) for survey in survey_ids])
-			case list() if isinstance(survey_ids[0], int):
-				cursor.executemany(query.format(id_field = sql.Identifier('survey_id')), [(survey_id,) for survey_id in survey_ids])
-			case list() if isinstance(survey_ids[0], UUID):
-				cursor.executemany(query.format(id_field = sql.Identifier('uuid')), [(survey_id,) for survey_id in survey_ids])
-			case Survey():
-				cursor.execute(query.format(id_field = sql.Identifier('survey_id')), (survey_ids.survey_id,))
+		match survey_id:
 			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('survey_id')), (survey_ids,))
+				cursor.execute(query.format(id_field = sql.Identifier('survey_id')), (survey_id,))
 			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (survey_ids,))
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (survey_id,))
 			case _:
 				raise TypeError('survey_id must be a Survey, int, uuid')
+
 		return True if cursor.rowcount > 0 else False
 	
-	def delete_survey(self, survey_ids: Survey | int | UUID) -> bool:
+	def delete_survey(self, survey_id: int | UUID) -> bool:
 		''' Delete a survey object from the database
 		
 		Args:
 			survey_id: either a survey object, a database id, or a universally unique identifier
 		'''
-		return self._delete_survey(survey_ids = survey_ids)
+		return self._delete_survey(survey_ids = survey_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Images	
 
 	@connect
-	def _create_image(self, cursor: psycopg.Cursor[Image], name: str, herd_unit_id: int | UUID, survey_id: int | UUID, img_key: str, image_length: int, image_width: int) -> Image | None:
+	def _create_image(self, cursor: psycopg.Cursor[Image], parameters: dict) -> Image:
 		'''
 		
 		'''
 		cursor.row_factory = class_row(Image)
-		herd_unit_id = herd_unit_id if isinstance(herd_unit_id, int) else self._get_herd_unit(herd_unit_id).herd_unit_id
-		survey_id = survey_id if isinstance(survey_id, int) else self._get_survey(survey_id).survey_id
-		cursor.execute(sql.SQL(' INSERT INTO core.images (herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px) VALUES (%s, %s, %s, %s, %s, %s) RETURNING *; '), (herd_unit_id, survey_id, name, img_key, image_length, image_width))
-		image = cursor.fetchone()	
-		return image if isinstance(image, Image) else None 
 
-	def create_image(self, name: str, herd_unit_id: int | UUID, survey_id: int | UUID, img_key: str, image_length: int, image_width: int) -> Image | None:
+		query_1 = sql.SQL(''' 
+			INSERT INTO core.images (
+				herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px,
+				area, viewshed_polygon, has_detection, dem_name, bbox_wsen
+			) 
+			VALUES (
+				%(herd_unit_id)s, %(survey_id)s, %(name)s, %(img_key)s, %(image_length_px)s, 
+				%(image_width_px)s, %(area)s, %(viewshed_polygon)s, %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
+			) 
+			RETURNING *; 
+		''')
+		
+		cursor.execute(query_1, parameters)
+
+		image = cursor.fetchone()
+
+		if not image: 
+			raise Exception('Image creation failed')
+
+		return image
+
+	def create_image(self, parameters: dict) -> Image:
 		'''
 		
 		'''
-		return self._create_image(name = name, herd_unit_id = herd_unit_id, survey_id=survey_id, img_key = img_key, image_length = image_length, image_width = image_width)
+		return self._create_image(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1260,7 +1688,7 @@ class Database:
 			raise Exception('Could not find image')
 		return image 
 	
-	def getImage(self, image_id: int | UUID) -> Image:
+	def get_image(self, image_id: int | UUID) -> Image:
 		'''
 		
 		'''
@@ -1268,29 +1696,103 @@ class Database:
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	#TODO: finish KW arg population
 	@connect 
-	def _update_image(self, cursor: psycopg.Cursor, image_id: Image | int | UUID, name: str | None, img_key: str | None, opened_by_user_id: int | None) -> bool:
-		''' Not fully implemented, do
+	def _get_image_crops(self, cursor: psycopg.Cursor[ReviewedArea], image_id: int | UUID) -> List[ReviewedArea]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(ReviewedArea)
+		query = sql.SQL(' SELECT * FROM core.reviewed_area WHERE image_id = %s; ')
+
+		match image_id: 
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute(query, (db_id,))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID!')
+		
+		return cursor.fetchall()
+
+	def get_image_crops(self, image_id: int | UUID) -> List[ReviewedArea]:
+		'''
+		'''
+		return self._get_image_crops(image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_image_predictions(self, cursor: psycopg.Cursor[Prediction], image_id: int | UUID) -> List[Prediction]:
+		'''
+		'''
+		cursor.row_factory = class_row(Prediction)
+		query = sql.SQL(' SELECT * FROM core.predictions WHERE image_id = %s; ')
+
+		match image_id:
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute(query, (db_id,))
+			case _:
+				raise TypeErorr('image_id must be an integer, or UUID!')
+
+		return cursor.fetchall()
+
+	def get_image_predictions(self, image_id: int | UUID) -> List[Prediction]:
+		'''
+		'''
+		return self._get_image_predictions(image_id = image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_image_annotations(self, cursor: psycopg.Cursor[Annotation], image_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		cursor.row_factory = class_row(Annotation)
+		query = sql.SQL(' SELECT * FROM core.annotations WHERE image_id = %s; ')
+
+		match image_id:
+			case int():
+				cursor.execute(query, (image_id,))
+			case UUID():
+				db_id = self.get_image(image_id).image_id
+				cursor.execute((query), (db_id,))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID!')
+		
+		return cursor.fetchall()
+
+	def get_image_annotations(self, image_id: int | UUID) -> List[Annotation]:
+		'''
+		'''
+		return self._get_image_annotations(image_id = image_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _update_image(self, cursor: psycopg.Cursor[Image], image_id: int | UUID, parameters: dict) -> Image:
+		'''
 		
 		'''
+		cursor.row_factory = class_row(Image)
 		query = sql.SQL(''' UPDATE core.images SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; ''')
+							WHERE {id_field} = %s
+							RETURNING *; ''')
 		kw_augmented_field = sql.SQL(',').join(
 			[
 				sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-				for key, value, in locals().items() 
-				if key in set(['name', 'img_key', 'image_length_px', 'image_width_px', 'herd_unit_id', 'survey_id', 'opened_by_user_id'])
+				for key, value, in parameters.items() 
+				if key in set([
+					'name', 'img_key', 'image_length_px', 'image_width_px', 'herd_unit_id', 'survey_id', 
+					'opened_by_user_id', 'area', 'polygon', 'has_detection', 'dem_name', 'bbox_wsen' 
+					])
 				and value is not None
 			]
 		) 
-
 		match image_id:
-			case Image():
-				cursor.execute(query.format(
-					augmented_field = sql.SQL(f"name = '{image_id.name}', herd_unit_id = '{image_id.herd_unit_id}', image_length_px = '{image_id.image_length_px}', image_width_px = '{image_id.image_width_px}'"), # type: ignore
-					id_field = sql.Identifier('image_id')
-				), (image_id.image_id,))
 			case int():
 				cursor.execute(query.format(
 					augmented_field = kw_augmented_field,
@@ -1302,14 +1804,43 @@ class Database:
 					id_field = sql.Identifier('uuid')
 				), (image_id,))
 			case _:
-				raise TypeError('image_id must be an Image, int, or UUID')
-		return True
+				raise TypeError('image_id must be an integer, or UUID')
+		image = cursor.fetchone()
+
+		if image is None:
+			raise Exception('Failed to update image!')
+
+		return image
 	
-	def update_image(self, image_id: Image | int | UUID, name: str | None=None, img_key: str | None=None, opened_by_user_id: int | None=None) -> bool:
+	def update_image(self, image_id: int | UUID, parameters: dict) -> Image:
 		'''
 		
 		'''
-		return self._update_image(image_id = image_id, name=name, img_key=img_key, opened_by_user_id=opened_by_user_id)
+		return self._update_image(image_id, parameters)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _delete_image(self, cursor: psycopg.Cursor, image_id: int | UUID) -> bool:
+		'''
+
+		'''
+		query = sql.SQL(''' DELETE FROM core.images WHERE {id_field} = %s; ''')
+		match image_id:
+			case int():
+				cursor.execute(query.format(id_field = sql.Identifier('image_id')), (image_id,))
+			case UUID():
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (image_id,))
+			case _:
+				raise TypeError('image_id must be an integer, or UUID')
+
+		return True if cursor.rowcount > 0 else False
+
+	def delete_image(self, image_id: int | UUID) -> bool:
+		'''
+		
+		'''
+		return self._delete_image(image_id=image_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Predictions
@@ -2204,7 +2735,6 @@ class Database:
 		survey = self._get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
 		herd_unit = self._get_herd_unit(herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
 		schema = self._get_schema(schema_id) if not isinstance(schema_id, Schema) else schema_id
-		y = class_row(Model)
 		cursor.row_factory = class_row(Model)
 		query = sql.SQL(''' SELECT models.model_id, name, created, modified, uuid, schema_id FROM projectmanagement.models AS models
 							JOIN projectmanagement.surveys_models AS surveys_models ON surveys_models.model_id = models.model_id

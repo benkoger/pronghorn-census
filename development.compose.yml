@@ -1,11 +1,37 @@
 services:
+  db:
+    container_name: prong_gres
+    image: postgres:18
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pronghorn_count -d testing"]
+      interval: 5s
+      timeout: 5s 
+      retries: 5
+    restart: always
+    environment:
+      POSTGRES_USER: pronghorn_count
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: testing
+    volumes:
+      - type: bind
+        source: ./local_db/restore.sh
+        target: /docker-entrypoint-initdb.d/restore.sh
+      - ./local_db/dev-bootstrap:/dev-bootstrap:Z
+    networks:
+      - dev_pronghorn_app_network
+    ports:
+      - "5432:5432"
+    command: ["postgres", "-c", "listen_addresses=*"]
   pronghorn-api-dev:
+    depends_on:
+      db:
+        condition: service_healthy
     container_name: prong_dev_api
     build:
       context: .
       dockerfile: development.prongapi.containerfile
     environment:
-      ORIGIN_URL: https://pronghorn-count-dev.arcc.uwyo.edu
+      ORIGIN_URL: ${ORIGIN_URL}
       ROOT: ${ROOT}
       HERD_UNIT: ${HERD_UNIT}
       CROP_FOLDER: ${CROP_FOLDER}
@@ -19,7 +45,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS} 
       DB_PORT: ${DB_PORT}
-      DB_NAME: pronghorn_count_test
+      DB_NAME: ${DB_NAME}
       BUCKET_NAME: ${BUCKET_NAME}
       NUM_API_WORKERS: ${NUM_API_WORKERS}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -33,6 +59,8 @@ services:
       /bin/bash -c "source /venv/api_env/bin/activate && python -u /app/app.py"
     networks: 
       - dev_pronghorn_app_network
+    ports: 
+      - 8000:8000
   valkey:
     container_name: prong_dev_valkey
     image: docker.io/valkey/valkey:8.1.1
@@ -40,6 +68,8 @@ services:
       test: valkey-cli ping || exit 1
     restart: always
     command: valkey-server --requirepass ${VALKEY_PASS}
+    ports:
+      - "6379:6379"
     networks: 
       - dev_pronghorn_app_network
   web-app-dev:
@@ -61,41 +91,8 @@ services:
           action: restart
     networks: 
       - dev_pronghorn_app_network
-  dev-proxy:
-    container_name: prong_dev_proxy
-    image: nginx:latest
-    ports:
-      - "443:443"
-      - "80:80"
-    networks:
-      - dev_pronghorn_app_network
-    volumes:
-      - dev_nginx_conf:/etc/nginx/
-      - nginx_certs:/etc/ssl/
-
-  # Postgres database, uncomment if not using external database host
-  # db:
-  #   container_name: postgres_container
-  #   image: postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: root
-  #     POSTGRES_PASSWORD: $(DB_ROOT_PASS)
-  #     POSTGRES_DB: annotation_db
-  #   volumes:
-  #     - $(DB_STORAGE):/var/lib/postgresql/data
-  #   networks:
-  #     - pronghorn_app_network
-  #   ports:
-  #     - "5432:5432"
-  #   user: "999:999"
-
-
-volumes:
-  dev_nginx_conf:
-    external: true
-  nginx_certs:
-    external: true
+    ports: 
+      - 5173:5173
 
 networks: 
   dev_pronghorn_app_network:

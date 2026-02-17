@@ -17,13 +17,19 @@ class FlaskConfig:
 	SESSION_REDIS = redis.from_url(os.environ.get('SESSION_REDIS'))
 	ORIGIN_URL = os.environ.get('ORIGIN_URL')
 	BUCKET_NAME = os.environ.get('BUCKET_NAME')
+	SWAGGER = {
+        'title': 'AIrial API',
+		'version': '1.0.0',
+		'description': 'Note: the try it out button wont work because of auth. Will be fixed with oauth2.0',
+        'uiversion': 3,
+    }
 
 db_config = {
 	'dbname': os.environ.get('DB_NAME'),
 	'user': os.environ.get('DB_USER'),              
 	'password': os.environ.get('DB_PASS'),    
 	'host': os.environ.get('DB_HOST'),           
-	'port': os.environ.get('DB_PORT'),      
+	'port': os.environ.get('DB_PORT'),    
 	'options': '-c statement_timeout=5000'        
 }
 
