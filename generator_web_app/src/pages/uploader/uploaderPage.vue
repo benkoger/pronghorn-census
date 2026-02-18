@@ -13,6 +13,7 @@ export default defineComponent({
 	},
 	setup() {
 		const pStore = useProjectStore();
+		if (pStore.projects.length == 0) pStore.get_projects();
 		return { pStore };
 	},
 	mounted() {

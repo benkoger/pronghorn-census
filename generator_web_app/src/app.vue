@@ -33,15 +33,13 @@ export default defineComponent({
 </script>
 
 <template>
-  <BApp class="vh-100 d-flex flex-column overflow-hidden">
-    
-    <Header />
+  <BApp>
+    <Header class="flex-shrink-0" /> 
     <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
-    <div class="d-flex flex-grow-1 overflow-hidden">
-      
       <main 
-        class="flex-grow-1 overflow-y-auto p-4 bg-body"
+        class="d-flex flex-column overflow-y-auto p-4 bg-body"
         :style="{ 
+          height: '93vh',
           marginLeft: uStore.nav_toggled ? '10%' : '4%', 
           transition: 'margin-left 0.2s' 
         }"
@@ -49,7 +47,5 @@ export default defineComponent({
         <BOrchestrator />
         <RouterView />
       </main>
-      
-    </div>
   </BApp>
 </template>

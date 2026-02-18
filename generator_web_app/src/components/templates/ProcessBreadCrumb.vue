@@ -37,12 +37,10 @@ export default {
 <template>
 	<nav>
     	<BBreadcrumb :items="breadcrumbItems" />
-		<div class="mt-4">
-			<slot :currentStep="modelValue"></slot>
-		</div>
-		<div
+	</nav>
+	<div
 			v-if="showButtons" 
-			class="d-flex mt-4"
+			class="d-flex mt-1"
 			:class="{ 
 				'justify-content-between': !isFirstStep, 
 				'justify-content-end': isFirstStep 
@@ -65,6 +63,8 @@ export default {
 				{{ nextText }}
 			</BButton>
 		</div>
-	</nav>
+		<div class="mt-4 flex-grow-1 overflow-auto">
+			<slot :currentStep="modelValue"></slot>
+		</div>
 </template>
 

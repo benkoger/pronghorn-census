@@ -209,6 +209,86 @@ export default defineComponent({
 });
 </script>
 <template>
+	<BContainer class="h-100" fluid>
+		<BRow class="h-100">
+			<BCol cols="9" class="d-flex flex-column m-0 h-100"> 
+				<h3>Upload Dropzone</h3>
+				<div class="h-100 rounded-3 shadow d-flex justify-content-center align-items-center bg-body-tertiary">
+					<div
+						id="Upload-DropZone"
+						class="d-flex h-100 w-100 justify-content-center align-items-center"
+						@dragover="drag_over"
+						@dragleave="drag_leave"
+						@drop="drop"
+					>
+					<input
+						type="file"
+						id="File-Input"
+						webkitdirectory=""
+						style="display: none"
+						directory="" 
+						@change="on_change"
+						ref="file"
+					/>
+
+					<label for="File-Input">
+						<Icon icon="material-symbols:upload" width="48" height="48"></Icon>
+						<div v-if="is_dragging">Release to drop files here.</div>
+						<div v-else>Drop files here or click anywhere to upload.</div>
+					</label>
+					<div class="preview-container mt-4" v-if="files.length">
+						<div v-for="file in files" :key="file.name" class="preview-card">
+						<Icon
+							icon="file-icons:numpy"
+							width="36px"
+							height="36px"
+							v-if="file.name.toLowerCase().endsWith('.npy')"
+						></Icon>
+						<Icon
+							icon="material-symbols:image-outline"
+							width="36px"
+							height="36px"
+							v-else-if="file.type.startsWith('image/')"
+						></Icon>
+						<p>
+							{{ file.name }}
+						</p>
+						<button
+							class="ml-2"
+							type="button"
+							@click="remove(files.indexOf(file))"
+							title="Remove file"
+						>
+							x
+						</button>
+						</div>
+					</div>
+					</div>
+				</div>
+			</BCol>
+			<BCol cols="3"> 
+				<h3>Statistics</h3> 
+			</BCol>
+		</BRow>
+	</BContainer>
+</template>
+<style scoped>
+	label:hover {
+		cursor: pointer;
+	}
+	label {
+		display: flex;
+		flex-grow: 1;
+		width: 100%;
+		height: 100%;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		text-align: center;
+	}
+</style>
+
+<!-- <template>
 <div id="Uploader-Contianer">
 	<div
 	id="Upload-DropZone"
@@ -435,4 +515,4 @@ export default defineComponent({
 		margin-right: 5%;
 	}
 	}
-</style>
+</style> -->
