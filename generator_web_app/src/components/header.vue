@@ -30,8 +30,8 @@ export default defineComponent({
 
 <template>
     <header 
-        class="sticky-top d-flex justify-content-between align-items-center bg-body-secondary py-2 px-3"
-        :style="{height: '7vh'}"
+        class="sticky-top d-flex justify-content-between align-items-center bg-body-secondary py-4 px-3"
+        :style="{height: '8vh'}"
         >
         <div>
             <h3 class="m-0">AIerial Survey Annotation Tools</h3>

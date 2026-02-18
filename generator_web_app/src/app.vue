@@ -39,7 +39,7 @@ export default defineComponent({
       <main 
         class="d-flex flex-column overflow-y-auto p-4 bg-body"
         :style="{ 
-          height: '93vh',
+          height: '92vh',
           marginLeft: uStore.nav_toggled ? '10%' : '4%', 
           transition: 'margin-left 0.2s' 
         }"
