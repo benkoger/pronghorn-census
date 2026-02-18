@@ -16,7 +16,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'dashboard',
-      component: () => import('@/components/pages/dashboard.vue'),
+      component: () => import('@/pages/dashboard.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -25,7 +25,7 @@ const router = createRouter({
     {
       path: '/user/:uuid?',
       name: 'user',
-      component: () => import('@/components/pages/user.vue'),
+      component: () => import('@/pages/user.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -34,7 +34,7 @@ const router = createRouter({
     {
       path: '/auto-cropper/:projects?/:uuid?',
       name: 'auto-cropper',
-      component: () => import('@/components/pages/autoCropper/autoCropperPage.vue'),
+      component: () => import('@/pages/autoCropper/autoCropperPage.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -43,7 +43,7 @@ const router = createRouter({
     {
       path: '/crop-verifier/:projects?/:uuid?',
       name: 'crop-verifier',
-      component: () => import('@/components/pages/cropVerifier/cropVerifierPage.vue'),
+      component: () => import('@/pages/cropVerifier/cropVerifierPage.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -52,7 +52,7 @@ const router = createRouter({
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/components/pages/settings.vue'),
+      component: () => import('@/pages/settings.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -61,7 +61,7 @@ const router = createRouter({
     {
       path: '/statistics',
       name: 'statistics',
-      component: () => import('@/components/pages/statistics.vue'),
+      component: () => import('@/pages/statistics.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -70,7 +70,7 @@ const router = createRouter({
     {
       path: '/upload/:projects?/:uuid?',
       name: 'upload',
-      component: () => import('@/components/pages/uploader/uploaderPage.vue'),
+      component: () => import('@/pages/uploader/uploaderPage.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,

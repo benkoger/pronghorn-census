@@ -5,7 +5,7 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, getUserOrganizations, deauthUser } from '../apiV1Methods.ts';
+import { authUser, checkAuth, getCurrentUser, getUserOrganizations, deauthUser } from '../api/apiV1Methods.ts';
 import { User, Organization } from '@/types/generatorobjects.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -16,6 +16,7 @@ export const useUserStore = defineStore('userStore', {
         user: undefined as User | undefined,
         organizations: undefined as Organization[] | undefined,
         organization_idx: undefined as number | undefined,
+        nav_toggled: false
     }),
     getters: {
         CurrentOrganization: (state) => (state.organizations && state.organization_idx) ? state.organizations[state.organization_idx] : undefined,
@@ -39,6 +40,9 @@ export const useUserStore = defineStore('userStore', {
         },
         async get_user_organizations() {
             this.organizations = await getUserOrganizations();
+        },
+        toggle_nav(value: boolean) {
+            this.nav_toggled = value;
         },
         set_current_organization(org: Organization) {
             if (this.organizations) {

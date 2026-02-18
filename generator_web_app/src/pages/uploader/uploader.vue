@@ -1,10 +1,10 @@
- <script lang="ts">
+<script lang="ts">
 // https://serversideup.net/blog/file-uploads-using-fetch-api-and-vuejs/
 // https://blog.logrocket.com/customizing-drag-drop-file-uploading-vue/#creating-advanced-dropzone
 import { defineComponent } from "vue";
 import { ref } from "vue";
 import { HerdUnit, Project, Survey, Model, Schema } from "@/types/generatorobjects";
-import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/apiV1Methods";
+import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/api/apiV1Methods";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { mapState } from "pinia";
 import { Md5 } from "ts-md5";

@@ -1,13 +1,12 @@
 // Project state store 
 // Author: Michael B. Lance
-// Created: August 6, 2025
-// Updated: September 11, 2025
+
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from "pinia";
-import { getProjects, getProjectSchemas, getProjectHerdUnits, getProjectModels, getProjectSurveys, getSchemaLabels, getCropperModels, getCropperHerdUnits } from "../apiV1Methods";
-import { Project, Schema, Label, HerdUnit, Model, Survey } from "../../types/generatorobjects";
-import { idText } from "typescript";
+import { getProjects, getProjectSchemas, getProjectHerdUnits, getProjectModels, getProjectSurveys, getSchemaLabels, getCropperModels, getCropperHerdUnits } from "../api/apiV1Methods";
+import { Project, Schema, Label, HerdUnit, Model, Survey } from "@/types/generatorobjects";
+import { getSurveyHerdUnits } from "@/modules/api/surveys";
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
@@ -123,7 +122,7 @@ export const useProjectStore = defineStore('pStore', {
             if (this.CurrentProject) this.herd_units = await getProjectHerdUnits(this.CurrentProject.uuid) as HerdUnit[];
         },
         async get_cropper_herd_units() {
-            if (this.CurrentSurvey) this.herd_units = await getCropperHerdUnits(this.CurrentSurvey.uuid) as HerdUnit[];
+            if (this.CurrentSurvey) this.herd_units = await getSurveyHerdUnits(this.CurrentSurvey.uuid) as HerdUnit[];
         },
         set_current_herd_unit(herdunit: HerdUnit | undefined) {
             if (herdunit != undefined) {

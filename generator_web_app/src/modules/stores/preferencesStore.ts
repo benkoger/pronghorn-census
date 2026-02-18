@@ -1,39 +1,34 @@
 // Preference state store 
 // Author: Michael B. Lance
-// Created: August 15, 2025
-// Updated: August 15, 2025
+
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from "pinia";
 
 export const usePreferenceStore = defineStore('preferenceStore', {
-	state: () => ({
-		first_login: true, // default to true until set otherwise
-		theme: 'light-theme',
-		batch_size: 20,
-
-	}),
-	persist: {
-		key: 'user-preferences'
-	},
-	actions: {
-		getBrowserPreference() {
-			const hasDarkPreference = window.matchMedia(
-        		'(prefers-color-scheme: dark)'
-      		).matches;
-      		if (hasDarkPreference) {
-      		  return 'dark-theme';
-      		} else {
-       		return 'light-theme';
-      		}
-		},
-		setTheme(theme: string) {
-			this.theme = theme;
-			document.documentElement.className = theme;
-		},
-		toggleTheme() {
-			this.theme = (this.theme == 'light-theme') ? 'dark-theme' : 'light-theme';
-			document.documentElement.className = this.theme;
-		}
-	}
+    state: () => ({
+        first_login: true,
+        theme: 'dark', 
+        batch_size: 20,
+    }),
+    persist: {
+        key: 'user-preferences'
+    },
+    actions: {
+        initializeTheme() {
+            const savedTheme = this.theme || (this.getBrowserPreference() ? 'dark' : 'light');
+            this.setTheme(savedTheme);
+        },
+        getBrowserPreference(): boolean {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        },
+        setTheme(theme: string) {
+            this.theme = theme;
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        },
+        toggleTheme() {
+            const newTheme = this.theme === 'light' ? 'dark' : 'light';
+            this.setTheme(newTheme);
+        }
+    }
 })

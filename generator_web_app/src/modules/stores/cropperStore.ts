@@ -8,7 +8,7 @@ import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
 import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects';
 import type { autoCropperBatch } from '@/types/generatorobjects';
-import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, closeImage, closeCropSession, setPredicionsReviewed } from '../apiV1Methods';
+import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, closeImage, closeCropSession, setPredicionsReviewed } from '../api/apiV1Methods';
 import { usePreferenceStore } from '@/modules/stores/preferencesStore';
 
 //---------------------------------------------------------------------------------------------------------------------------//

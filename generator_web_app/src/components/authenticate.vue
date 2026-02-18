@@ -2,18 +2,16 @@
 import { defineComponent, ref, computed } from 'vue'; 
 import { useUserStore } from '@/modules/stores/userStore';
 import { useRouter, useRoute } from 'vue-router';
-import { useToast } from "vue-toastification";
 
 export default defineComponent({
     name: 'Authenticate',
     setup() {
-        const toast = useToast();
         const user_store = (useUserStore());
         const router = useRouter();
         const route = useRoute();
         const redirection_path = route.query.redirect as string; 
   
-        return { user_store, router, route, redirection_path, toast }
+        return { user_store, router, route, redirection_path }
     },
     data() {
         return {
@@ -25,15 +23,6 @@ export default defineComponent({
         async establish_auth(external_id: string) {
             await this.user_store.authenticate(external_id)
             if (this.user_store.logged_in) {
-                this.toast.dismiss('auth-warning');
-                this.toast.success(`Welcome, ${this.user_store.user?.username}, last login: ${this.user_store.user?.last_login.toLocaleString('en-US', { 
-                    year: 'numeric', 
-                    month: 'numeric', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: 'numeric', 
-                    second: 'numeric', 
-                    hour12: true })}`, {timeout: 2500});
                 if (this.redirection_path) {
                     this.router.push(this.redirection_path);
                 }
@@ -41,24 +30,12 @@ export default defineComponent({
                     this.router.push('/');
                 }
             } else {
-                this.toast('Authentication Failed!');
-            }
-        },
-        start_up_toast() {
-            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-                window.requestIdleCallback(() => {
-                    this.toast.warning('You must authenticate to access this resource!', {id: 'auth-warning'});
-                });
-            } else {
-                setTimeout(() => {
-                    this.toast.warning('You must authenticate to access this resource!');
-                }, 0);
+
             }
         },
     },
    
     async mounted() {        
-        this.start_up_toast()
         await this.user_store.check_auth();
         if (this.user_store.logged_in == true) {
             this.router.push('/')

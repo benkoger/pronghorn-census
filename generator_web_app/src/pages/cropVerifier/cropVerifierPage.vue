@@ -10,7 +10,7 @@ export default defineComponent({
     components: {
         selector1: defineAsyncComponent(() => import('@/components/templates/objectSelector/selector1.vue')),
         selector2: defineAsyncComponent(() => import('@/components/templates/objectSelector/selector2.vue')),
-        Validate: defineAsyncComponent(() => import('@/components/pages/cropVerifier/verify.vue'))
+        Validate: defineAsyncComponent(() => import('@/pages/cropVerifier/verify.vue'))
     },
     setup() {
         const pStore = useProjectStore();
