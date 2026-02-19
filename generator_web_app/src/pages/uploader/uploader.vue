@@ -244,7 +244,7 @@ export default defineComponent({
 							id="FilesPreview"
 							class="d-flex h-25 bg-body-secondary w-100 shadow-sm rounded-bottom 
 							p-2 overflow-y-hidden overflow-x-scroll border-top gap-3
-							justify-content-center align-items-center" 
+							justify-content-center align-items-center Overflow" 
 							v-if="files.length"
 						>
 							<div 
@@ -382,7 +382,8 @@ export default defineComponent({
 		align-items: center;
 		text-align: center;
 	}
-	#FilesPreview {
-		padding-left: 28vw !important;
+	.Overflow {		
+		justify-content: flex-start !important;
+		scroll-padding-inline: 10%;
 	}
 </style>
