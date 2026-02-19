@@ -7,7 +7,7 @@
 import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
 import { Annotation, Box, Label, ReviewedArea, type cropVerifierBatch, type konvaBoxConf, type tempRect } from '@/types/generatorobjects';
-import { fetchReviewedArea, getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl, closeCropSession, submitApprovedAreaAnnotations } from '@/modules/apiV1Methods';
+import { fetchReviewedArea, getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl, closeCropSession, submitApprovedAreaAnnotations } from '@/modules/api/apiV1Methods';
 import { useImage, type KonvaNodeConstructor } from 'vue-konva';
 
 //---------------------------------------------------------------------------------------------------------------------------//

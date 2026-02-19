@@ -1,14 +1,12 @@
-import './assets/main.css';
-import './assets/layout.css';
-import 'vue-toastification/dist/index.css';
+import '@/assets/custom.scss'
+import 'bootstrap/dist/css/bootstrap.css'
+import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './app.vue';
 import router from './router';
 import { Icon } from '@iconify/vue';
-import Toast from 'vue-toastification';
-import { POSITION, type PluginOptions } from 'vue-toastification';
 import VueKonva from 'vue-konva';
 import { useUserStore } from './modules/stores/userStore';
 
@@ -20,18 +18,9 @@ app.use(pinia);
 app.use(router);
 app.use(VueKonva);
 
-const options: PluginOptions = {
-    position: POSITION.BOTTOM_RIGHT,
-    transition: "Vue-Toastification__bounce",
-    maxToasts: 5,
-    newestOnTop: true
-};
-
 const userStore = useUserStore();
 
 await userStore.check_auth();
-
-app.use(Toast, options);
 
 app.component('Icon', Icon);
 

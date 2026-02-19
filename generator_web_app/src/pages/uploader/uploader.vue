@@ -1,12 +1,11 @@
- <script lang="ts">
+<script lang="ts">
 // https://serversideup.net/blog/file-uploads-using-fetch-api-and-vuejs/
 // https://blog.logrocket.com/customizing-drag-drop-file-uploading-vue/#creating-advanced-dropzone
 import { defineComponent } from "vue";
 import { ref } from "vue";
 import { HerdUnit, Project, Survey, Model, Schema } from "@/types/generatorobjects";
-import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/apiV1Methods";
+import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/api/apiV1Methods";
 import { useProjectStore } from "@/modules/stores/projectStore";
-import { mapState } from "pinia";
 import { Md5 } from "ts-md5";
 import { filesize } from 'filesize';
 
@@ -52,6 +51,12 @@ export default defineComponent({
 		},
 		numFiles() {
 			return this.files.length;
+		},
+		canStart() {
+			if (this.numFiles > 0) {
+				return true;
+			}
+			return false;
 		}
 	},
 	methods: {
@@ -80,21 +85,25 @@ export default defineComponent({
 			this.is_dragging = false;
 		}
 	},
+	clear() {
+		this.files = [];
+	},
 	remove(index: number) {
 		this.files.splice(index, 1);
 	},
+	startUpload() {
+		this.is_uploading = true;
+		//this.upload();
+	},
 	async upload() {
 		// Cache relevant Ids from store (Current objects are computed getters in the store)
-		this.is_uploading = true;
-		const project_id = this.pStore.CurrentProject?.uuid;
 		const survey_id = this.pStore.CurrentSurvey?.uuid;
 		const herd_unit_id = this.pStore.CurrentHerdUnit?.uuid;
-		const model_id = this.pStore.CurrentModel?.uuid;
 
 		for (const file of this.files) {
 			const extension = file.name.toLowerCase().split(".").pop();
-			this.current_file_name = file.name
-			this.current_file_size = filesize(file.size)
+			this.current_file_name = file.name;
+			this.current_file_size = filesize(file.size);
 			// Check if file is image (switch case)
 			switch (extension) {
 				case "jpg":
@@ -195,10 +204,6 @@ export default defineComponent({
 					);
 					this.current_file_num++;
 					this.current_file_part = 0;
-
-				// Check if file is npy (switch case)
-
-				// Expand switch statement
 			}
 		}
 		this.current_file_num = 0;
@@ -209,230 +214,176 @@ export default defineComponent({
 });
 </script>
 <template>
-<div id="Uploader-Contianer">
-	<div
-	id="Upload-DropZone"
-	@dragover="drag_over"
-	@dragleave="drag_leave"
-	@drop="drop"
-	>
-	<input
-		type="file"
-		id="File-Input"
-		webkitdirectory=""
-		style="display: none"
-		directory=""
-		@change="on_change"
-		ref="file"
-	/>
+	<BContainer class="h-100" fluid>
+		<BRow class="h-100">
+			<BCol cols="9" class="d-flex flex-column m-0 h-100"> 
+				<h3>File Dropzone</h3>
+				<div class="h-100 rounded-3 shadow d-flex justify-content-center align-items-center bg-body-tertiary">
+					<div
+						id="Upload-DropZone"
+						class="d-flex h-100 w-100 justify-content-center align-items-center flex-column"
+						@dragover="drag_over"
+						@dragleave="drag_leave"
+						@drop="drop"
+					>
+						<input
+							type="file"
+							id="File-Input"
+							webkitdirectory=""
+							style="display: none"
+							directory="" 
+							@change="on_change"
+							ref="file"
+						/>
+						<label for="File-Input">
+							<Icon icon="material-symbols:upload" width="48" height="48"></Icon>
+							<div v-if="is_dragging">Release to drop files here.</div>
+							<div v-else>Drop files here or click anywhere to upload.</div>
+						</label>
+						<div 
+							id="FilesPreview"
+							class="d-flex h-25 bg-body-secondary w-100 shadow-sm rounded-bottom 
+							p-2 overflow-y-hidden overflow-x-scroll border-top gap-3
+							justify-content-center align-items-center Overflow" 
+							v-if="files.length"
+						>
+							<div 
+								class="border overflow-hidden rounded-3 d-flex flex-shrink-0 p-1"
+								style="width: 250px"
+								v-for="file in files" :key="file.name" 
+							>
+								<BRow class="g-0 w-100 d-flex justify-content-evenly">
+									<BCol cols="2" class="d-flex align-items-center justify-content-center">
+									<Icon
+										icon="material-symbols:image-outline"
+										width="auto"
+										height="100%"
+										v-if="file.type.startsWith('image/')"
+										/>
+									</BCol>
+									<BCol cols="10">
+										<BCardBody class="overflow-hidden d-flex w-100 justify-content-between align-items-center">
+											<BCardText class="d-flex justify-content-center align-items-center" style="max-width: 170px">
+												<small class="text-truncate">{{ file.name }}</small>
+											</BCardText>
+											<BButton
+												size="sm"
+												variant="outline-danger"
+												type="button"
+												@click="remove(files.indexOf(file))"
+												title="Remove file"
+											>
+												x
+											</BButton>
+										</BCardBody>
+									</BCol>
+								</BRow>
+							</div>
+						</div>
+					</div>
+				</div>
+			</BCol>
+			<BCol cols="3" class="d-flex flex-column m-0 h-100"> 
+				<h3>Upload Details</h3>
+				<div class="d-flex flex-column flex-grow-1 w-100 bg-body-tertiary rounded-top-3 shadow p-2">
+					<h4>Destination</h4>
+					<BListGroup>
+						<BListGroupItem>
+							<strong>Project:</strong> {{ pStore.CurrentProject?.name }}
+						</BListGroupItem>
+						<BListGroupItem>
+							<strong>Herd Unit:</strong> {{ pStore.CurrentHerdUnit?.name }}
+						</BListGroupItem>
+						<BListGroupItem>
+							<strong>Survey:</strong> {{ pStore.CurrentSurvey?.name }}
+						</BListGroupItem>
+					</BListGroup>
+					<h4 class="mt-2">Upload Info</h4>
+					<BListGroup>
+						<BListGroupItem>
+							<strong>Upload Size:</strong> {{ uploadSize }}
+						</BListGroupItem>
+						<BListGroupItem>
+							<strong>Number of Files:</strong> {{ numFiles }}
+						</BListGroupItem>
+					</BListGroup>
+					<br>
+					<BButton 
+						variant="outline-danger" 
+						size="sm" 
+						v-if="numFiles > 0"
+						@click="clear()"
+					>
+						Clear all Files
+					</BButton>
+					<p class="p-1 mt-4">
+						This utility is designed to allow for entire surveys to be Uploaded
+						at once. Due to the large volume of data it is reccomended to use only 
+						use this on a computer connected to AC power with a fast, prefererably 
+						wired internet connection.
+					</p>
 
-	<label for="File-Input">
-		<Icon icon="material-symbols:upload" width="48" height="48"></Icon>
-		<div v-if="is_dragging">Release to drop files here.</div>
-		<div v-else>Drop files here or click anywhere to upload.</div>
-	</label>
-	<div class="preview-container mt-4" v-if="files.length">
-		<div v-for="file in files" :key="file.name" class="preview-card">
-		<Icon
-			icon="file-icons:numpy"
-			width="36px"
-			height="36px"
-			v-if="file.name.toLowerCase().endsWith('.npy')"
-		></Icon>
-		<Icon
-			icon="material-symbols:image-outline"
-			width="36px"
-			height="36px"
-			v-else-if="file.type.startsWith('image/')"
-		></Icon>
-		<p>
-			{{ file.name }}
-		</p>
-		<button
-			class="ml-2"
-			type="button"
-			@click="remove(files.indexOf(file))"
-			title="Remove file"
-		>
-			x
-		</button>
-		</div>
-	</div>
-	</div>
-	<div id="Uploader-Context">
-	<h2> Statistics </h2>
-	<ul style="align-self: flex-start">
-		<li> <p> Upload size: {{ uploadSize }} </p> </li>
-		<li> <p> Number of files: {{ numFiles }} </p> </li>
-		<li> <p> {{ current_file_num }} / {{ numFiles }} Files uploaded... </p> </li>
-	</ul>
-	
-	<div v-if="is_uploading" id="Upload-Statistics">
-		<h4> Now Uploading: {{ current_file_name }} </h4>
-		<p> Uploaded Part: {{ current_file_part }} / {{ total_file_parts }} </p>
-	</div>
-	<button
-		v-if="
-		pStore.CurrentProject &&
-		pStore.CurrentHerdUnit &&
-		pStore.CurrentSurvey"
-		@click="upload()">
-		Upload
-	</button>
-	</div>
-</div>
+				</div> 
+				<BButton 
+					variant="primary" 
+					class="rounded-top-0 rounded-bottom-3"
+					size="lg"
+					:disabled="!canStart"
+					@click="startUpload()"
+				>
+					<Icon icon="glyphs:arrow-solid-line-start-bold" width="24" height="24"/>
+					Begin Upload
+				</BButton>
+			</BCol>
+		</BRow>
+	</BContainer>
+	<BModal v-model="is_uploading" size="xl" centered
+		no-close-on-esc no-close-on-backdrop ok-only ok-variant="danger"
+		ok-title="Cancel" no-header
+	>	
+		<BContainer class="w-100" fluid>
+			<BRow class="h-100">
+				<BCol cols="6" class="h-100 d-flex flex-column align-items-center">
+					<Icon icon="line-md:uploading-loop" height="25%" width="25%"/>
+						<BProgress
+							class="mt-4 w-100" 
+							:value="current_file_num"
+							:max="numFiles"
+							height="0.5rem"
+							variant="primary"
+						/>
+				</BCol>
+				<BCol cols="6" class="h-100">
+					<h5>Now Uploading Image {{ current_file_num }} / {{ numFiles }}</h5>
+					<ul>
+						<li><strong>Name:</strong> {{ current_file_name }}</li>
+						<li><strong>Uploaded Part:</strong> {{ current_file_part }} / {{ total_file_parts }}</li>
+					</ul>
+					<p>
+						Please keep this tab visible and your computer awake. For larger surveys please
+						allow for plenty of time for the upload process to complete.
+					</p>
+				</BCol>
+			</BRow>
+		</BContainer>
+	</BModal>
 </template>
 <style scoped>
-	#Page-Title {
-		margin-bottom: auto;
-		width: 100%;
-		display: flex;
-		justify-content: center;
-		border-radius: 4px 4px 0px 0px;
-		background-color: var(--wygf-bg-blue);
-		padding: 0.5%;
-	}
-	#Uploader-Contianer {
-		display: flex;
-		width: 100%;
-		height: 100%;
-		gap: 2%;
-		
-	}
-	#Upload-DropZone {
-		height: 100%;
-		width: 100%;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		border-radius: 8px;
-		box-shadow: 0 8px 12px 4px var(--color-background);
-		border: solid 1px var(--color-background);
-		max-width: 60vw;
-		label {
-			width: 100%;
-			height: 100%;
-			display: flex;
-			flex-direction: column;
-			justify-content: center;
-			align-items: center;
-			text-align: center;
-		}
-		::file-selector-button {
-			background: none;
-			border: none;
-		}
-	}
-	#Uploader-Context {
-		width: 30vw !important;
-		height: 100%;
-		display: flex;
-		flex-direction: column;
-		padding: 1%;
-		align-items: center;
-		border-radius: 8px;
-		box-shadow: 0 8px 12px 4px var(--color-background);
-		border: solid 1px var(--color-background);
-	h2 {
-		margin-bottom: 5%;
-		font-weight: bold;
-	}
-	h3 {
-		font-weight: bold;
-		text-overflow: ellipsis;
-	}
-	form {
-		width: 100%;
-	}
-	label {
-		font-weight: bold;
-	}
-	select {
-		border-radius: 4px;
-		width: 100%;
-		margin-bottom: 10px;
-	}
-	button {
-		margin-top: auto;
-		width: 100%;
-		height: 5vh;
-		border-radius: 8px;
-		background-color: var(--wygf-bg-blue);
-		color: var(--color-text);
-		border: none;
-	}
-	button:hover {
-		color: var(--wygf-yellow);
-	}
-	p {
-		text-align: left;
-		align-self: flex-start;
-	}
-	#Upload-Statistics {
-		width: 100%;
-		background-color: var(--color-background-mute);
-		border-radius: 8px;
-		margin: 2%;
-		padding: 2%;
-		p {
-			margin-left: 15%;
-		}
-		h4 {
-			text-overflow: ellipsis;
-			overflow: hidden;
-		}
-	}
-	}
-	.file-label {
-		font-size: 20px;
-		display: block;
+	label:hover {
 		cursor: pointer;
 	}
-	.preview-container {
-		display: grid;
-		grid-template-rows: auto auto;
-		grid-auto-flow: column;
-		justify-content: center;
-		align-items: center;
-		overflow-x: scroll;
-		overflow-y: hidden;
-		scrollbar-color: var(--color-text) transparent;
-		max-height: 25vh;
-		height: 100%;
-		gap: 5px;
-		width: 98%;
-		border: 1px solid var(--color-background);
-		border-radius: 8px;
-		padding: 1%;
-		margin: 2%;
-		background-color: var(--color-background);
-	}
-	.preview-card {
+	label {
 		display: flex;
+		flex-grow: 1;
+		width: 100%;
+		height: 100%;
+		flex-direction: column;
 		justify-content: center;
 		align-items: center;
-		border: 1px solid var(--color-background);
-		background-color: var(--color-background-soft);
-		border-radius: 8px;
-		padding: 2%;
-		width: 10vw;
-		height: 5vw;
-	p {
-		width: 8vw;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		text-align: center;
 	}
-	button {
-		border: none;
-		background: none;
-		color: var(--color-text);
-		margin-bottom: auto;
-	}
-	svg {
-		margin-right: 5%;
-	}
+	.Overflow {		
+		justify-content: flex-start !important;
+		scroll-padding-inline: 10%;
 	}
 </style>

@@ -2,17 +2,22 @@
 import { defineComponent, ref } from 'vue';
 import { usePreferenceStore } from '@/modules/stores/preferencesStore';
 import { useUserStore } from '@/modules/stores/userStore';
-import { preProcessFile } from 'typescript';
+import { BButton, BTooltip } from 'bootstrap-vue-next'; // Import BVN components
 
 export default defineComponent({
-	name:'header_component',
+    name: 'header_component',
+    components: { BButton, BTooltip },
     setup() {
         const isDev = import.meta.env.DEV;
-		const user_store = useUserStore();
-		const pref_store = usePreferenceStore();
-		const is_toggled = ref((pref_store.theme == 'light-theme') ? true : false)
+        const user_store = useUserStore();
+        const pStore = usePreferenceStore();
+        
+        // Helper to handle the toggle logic
+        const handleThemeToggle = () => {
+            pStore.toggleTheme();
+        };
 
-		return {user_store, pref_store, is_toggled, isDev}
+        return { user_store, pStore, isDev, handleThemeToggle }
     },
     methods: {
         async logout() {
@@ -21,82 +26,48 @@ export default defineComponent({
         }
     }
 })
-
 </script>
+
 <template>
-    <header>
-        <h1> Pronghorn Census Software / {{ $route.name }}</h1>
-        <p v-if="isDev" style="color: red; margin-left: 0.5%; "> Development Mode  </p>
-	    <div id="User-Quick-Actions-Holder" v-if="user_store.logged_in">
-			<label class="switch" for="theme-toggle" title="Toggle Theme">
-					<input id="theme-toggle" type="checkbox" @change="pref_store.toggleTheme()" v-model="is_toggled"> 
-					<div class="slider round">
-					</div>
-			</label>  
-			<Icon icon="material-symbols-light:light-mode" width="24" height="24 " v-if="pref_store.theme == 'light-theme'"></Icon>
-			<Icon icon="material-symbols:dark-mode-outline" width="24" height="24 " v-else></Icon>
-			<p> {{ user_store.user?.username }} </p>
-            <button id="logout" @click="logout()"><Icon icon="mdi:logout"></Icon></button>
+    <header 
+        class="sticky-top d-flex justify-content-between align-items-center 
+        bg-body-secondary py-4 px-3"
+        :style="{height: '8vh'}"
+        >
+        <div>
+            <h3 class="m-0">AIerial Survey Annotation Tools</h3>
+            <p v-if="isDev" class="text-warning m-0 small">Development Mode</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <BButton
+                class="btn-secondary p-2 d-flex align-items-center"
+                @click="handleThemeToggle"
+                v-b-tooltip.hover="'Switch Theme'"
+            >
+                <Icon 
+                    v-if="pStore.theme == 'light'" 
+                    icon="material-symbols:light-mode" 
+                    width="20" height="20" 
+                    class="text-info"
+                />
+                <Icon 
+                    v-else 
+                    icon="material-symbols:dark-mode" 
+                    width="20" height="20" 
+                    class="text-info"
+                />
+            </BButton>
+            <BButton 
+                v-if="user_store.logged_in"
+                id="logout" 
+                @click="logout" 
+                class="d-flex align-items-center bnt-secondary"
+                v-b-tooltip.hover="'Log Out'"
+            >
+                <span class="me-2">{{ user_store.user?.username }}</span>
+                <Icon icon="mdi:logout" width="20" height="20"></Icon>
+            </BButton>
         </div>
     </header>
 </template>
-
-<style scoped>
-
-	p {
-		margin: 1%;
-	}
-	.switch {
-        position: relative;
-        display: inline-block;
-        width: 2.5vw;
-		align-self: center;
-        height: 15px;
-		margin: 2%;
-    }
-    .switch input {
-        display: none;
-    }
-	.slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #ccc;
-        -webkit-transition: 0.4s;
-        transition: 0.4s;
-}
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 8px;
-        width: 8px;
-        left: 0.25vw;
-        bottom: 4px;
-        background-color: rgb(73, 73, 73);
-        -webkit-transition: 0.4s;
-        transition: 0.4s;
-    }
-
-    input:focus + .slider {
-        box-shadow: 0 0 1px #101010;
-    }
-    input:checked + .slider:before {
-        -webkit-transform: translateX(1.19vw);
-        -ms-transform: translateX(1.19vw);
-        transform: translateX(1.19vw);
-    }
-    .slider.round {
-        border-radius: 34px;
-    }
-    .slider.round:before {
-        border-radius: 50%;
-    }
-#logout {
-    background: none;
-    border: none;
-    color: var(--color-text)
-}
-</style>

@@ -1,7 +1,6 @@
 # Psycopg3 database abstraction layer for crop generator_api
 # Author: Michael B. Lance
-# Created: November 17, 2024
-# Updated: February 12, 2025
+
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from datetime import datetime, date
@@ -83,6 +82,12 @@ class Database:
 		'''
 		@wraps(fn)
 		def wrapper(self, *args, **kwargs):
+
+			has_cursor = 'cursor' in kwargs or (len(args) > 0 and args[0].__class__.__name__ == 'Cursor')
+        
+			if has_cursor:
+				return fn(self, *args, **kwargs)
+
 			if not self._pool:
 				self.create_pool()
 			with self._pool.connection() as conn:
@@ -874,22 +879,52 @@ class Database:
 	# Project Management - Herd Units
 
 	@connect
-	def _create_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], name: str) -> HerdUnit | None:
+	def _create_herd_unit(self, cursor: psycopg.Cursor[HerdUnit], parameters: dict) -> HerdUnit:
 		''' Internal helper function, do not call directly
 		
 		'''
+		
+		project = self._get_project(cursor, parameters['project_id'])
+
+		if not project:
+			raise Exception('Project not found')
+
+		query_1 = sql.SQL('''
+			INSERT INTO projectmanagement.herd_units (
+				name
+			) 
+			VALUES (
+				%(name)s
+			)
+			RETURNING *; ''')
+		
 		cursor.row_factory = class_row(HerdUnit)
-		cursor.execute(sql.SQL(' INSERT INTO projectmanagement.herd_units (name) VALUES (%s) RETURNING *; '), (name,))
+		cursor.execute(query_1, parameters)
+
 		herd_unit = cursor.fetchone()
-		return herd_unit if isinstance(herd_unit, HerdUnit) else None
-	
-	def create_herd_unit(self, name: str):
+		if not herd_unit:
+			raise Exception('Failed to create herd unit')
+
+		query_2 = sql.SQL('''
+			INSERT INTO projectmanagement.projects_herd_units (
+				project_id, herd_unit_id 
+			)
+			VALUES (
+				%s, %s
+			);
+		''')
+
+		cursor.execute(query_2, (project.project_id, herd_unit.herd_unit_id))
+
+		return herd_unit
+
+	def create_herd_unit(self, parameters: dict) -> HerdUnit:
 		''' Insert a new herd unit object into the database
 
 		Args:
 			name: the herd unit name 
 		'''
-		return self._create_herd_unit(name=name)
+		return self._create_herd_unit(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -992,10 +1027,8 @@ class Database:
 		''' Internal helper function, do not call directly
 		
 		'''
-		cursor.row_factory=class_row(Model)
-
-		project = self.get_project(parameters['project_id'])
-		schema = self.get_schema(parameters['schema_id'])
+		project = self._get_project(cursor, parameters['project_id'])
+		schema = self._get_schema(cursor, parameters['schema_id'])
 
 		# TODO: create method to get list of surveys
 		survey_ids = [
@@ -1003,8 +1036,7 @@ class Database:
 			for survey_id in parameters['survey_ids']
 		]
 
-		if not project:
-			raise Exception('Project not found')
+
 		if not schema:
 			raise Exception('Schema not found')
 		if len(survey_ids) == 0:
@@ -1021,6 +1053,7 @@ class Database:
 		''')
 		
 		cursor.execute(query_1, parameters)
+		cursor.row_factory=class_row(Model)
 		model = cursor.fetchone()
 		if not model:
 			raise Exception('Failed to create model')
@@ -1283,11 +1316,10 @@ class Database:
 		''' Internal helper function, do not call directly
 		
 		'''
-		cursor.row_factory = class_row(Survey)
 
-		project = self.get_project(parameters['project_id'])
+		project = self._get_project(cursor, parameters['project_id'])
 		
-		# TODO: create method to get list of surveys
+		# TODO: create method to get list of herd units
 		herd_unit_ids = [
 			herd_unit_id if isinstance(herd_unit_id, int) else UUID(herd_unit_id)
 			for herd_unit_id in parameters['herd_unit_ids']
@@ -1304,10 +1336,11 @@ class Database:
 				survey_date, name, additional_info
 			) 
 			VALUES (
-			%(survey_date)s, %(name)s, %(additional_info)s
+				%(survey_date)s, %(name)s, %(additional_info)s
 			) 
 			RETURNING *; ''')
 
+		cursor.row_factory = class_row(Survey)
 		cursor.execute(query_1, parameters)
 		survey = cursor.fetchone()
 		if not survey:
@@ -3009,28 +3042,25 @@ class Database:
 	# Functionality - Get crops to review
 
 	@connect
-	def _get_crop_to_review(self, cursor: psycopg.Cursor[ReviewedArea], user_id: Union[User, int, UUID], herd_unit_id: Union[HerdUnit, int, UUID], 
+	def _get_crop_to_review(self, cursor: psycopg.Cursor[ReviewedArea], user_id: Union[User, int, UUID], 
 								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
 		''' Fetch a batch of reviewed areas that have yet to be reviewed.
 
 		'''
 		cursor.row_factory = class_row(ReviewedArea)
-		herd_unit = self.get_herd_unit(herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
 		survey = self.get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
 		user = self.get_user(user_id) if not isinstance(user_id, User) else user_id
-		if not herd_unit or not survey or not user:
+		if not survey or not user:
 			raise Exception('Could not fetch batch')
 
 		query = sql.SQL(''' SELECT RA.* FROM core.reviewed_area as RA
 							JOIN core.images as I on ra.image_id = I.image_id
-							WHERE I.herd_unit_id = %(herd_unit_id)s
 								AND I.survey_id = %(survey_id)s
 								AND I.opened_by_user_id = 0
 								AND RA.reviewed_by_user_id = 0
 							LIMIT 1;
 						''')
 		params = {
-			'herd_unit_id': herd_unit.herd_unit_id,
 			'survey_id' : survey.survey_id,
 		}
 		
@@ -3045,12 +3075,12 @@ class Database:
 
 		return result
 	
-	def get_crop_to_review(self, user_id: Union[User, int, UUID], herd_unit_id: Union[HerdUnit, int, UUID], 
+	def get_crop_to_review(self, user_id: Union[User, int, UUID],
 								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
 		'''
 
 		'''
-		return self._get_crop_to_review(user_id=user_id, herd_unit_id=herd_unit_id, survey_id=survey_id)
+		return self._get_crop_to_review(user_id=user_id, survey_id=survey_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get annotations for crop 

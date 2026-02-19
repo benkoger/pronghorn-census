@@ -8,13 +8,11 @@ import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
 import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects';
 import type { autoCropperBatch } from '@/types/generatorobjects';
-import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, closeImage, closeCropSession, setPredicionsReviewed } from '../apiV1Methods';
-import { usePreferenceStore } from '@/modules/stores/preferencesStore';
+import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, closeImage, closeCropSession, setPredicionsReviewed } from '../api/apiV1Methods';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 const pStore = useProjectStore();
-const prefStore = usePreferenceStore();
 
 export const useAutoCropperStore = defineStore('autoCropperStore', {
 	state: () => ({
@@ -29,6 +27,8 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		loading: false,
 		bootStrapped: false,
 		minConfidence: 0.9,
+		maxConfidence: 1.0,
+		batch_size: 20,	
 	}),
 	getters: {
 		currentBatch: (state) => state.batches[state.batchIdx],
@@ -71,7 +71,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		async getbatch(batchIndex: number) {
 			const resp = await fetchAutoCropperBatch(pStore.CurrentSurvey?.uuid,
 				pStore.CurrentHerdUnit?.uuid,
-				prefStore.batch_size,
+				this.batch_size,
 				this.minConfidence,
 				pStore.CurrentLabelValues,
 				pStore.CurrentModel?.uuid)

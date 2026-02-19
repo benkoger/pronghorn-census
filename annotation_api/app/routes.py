@@ -512,7 +512,6 @@ def get_ra_batch():
 	try:
 		ra = base.get_crop_to_review(
 			cast(User, current_user), 
-			UUID(data['herd_unit_id']),
 			UUID(data['survey_id']))
 	except Exception as e:
 		abort(404, str(e))

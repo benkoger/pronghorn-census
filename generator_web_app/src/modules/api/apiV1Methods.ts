@@ -1,7 +1,6 @@
 // Methods for interacting with the version 1 of the crop generator API 
 // Author: Michael B. Lance
-// Created: April 20, 2025
-// Updated: November 11, 2025
+
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import {
@@ -9,18 +8,16 @@ import {
 	Label, HerdUnit, Survey, Model, Annotation
 } from '@/types/generatorobjects.ts';
 import type { PredictionIntf, User_intf, ImageIntf, PredictionCrop_intf, ReviewedArea_intf, Annotation_intf } from '@/types/generatorobjects.ts';
-import { useToast } from 'vue-toastification'
 
 
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
 const api_url: URL = new URL(api_url_base);
 
-const toast = useToast()
-
 //---------------------------------------------------------------------------------------------------------------------------//
+// TODO: abstract out to a better location
 
-type apiError = {
+export type apiError = {
 	error: string
 	message: string
 	code: number
@@ -45,7 +42,6 @@ export async function authUser(external_id: string): Promise<User | undefined> {
 		return user;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -64,7 +60,6 @@ export async function checkAuth(): Promise<boolean> {
 		else return true;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return false;
 	}
 }
@@ -83,7 +78,6 @@ export async function getCurrentUser(): Promise<User | undefined> {
 		return user;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -104,7 +98,6 @@ export async function deauthUser(): Promise<boolean> {
 		}
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return false;
 	}
 }
@@ -128,7 +121,6 @@ export async function getUserOrganizations(): Promise<Organization[] | undefined
 		return organizations;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -158,7 +150,6 @@ export async function getProjects(): Promise<Project[] | undefined> {
 		return projects;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -182,7 +173,6 @@ export async function getProjectSchemas(project_id: string | undefined): Promise
 		return schemas;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -206,7 +196,6 @@ export async function getSchemaLabels(project_id: string | undefined, schema_id:
 		return labels;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -230,7 +219,6 @@ export async function getProjectHerdUnits(project_id: string | undefined): Promi
 		return herd_units;
 	} catch (error: any) {
 		console.error("There was an error fetching the data:", error);
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -251,7 +239,6 @@ export async function getCropperHerdUnits(survey_id: string | undefined): Promis
 		return herd_units;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -275,7 +262,6 @@ export async function getProjectModels(project_id: string | undefined): Promise<
 		return models;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -296,7 +282,6 @@ export async function getCropperModels(survey_id: string | undefined, herd_unit_
 		return models;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
 		return undefined;
 	}
 }
@@ -320,8 +305,7 @@ export async function getProjectSurveys(project_id: string | undefined): Promise
 		return surveys;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -353,8 +337,7 @@ export async function createImage(survey_id: string | undefined,
 		return image;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -378,8 +361,7 @@ export async function createMultiPartUpload(image_key: string): Promise<string |
 		return resp.upload_id as string;
 	} catch (error: any) {
 		console.error("There was an error creating the upload:", error);
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -404,8 +386,7 @@ export async function get_imagePresignedPostUrl(upload_id: string, part_number: 
 		return resp as string;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -427,8 +408,7 @@ export async function abortMultipartUpload(image_key: string, upload_id: string)
 		return resp as string;
 	} catch (error: any) {
 		console.error("There was an error aborting the multipart upload:", error);
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -450,8 +430,7 @@ export async function completeMultiPartUpload(image_key: string, parts: any[], u
 		return await response.json() as string;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 
 }
@@ -492,8 +471,7 @@ export async function fetchAutoCropperBatch(survey_id: string | undefined, herd_
 		return [images as Image[], predictions as Prediction[][]];
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 
 }
@@ -526,7 +504,6 @@ export async function fetchPredCrops(image_id: string | undefined, survey_id: st
 		return pred_crops;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error}`);
 		return undefined;
 	}
 }
@@ -550,7 +527,7 @@ export async function closeImage(image_id: string): Promise<boolean> {
 		}
 	} catch (error: any) {
 		console.error("Error: ", error);
-		toast.error(`${error}`);
+		  
 		return false;
 	}
 }
@@ -574,7 +551,7 @@ export async function setPredicionsReviewed(prediction_ids: string[]): Promise<b
 		}
 	} catch (error: any) {
 		console.error("Error: ", error);
-		toast.error(`${error}`);
+		  
 		return false;
 	}
 }
@@ -602,7 +579,7 @@ export async function autoCrop(image_uuid: string, predictions: Prediction[], he
 		}
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error}`);
+		  
 		return false;
 	}
 }
@@ -624,7 +601,7 @@ export async function closeCropSession(): Promise<boolean> {
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error}`);
+		  
 		return false;
 	}
 
@@ -654,7 +631,7 @@ export async function fetchReviewedArea(herd_unit_id: string | undefined, survey
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error}`);
+		  
 		return undefined;
 	}
 }
@@ -676,8 +653,7 @@ export async function getReviewedAreaPresignedGetUrl(ra_key: string): Promise<st
 		return resp as string;
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -698,8 +674,7 @@ export async function getReviewedAreaAnnotations(ra_id: string): Promise<Annotat
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return undefined;
+ 		return undefined;
 	}
 }
 
@@ -725,7 +700,6 @@ export async function submitApprovedAreaAnnotations(reviewedArea: ReviewedArea, 
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		toast.error(`${error.message}`);
-		return false;
+ 		return false;
 	}
 }

@@ -1,8 +1,8 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
-import Header from './components/header.vue'
-import Menu from './components/menu.vue'
-import { RouterView } from 'vue-router'
+import Header from './components/header.vue';
+import Nav from './components/nav.vue';
+import { RouterView } from 'vue-router';
 import { useUserStore } from './modules/stores/userStore';
 import { usePreferenceStore } from './modules/stores/preferencesStore';
 
@@ -11,46 +11,41 @@ export default defineComponent({
   components: {
     RouterView,
     Header,
-    Menu
+    Nav,
   },
   setup() {
-    const user_store = useUserStore();
+    const uStore = useUserStore();
     const pref_store = usePreferenceStore();
     if (pref_store.first_login) {
       pref_store.getBrowserPreference();
       pref_store.first_login = false; 
     } else {
       pref_store.setTheme(pref_store.theme);
-    }
-    return { user_store, pref_store }
+    } 
+    return { uStore, pref_store }
   },
   async mounted() {
-    if (this.user_store.logged_in) {
-      await this.user_store.getCurrentUser()
+    if (this.uStore.logged_in) {
+      await this.uStore.getCurrentUser()
     }
   }
 })
 </script>
 
 <template>
-  <Header />
-  <main>
-    <Menu v-if="!$route.meta.requiresNoLayout" />
-      <RouterView />
-  </main>
+  <BApp>
+    <Header class="flex-shrink-0" /> 
+    <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
+      <main 
+        class="d-flex flex-column overflow-y-auto p-4 bg-body"
+        :style="{ 
+          height: '92vh',
+          marginLeft: uStore.nav_toggled ? '10%' : '4%', 
+          transition: 'margin-left 0.2s' 
+        }"
+      >
+        <BOrchestrator />
+        <RouterView />
+      </main>
+  </BApp>
 </template>
-
-<style scoped>
-  main {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    justify-content: flex-start;
-    height: 95.5vh;
-    width: 100%;
-	max-width: 100%;
-    max-width: 100%;
-    overflow: none;
-  }
-</style>

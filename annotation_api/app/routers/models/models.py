@@ -1,7 +1,5 @@
 # Endpoints for managing models in the API 
 # Author: Michael B. Lance
-# Created: Janaury 28, 2026
-# Updated: February 3, 2026
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -9,11 +7,10 @@ from flask import Blueprint,  abort, request
 from app.extensions import base 
 from flask_pydantic import validate
 from .model_validators import CreateModel
-from datetime import date, datetime
+from datetime import datetime
 from flask_login import (
 	login_required,
 ) 
-from typing import cast, List
 from uuid import UUID
 
 modelBp = Blueprint('models', __name__, url_prefix='/api/v1/models')
@@ -41,12 +38,11 @@ def get_by_id(model_id: str):
 	'''
 	model = base.get_model(UUID(model_id))
 
-	if model is not None:
-		return model.serialize()
-	else:
+	if model is None:
 		abort(404, f'Model with ID {model_id} was not found!')
-	
-	return ''
+	else:
+		return model.serialize()
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

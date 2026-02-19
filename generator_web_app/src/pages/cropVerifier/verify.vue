@@ -1,7 +1,6 @@
 <script lang="ts">
 // Heavily adapted from several excellent Konva demos https://konvajs.org/
 // TS ignores because Konva has bad TS support, it works though.
-
 import { defineComponent, ref } from 'vue';
 import { type konvaBoxConf, type tempRect, Label } from '@/types/generatorobjects';
 import { useCropVerifierStore } from '@/modules/stores/cropVerifierStore';
@@ -355,322 +354,285 @@ export default defineComponent({
 });
 </script>
 <template>
-    <div v-if="cvs.bootStrapped && !cvs.loading" id="cropContainer">
-        <div id="layerContainer">
-            <h2>Labels</h2>
-            <div
-            v-for="label in pStore.labels"
-            class="labelSection"
-            >
-                <div class="item">
-                    <h3 
-                    :style="{ color: label.color, borderColor: label.color }"
-                    class="label"
-                    >{{ label.label }}</h3>
-                    <p>{{ label.name }}</p>
-                    <button @click="startDrawing(label)">
-                        <Icon icon="material-symbols:add"/>
-                    </button>
-                </div>
-                
-                <div class="wrapper">
-                    <button 
-                        v-for="annot, count in cvs.annotationsByLabelId(label.label_id)"
-                        :class="{hovered: annot.uuid === cvs.hoveredUuid}"
-                        class="item subItem"
-                        @mouseover="(e: MouseEvent) => {
-                            //@ts-ignore
-                            cvs.currentBoxConfs[annot.uuid].fill = 'rgba(255, 255, 255, 0.35)';
-                            (e.target as HTMLButtonElement).style.cursor = 'pointer';
-                            
-                        }"
-                        @mouseout="(e: MouseEvent) => {
-                            //@ts-ignore
-                            cvs.currentBoxConfs[annot.uuid].fill = '';
-                            (e.target as HTMLButtonElement).style.cursor = 'default';
-                        }"
-                        @click="console.log('clicked')"
-                    >
-                        <div 
-                            :style="{ backgroundColor: pStore.labels.find(label => label.label_id === annot.label_id)?.color }"
-                            class="label" 
-                        ></div>
-                        <p>{{ count + 1 }} - {{ pStore.labels.find(label => label.label_id === annot.label_id)?.name }}</p>
-                        <button @click="cvs.deleteAnnotation(annot.uuid )">
-                            <Icon icon="material-symbols:delete"/>
-                        </button>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div id="stagewrapper" ref="stagewrapper">
-            <v-stage :config="{
-                width: stageWidth,
-                height: stageHeight,
-                draggable: true,
-                scaleX: scaleX, 
-                scaleY: scaleY,
-                dragBoundFunc: function (pos: number, e: MouseEvent) {
-                    //@ts-ignore
-                    return isDrawing ? this.getAbsolutePosition() : pos;
-                }
-            }"
-            @wheel="handleWheel"
-            @mousedown="handleMouseDown"
-            ref="stageRef"
-            >
-                <v-layer 
-                ref="imageLayer" 
-                :config="{listening: false}">
-                    <v-image
-                    v-if="cvs.currentImage && cvs.currentImage[1].value == 'loaded'" 
-                    :config="{
-                        image: cvs.currentImage[0].value,
-                    }"
-                    />
-                </v-layer> 
-                <v-layer ref="annotationLayer">
-                    <v-rect
-                        v-for="(conf, uuid) in cvs.currentBoxConfs"
-                        :key="uuid"
-                        :config="{
-                            ...conf,
-                            name: uuid,
-                            draggable: true,
-                            // TODO: Beg for forgiveness from above for creating this next line
-                            stroke: (conf.stroke == '') ? pStore.labels.find((label) => label.label_id === cvs.currentAnnotations[uuid].label_id)?.color : conf.stroke,
-                            strokeWidth: 2,
-                            strokeScaleEnabled: false,
-                            rotation: 0
-                        }"
-                        
-                        ref="rectRefs"
-                        @transformend="handleTransformEnd"
-                        @mouseover="(e: MouseEvent) => {
-                            if (!e.target) return
-                            // @ts-ignore
-                            e.target.getStage().container().style.cursor = 'move'
-                            // @ts-ignore
-                            cvs.hoveredUuid = e.target.attrs.name
-                            // @ts-ignore
-                            e.target.attrs['fill'] =  e.target.attrs.stroke + '66' 
-                        }"
-                        @mouseout="(e: MouseEvent) => {
-                            if (!e.target) return
-                            // @ts-ignore
-                            e.target.getStage().container().style.cursor = 'default'
-                            cvs.hoveredUuid = ''
-                            // @ts-ignore
-                            e.target.attrs['fill'] = ''
-                        }" 
-                        @dragend="handleDragEnd"
-                        /> 
-                        <v-rect
-                        v-if="isDrawing"
-                        :config="{
-                            x: Math.min(drawingRect.startPointX, drawingRect.startPointX - drawingRect.width),
-                            y: Math.min(drawingRect.startPointY, drawingRect.startPointY - drawingRect.height),
-                            width: Math.abs(drawingRect.width),
-                            height: Math.abs(drawingRect.height),
-                            stroke: (drawingLabel?.color) ? drawingLabel.color: 'red',
-                            strokeWidth: 1,
-                        }">
-
-                        </v-rect>
-                    <v-transformer
-                        ref="transformerRef"
-                        :config="{
-                            rotateEnabled: false,
-                            padding: 1,
-                            ignoreStroke: true,
-                            anchorStroke: '#ffffff',
-                            anchorFill: '#ffffff',
-                            anchorStrokeWidth: 2,
-                            anchorSize: 10,
-                            anchorCornerRadius: 50,
-                            keepRatio: false,
-                            borderStroke: 'rgba(0, 154, 222, 0.45)',
-                            borderStrokeWidth: 1,
-                            boundingBoxFunc: (oldBox: konvaBoxConf, newBox: konvaBoxConf) => {
-                                if (newBox.width < 5 || newBox.height < 5) {
-                                    return oldBox;
-                                }
-                                return newBox;
-                            },
-                        }"
-                        @mouseover="(e: MouseEvent) => {
-                             // @ts-ignore
-                            e.target.parent._nodes[0].attrs['fill'] =  e.target.parent._nodes[0].attrs.stroke + '66' 
-                        }"
-                        @mouseout="(e: MouseEvent) => {
-                            // @ts-ignore
-                            e.target.parent._nodes[0].attrs['fill'] = ''
-                        }"
-                        />
-                </v-layer>
-            </v-stage>
-            <div
-                v-if="cvs.selectedShapeName != ''"
-                id="annotationInfo"
-            >
-                <h2>UUID: {{ cvs.currentAnnotations[cvs.selectedShapeName].uuid }} (eventually clicking the annotation will center it above this)</h2>
-                <div class="annotationSection">
-                    <h3>Label</h3>
-                    <div class="content">
-                        <label for="labelSelector">Select Label:</label>
-                        <select id="labelSelector" v-model="cvs.currentAnnotations[cvs.selectedShapeName].label_id">
-                            <option v-for="label in pStore.labels" :key="label.label_id" :value="label.label_id">
-                                {{ label.name }}
-                            </option>
-                        </select>
-                    </div>
-                </div>
-                <div class="vl"></div>
-                <div class="annotationSection">
-                    <h3>Transformation and Translation</h3>
-                    <div class="content" style="flex-direction: row;">
-                        <div style="display: flex; gap: 5%; flex-direction: column; justify-content: center;">
-                            <div>
-                                <label for="xPos">X</label>
-                                <input 
-                                    id="xPos"
-                                    type="number"
-                                    v-model="cvs.currentBoxConfs[cvs.selectedShapeName].x"
-                                />
+    <div v-if="cvs.bootStrapped && !cvs.loading" class="d-flex h-100 flex-column overflow-hidden">
+        <BContainer fluid class="h-100 overflow-y-hidden">
+            <BRow class="h-100 overflow-y-hidden">
+                <BCol cols="3" class="h-100 bg-body-tertiary rounded-3 overflow-y-auto shadow1">
+                    <BListGroup class=" h-100 p-1">
+                        <h3>Labels</h3>
+                        <BListGroupItem
+                            v-for="label in pStore.labels"
+                            class="labelSection"
+                        >
+                            <div 
+                                class="d-flex justify-content-between 
+                                align-items-center"
+                            >
+                                <h3 
+                                :style="{ color: label.color, borderColor: label.color }"
+                                class="label"
+                                >{{ label.label }}</h3>
+                                <p>{{ label.name }}</p>
+                                <BButton @click="startDrawing(label)">
+                                    <Icon icon="material-symbols:add"/>
+                                </BButton>
                             </div>
-                            <div>
-                                <label for="yPos">Y</label>
-                                <input 
-                                    id="yPos"
-                                    type="number"
-                                    v-model="cvs.currentBoxConfs[cvs.selectedShapeName].y"
+                            
+                            <BListGroup class="w-100 d-flex flex-column align-items-end relative overflow-y-auto overflow-x-hidden">
+                                <BListGroupItem 
+                                    v-for="annot, count in cvs.annotationsByLabelId(label.label_id)"
+                                    :class="{hovered: annot.uuid === cvs.hoveredUuid}"
+                                    class="item subItem"
+                                    @mouseover="(e: MouseEvent) => {
+                                        //@ts-ignore
+                                        cvs.currentBoxConfs[annot.uuid].fill = 'rgba(255, 255, 255, 0.35)';
+                                        (e.target as HTMLButtonElement).style.cursor = 'pointer';
+                                        
+                                    }"
+                                    @mouseout="(e: MouseEvent) => {
+                                        //@ts-ignore
+                                        cvs.currentBoxConfs[annot.uuid].fill = '';
+                                        (e.target as HTMLButtonElement).style.cursor = 'default';
+                                    }"
+                                    @click="console.log('clicked')"
+                                >
+                                    <div 
+                                        :style="{ backgroundColor: pStore.labels.find(label => label.label_id === annot.label_id)?.color }"
+                                        class="label" 
+                                    ></div>
+                                    <p>{{ count + 1 }} - {{ pStore.labels.find(label => label.label_id === annot.label_id)?.name }}</p>
+                                    <BButton @click="cvs.deleteAnnotation(annot.uuid )">
+                                        <Icon icon="material-symbols:delete"/>
+                                    </BButton>
+                                </BListGroupItem>
+                            </BListGroup>
+                        </BListGroupItem>
+                    </BListGroup>
+                </BCol>
+                <BCol cols="9" class="h-100">
+                    <div id="stagewrapper" ref="stagewrapper" class="h-100 bg-body-tertiary rounded-3 shadow">
+                        <v-stage :config="{
+                            width: stageWidth,
+                            height: stageHeight,
+                            draggable: true,
+                            scaleX: scaleX, 
+                            scaleY: scaleY,
+                            dragBoundFunc: function (pos: number, e: MouseEvent) {
+                                //@ts-ignore
+                                return isDrawing ? this.getAbsolutePosition() : pos;
+                            }
+                        }"
+                        @wheel="handleWheel"
+                        @mousedown="handleMouseDown"
+                        ref="stageRef"
+                        >
+                            <v-layer 
+                            ref="imageLayer" 
+                            :config="{listening: false}">
+                                <v-image
+                                v-if="cvs.currentImage && cvs.currentImage[1].value == 'loaded'" 
+                                :config="{
+                                    image: cvs.currentImage[0].value,
+                                }"
                                 />
+                            </v-layer> 
+                            <v-layer ref="annotationLayer">
+                                <v-rect
+                                    v-for="(conf, uuid) in cvs.currentBoxConfs"
+                                    :key="uuid"
+                                    :config="{
+                                        ...conf,
+                                        name: uuid,
+                                        draggable: true,
+                                        // TODO: Beg for forgiveness from above for creating this next line
+                                        stroke: (conf.stroke == '') ? pStore.labels.find((label) => label.label_id === cvs.currentAnnotations[uuid].label_id)?.color : conf.stroke,
+                                        strokeWidth: 2,
+                                        strokeScaleEnabled: false,
+                                        rotation: 0
+                                    }"
+                                    
+                                    ref="rectRefs"
+                                    @transformend="handleTransformEnd"
+                                    @mouseover="(e: MouseEvent) => {
+                                        if (!e.target) return
+                                        // @ts-ignore
+                                        e.target.getStage().container().style.cursor = 'move'
+                                        // @ts-ignore
+                                        cvs.hoveredUuid = e.target.attrs.name
+                                        // @ts-ignore
+                                        e.target.attrs['fill'] =  e.target.attrs.stroke + '66' 
+                                    }"
+                                    @mouseout="(e: MouseEvent) => {
+                                        if (!e.target) return
+                                        // @ts-ignore
+                                        e.target.getStage().container().style.cursor = 'default'
+                                        cvs.hoveredUuid = ''
+                                        // @ts-ignore
+                                        e.target.attrs['fill'] = ''
+                                    }" 
+                                    @dragend="handleDragEnd"
+                                    /> 
+                                    <v-rect
+                                    v-if="isDrawing"
+                                    :config="{
+                                        x: Math.min(drawingRect.startPointX, drawingRect.startPointX - drawingRect.width),
+                                        y: Math.min(drawingRect.startPointY, drawingRect.startPointY - drawingRect.height),
+                                        width: Math.abs(drawingRect.width),
+                                        height: Math.abs(drawingRect.height),
+                                        stroke: (drawingLabel?.color) ? drawingLabel.color: 'red',
+                                        strokeWidth: 1,
+                                    }">
+                                    </v-rect>
+                                <v-transformer
+                                    ref="transformerRef"
+                                    :config="{
+                                        rotateEnabled: false,
+                                        padding: 1,
+                                        ignoreStroke: true,
+                                        anchorStroke: '#ffffff',
+                                        anchorFill: '#ffffff',
+                                        anchorStrokeWidth: 2,
+                                        anchorSize: 10,
+                                        anchorCornerRadius: 50,
+                                        keepRatio: false,
+                                        borderStroke: 'rgba(0, 154, 222, 0.45)',
+                                        borderStrokeWidth: 1,
+                                        boundingBoxFunc: (oldBox: konvaBoxConf, newBox: konvaBoxConf) => {
+                                            if (newBox.width < 5 || newBox.height < 5) {
+                                                return oldBox;
+                                            }
+                                            return newBox;
+                                        },
+                                    }"
+                                    @mouseover="(e: MouseEvent) => {
+                                        // @ts-ignore
+                                        e.target.parent._nodes[0].attrs['fill'] =  e.target.parent._nodes[0].attrs.stroke + '66' 
+                                    }"
+                                    @mouseout="(e: MouseEvent) => {
+                                        // @ts-ignore
+                                        e.target.parent._nodes[0].attrs['fill'] = ''
+                                    }"
+                                    />
+                            </v-layer>
+                        </v-stage>
+                        <div
+                            v-if="cvs.selectedShapeName != ''"
+                            id="annotationInfo"
+                        >
+                            <h2>UUID: {{ cvs.currentAnnotations[cvs.selectedShapeName].uuid }} (eventually clicking the annotation will center it above this)</h2>
+                            <div class="annotationSection">
+                                <h3>Label</h3>
+                                <div class="content">
+                                    <label for="labelSelector">Select Label:</label>
+                                    <select id="labelSelector" v-model="cvs.currentAnnotations[cvs.selectedShapeName].label_id">
+                                        <option v-for="label in pStore.labels" :key="label.label_id" :value="label.label_id">
+                                            {{ label.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="annotationSection">
+                                <h3>Transformation and Translation</h3>
+                                <div class="content" style="flex-direction: row;">
+                                    <div style="display: flex; gap: 5%; flex-direction: column; justify-content: center;">
+                                        <div>
+                                            <label for="xPos">X</label>
+                                            <input 
+                                                id="xPos"
+                                                type="number"
+                                                v-model="cvs.currentBoxConfs[cvs.selectedShapeName].x"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label for="yPos">Y</label>
+                                            <input 
+                                                id="yPos"
+                                                type="number"
+                                                v-model="cvs.currentBoxConfs[cvs.selectedShapeName].y"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 5%; flex-direction: column; justify-content: center;">
+                                            <div>
+                                                <label for="yPos">Width</label>
+                                            <input 
+                                                id="yPos"
+                                                type="number"
+                                                v-model="cvs.currentBoxConfs[cvs.selectedShapeName].width"
+                                            />
+                                            </div>
+                                            <div>
+                                                <label for="yPos">Height</label>
+                                            <input 
+                                                id="yPos"
+                                                type="number"
+                                                v-model="cvs.currentBoxConfs[cvs.selectedShapeName].height"
+                                            />
+                                            </div>
+                                        </div>
+                                </div>
+                            </div>
+                            <div class="annotationSection">
+                                <h3>Section 3</h3>
+                                <div class="content">
+                                    <p>reset button, edit history?</p>
+                                </div>
                             </div>
                         </div>
-                        <div style="display: flex; gap: 5%; flex-direction: column; justify-content: center;">
-                                <div>
-                                    <label for="yPos">Width</label>
-                                <input 
-                                    id="yPos"
-                                    type="number"
-                                    v-model="cvs.currentBoxConfs[cvs.selectedShapeName].width"
-                                />
-                                </div>
-                                <div>
-                                    <label for="yPos">Height</label>
-                                <input 
-                                    id="yPos"
-                                    type="number"
-                                    v-model="cvs.currentBoxConfs[cvs.selectedShapeName].height"
-                                />
-                                </div>
-                            </div>
-
                     </div>
-                </div>
-                <div class="vl"></div>
-                <div class="annotationSection">
-                    <h3>Section 3</h3>
-                    <div class="content">
-                        <p>reset button, edit history?</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="cropExplorer">
-            <button 
-                class="explorerButton"
-                @click="handleLeftArrow()"
-            >
-                <Icon icon="ooui:next-rtl"/>
-                Previous Crop
-            </button>
-            <button 
-                class="explorerButton"
-            >
-                <Icon icon="material-symbols:undo"/>
-                Undo
-            </button>
-            <button 
-                class="explorerButton"
-            >
-                <Icon icon="material-symbols:redo"/>
-                Redo
-            </button>
-            <button 
-                class="explorerButton" 
-                @click="handleEnter()"
-            >
-                <Icon icon="vaadin:enter-arrow"/>
-                Submit
-            </button>
-            <button 
-                class="explorerButton"
-                @click="handleRightArrow()"
-            >
-                <Icon icon="ooui:next-ltr"/> 
-                Next Crop
-            </button>
-            </div>
+                </Bcol>
+            </BRow>
+        </BContainer>
+        <BButtonToolbar 
+                key-nav justify 
+                aria-label="Crop Explorer Controls"
+                class="bg-body-secondary mt-3"	
+        >
+            <BButtonGroup>
+                <BButton 
+                    class="w-100"
+                    @click="handleLeftArrow()"
+                    variant="primary"
+                >
+                    <Icon icon="ooui:next-rtl"/>
+                    Previous Crop
+                </BButton>
+            </BButtonGroup>
+            <BButtonGroup>
+                <BButton>
+                    <Icon icon="material-symbols:undo"/>
+                    Undo
+                </BButton>
+                <BButton>
+                    <Icon icon="material-symbols:redo"/>
+                    Redo
+                </BButton>
+                <BButton 
+                    class="explorerButton" 
+                    @click="handleEnter()"
+                    variant="success"
+                >
+                    <Icon icon="vaadin:enter-arrow"/>
+                    Submit
+                </BButton>
+            </BButtonGroup>
+            <BButtonGroup>
+                <BButton 
+                    class="w-100"
+                    @click="handleRightArrow()"
+                    variant="primary"
+                >
+                    Next Crop
+                    <Icon icon="ooui:next-ltr"/> 
+                </BButton>
+            </BButtonGroup>
+        </BButtonToolbar>
     </div>
-    <div id="cropContainer" v-else>
+    <div v-else class="d-flex justify-content-center align-items-center h-100">
         <Icon icon="eos-icons:three-dots-loading" width="96" height="96"/> 
     </div>
 </template>
-<!-- TODO: fix css to not suck so hard -->
 <style scoped>
-    #cropContainer {
-        display: flex;
-        justify-content: flex-start;
-        width: 100%;
-        overflow: hidden;
-        height: 100%;
-        padding-bottom: 5vh;
-        
-    }
-    #cropContainer svg {
-        justify-self: center !important;
-        align-self: center;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    #stagewrapper {
-        position: relative;
-        width: 100%;
-        margin: 0.5% 0.5% 0.5% 0.25%;
-        overflow: hidden;    
-        background-color: var(--color-background-soft);
-        border-radius: 8px;
-    }
-    
-    #layerContainer {
-        width: 20%;
-        display: flex;
-        margin: 0.5% 0.25% 0.5% 0.5%;
-        border-radius: 8px;
-        flex-direction: column;
-        background-color: var(--color-background-mute);
-        overflow-wrap: normal;
-        padding: 1%;
-        text-align: center;
-        align-items: center;
-        flex-grow: 0;
-        overflow-y: auto;
-        scrollbar-color: var(--color-text) transparent;
-    }
-    .hovered {
-        color: var(--wygf-yellow);
-    }
-    .wrapper {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        position: relative;
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-color: var(--color-text) transparent;
-    }
     .item { 
         display: flex;
         border: 1px solid var(--color-background-mute);
@@ -682,11 +644,6 @@ export default defineComponent({
         justify-content: space-between;
         align-items: center;
     }
-
-    button svg {
-        width: 1.25vw;
-        height: 1.25vw;
-    }
     .item .label {
         border: solid 1px white;
         width: 2vw;
@@ -696,6 +653,11 @@ export default defineComponent({
         display: flex;
         justify-content: center;
         align-items: center;
+    }
+    .label {
+        border: solid 1px; 
+        border-radius: 4px;
+        padding: 1%;
     }
     .labelSection {
         display: flex;
@@ -733,13 +695,6 @@ export default defineComponent({
         font-size: medium;
         text-decoration: underline;
     }
-    .vl {
-        border-left: 1px solid white;
-        height: 100%;
-        width: 0%;
-        opacity: 50%;
-        margin-top: 3%;
-    }
     .annotationSection{
         display: flex;
         flex-direction: column;
@@ -771,29 +726,5 @@ export default defineComponent({
         height: fit-content;
         margin-left: 5%;
     }
-    .cropExplorer{
-        position: absolute;
-        height: 5vh;
-        width: 100%;
-        background-color: var(--color-background-mute);
-        bottom: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 5% 0 5%
-    }
 
-    .explorerButton {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-    .explorerButton :hover {
-            cursor: pointer;
-            color: var(--wygf-yellow) !important;
-        }
-
-    .explorerButton svg {
-        margin: 2%;
-    }
 </style>
