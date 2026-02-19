@@ -354,17 +354,20 @@ export default defineComponent({
 });
 </script>
 <template>
-    <div v-if="cvs.bootStrapped && !cvs.loading" class="d-flex h-100 flex-column">
-        <BContainer fluid class="h-100">
-            <BRow class="h-100">
-                <BCol cols="3" class="h-100">
-                    <div class="h-100 bg-body-tertiary p-3 rounded-3 shadow">
+    <div v-if="cvs.bootStrapped && !cvs.loading" class="d-flex h-100 flex-column overflow-hidden">
+        <BContainer fluid class="h-100 overflow-y-hidden">
+            <BRow class="h-100 overflow-y-hidden">
+                <BCol cols="3" class="h-100 bg-body-tertiary rounded-3 overflow-y-auto shadow1">
+                    <BListGroup class=" h-100 p-1">
                         <h3>Labels</h3>
-                        <div
+                        <BListGroupItem
                             v-for="label in pStore.labels"
                             class="labelSection"
                         >
-                            <div class="item">
+                            <div 
+                                class="d-flex justify-content-between 
+                                align-items-center"
+                            >
                                 <h3 
                                 :style="{ color: label.color, borderColor: label.color }"
                                 class="label"
@@ -375,8 +378,8 @@ export default defineComponent({
                                 </BButton>
                             </div>
                             
-                            <div class="wrapper">
-                                <BButton 
+                            <BListGroup class="w-100 d-flex flex-column align-items-end relative overflow-y-auto overflow-x-hidden">
+                                <BListGroupItem 
                                     v-for="annot, count in cvs.annotationsByLabelId(label.label_id)"
                                     :class="{hovered: annot.uuid === cvs.hoveredUuid}"
                                     class="item subItem"
@@ -401,10 +404,10 @@ export default defineComponent({
                                     <BButton @click="cvs.deleteAnnotation(annot.uuid )">
                                         <Icon icon="material-symbols:delete"/>
                                     </BButton>
-                                </BButton>
-                            </div>
-                        </div>
-                    </div>
+                                </BListGroupItem>
+                            </BListGroup>
+                        </BListGroupItem>
+                    </BListGroup>
                 </BCol>
                 <BCol cols="9" class="h-100">
                     <div id="stagewrapper" ref="stagewrapper" class="h-100 bg-body-tertiary rounded-3 shadow">
@@ -628,23 +631,7 @@ export default defineComponent({
         <Icon icon="eos-icons:three-dots-loading" width="96" height="96"/> 
     </div>
 </template>
-<!-- TODO: fix css to not suck so hard -->
 <style scoped>
-    #stagewrapper {
-        width: 100%;
-        overflow: hidden;    
-    }
-
-    .wrapper {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        position: relative;
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-color: var(--color-text) transparent;
-    }
     .item { 
         display: flex;
         border: 1px solid var(--color-background-mute);
@@ -656,11 +643,6 @@ export default defineComponent({
         justify-content: space-between;
         align-items: center;
     }
-
-    button svg {
-        width: 1.25vw;
-        height: 1.25vw;
-    }
     .item .label {
         border: solid 1px white;
         width: 2vw;
@@ -670,6 +652,11 @@ export default defineComponent({
         display: flex;
         justify-content: center;
         align-items: center;
+    }
+    .label {
+        border: solid 1px; 
+        border-radius: 4px;
+        padding: 1%;
     }
     .labelSection {
         display: flex;
@@ -707,13 +694,6 @@ export default defineComponent({
         font-size: medium;
         text-decoration: underline;
     }
-    .vl {
-        border-left: 1px solid white;
-        height: 100%;
-        width: 0%;
-        opacity: 50%;
-        margin-top: 3%;
-    }
     .annotationSection{
         display: flex;
         flex-direction: column;
@@ -745,29 +725,7 @@ export default defineComponent({
         height: fit-content;
         margin-left: 5%;
     }
-    .cropExplorer{
-        position: absolute;
-        height: 5vh;
-        width: 100%;
-        background-color: var(--color-background-mute);
-        bottom: 0;
-        display: flex;
-        justify-content: space-between;
-        padding: 0 5% 0 5%
-    }
 
-    .explorerButton {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-    .explorerButton :hover {
-            cursor: pointer;
-            color: var(--wygf-yellow) !important;
-        }
 
-    .explorerButton svg {
-        margin: 2%;
-    }
+
 </style>
