@@ -3,17 +3,17 @@ import { defineComponent, defineAsyncComponent, ref } from "vue";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { Project, Survey, Schema, HerdUnit, Label, Model } from '@/types/generatorobjects';
 import { mapState } from "pinia";
+import ProcessBreadCrumb  from '@/components/templates/ProcessBreadCrumb.vue';
 
-var crumb_num = ref<number>(0);
 export default defineComponent({
     name: 'Crop-Verification',
     components: {
-        selector1: defineAsyncComponent(() => import('@/components/templates/objectSelector/selector1.vue')),
-        selector2: defineAsyncComponent(() => import('@/components/templates/objectSelector/selector2.vue')),
-        Validate: defineAsyncComponent(() => import('@/pages/cropVerifier/verify.vue'))
+        Validate: defineAsyncComponent(() => import('@/pages/cropVerifier/verify.vue')),
+		BreadCrumb: ProcessBreadCrumb
     },
     setup() {
         const pStore = useProjectStore();
+		if (pStore.projects.length == 0) pStore.get_projects();
         return { pStore }
     },
     mounted() {
@@ -21,24 +21,34 @@ export default defineComponent({
 			this.$router.push({name: 'crop-verifier', params: { projects: 'projects', uuid: this.pStore.CurrentProject.uuid }})
 		}
     },
-    unmounted() {
-        this.current_crumb = 0;
-    },
     data() {
         return {
-            current_crumb: crumb_num,
+            currentStep: 0,
+			steps: ['Project and Survey', 'Schema', 'Verify'  ]
         };
     },
     computed: {
-    ...mapState(useProjectStore, {
-        CurrentProject: 'CurrentProject',
-		CurrentSchema: 'CurrentSchema', 
-		CurrentSurvey: 'CurrentSurvey',
-		CurrentHerdUnit: 'CurrentHerdUnit',
-		CurrentLabels: 'CurrentLabels',
-		CurrentModel: 'CurrentModel',
-    })
+		...mapState(useProjectStore, {
+			CurrentProject: 'CurrentProject',
+			CurrentSchema: 'CurrentSchema', 
+			CurrentSurvey: 'CurrentSurvey',
+		}
+	),
+	canProceed() {
+			switch(this.currentStep) {
+				case 0:
+					return this.CurrentProject != undefined 
+					&& this.CurrentSurvey != undefined;
+					break;
+				case 1:
+					return this.CurrentSchema != undefined 
+					break;
+				default:
+					return false;
+			};
+		}
     },
+	
     watch: {
 		CurrentProject(newValue: Project, oldValue: Project) {
 			if (newValue != oldValue && newValue != undefined) {
@@ -52,7 +62,6 @@ export default defineComponent({
 		},
 		CurrentSurvey(newValue: Survey, oldValue: Survey) {
 			const currentQuery = {...this.$route.query};
-			this.pStore.clear_herd_units();
 			this.pStore.clear_models();
 			if (newValue !=oldValue && newValue != undefined) {
 				const newQuery = {
@@ -98,165 +107,127 @@ export default defineComponent({
 				this.$router.push({query: newQuery});
 			}
 		},
-		CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
-			const currentQuery = {...this.$route.query };
-			this.pStore.clear_models();
-			if (newValue != oldValue && newValue != undefined) {
-				const newQuery = {
-					...currentQuery,
-					herd_unit: newValue.uuid,
-					model: undefined,
-				};
-				this.$router.push({query: newQuery})
-				this.pStore.get_cropper_models();	
-			} else {
-				const newQuery = {
-					...currentQuery,
-					herd_unit: undefined,
-					model: undefined,
-				};
-				this.$router.push({query: newQuery});
-			}
-		}
 	},
-	methods: {
-		increment_crumb() {
-			if (this.current_crumb == 0 && !this.pStore.CurrentProject) return;
-			else if (this.current_crumb == 0 && !this.pStore.CurrentProject) return;
-			else if (this.current_crumb == 0 && !this.pStore.CurrentSurvey) return;
-			else if (this.current_crumb == 1 && !this.pStore.CurrentSchema) return;
-			else if (this.current_crumb == 1 && !this.pStore.CurrentHerdUnit) return;
-			else if (this.current_crumb <=3 && this.current_crumb != 2) this.current_crumb+=1;
-		},
-		decrement_crumb() {
-			if (this.current_crumb >= 0 && this.current_crumb !=0) this.current_crumb-=1;
-		}
-	}
-
 })
-
 </script>
 <template>
-    <div class="pageContainer">
-		<h2 class="utilityTitle">
-			Crop Verifier 
-			<button @click="current_crumb = 0" title="Project Selection">
-				&gt;
-				Project and Survey
-			</button>
-			<button @click="current_crumb = 1" title="Crop Verifier Configuration" v-if="current_crumb >= 1"> 
-				&gt;
-				HerdUnit, Model, Schema, and Label
-			</button>
-			<button @click="current_crumb = 2" title="Crop Verifier" v-if="current_crumb  == 2">
-				&gt;
-				Crop Verification
-			</button>
-		</h2>
-		<div class="componentContainer">
-			<selector1 v-if="current_crumb == 0"/>
-			<selector2 v-if="current_crumb == 1" />
-			<Validate v-if="current_crumb == 2" />
-			<div class="instructions" v-if="current_crumb < 2">
-				<h1 style="align-self: center"><u>Crop Verifier</u></h1>
-					<br/>
-					<details>
-						<summary style="font-weight: bold"> Description: </summary>
-						<p>
-							The crop verifier utility is the second and final step in training 
-							data creation. Similar selections must be made to determine what
-							crops you wish to verify. Note that you are capable of adding
-							and modified annotations to crops with this tool.
-						</p>
-				</details>
-				<br/>
-				<div v-if="current_crumb == 0" style="width: 100%">
-					<h2> Projects and Surveys </h2>					
-					<ol>
-						<li>
-							<details>
-								<summary style="font-weight: bold"> Projects: </summary>
-								<p>
-									Projects are simple categories that allow you to 
-									separate different census 'projects' and easily 
-									maintain separate computer vision models specialized 
-									for different animals in different geographical regions. 
-								</p>
-							</details>
-						</li>
-						<li>
-							<details>
-								<summary style="font-weight: bold"> Surveys: </summary>
-								<p>
-								Surveys provide separation for datasets (herd units) by year. 
-								This is important for the actual census process, as imagery 
-								from the prior year should not be used to produce the population
-								estimation for the current year. It also enables finer control 
-								over the data used to train a given computer vision model.
-								</p>
-							</details>
-						</li>
-					</ol>
-				</div>
-				<div v-if="current_crumb == 1" style="width: 100%">
-					<h2> Schemas, Herd Units, Models  </h2>
-					<ol>
-						<li>
-							<details>
-								<summary style="font-weight: bold"> Schemas: </summary>
-								<p>
-									Schemas are containers for human readable interfaces
-									between computer vision model labels and the objects
-									(animals) they represent. 
-								</p>
-							</details>
-						</li>
-						<li>
-							<details>
-								<summary style="font-weight: bold"> Herd Units: </summary>
-								<p>
-									Herd Units identify individual herds (and the area 
-									they inhabit) allowing for models to be specialized
-									to specific geographical regions and to track the 
-									population of individual herds.
-								</p>
-							</details>
-						</li>
-						<li>
-							<details>
-								<summary style="font-weight: bold"> Models: </summary>
-								<p>
-									Models are containers for predictions that represent the 
-									computer vision model used to produce them. This tool's
-									models and their predictions are not ran real time. In 
-									order to use a model it must have first been trained and 
-									then "ran" over a dataset (herdunit) in order to access it's
-									predictions. 
-								</p>
-							</details>
-						</li>
-					</ol>
-					<br/>
-					<div id="configurationVerification" v-if="pStore.CurrentLabels && pStore.CurrentModel && pStore.CurrentHerdUnit">
-						<hr/>
-						
-					</div> 
-				</div> 
-				<div id="navigationButtons">
-					<button @click="decrement_crumb()">
-						<Icon icon="ooui:next-rtl" width="16" height="16"/>
-						Back
-					</button>
-					<button @click="increment_crumb()" v-if="current_crumb < 1">
-						Next
-						<Icon icon="ooui:next-ltr" width="16" height="16"/>
-					</button>
-					<button @click="increment_crumb()" v-else>
-						Start
-						<Icon icon="majesticons:rocket-3-start-line" width="16" height="16"/>
-					</button>
-				</div> 
-			</div> 
-		</div>  
-	</div> 
+	<BreadCrumb 
+		v-model="currentStep"
+		:steps="steps"
+		:showButtons="true"
+		:canContinue="canProceed"
+	>
+		<div v-if="currentStep === 0" class="d-flex flex-column h-100">
+			<BContainer fluid>
+			<BRow>
+				<BCol cols="6">
+					<h3>Project Selection</h3>
+					<div class="flex-grow-1 overflow-y-auto">
+						<BListGroup>
+							<BListGroupItem
+								v-for="project in pStore.projects"
+								:key="project.uuid"
+								action
+								:active="CurrentProject?.uuid === project.uuid"
+								@click="pStore.set_current_project(project)"
+							>
+								<div class="d-flex justify-content-between align-items-flex-start flex-column">
+									<span class="mb-1 fw-bold">{{ project.name }}</span>
+									<div class="d-flex gap-4">
+										<small class="text-muted">Created: 
+											{{ project.created.toLocaleString('en-US', { 
+													year: 'numeric', 
+													month: 'numeric', 
+													day: 'numeric', 
+												}) 
+											}}
+										</small>
+										<small class="text-muted">Modified: 
+											{{ project.modified.toLocaleString('en-US', { 
+													year: 'numeric', 
+													month: 'numeric', 
+													day: 'numeric', 
+												}) 
+											}}</small>
+									</div>
+								</div>
+							</BListGroupItem>
+						</BListGroup> 
+					</div>
+				</BCol>
+				<BCol cols="6">
+						<h3>Survey Selection</h3>
+						<div class="flex-grow-1 overflow-y-auto">
+							<BListGroup>
+								<BListGroupItem
+									v-for="survey in pStore.surveys"
+									:key="survey.uuid"
+									action
+									:active="CurrentSurvey?.uuid === survey.uuid"
+									@click="pStore.set_current_survey(survey)"
+								>
+									<div class="d-flex justify-content-between align-items-flex-start flex-column">
+										<span class="mb-1 fw-bold">{{ survey.name }}</span>
+										<div class="d-flex gap-4">
+											<small class="text-muted">Created: 
+												{{ survey.created.toLocaleString('en-US', { 
+														year: 'numeric', 
+														month: 'numeric', 
+														day: 'numeric', 
+													}) 
+												}}
+											</small>
+											<small class="text-muted">Modified: 
+												{{ survey.modified.toLocaleString('en-US', { 
+														year: 'numeric', 
+														month: 'numeric', 
+														day: 'numeric', 
+													}) 
+												}}</small>
+										</div>
+									</div>
+								</BListGroupItem>
+							</BListGroup>
+						</div>
+				</BCol>
+			</BRow>
+		</BContainer>
+		</div>
+		<div v-if="currentStep === 1" class="d-flex flex-column h-100">
+			<h3>Schema Selection</h3>
+			<div class="flex-grow-1 overflow-y-auto">
+				<BListGroup>
+					<BListGroupItem
+						v-for="schema in pStore.schemas"
+						:key="schema.uuid"
+						action
+						:active="CurrentSchema?.uuid === schema.uuid"
+						@click="pStore.set_current_schema(schema)"
+					>
+						<div class="d-flex justify-content-between align-items-flex-start flex-column">
+							<span class="mb-1 fw-bold">{{ schema.name }}</span>
+							<div class="d-flex gap-4">
+								<small class="text-muted">Created: 
+									{{ schema.created.toLocaleString('en-US', { 
+											year: 'numeric', 
+											month: 'numeric', 
+											day: 'numeric', 
+										}) 
+									}}
+								</small>
+								<small class="text-muted">Modified: 
+									{{ schema.modified.toLocaleString('en-US', { 
+											year: 'numeric', 
+											month: 'numeric', 
+											day: 'numeric', 
+										}) 
+									}}</small>
+							</div>
+						</div>
+					</BListGroupItem>
+				</BListGroup>
+			</div>
+		</div>
+		<Validate v-if="currentStep === 2"/>
+	</BreadCrumb>
 </template>

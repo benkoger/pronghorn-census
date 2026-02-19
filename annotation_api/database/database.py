@@ -3042,28 +3042,25 @@ class Database:
 	# Functionality - Get crops to review
 
 	@connect
-	def _get_crop_to_review(self, cursor: psycopg.Cursor[ReviewedArea], user_id: Union[User, int, UUID], herd_unit_id: Union[HerdUnit, int, UUID], 
+	def _get_crop_to_review(self, cursor: psycopg.Cursor[ReviewedArea], user_id: Union[User, int, UUID], 
 								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
 		''' Fetch a batch of reviewed areas that have yet to be reviewed.
 
 		'''
 		cursor.row_factory = class_row(ReviewedArea)
-		herd_unit = self.get_herd_unit(herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
 		survey = self.get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
 		user = self.get_user(user_id) if not isinstance(user_id, User) else user_id
-		if not herd_unit or not survey or not user:
+		if not survey or not user:
 			raise Exception('Could not fetch batch')
 
 		query = sql.SQL(''' SELECT RA.* FROM core.reviewed_area as RA
 							JOIN core.images as I on ra.image_id = I.image_id
-							WHERE I.herd_unit_id = %(herd_unit_id)s
 								AND I.survey_id = %(survey_id)s
 								AND I.opened_by_user_id = 0
 								AND RA.reviewed_by_user_id = 0
 							LIMIT 1;
 						''')
 		params = {
-			'herd_unit_id': herd_unit.herd_unit_id,
 			'survey_id' : survey.survey_id,
 		}
 		
@@ -3078,12 +3075,12 @@ class Database:
 
 		return result
 	
-	def get_crop_to_review(self, user_id: Union[User, int, UUID], herd_unit_id: Union[HerdUnit, int, UUID], 
+	def get_crop_to_review(self, user_id: Union[User, int, UUID],
 								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
 		'''
 
 		'''
-		return self._get_crop_to_review(user_id=user_id, herd_unit_id=herd_unit_id, survey_id=survey_id)
+		return self._get_crop_to_review(user_id=user_id, survey_id=survey_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get annotations for crop 

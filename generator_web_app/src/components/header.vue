@@ -30,7 +30,8 @@ export default defineComponent({
 
 <template>
     <header 
-        class="sticky-top d-flex justify-content-between align-items-center bg-body-secondary py-4 px-3"
+        class="sticky-top d-flex justify-content-between align-items-center 
+        bg-body-secondary py-4 px-3"
         :style="{height: '8vh'}"
         >
         <div>

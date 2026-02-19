@@ -24,7 +24,7 @@ export default defineComponent({
 	data() {
 		return {
 			currentStep: 0,
-			steps: ['Project', 'Herd Unit', 'Review'],
+			steps: ['Project', 'Herd Unit', 'Survey', 'Upload'],
 			newHerdUnit: false,
 			newHerdUnitName: '',
 			newSurvey: false,
@@ -118,7 +118,7 @@ export default defineComponent({
 <template>	
 	<BreadCrumb 
 		v-model="currentStep"
-		:steps="['Project Selection', 'Herd Unit Selection', 'Survey Selection', 'Upload']"
+		:steps="steps"
 		:showButtons="true"
 		:canContinue="canProceed"
 	>

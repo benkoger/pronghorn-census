@@ -11,11 +11,11 @@ export default {
 	computed: {
 		isLastStep() {
 			return this.modelValue === this.steps.length - 1;
-    	},
+		},
 		isFirstStep() {
 			return this.modelValue === 0;
 		},
-    	breadcrumbItems() {
+		breadcrumbItems() {
 			return this.steps.map((label, index) => ({
 				text: label,
 				active: index === this.modelValue,
@@ -38,12 +38,9 @@ export default {
 	<nav>
     	<BBreadcrumb :items="breadcrumbItems" />
 	</nav>
-		<div class="mt-1 flex-grow-1 overflow-auto">
-			<slot :currentStep="modelValue"></slot>
-		</div>
-		<div
+	<div
 			v-if="showButtons" 
-			class="d-flex mt-3"
+			class="d-flex m-1"
 			:class="{ 
 				'justify-content-between': !isFirstStep, 
 				'justify-content-end': isFirstStep 
@@ -66,5 +63,8 @@ export default {
 				{{ nextText }}
 			</BButton>
 		</div>
+	<div class="mt-1 flex-grow-1 overflow-auto">
+		<slot :currentStep="modelValue"></slot>
+	</div>
 </template>
 
