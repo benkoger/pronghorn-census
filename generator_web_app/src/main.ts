@@ -10,7 +10,6 @@ import { Icon } from '@iconify/vue';
 import VueKonva from 'vue-konva';
 import { useUserStore } from './modules/stores/userStore';
 
-
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 const app = createApp(App);

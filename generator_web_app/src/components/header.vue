@@ -21,7 +21,7 @@ export default defineComponent({
     },
     methods: {
         async logout() {
-            await this.user_store.deuathenticate(); // Fixed typo from your snippet: deuathenticate
+            await this.user_store.deuathenticate();
             this.$router.push('/authenticate')
         }
     }
@@ -39,7 +39,7 @@ export default defineComponent({
             <p v-if="isDev" class="text-warning m-0 small">Development Mode</p>
         </div>
 
-        <div class="d-flex align-items-center gap-2" v-if="user_store.logged_in">
+        <div class="d-flex align-items-center gap-2">
             <BButton
                 class="btn-secondary p-2 d-flex align-items-center"
                 @click="handleThemeToggle"
@@ -59,6 +59,7 @@ export default defineComponent({
                 />
             </BButton>
             <BButton 
+                v-if="user_store.logged_in"
                 id="logout" 
                 @click="logout" 
                 class="d-flex align-items-center bnt-secondary"
