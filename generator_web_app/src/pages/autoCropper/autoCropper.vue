@@ -167,239 +167,146 @@ export default defineComponent({
 
 </script>
 <template>
-	<div id="cropperContianer">
-		<div id="cropperContianer" v-if="!cStore.loading">
-			<div id="predictionsCarosuel" v-if="!cStore.loading" :class="{Overflow : cStore.CurrentPredictionCrops.length > 2}">
-				<div v-for="predCrop in cStore.CurrentPredictionCrops" 
-					:key="predCrop.uuid" 
-					class="predictionObject" 
-					:class="{Approved: predCrop.approved == true, Selected: cStore.activePredIdx == cStore.CurrentPredictionCrops.indexOf(predCrop)}"  
-					:title="'Prediction: ' + predCrop.uuid"
-					:ref="(el) => {if (el) {predictionRefs[predCrop.uuid] = el as HTMLDivElement}}">
-					<h2> Score: {{ predCrop.score?.toFixed(3) }} </h2>
-					<button @click="predCrop.approved = (predCrop.approved) ? false : true" tabindex="-1">
-						<canvas :ref="(el) => {if (el) {predCropRefs[predCrop.uuid] = el as HTMLCanvasElement}}" :class="{Visible: predCrop.drawBox}" tabindex="-1"></canvas>
-						<img :src="predCrop.url" tabindex="-1"></img>
-					</button>
-					<div class="predictionObjectOptions">
-						<section>
-						<label for="label-select-{{ predCrop.uuid }}">Label:</label>
-						<select id="label-select-{{ predCrop.uuid }}" v-model="cStore.CurrentPredictionCrops[cStore.CurrentPredictionCrops.indexOf(predCrop)].label" @change="drawBoundingBox(predCropRefs[predCrop.uuid], predCrop)">
-							<option v-for="label in pStore.labels" :value="label.label" :key="label.label">
-								{{ label.name }}
-							</option>
-						</select>
-						</section>
-						<section>
-							<label for="boxToggle-{{ predCrop.uuid }}"> Box: </label>
-							<input type="checkbox" id="boxToggle-{{ predCrop.uuid }}" name="boxToggle" v-model="predCrop.drawBox" tabindex="-1"/>
-						</section>
+	<div v-if="!cStore.loading" class="d-flex h-100 flex-column">
+		<BContainer fluid class="h-100">
+			<BRow class="h-100 d-flex justify-content-center">
+				<div id="predictionsCarosuel" v-if="!cStore.loading" :class="{Overflow : cStore.CurrentPredictionCrops.length > 2}">
+					<div v-for="predCrop in cStore.CurrentPredictionCrops" 
+						:key="predCrop.uuid" 
+						class="predictionObject bg-body-secondary rounded-3 shadow" 
+						:class="{Approved: predCrop.approved == true, Selected: cStore.activePredIdx == cStore.CurrentPredictionCrops.indexOf(predCrop)}"  
+						:title="'Prediction: ' + predCrop.uuid"
+						:ref="(el) => {if (el) {predictionRefs[predCrop.uuid] = el as HTMLDivElement}}">
+						<span class="text-info fs-4"> Score: {{ predCrop.score?.toFixed(3) }} </span>
+						<button @click="predCrop.approved = (predCrop.approved) ? false : true" tabindex="-1">
+							<canvas :ref="(el) => {if (el) {predCropRefs[predCrop.uuid] = el as HTMLCanvasElement}}" :class="{Visible: predCrop.drawBox}" tabindex="-1"></canvas>
+							<BImg :src="predCrop.url" tabindex="-1"></BImg>
+						</button>
+						<div class="d-flex w-100 h-100 m-1 p-1 justify-content-evenly align-items-center">
+							<label for="label-select-{{ predCrop.uuid }}">Label:</label>
+							<BFormSelect 
+								id="label-select-{{ predCrop.uuid }}" 
+								v-model="cStore.CurrentPredictionCrops[cStore.CurrentPredictionCrops.indexOf(predCrop)].label" 
+								@change="drawBoundingBox(predCropRefs[predCrop.uuid], predCrop)"
+								class="w-auto"
+							>
+								<option v-for="label in pStore.labels" :value="label.label" :key="label.label">
+									{{ label.name }}
+								</option>
+							</BFormSelect>
+								<label for="boxToggle-{{ predCrop.uuid }}"> Box: </label>
+								<BFormCheckbox id="boxToggle-{{ predCrop.uuid }}" name="boxToggle" v-model="predCrop.drawBox" tabindex="-1"/>
+						</div>
 					</div>
 				</div>
-			</div>
-		</div>
-		<div id="cropperContianer" v-else>
-			<Icon icon="eos-icons:three-dots-loading" width="96" height="96"/> 
-		</div>
-		<div id="Tool-Bar">
-			<div class="Tool">
-				<button @click="handleLeftArrow()" tabindex="-1">
+			</BRow>
+		</BContainer>
+		<BButtonToolbar
+			key-nav justify
+			aria-label="Auto Cropper Controls"
+			class="bg-body-secondary w-100 mt-1"
+			>
+			<BButtonGroup>
+				<BButton
+					class="w-100"
+					@click="handleLeftArrow()"
+					variant="primary"
+				>
 					<Icon icon="ooui:next-rtl" width="16" height="16"/>
 					Previous Image
-				</button>
-			</div>
-			<div class="Tool">
-				<button @click="handleSpace()" tabindex="-1">
+				</BButton>
+			</BButtonGroup>
+			<BButtonGroup>
+				<BButton
+					@click="handleSpace()"
+				>
 					<Icon icon="uis:space-key" width="16" height="16"/>
 					Toggle All
-				</button>
-			</div>
-			<div class="Tool" Title="Submit (Enter)">
-				<button @click="handleEnter()" tabindex="-1">
+				</BButton>
+				<BButton
+					@click="handleEnter()"
+				>
 					<Icon icon="vaadin:enter-arrow" width="16" height="16"/>
 					Submit
-				</button>
-			</div>
-			<div class="Tool">
-				<button @click="handleRightArrow()" tabindex="-1">
+				</BButton>
+			</BButtonGroup>
+			<BButtonGroup>
+				<BButton
+					class="w-100"
+					@click="handleRightArrow"
+					variant="primary"
+				>
 					Next Image
 					<Icon icon="ooui:next-ltr" width="16" height="16"/> 
-				</button>
-			</div>
-		</div>
+				</BButton>
+			</BButtonGroup>
+		</BButtonToolbar>
 	</div>
+	<div v-else class="d-flex justify-content-center align-items-center h-100">
+		<Icon icon="eos-icons:three-dots-loading" width="96" height="96"/>
+	</div> 
 </template>
 <style scoped>
-#cropperContianer {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	height: 100%;
-	width: 100%;
-	overflow: hidden;
-}
-#cropperContianer {
-	height: 100%;
-	display: flex;
-	width: 100%;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding: 0 5% 0 5%;
-	svg {
-		justify-self: center;
-		align-self: center;
+	#predictionsCarosuel {
+		display: flex; 
+		align-items: center;
+		justify-content: center;
+		gap: 2.5%;
+		max-width: 80vw;
+		width: fit-content;
+		margin: 0 2% 0 2%;
+		padding: 2%;
 	}
-	overflow: hidden;
-}
-#predictionsCarosuel {
-	display: flex; 
-	align-items: center;
-	justify-content: center;
-    gap: 2.5%;
-	max-width: 80vw;
-	width: fit-content;
-	margin: 0 2% 0 2%;
-	padding: 2%;
-}
-.Overflow {		
-	overflow-x: auto;
-	justify-content: flex-start !important;
-	scrollbar-color: var(--color-text) transparent;
-	scroll-padding-inline: 10%;
-}
-.predictionObject {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	border-radius: 8px;
-	padding: 1vw;
-	background-color: var(--wygf-bg-blue);
-	box-shadow: 0 4px 6px 2px var(--color-background);
-}
-	.predictionObject img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
+	.Overflow {		
+		overflow-x: auto;
+		justify-content: flex-start !important;
+		scrollbar-color: var(--color-text) transparent;
+		scroll-padding-inline: 10%;
 	}
-	.predictionObject canvas {
-		object-fit: cover;
-		display: none;
-		position: absolute;
-		top: 0;
-		z-index: 1;
-	}
-
-	.predictionObject canvas.Visible {
-		width: 100%;
-		height: 100%;
-		display: block;
-		z-index: 999;
-	}
-	.predictionObject button {
+	.predictionObject {
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		width: 22vw;
-		height: auto;
 		align-items: center;
-		border: none;
-		background: none;
-		position: relative;
-		color: var(--color-heading);
+		padding: 1%;
+		background-color: var(--wygf-bg-blue);
 	}
+		.predictionObject img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+		.predictionObject canvas {
+			object-fit: cover;
+			display: none;
+			position: absolute;
+			top: 0;
+			z-index: 1;
+		}
+		.predictionObject canvas.Visible {
+			width: 100%;
+			height: 100%; 
+			display: block;
+			z-index: 999;
+		}
+		.predictionObject button {
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			width: 22vw;
+			height: auto;
+			align-items: center;
+			border: none;
+			background: none;
+			position: relative;
+			color: var(--color-heading);
+		}
 
-
-.predictionObjectOptions {
-	display: flex;
-	width: 100%;
-	height: 100%;
-	margin: 2%;
-	justify-content: center;
-	align-items: center;
-	gap: 1vw;
-}
-.predictionObjectOptions section {
-	display: flex; 
-	align-items: center;
-	gap: 5%;
-	width: 100%;
-	height: 100%;
-	label {
-		font-size: 1.5em;
-		margin-right: 5px;
-		text-align: center;
+	.predictionObject.Selected {
+		box-shadow: 0 0 3px 1px white !important;
 	}
-	select {
-		border-radius: 8px;
-		cursor: pointer;
-		width: 10vw;
-		height: 2vh;
+	.predictionObject.Approved {
+		background-color:  var(--bs-success) !important;
 	}
-	select > option:hover {
-		cursor: pointer;
-	}
-	input[type='checkbox'] {
-		cursor: pointer;
-		width: 2vh;
-		height: 2vh;
-	}
-}
-.predictionObject.Selected {
-	box-shadow: 0 0 3px 1px white;
-}
-.predictionObject.Approved {
-	box-shadow: 0 0 3px 1px var(--wygf-yellow);
-}
-#Tool-Bar{
-	width: 80%;
-	height: 5vh;
-	justify-self: flex-end;
-	border-radius: 8px;
-	box-shadow: 0 8px 12px 4px var(--color-background);
-	display: flex;
-	justify-content: space-between;
-	margin: 2% 0 2% 0;
-	align-items: center;
-	background-color: var(--wygf-bg-blue)
-}
-#Tool-Bar .Tool {
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	height: 100%;
-	max-height: 5vh;
-	display: flex;
-	color: var(--color-heading);
-	justify-content: center;
-	align-items: center;
-	min-width: 12vw;
-	font-size: 1em;
-	padding: 1%;
-	border: None;
-}
-#Tool-Bar .Tool:hover {
-	color: var(--wygf-yellow);
-}
-#Tool-Bar .Tool button {
-	background: none;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	color: inherit;
-	border-radius: 4px;
-	width: 100%;
-	height: 100%;
-	border: none;
-	font-size: 1em;
-}
-#Tool-Bar .Tool :hover {
-	cursor: pointer;
-}
-#Tool-Bar .Tool  svg {
-    margin: 2%;
-}
 </style>

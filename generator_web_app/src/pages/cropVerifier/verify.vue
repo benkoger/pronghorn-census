@@ -583,51 +583,52 @@ export default defineComponent({
                 </Bcol>
             </BRow>
         </BContainer>
-		<BButtonToolbar 
-		key-nav justify 
-		aria-label="Crop Explorer Tools"
-		class="bg-body-tertiary mt-3"	>
-		<BButtonGroup>
-			<BButton 
-				class="w-100"
-				@click="handleLeftArrow()"
-				variant="primary"
-			>
-				<Icon icon="ooui:next-rtl"/>
-				Previous Crop
-			</BButton>
-		</BButtonGroup>
-		<BButtonGroup>
-			<BButton >
-				<Icon icon="material-symbols:undo"/>
-				Undo
-			</BButton>
-			<BButton >
-				<Icon icon="material-symbols:redo"/>
-				Redo
-			</BButton>
-			<BButton 
-				class="explorerButton" 
-				@click="handleEnter()"
-				variant="success"
-			>
-				<Icon icon="vaadin:enter-arrow"/>
-				Submit
-			</BButton>
-		</BButtonGroup>
-		<BButtonGroup>
-			<BButton 
-				class="w-100"
-				@click="handleRightArrow()"
-				variant="primary"
-			>
-				Next Crop
-				<Icon icon="ooui:next-ltr"/> 
-			</BButton>
-		</BButtonGroup>
-	</BButtonToolbar>
+        <BButtonToolbar 
+                key-nav justify 
+                aria-label="Crop Explorer Controls"
+                class="bg-body-secondary mt-3"	
+        >
+            <BButtonGroup>
+                <BButton 
+                    class="w-100"
+                    @click="handleLeftArrow()"
+                    variant="primary"
+                >
+                    <Icon icon="ooui:next-rtl"/>
+                    Previous Crop
+                </BButton>
+            </BButtonGroup>
+            <BButtonGroup>
+                <BButton>
+                    <Icon icon="material-symbols:undo"/>
+                    Undo
+                </BButton>
+                <BButton>
+                    <Icon icon="material-symbols:redo"/>
+                    Redo
+                </BButton>
+                <BButton 
+                    class="explorerButton" 
+                    @click="handleEnter()"
+                    variant="success"
+                >
+                    <Icon icon="vaadin:enter-arrow"/>
+                    Submit
+                </BButton>
+            </BButtonGroup>
+            <BButtonGroup>
+                <BButton 
+                    class="w-100"
+                    @click="handleRightArrow()"
+                    variant="primary"
+                >
+                    Next Crop
+                    <Icon icon="ooui:next-ltr"/> 
+                </BButton>
+            </BButtonGroup>
+        </BButtonToolbar>
     </div>
-<div v-else>
+    <div v-else class="d-flex justify-content-center align-items-center h-100">
         <Icon icon="eos-icons:three-dots-loading" width="96" height="96"/> 
     </div>
 </template>
@@ -725,7 +726,5 @@ export default defineComponent({
         height: fit-content;
         margin-left: 5%;
     }
-
-
 
 </style>
