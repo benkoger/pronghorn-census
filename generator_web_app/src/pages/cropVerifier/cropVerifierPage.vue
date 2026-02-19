@@ -1,7 +1,7 @@
 <script lang="ts">
-import { defineComponent, defineAsyncComponent, ref } from "vue";
+import { defineComponent, defineAsyncComponent } from "vue";
 import { useProjectStore } from "@/modules/stores/projectStore";
-import { Project, Survey, Schema, HerdUnit, Label, Model } from '@/types/generatorobjects';
+import { Project, Survey, Schema } from '@/types/generatorobjects';
 import { mapState } from "pinia";
 import ProcessBreadCrumb  from '@/components/templates/ProcessBreadCrumb.vue';
 
@@ -119,58 +119,23 @@ export default defineComponent({
 	>
 		<div v-if="currentStep === 0" class="d-flex flex-column h-100">
 			<BContainer fluid>
-			<BRow>
-				<BCol cols="6">
-					<h3>Project Selection</h3>
-					<div class="flex-grow-1 overflow-y-auto">
-						<BListGroup>
-							<BListGroupItem
-								v-for="project in pStore.projects"
-								:key="project.uuid"
-								action
-								:active="CurrentProject?.uuid === project.uuid"
-								@click="pStore.set_current_project(project)"
-							>
-								<div class="d-flex justify-content-between align-items-flex-start flex-column">
-									<span class="mb-1 fw-bold">{{ project.name }}</span>
-									<div class="d-flex gap-4">
-										<small class="text-muted">Created: 
-											{{ project.created.toLocaleString('en-US', { 
-													year: 'numeric', 
-													month: 'numeric', 
-													day: 'numeric', 
-												}) 
-											}}
-										</small>
-										<small class="text-muted">Modified: 
-											{{ project.modified.toLocaleString('en-US', { 
-													year: 'numeric', 
-													month: 'numeric', 
-													day: 'numeric', 
-												}) 
-											}}</small>
-									</div>
-								</div>
-							</BListGroupItem>
-						</BListGroup> 
-					</div>
-				</BCol>
-				<BCol cols="6">
-						<h3>Survey Selection</h3>
+				<BRow>
+					<BCol cols="6">
+						<h3>Project Selection</h3>
 						<div class="flex-grow-1 overflow-y-auto">
 							<BListGroup>
 								<BListGroupItem
-									v-for="survey in pStore.surveys"
-									:key="survey.uuid"
+									v-for="project in pStore.projects"
+									:key="project.uuid"
 									action
-									:active="CurrentSurvey?.uuid === survey.uuid"
-									@click="pStore.set_current_survey(survey)"
+									:active="CurrentProject?.uuid === project.uuid"
+									@click="pStore.set_current_project(project)"
 								>
 									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ survey.name }}</span>
+										<span class="mb-1 fw-bold">{{ project.name }}</span>
 										<div class="d-flex gap-4">
 											<small class="text-muted">Created: 
-												{{ survey.created.toLocaleString('en-US', { 
+												{{ project.created.toLocaleString('en-US', { 
 														year: 'numeric', 
 														month: 'numeric', 
 														day: 'numeric', 
@@ -178,7 +143,7 @@ export default defineComponent({
 												}}
 											</small>
 											<small class="text-muted">Modified: 
-												{{ survey.modified.toLocaleString('en-US', { 
+												{{ project.modified.toLocaleString('en-US', { 
 														year: 'numeric', 
 														month: 'numeric', 
 														day: 'numeric', 
@@ -187,11 +152,46 @@ export default defineComponent({
 										</div>
 									</div>
 								</BListGroupItem>
-							</BListGroup>
+							</BListGroup> 
 						</div>
-				</BCol>
-			</BRow>
-		</BContainer>
+					</BCol>
+					<BCol cols="6">
+							<h3>Survey Selection</h3>
+							<div class="flex-grow-1 overflow-y-auto">
+								<BListGroup>
+									<BListGroupItem
+										v-for="survey in pStore.surveys"
+										:key="survey.uuid"
+										action
+										:active="CurrentSurvey?.uuid === survey.uuid"
+										@click="pStore.set_current_survey(survey)"
+									>
+										<div class="d-flex justify-content-between align-items-flex-start flex-column">
+											<span class="mb-1 fw-bold">{{ survey.name }}</span>
+											<div class="d-flex gap-4">
+												<small class="text-muted">Created: 
+													{{ survey.created.toLocaleString('en-US', { 
+															year: 'numeric', 
+															month: 'numeric', 
+															day: 'numeric', 
+														}) 
+													}}
+												</small>
+												<small class="text-muted">Modified: 
+													{{ survey.modified.toLocaleString('en-US', { 
+															year: 'numeric', 
+															month: 'numeric', 
+															day: 'numeric', 
+														}) 
+													}}</small>
+											</div>
+										</div>
+									</BListGroupItem>
+								</BListGroup>
+							</div>
+					</BCol>
+				</BRow>
+			</BContainer>
 		</div>
 		<div v-if="currentStep === 1" class="d-flex flex-column h-100">
 			<h3>Schema Selection</h3>

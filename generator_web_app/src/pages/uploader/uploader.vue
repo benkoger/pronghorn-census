@@ -247,8 +247,7 @@ export default defineComponent({
 							justify-content-center align-items-center" 
 							v-if="files.length"
 						>
-							<Bcard 
-								no-body
+							<div 
 								class="border overflow-hidden rounded-3 d-flex flex-shrink-0 p-1"
 								style="width: 250px"
 								v-for="file in files" :key="file.name" 
@@ -279,7 +278,7 @@ export default defineComponent({
 										</BCardBody>
 									</BCol>
 								</BRow>
-							</Bcard>
+							</div>
 						</div>
 					</div>
 				</div>

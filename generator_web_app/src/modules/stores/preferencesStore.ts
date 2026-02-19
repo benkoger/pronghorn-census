@@ -9,7 +9,6 @@ export const usePreferenceStore = defineStore('preferenceStore', {
     state: () => ({
         first_login: true,
         theme: 'dark', 
-        batch_size: 20,
     }),
     persist: {
         key: 'user-preferences'
