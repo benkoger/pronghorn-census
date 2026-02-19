@@ -903,11 +903,11 @@ class Database:
 
 		herd_unit = cursor.fetchone()
 		if not herd_unit:
-			raise Exception('Failed to create survey')
+			raise Exception('Failed to create herd unit')
 
 		query_2 = sql.SQL('''
 			INSERT INTO projectmanagement.projects_herd_units (
-				project_id, survey_id 
+				project_id, herd_unit_id 
 			)
 			VALUES (
 				%s, %s

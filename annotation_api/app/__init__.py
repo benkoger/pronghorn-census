@@ -51,5 +51,8 @@ def create_app():
 	from app.routers.surveys import surveyBp
 	app.register_blueprint(surveyBp)
 
+	from app.routers.herdunits import herdunitBp
+	app.register_blueprint(herdunitBp)
+
 	return app
 

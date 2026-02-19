@@ -24,7 +24,13 @@ export default defineComponent({
 	data() {
 		return {
 			currentStep: 0,
-			steps: ['Project', 'Herd Unit', 'Review']
+			steps: ['Project', 'Herd Unit', 'Review'],
+			newHerdUnit: false,
+			newHerdUnitName: '',
+			newSurvey: false,
+			newSurveyName: '',
+			newSurveyDate: '',
+			newSurveyAdditionalInfo: '',
 		};
 	},
 	computed: {
@@ -81,6 +87,32 @@ export default defineComponent({
 			}
 		},
 	},
+	methods: {
+		toggleNewHerdUnit() {
+			if (this.CurrentHerdUnit) this.pStore.set_current_herd_unit(this.CurrentHerdUnit);
+			this.newHerdUnit = !this.newHerdUnit;
+			this.newHerdUnitName = '';
+		},
+		toggleNewSurvey() {
+			if (this.CurrentSurvey) this.pStore.set_current_survey(this.CurrentSurvey);
+			this.newSurvey = !this.newSurvey;
+		},
+		async submitNewHerdUnit() {
+			if (this.CurrentProject) {
+				await this.pStore.create_herd_unit(this.CurrentProject?.project_id, this.newHerdUnitName)
+				this.newHerdUnit = false;
+			}
+			
+		},
+		async submitNewSurvey() {
+			if (this.CurrentProject && this.CurrentHerdUnit) {
+				await this.pStore.create_survey(this.CurrentProject.project_id, this.CurrentHerdUnit.herd_unit_id,
+					this.newSurveyName, new Date(this.newSurveyDate).toISOString(), this.newSurveyAdditionalInfo
+				);
+				this.newSurvey = false;
+			}
+		}
+	}
 });
 </script> 
 <template>	
@@ -157,7 +189,39 @@ export default defineComponent({
 							</div>
 						</div>
 					</BListGroupItem>
+					<BListGroupItem v-if="newHerdUnit">
+						<BForm 
+							@submit.prevent="submitNewHerdUnit"
+							class="d-flex flex-row align-items-center flex-wrap"
+						>
+							<label class="visually-hidden" for="herd-unit-name">Name</label>
+							
+							<BFormInput
+								id="herd-unit-name"
+								placeholder="Name"
+								class="w-auto me-2"
+								required
+								v-model="newHerdUnitName"
+							></BFormInput>
+							<span class="text-info">A new herd unit will be created and
+								associated with the project: <strong>{{ CurrentProject?.name }}</strong>.
+							</span>
+							<BButton variant="outline-danger" class="ms-auto" @click="toggleNewHerdUnit()">Cancel</BButton>
+							<BButton type="submit" variant="primary" class="ms-3">Create</BButton>
+						</BForm>
+					</BListGroupItem>
 				</BListGroup>
+				<div class="d-flex justify-content-end">
+					<BButton
+						id="AddHerdUnit"
+						class="m-2"
+						variant="outline-primary"
+						@click="toggleNewHerdUnit()"
+					>
+						<Icon icon="material-symbols:add"/>
+					</BButton>
+				</div>
+				
 			</div>
 		</div>
 		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
@@ -192,7 +256,50 @@ export default defineComponent({
 							</div>
 						</div>
 					</BListGroupItem>
+					<BListGroupItem v-if="newSurvey">
+						<BForm 
+							@submit.prevent="submitNewSurvey"
+							class="d-flex flex-row align-items-center flex-wrap"
+						>
+							<label class="visually-hidden" for="survey-name">Name</label>
+							<BFormInput
+								id="survey-name"
+								placeholder="name"
+								class="w-auto me-2"
+								required
+								v-model="newSurveyName"
+							></BFormInput>
+							<label class="visually-hidden" for="survey-date">Survey Date</label>
+							<BFormInput
+								type="date"
+								id="survey-date"
+								v-model="newSurveyDate"
+								required
+								class="w-auto m-2"
+							></BFormInput>
+							<label class="visually-hidden" for="additional-info">Additional Info</label>
+							<BFormTextarea
+								id="additional-info"
+								placeholder="Additional Info"
+								v-model="newSurveyAdditionalInfo"
+								class="w-50 m-2"
+								required
+							></BFormTextarea>
+							<BButton variant="outline-danger" class="ms-auto" @click="toggleNewSurvey()">Cancel</BButton>
+							<BButton type="submit" variant="primary" class="ms-3">Create</BButton>
+						</BForm>
+					</BListGroupItem>
 				</BListGroup>
+				<div class="d-flex justify-content-end">
+					<BButton
+						id="AddHerdUnit"
+						class="m-2"
+						variant="outline-primary"
+						@click="toggleNewSurvey()"
+					>
+						<Icon icon="material-symbols:add"/>
+					</BButton>
+				</div>
 			</div>
 		</div>
 		<Upload v-if="currentStep === 3 " />

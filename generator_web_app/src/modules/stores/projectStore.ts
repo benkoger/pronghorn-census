@@ -6,7 +6,8 @@
 import { defineStore } from "pinia";
 import { getProjects, getProjectSchemas, getProjectHerdUnits, getProjectModels, getProjectSurveys, getSchemaLabels, getCropperModels, getCropperHerdUnits } from "../api/apiV1Methods";
 import { Project, Schema, Label, HerdUnit, Model, Survey } from "@/types/generatorobjects";
-import { getSurveyHerdUnits } from "@/modules/api/surveys";
+import { getSurveyHerdUnits, createSurvey } from "@/modules/api/surveys";
+import { createHerdUnit } from "@/modules/api/herdunits";
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
@@ -157,6 +158,16 @@ export const useProjectStore = defineStore('pStore', {
             await this.get_surveys();
             await this.get_schemas();
             await this.get_cropper_models();
+        },
+        async create_herd_unit(project_id: number, name: string) {
+            const herd_unit = await createHerdUnit(project_id, name);
+            this.herd_units.push(herd_unit);
+            this.herd_unit_idx = this.herd_units.indexOf(herd_unit);
+        },
+        async create_survey(project_id: number, herd_unit_id: number, name: string, survey_date: string, additional_info: string){
+            const survey = await createSurvey(project_id, herd_unit_id, name, survey_date, additional_info);
+            this.surveys.push(survey);
+            this.survey_idx = this.surveys.indexOf(survey);
         },
         clear_state() {
             this.schemas = [];

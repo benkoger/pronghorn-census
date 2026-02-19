@@ -93,7 +93,7 @@ export default defineComponent({
 	},
 	startUpload() {
 		this.is_uploading = true;
-		//this.upload()
+		//this.upload();
 	},
 	async upload() {
 		// Cache relevant Ids from store (Current objects are computed getters in the store)
@@ -102,8 +102,8 @@ export default defineComponent({
 
 		for (const file of this.files) {
 			const extension = file.name.toLowerCase().split(".").pop();
-			this.current_file_name = file.name
-			this.current_file_size = filesize(file.size)
+			this.current_file_name = file.name;
+			this.current_file_size = filesize(file.size);
 			// Check if file is image (switch case)
 			switch (extension) {
 				case "jpg":
