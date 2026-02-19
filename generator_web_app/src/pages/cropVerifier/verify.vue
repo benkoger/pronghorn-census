@@ -407,7 +407,7 @@ export default defineComponent({
                     </div>
                 </BCol>
                 <BCol cols="9" class="h-100">
-                    <div id="stagewrapper" ref="stagewrapper" class="h-100 bg-body-tertiary">
+                    <div id="stagewrapper" ref="stagewrapper" class="h-100 bg-body-tertiary rounded-3 shadow">
                         <v-stage :config="{
                             width: stageWidth,
                             height: stageHeight,
@@ -586,7 +586,7 @@ export default defineComponent({
 		class="bg-body-tertiary mt-3"	>
 		<BButtonGroup>
 			<BButton 
-				class="explorerButton"
+				class="w-100"
 				@click="handleLeftArrow()"
 				variant="primary"
 			>
@@ -595,15 +595,11 @@ export default defineComponent({
 			</BButton>
 		</BButtonGroup>
 		<BButtonGroup>
-			<BButton 
-				class="explorerButton"
-			>
+			<BButton >
 				<Icon icon="material-symbols:undo"/>
 				Undo
 			</BButton>
-			<BButton 
-				class="explorerButton"
-			>
+			<BButton >
 				<Icon icon="material-symbols:redo"/>
 				Redo
 			</BButton>
@@ -618,7 +614,7 @@ export default defineComponent({
 		</BButtonGroup>
 		<BButtonGroup>
 			<BButton 
-				class="explorerButton"
+				class="w-100"
 				@click="handleRightArrow()"
 				variant="primary"
 			>
