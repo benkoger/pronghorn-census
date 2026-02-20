@@ -6,10 +6,9 @@
 import { HerdUnit } from '@/types/generatorobjects.ts';
 import type { HerdUnitIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
+import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
-const api_url: URL = new URL(api_url_base);
 
 //---------------------------------------------------------------------------------------------------------------------------//
 

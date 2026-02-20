@@ -5,11 +5,8 @@
 
 import { HerdUnit, Survey } from '@/types/generatorobjects.ts';
 import type { HerdUnitIntf, Survey_intf } from '@/types/generatorobjects.ts';
-import type { apiError } from '@/modules/api/apiV1Methods';
-
-const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
-
-const api_url: URL = new URL(api_url_base);
+import type { apiError } from '@/modules/api/errors.ts';
+import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
