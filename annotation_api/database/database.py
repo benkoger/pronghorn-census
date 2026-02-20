@@ -945,7 +945,7 @@ class Database:
 		herd_unit = cursor.fetchone()
 
 		if not herd_unit:
-			raise Exception('uh oh spaghettios')
+			raise Exception('Herd Unit was not found')
 
 		return herd_unit
 	
@@ -1638,7 +1638,11 @@ class Database:
 		'''
 		
 		'''
-		cursor.row_factory = class_row(Image)
+		if isinstance(parameters['survey_id'], str):
+			parameters['survey_id'] = self._get_survey(cursor, parameters['survey_id']).survey_id
+
+		if isinstance(parameters['herd_unit_id'], str):
+			parameters['herd_unit_id'] = self._get_herd_unit(cursor, parameters['herd_unit_id']).herd_unit_id
 
 		query_1 = sql.SQL(''' 
 			INSERT INTO core.images (
@@ -1651,7 +1655,8 @@ class Database:
 			) 
 			RETURNING *; 
 		''')
-		
+
+		cursor.row_factory = class_row(Image)
 		cursor.execute(query_1, parameters)
 
 		image = cursor.fetchone()

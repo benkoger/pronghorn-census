@@ -6,7 +6,8 @@
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint,  abort, request, current_app
-from .image_validators import CreateImage, UpdateImage
+from psycopg.errors import UniqueViolation
+from .image_validators import *																																																																							
 from app.extensions import base, s3 
 from botocore.exceptions import ClientError
 from flask_pydantic import validate
@@ -114,20 +115,23 @@ def create(body: CreateImage):
 	'''
 	try:
 		image = base.create_image(body.model_dump())
-	except Exception as e:
-		abort(500)
+	except (UniqueViolation, Exception) as e:
+		if type(e) is UniqueViolation:
+			abort(409, 'Image already exists')
+		else:
+			abort(500)
 
 	return image.serialize(), 201
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.post('/<string:image_id>/presigned_url')
+@imageBp.post('/presigned-get-url')
 @login_required
-def create_presigned_get(image_id: str):
+def create_presigned_get(body: CreatePresignedPut):
 	'''
 	'''
-	data = request.get_json()
-	image = base.get_image(UUID(image_id))
+	data = body.model_dump()
+	image = base.get_image(UUID(data['image_id']))
 
 	try:
 		response = s3.generate_presigned_url(
@@ -141,6 +145,61 @@ def create_presigned_get(image_id: str):
 	except ClientError as e:
 		abort(500)
 	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('/presigned-put-url')
+@validate()
+@login_required
+def create_presigned_post():
+	'''
+	Generates a pre-signed URL for a single file chunk. 
+	This is the core endpoint for offloading data transfer. 
+	The client sends a PUT request to this temporary URL with the chunk data.
+	'''
+	data = request.get_json()
+	image_id = UUID(data['image_id']) if isinstance(data['image_id'], str) else data['image_id']
+	image = base._get_image(image_id)
+
+	try: 
+		response = s3.generate_presigned_url(
+		ClientMethod='upload_part', 
+		Params = {
+			'Bucket': current_app.config['BUCKET_NAME'],
+			'Key': image.img_key, 
+			'UploadId': data['upload_id'],
+			'PartNumber': data['part_number'],
+			'ContentLength': data['chunk_size'],
+			'ContentMD5' : data['chunk_md5'],
+		},
+		ExpiresIn=3600,
+		)
+	except Exception as e:
+		abort(500)
+	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('/create-multipart-upload')
+@login_required
+def create_multipart_upload():
+	'''
+	Initiates a new multipart upload. The client calls this for each file 
+	to be uploaded. the app responds with a unique UploadId, which is required 
+	for all subsequent chunk uploads for that file.
+	'''
+
+	data = request.get_json()
+	try: 
+		response = s3.create_multipart_upload(
+			Bucket = current_app.config['BUCKET_NAME'],
+			Key = data['image_key'],
+			ContentType = 'image/jpeg',
+		)
+	except Exception:
+		abort(500)
+	
+	return response['UploadId'], 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #PUT

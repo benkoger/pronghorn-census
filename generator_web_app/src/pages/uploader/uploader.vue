@@ -3,11 +3,13 @@
 // https://blog.logrocket.com/customizing-drag-drop-file-uploading-vue/#creating-advanced-dropzone
 import { defineComponent } from "vue";
 import { ref } from "vue";
-import { HerdUnit, Project, Survey, Model, Schema } from "@/types/generatorobjects";
-import { abortMultipartUpload, createImage, createMultiPartUpload, get_imagePresignedPostUrl, completeMultiPartUpload } from "@/modules/api/apiV1Methods";
+import { HerdUnit, Project, Survey, Model, Schema, Image } from "@/types/generatorobjects";
+import { createImagePresignedPut, createImage, abortMultipartUpload, uploadImagePart,
+			createMultiPartUpload, completeMultiPartUpload } from '@/modules/api/images';
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { Md5 } from "ts-md5";
 import { filesize } from 'filesize';
+import { ApiError } from "@/modules/api/errors";
 
 export default defineComponent({
 	name: "Upload-Utility",
@@ -93,12 +95,14 @@ export default defineComponent({
 	},
 	startUpload() {
 		this.is_uploading = true;
-		//this.upload();
+		this.upload();
 	},
 	async upload() {
 		// Cache relevant Ids from store (Current objects are computed getters in the store)
-		const survey_id = this.pStore.CurrentSurvey?.uuid;
-		const herd_unit_id = this.pStore.CurrentHerdUnit?.uuid;
+		const surveyId = this.pStore.CurrentSurvey?.survey_id;
+		const herdUnitId = this.pStore.CurrentHerdUnit?.herd_unit_id;
+
+		if (surveyId == undefined || herdUnitId == undefined) throw new Error('No survey or herd unit id'); 
 
 		for (const file of this.files) {
 			const extension = file.name.toLowerCase().split(".").pop();
@@ -108,104 +112,140 @@ export default defineComponent({
 			switch (extension) {
 				case "jpg":
 					// Post image to API store returned uuid for object key
-					const img = new window.Image();
 					const imageBitmap = await createImageBitmap(file);
 
 					// Create key
-					const image_key = `images/survey/${survey_id}/herd_unit/${herd_unit_id}/image/${file.name}`;
+					const image_key = `images/survey/${surveyId}/herd_unit/${herdUnitId}/image/${file.name}`;
 
 					// Create Image object in database
-					const image = await createImage(
-						survey_id,
-						herd_unit_id,
-						file.name,
-						image_key,
-						imageBitmap.height,
-						imageBitmap.width
-					);
-					if (image == undefined) throw new Error(`failed to create image!`);
-				
+					let image: Image;
+					
+					try {
+						image = await createImage({
+										survey_id: surveyId,
+										herd_unit_id: herdUnitId,
+										name: file.name,
+										img_key: image_key,
+										image_length_px: imageBitmap.height,
+										image_width_px: imageBitmap.width
+									});
 
-					// Instantiate list to hold Parts
-					const part_list = [];
+
+					} catch (error: any) {
+						if (error instanceof ApiError) {
+							if (error.code == 409) {
+								//TODO: Replace with Toast error
+								console.log('image already exists!');
+
+								// Non-fatal error -- move to next image
+								continue;
+							}
+						}
+						console.error('Unkown error, panicking!')
+						return;
+					}
+					
+					// array to hold image part numbers and Etags
+					const partArray = [];
 
 					// Initiate Mulitpart upload
-					const upload_id = await createMultiPartUpload(image_key);
-					
-					if (upload_id == undefined)
-					throw new Error(`failed to create multipart upload!`);
+					let uploadId: string;
+					try {
+						uploadId = await createMultiPartUpload(image_key);
+					} catch (error: any) {
+						console.error(error);
+						return;
+					}
 					
 					// chunk the image file based on size
 					const chunkSize = 1024 * 1024 * 5; // (5MB)
 					const totalParts = Math.ceil(file.size / chunkSize);
 					this.total_file_parts = totalParts; 
 					for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+						// Create file chunk
+						const start = (partNumber - 1) * chunkSize;
+						const end = Math.min(start + chunkSize, file.size);
+						const chunk = file.slice(start, end);
+
+						// Hash the chunk
+						let md5 = new Md5();
+						md5.appendByteArray(new Uint8Array(await chunk.arrayBuffer()));
+						const chunk_hash_hex = md5.end() as string;
+						
+						// Convert the hash to a base64 string
+						const chunkMd5Base64 = btoa(
+							String.fromCharCode.apply(
+								null,
+								chunk_hash_hex.match(/.{2}/g)!.map((hex) => parseInt(hex, 16))
+							)
+						);
+
+						// Request pre-signed url for chuck
+						let presignedUrl: string;
 						try {
-							// Create file chunk
-							const start = (partNumber - 1) * chunkSize;
-							const end = Math.min(start + chunkSize, file.size);
-							const chunk = file.slice(start, end);
-
-							// Hash the chunk
-							let md5 = new Md5();
-							md5.appendByteArray(new Uint8Array(await chunk.arrayBuffer()));
-							const chunk_hash_hex = md5.end() as string;
-							
-							// Convert the hash to a base64 string
-							const chunk_md5_base64 = btoa(
-								String.fromCharCode.apply(
-									null,
-									chunk_hash_hex.match(/.{2}/g)!.map((hex) => parseInt(hex, 16))
-								)
-							);
-
-							// Request pre-signed url for chuck
-							const presigned_url = await get_imagePresignedPostUrl(
-								upload_id,
-								partNumber,
-								image_key,
-								chunk.size,
-								chunk_md5_base64
-							);
-
-							// Post request to pre-signed url with part-num, upload-id
-							if (presigned_url == undefined) throw new Error(`failed to create pre-signed url!`);
-
-							const headers = new Headers();
-							headers.append("Content-Length", chunk.size.toString());
-							headers.append("Content-MD5", chunk_md5_base64);
-
-							const response = await fetch(presigned_url, {
-								method: "PUT",
-								body: chunk,
-								headers: headers,
+							presignedUrl = await createImagePresignedPut({
+								upload_id: uploadId,
+								part_number: partNumber,
+								image_id: image.image_id,
+								chunk_size: chunk.size,
+								chunk_md5: chunkMd5Base64
 							});
-							if (!response.ok) {
-							throw new Error(`Upload of part ${partNumber} failed with status: ${response.status}`);
-							}
-							// Push PartNumber and Etag to list
-							part_list.push({
-								PartNumber: partNumber,
-								ETag: response.headers.get("ETag"),
-							});
+
 						} catch (error: any) {
-							// Abort multipart upload
 							console.error(error);
-							const response = await abortMultipartUpload(image_key, upload_id);
 							return;
 						}
+						
+						let ETag: string;
+						try {
+							ETag = await uploadImagePart({
+							presigned_url: presignedUrl,
+							chunk_size: chunk.size.toString(),
+							chunk_md5: chunkMd5Base64,
+							chunk: chunk
+						});
+						} catch (error: any) {
+							console.error(error);
+							return;
+						}
+						
+						// Post request to pre-signed url with part-num, upload-id
+						// const headers = new Headers();
+						// headers.append("Content-Length", chunk.size.toString());
+						// headers.append("Content-MD5", chunkMd5Base64);
+
+						// const response = await fetch(presignedUrl, {
+						// 	method: "PUT",
+						// 	body: chunk,
+						// 	headers: headers,
+						// });
+						// if (!response.ok) {
+						// throw new Error(`Upload of part ${partNumber} failed with status: ${response.status}`);
+						// }
+						// Push PartNumber and Etag to list
+						partArray.push({
+							PartNumber: partNumber,
+							ETag: ETag,
+						});
+	
 						this.current_file_part++;
 					}
 					// Complete multipart upload
-					const response = await completeMultiPartUpload(
-						image_key,
-						part_list,
-						upload_id
-					);
+					try {
+						await completeMultiPartUpload(
+							image_key,
+							partArray,
+							uploadId
+						);
+					} catch (error: any) {
+						console.error(error)
+						return;
+					}
 					this.current_file_num++;
 					this.current_file_part = 0;
 			}
 		}
+		// Upload process complete
 		this.current_file_num = 0;
 		this.is_uploading = false;
 		this.files = [];

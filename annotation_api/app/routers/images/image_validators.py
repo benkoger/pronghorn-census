@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 
 class CreateImage(BaseModel):
     name: str
@@ -13,6 +13,13 @@ class CreateImage(BaseModel):
     has_detection: bool = False   
     dem_name: Optional[str] = None
     bbox_wsen: Optional[List[int]] = None
+
+class CreatePresignedPut(BaseModel):
+    image_id: Union[str, int]
+    upload_id: str
+    part_number: int
+    chunk_size: int
+    chunk_md5: str
 
 class UpdateImage(BaseModel):
     name: Optional[str] = None

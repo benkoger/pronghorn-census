@@ -471,6 +471,7 @@ export class Label implements Label_intf {
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export interface Survey_intf {
+    survey_id: number
     survey_date: Date;
     name: string;
     additional_info: string;
@@ -480,6 +481,7 @@ export interface Survey_intf {
 }
 
 export class Survey implements Survey_intf {
+    survey_id: number;
     survey_date: Date;
     name: string;
     additional_info: string;
@@ -488,6 +490,7 @@ export class Survey implements Survey_intf {
     uuid: string;
 
     constructor(srvy: Survey_intf) {
+        this.survey_id = srvy.survey_id;
         this.survey_date = new Date(srvy.survey_date);
         this.name = srvy.name;
         this.additional_info = srvy.additional_info;

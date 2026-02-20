@@ -233,54 +233,6 @@ def create_prediction():
 #---------------------------------------------------------------------------------------------------------------------------#
 # Image and Prediction Mass Uploader
 
-@bp.route('/api/v1/create/image/presigned-put-url', methods=['POST'])
-@login_required
-def get_presigned_url():
-	'''
-	Generates a pre-signed URL for a single file chunk. 
-	This is the core endpoint for offloading data transfer. 
-	The client sends a PUT request to this temporary URL with the chunk data.
-	'''
-	data = request.get_json()
-	try: 
-		response = s3.generate_presigned_url(
-		ClientMethod='upload_part', 
-		Params = {
-			'Bucket': current_app.config['BUCKET_NAME'],
-			'Key': data['image_key'], 
-			'UploadId': data['upload_id'],
-			'PartNumber': data['part_number'],
-			'ContentLength': data['chunk_size'],
-			'ContentMD5' : data['chunk_md5'],
-		},
-		ExpiresIn=3600,
-		)
-	except Exception:
-		abort(500)
-	return jsonify(response), 201
-
-
-@bp.route('/api/v1/upload/image/create_multipart_upload', methods=['POST'])
-@login_required
-def create_multipart_upload():
-	'''
-	Initiates a new multipart upload. The client calls this for each file 
-	to be uploaded. the app responds with a unique UploadId, which is required 
-	for all subsequent chunk uploads for that file.
-	'''
-
-	data = request.get_json()
-	try: 
-		response = s3.create_multipart_upload(
-			Bucket = current_app.config['BUCKET_NAME'],
-			Key = data['image_key'],
-			ContentType = 'image/jpeg',
-		)
-		upload_id = response['UploadId']
-		return jsonify({'upload_id': upload_id}), 201
-	except Exception:
-		abort(500)
-
 @bp.route('/api/v1/upload/image/complete', methods=['POST'])
 @login_required
 def complete_upload():

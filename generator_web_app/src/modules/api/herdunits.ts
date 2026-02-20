@@ -3,13 +3,9 @@
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-import {
-	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User, Schema,
-	Label, HerdUnit, Survey, Model, Annotation
-} from '@/types/generatorobjects.ts';
-import type { PredictionIntf, User_intf, ImageIntf, PredictionCrop_intf, ReviewedArea_intf, Annotation_intf, HerdUnitIntf } from '@/types/generatorobjects.ts';
-import type { apiError } from '@/modules/api/apiV1Methods';
-
+import { HerdUnit } from '@/types/generatorobjects.ts';
+import type { HerdUnitIntf } from '@/types/generatorobjects.ts';
+import { ApiError } from '@/modules/api/errors.ts'
 
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
@@ -29,8 +25,7 @@ export async function createHerdUnit(project_id: number, name: string): Promise<
             'name': name
         }),
     });
-    if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
-        const resp = await response.json();
-        let herd_unit = new HerdUnit(resp as HerdUnitIntf);
-        return herd_unit;
+    if (!response.ok) throw new ApiError(await response.json());
+    
+    return new HerdUnit(await response.json() as HerdUnitIntf);
 }

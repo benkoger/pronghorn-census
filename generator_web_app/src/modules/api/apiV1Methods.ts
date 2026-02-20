@@ -8,20 +8,11 @@ import {
 	Label, HerdUnit, Survey, Model, Annotation
 } from '@/types/generatorobjects.ts';
 import type { PredictionIntf, User_intf, ImageIntf, PredictionCrop_intf, ReviewedArea_intf, Annotation_intf } from '@/types/generatorobjects.ts';
-
+import type { apiError } from '@/modules/api/errors.ts';
 
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
 const api_url: URL = new URL(api_url_base);
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// TODO: abstract out to a better location
-
-export type apiError = {
-	error: string
-	message: string
-	code: number
-}
 
 //---------------------------------------------------------------------------------------------------------------------------//
 // User authentication
@@ -305,134 +296,8 @@ export async function getProjectSurveys(project_id: string | undefined): Promise
 		return surveys;
 	} catch (error: any) {
 		console.error("Error: ", error)
- 		return undefined;
+		return undefined;
 	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Image Crud
-
-export async function createImage(survey_id: string | undefined,
-	herd_unit_id: string | undefined, name: string, img_key: string, image_length: number, image_width: number
-): Promise<Image | undefined> {
-	try {
-		const response = await fetch(`${api_url}/images`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'survey_id': survey_id,
-				'herd_unit_id': herd_unit_id,
-				'img_key': img_key,
-				'name': name,
-				'image_length': image_length,
-				'image_width': image_width,
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		const image = new Image(resp)
-		return image;
-	} catch (error: any) {
-		console.error("Error: ", error)
- 		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Multipart image upload
-
-export async function createMultiPartUpload(image_key: string): Promise<string | undefined> {
-	try {
-		const response = await fetch(`${api_url}/upload/image/create_multipart_upload`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'image_key': image_key,
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		return resp.upload_id as string;
-	} catch (error: any) {
-		console.error("There was an error creating the upload:", error);
- 		return undefined;
-	}
-}
-
-export async function get_imagePresignedPostUrl(upload_id: string, part_number: number, image_key: string, chunk_size: number, chunk_md5: string): Promise<string | undefined> {
-	try {
-		const response = await fetch(`${api_url}/create/image/presigned-put-url`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				'upload_id': upload_id,
-				'part_number': part_number,
-				'image_key': image_key,
-				'chunk_size': chunk_size,
-				'chunk_md5': chunk_md5,
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
-		const resp = await response.json();
-		return resp as string;
-	} catch (error: any) {
-		console.error("Error: ", error)
- 		return undefined;
-	}
-}
-
-export async function abortMultipartUpload(image_key: string, upload_id: string): Promise<string | undefined> {
-	try {
-		const response = await fetch(`${api_url}/upload/image/abort`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				'image_key': image_key,
-				'upload_id': upload_id,
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json()
-		return resp as string;
-	} catch (error: any) {
-		console.error("There was an error aborting the multipart upload:", error);
- 		return undefined;
-	}
-}
-
-export async function completeMultiPartUpload(image_key: string, parts: any[], upload_id: string): Promise<string | undefined> {
-	try {
-		const response = await fetch(`${api_url}/upload/image/complete`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'image_key': image_key,
-				'parts': parts,
-				'upload_id': upload_id
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
-		return await response.json() as string;
-	} catch (error: any) {
-		console.error("Error: ", error)
- 		return undefined;
-	}
-
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
