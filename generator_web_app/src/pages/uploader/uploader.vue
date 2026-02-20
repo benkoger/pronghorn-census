@@ -4,7 +4,7 @@
 import { defineComponent } from "vue";
 import { ref } from "vue";
 import { HerdUnit, Project, Survey, Model, Schema, Image } from "@/types/generatorobjects";
-import { createImagePresignedPut, createImage, abortMultipartUpload, uploadImagePart,
+import { createImagePresignedPut, createImage, abortMultipartUpload,
 			createMultiPartUpload, completeMultiPartUpload } from '@/modules/api/images';
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { Md5 } from "ts-md5";
@@ -196,36 +196,25 @@ export default defineComponent({
 							return;
 						}
 						
-						let ETag: string;
-						try {
-							ETag = await uploadImagePart({
-							presigned_url: presignedUrl,
-							chunk_size: chunk.size.toString(),
-							chunk_md5: chunkMd5Base64,
-							chunk: chunk
-						});
-						} catch (error: any) {
-							console.error(error);
-							return;
-						}
-						
 						// Post request to pre-signed url with part-num, upload-id
-						// const headers = new Headers();
-						// headers.append("Content-Length", chunk.size.toString());
-						// headers.append("Content-MD5", chunkMd5Base64);
+						const headers = new Headers();
+						headers.append("Content-Length", chunk.size.toString());
+						headers.append("Content-MD5", chunkMd5Base64);
 
-						// const response = await fetch(presignedUrl, {
-						// 	method: "PUT",
-						// 	body: chunk,
-						// 	headers: headers,
-						// });
-						// if (!response.ok) {
-						// throw new Error(`Upload of part ${partNumber} failed with status: ${response.status}`);
-						// }
+						const response = await fetch(presignedUrl, {
+							method: "PUT",
+							body: chunk,
+							headers: headers,
+						});
+						if (!response.ok) {
+						abortMultipartUpload(image.img_key, uploadId);
+						throw new Error(`Upload of part ${partNumber} failed with status: ${response.status}`);
+						
+						}
 						// Push PartNumber and Etag to list
 						partArray.push({
 							PartNumber: partNumber,
-							ETag: ETag,
+							ETag: response.headers.get("Etag"),
 						});
 	
 						this.current_file_part++;

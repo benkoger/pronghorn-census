@@ -126,20 +126,3 @@ interface uploadImagePartOptions {
     chunk_md5: string;
     chunk: Blob;
 }
-
-export async function uploadImagePart(options: uploadImagePartOptions ): Promise<string> {
-    const response = await fetch(options.presigned_url, {
-        method: 'PUT',
-        headers: {
-            'Content-Length': options.chunk_size,
-            'Content-MD5': options.chunk_md5,
-        },
-        body: options.chunk
-    });
-    if (!response.ok) throw new Error(await response.json());
-    
-    const etag = response.headers.get("Etag");
-
-    if (etag === null) throw new Error('No Etag Provided');
-    return etag;
-}
