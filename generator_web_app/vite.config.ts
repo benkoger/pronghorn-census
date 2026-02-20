@@ -15,6 +15,12 @@ export default defineConfig({
       resolvers: [BootstrapVueNextResolver()]
     })
   ],
+  optimizeDeps: {
+    include: [
+      'bootstrap-vue-next/components/**/*' ,
+      '@vueuse/core'
+    ]
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
