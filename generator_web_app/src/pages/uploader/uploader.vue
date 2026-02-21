@@ -10,6 +10,7 @@ import { useProjectStore } from "@/modules/stores/projectStore";
 import { Md5 } from "ts-md5";
 import { filesize } from 'filesize';
 import { ApiError } from "@/modules/api/errors";
+import { useToast } from "bootstrap-vue-next";
 
 export default defineComponent({
 	name: "Upload-Utility",
@@ -22,7 +23,10 @@ export default defineComponent({
 		const survey = ref<Survey | undefined> (pStore.CurrentSurvey);
 		const schema = ref<Schema | undefined> (pStore.CurrentSchema);
 		if (!pStore.projects) pStore.get_projects();
-		return { pStore, project, herdunit, model, survey, schema };
+		
+		const {create} = useToast();
+
+		return { pStore, project, herdunit, model, survey, schema, create };
 	},
 	mounted() {
 	if (this.pStore.CurrentProject) {
@@ -31,6 +35,7 @@ export default defineComponent({
 		params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
 		});
 	}
+	
 	},
 	data() {
 		return {
@@ -42,6 +47,8 @@ export default defineComponent({
 		current_file_size: undefined as string | undefined,
 		current_file_part: 0,
 		total_file_parts: 0,
+		upload_info_text: '',
+		has_info: false,
 		};
 	},
 	computed: {
@@ -99,10 +106,10 @@ export default defineComponent({
 	},
 	async upload() {
 		// Cache relevant Ids from store (Current objects are computed getters in the store)
-		const surveyId = this.pStore.CurrentSurvey?.survey_id;
-		const herdUnitId = this.pStore.CurrentHerdUnit?.herd_unit_id;
+		const survey = this.pStore.CurrentSurvey;
+		const herdUnit = this.pStore.CurrentHerdUnit;
 
-		if (surveyId == undefined || herdUnitId == undefined) throw new Error('No survey or herd unit id'); 
+		if (survey == undefined || herdUnit == undefined) throw new Error('No survey or herd unit id'); 
 
 		for (const file of this.files) {
 			const extension = file.name.toLowerCase().split(".").pop();
@@ -115,36 +122,48 @@ export default defineComponent({
 					const imageBitmap = await createImageBitmap(file);
 
 					// Create key
-					const image_key = `images/survey/${surveyId}/herd_unit/${herdUnitId}/image/${file.name}`;
+					const image_key = `images/survey/${survey.uuid}/herd_unit/${herdUnit.uuid}/image/${file.name}`;
 
 					// Create Image object in database
 					let image: Image;
 					
 					try {
 						image = await createImage({
-										survey_id: surveyId,
-										herd_unit_id: herdUnitId,
-										name: file.name,
-										img_key: image_key,
-										image_length_px: imageBitmap.height,
-										image_width_px: imageBitmap.width
-									});
-
-
-					} catch (error: any) {
-						if (error instanceof ApiError) {
-							if (error.code == 409) {
-								//TODO: Replace with Toast error
-								console.log('image already exists!');
-
+							survey_id: survey.survey_id,
+							herd_unit_id: herdUnit.herd_unit_id,
+							name: file.name,
+							img_key: image_key,
+							image_length_px: imageBitmap.height,
+							image_width_px: imageBitmap.width
+						});
+					} catch (err: any) {
+						if (err instanceof ApiError) {
+							if (err.code == 409) {
+								this.create({
+									title: 'Info',
+									body: err.message,
+									variant: 'warning',
+									position: 'bottom-start'
+								})
+								this.upload_info_text = 'Image exists -- skipping...';
+								this.has_info = true;
+								this.current_file_num++;
 								// Non-fatal error -- move to next image
 								continue;
 							}
 						}
-						console.error('Unkown error, panicking!')
+						console.error('Unkown error, panicking!');
+						this.is_uploading = false;
+						this.create({
+									title: 'Error',
+									body: err.message,
+									variant: 'danger',
+									position: 'bottom-start'
+								})
 						return;
 					}
-					
+					this.has_info = false;
+
 					// array to hold image part numbers and Etags
 					const partArray = [];
 
@@ -237,6 +256,12 @@ export default defineComponent({
 		// Upload process complete
 		this.current_file_num = 0;
 		this.is_uploading = false;
+		this.create({
+			title: 'Finished Uploading',
+			body: 'The upload has finished successfully',
+			variant: 'success',
+			position: 'bottom-start'
+		})
 		this.files = [];
 	},
 },
@@ -388,6 +413,7 @@ export default defineComponent({
 						<li><strong>Name:</strong> {{ current_file_name }}</li>
 						<li><strong>Uploaded Part:</strong> {{ current_file_part }} / {{ total_file_parts }}</li>
 					</ul>
+					<span v-if="has_info" class="text-warning">{{ upload_info_text }}</span>
 					<p>
 						Please keep this tab visible and your computer awake. For larger surveys please
 						allow for plenty of time for the upload process to complete.

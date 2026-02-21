@@ -6,7 +6,7 @@
 from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, Dict, List, Optional, Reversible, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
 
@@ -18,7 +18,6 @@ from cropgenerator.generatorobjects import (
 	Model,
 	Organization,
 	Prediction,
-	PredictionCrop,
 	Project,
 	ReviewedArea,
 	Role,
@@ -1639,10 +1638,10 @@ class Database:
 		
 		'''
 		if isinstance(parameters['survey_id'], str):
-			parameters['survey_id'] = self._get_survey(cursor, parameters['survey_id']).survey_id
+			parameters['survey_id'] = self._get_survey(cursor, UUID(parameters['survey_id'])).survey_id
 
 		if isinstance(parameters['herd_unit_id'], str):
-			parameters['herd_unit_id'] = self._get_herd_unit(cursor, parameters['herd_unit_id']).herd_unit_id
+			parameters['herd_unit_id'] = self._get_herd_unit(cursor, UUID(parameters['herd_unit_id'])).herd_unit_id
 
 		query_1 = sql.SQL(''' 
 			INSERT INTO core.images (

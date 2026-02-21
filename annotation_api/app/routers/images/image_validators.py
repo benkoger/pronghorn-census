@@ -3,8 +3,8 @@ from typing import Optional, List, Union
 
 class CreateImage(BaseModel):
     name: str
-    herd_unit_id: int
-    survey_id: int
+    herd_unit_id: Union[int, str]
+    survey_id: Union[int, str]
     img_key: str
     image_length_px: int
     image_width_px: int

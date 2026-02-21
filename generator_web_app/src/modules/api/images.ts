@@ -20,7 +20,6 @@ interface createImageOptions{
 }
 
 export async function createImage(options: createImageOptions): Promise<Image> {
-
         const response = await fetch(`${api_url}/images`, {
             method: 'POST',
             credentials: 'include',
