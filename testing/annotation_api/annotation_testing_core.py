@@ -1,7 +1,9 @@
-import pytest 
-from annotation_api.app.extensions import base
 import os
+
+import pytest
+
 from annotation_api.app import create_app
+from annotation_api.app.extensions import base
 
 class APITester:
     @pytest.fixture

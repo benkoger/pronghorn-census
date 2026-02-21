@@ -1,7 +1,6 @@
 import os
 
 from boto3 import client
-from flasgger import Swagger
 from flask import Flask
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
@@ -11,11 +10,9 @@ from app.extensions import base, cache, login_manager, session_manager
 from config import s3_config
 from config import FlaskConfig, cache_config, s3_config
 
-
 def create_app():
 	app = Flask(__name__)
 	app.config.from_object(FlaskConfig)
-	swagger = Swagger(app)
 
 	CORS(app, resources={
 		r'/api/*': {

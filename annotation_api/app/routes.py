@@ -229,52 +229,6 @@ def create_prediction():
 		abort(500)
 	return prediction.serialize(), 201
 
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Image and Prediction Mass Uploader
-
-@bp.route('/api/v1/upload/image/complete', methods=['POST'])
-@login_required
-def complete_upload():
-	'''
-	Finalizes a multipart upload. After all chunks have been successfully 
-	uploaded, the client calls this endpoint with the UploadId and a list 
-	of all part details (PartNumber, ETag) to assemble the file on the 
-	storage backend.
-	'''
-	data = request.get_json()
-	try:
-		response = s3.complete_multipart_upload(
-			Bucket = current_app.config['BUCKET_NAME'],
-			Key = data['image_key'],
-			MultipartUpload={
-				'Parts': data['parts']
-			},
-			UploadId = data['upload_id'],
-		)
-	except Exception:
-		abort(500)
-	return jsonify(response), 201
-
-@bp.route('/api/v1/upload/image/abort', methods=['POST'])
-@login_required 
-def abort_upload():
-	'''
-	Aborts a multipart upload. This endpoint is for cleaning up partial 
-	uploads on the storage backend if an upload is canceled or fails
-	permanently.
-	'''
-	data = request.get_json()
-	try:
-		response = s3.abort_multipart_upload(
-			Bucket = current_app.config['BUCKET_NAME'],
-			Key = data['image_key'],
-			UploadId = data['upload_id'],
-		)
-	except Exception: #
-		abort(500)
-	return jsonify(response), 201
-
 #---------------------------------------------------------------------------------------------------------------------------#
 # Auto Cropping
 

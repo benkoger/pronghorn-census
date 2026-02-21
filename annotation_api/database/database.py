@@ -9,6 +9,7 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
+from .errors import *
 
 from cropgenerator.generatorobjects import (
 	Annotation,
@@ -1688,8 +1689,9 @@ class Database:
 			case _:
 				raise TypeError('image_ids must be an int, or uuid or a list')
 		image = cursor.fetchone()
-		if image is None:
-			raise Exception('Could not find image')
+		if not image:
+			raise ObjectNotFound('Image', image_id)
+
 		return image 
 	
 	def get_image(self, image_id: int | UUID) -> Image:

@@ -81,7 +81,7 @@ export async function createMultiPartUpload(image_key: string): Promise<string> 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function completeMultiPartUpload(image_key: string, parts: any[], upload_id: string): Promise<string> {
-    const response = await fetch(`${api_url}/upload/image/complete`, {
+    const response = await fetch(`${api_url}/images/complete-multipart-upload`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -101,7 +101,7 @@ if (!response.ok) throw new ApiError(await response.json());
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function abortMultipartUpload(image_key: string, upload_id: string): Promise<string> {
-    const response = await fetch(`${api_url}/upload/image/abort`, {
+    const response = await fetch(`${api_url}/images/abort-multipart-upload`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -119,9 +119,17 @@ export async function abortMultipartUpload(image_key: string, upload_id: string)
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-interface uploadImagePartOptions {
-    presigned_url: string;
-    chunk_size: string;
-    chunk_md5: string;
-    chunk: Blob;
+export async function deleteImage(image_id: string): Promise<boolean> {
+    const response = await fetch(`${api_url}/images/${image_id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+    });
+    if (!response.ok) throw new ApiError(await response.json());
+
+    return true;
 }
+
+//---------------------------------------------------------------------------------------------------------------------------//
