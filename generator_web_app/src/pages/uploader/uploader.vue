@@ -17,7 +17,7 @@ export default defineComponent({
 	name: "Upload-Utility",
 	setup() {
 		const pStore = useProjectStore();
-		if (pStore.CurrentProject && pStore.surveys == undefined) pStore.get_surveys();
+		if (pStore.CurrentProject && pStore.surveys == undefined) pStore.get_herd_unit_surveys();
 		const project = ref<Project | undefined> (pStore.CurrentProject);
 		const herdunit = ref<HerdUnit | undefined> (pStore.CurrentHerdUnit);
 		const model = ref<Model | undefined> (pStore.CurrentModel);
