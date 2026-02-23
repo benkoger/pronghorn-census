@@ -357,10 +357,10 @@ export default defineComponent({
 	<div v-if="cvs.bootStrapped && !cvs.loading" class="d-flex h-100 flex-column">
 		<BContainer fluid class="h-100 overflow-y-hidden">
 			<BRow class="h-100">
-				<BCol cols="2" class="bg-body-tertiary rounded-3 shadow h-100">
+				<BCol cols="2" class="bg-body-tertiary rounded-3 shadow h-100 p-0">
 					<h3 class="mt-2">Crop Explorer</h3>
 					<BListGroup class="overflow-y-auto overflow-x-hidden" style="max-height: 90% !important">
-						<BListGroupItem v-for="label in pStore.SortedLabels">
+						<BListGroupItem v-for="label in pStore.SortedLabels" class="p-1 m-0 d-flex flex-column justify-content-center">
 							<div class="d-flex justify-content-between w-100 align-items-center">
 								<h4 
 									:style="{ color: label.color, borderColor: label.color }"
@@ -368,7 +368,7 @@ export default defineComponent({
 								>
 									{{ label.label }}
 							</h4>
-								<span class="ms-auto">{{ label.name }}</span>
+								<span class="ms-auto text-truncate">{{ label.name }}</span>
 								<BButton 
 									@click="startDrawing(label)" variant="outline-success" size="sm"
 									v-b-tooltip.hover="'Create new annotation'"
