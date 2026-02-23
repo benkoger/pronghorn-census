@@ -359,7 +359,7 @@ export default defineComponent({
 			<BRow class="h-100">
 				<BCol cols="2" class="bg-body-tertiary rounded-3 shadow h-100">
 					<h3 class="mt-2">Crop Explorer</h3>
-					<BListGroup class="overflow-y-auto overflow-x-hidden" style="max-height: 100% !important">
+					<BListGroup class="overflow-y-auto overflow-x-hidden" style="max-height: 90% !important">
 						<BListGroupItem v-for="label in pStore.SortedLabels">
 							<div class="d-flex justify-content-between w-100 align-items-center">
 								<h4 
