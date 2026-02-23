@@ -91,15 +91,22 @@ export default defineComponent({
 	},
 	async handleLeftBracket() {
 		await this.cStore.previousPrediction();
-		this.predictionRefs[this.cStore.CurrentPredictionCrop.uuid].scrollIntoView({ behavior: 'smooth' });
+		if (this.cStore.CurrentPredictionCrop) {
+			this.predictionRefs[this.cStore.CurrentPredictionCrop.uuid].scrollIntoView({ behavior: 'smooth' });
+		}
 	},
 	async handle_right_bracket() {
 		await this.cStore.nextPrediction();
-		this.predictionRefs[this.cStore.CurrentPredictionCrop.uuid].scrollIntoView({ behavior: 'smooth' });
+		if (this.cStore.CurrentPredictionCrop) {
+			this.predictionRefs[this.cStore.CurrentPredictionCrop.uuid].scrollIntoView({ behavior: 'smooth' });
+		}
+		
 	},
 	handleS() {
-		this.cStore.CurrentPredictionCrop.approved = (this.cStore.CurrentPredictionCrop.approved) ? false : true;
-		this.drawBoundingBox(this.predCropRefs[this.cStore.CurrentPredictionCrop.uuid], this.cStore.CurrentPredictionCrop);
+		if (this.cStore.CurrentPredictionCrop){
+			this.cStore.CurrentPredictionCrop.approved = (this.cStore.CurrentPredictionCrop.approved) ? false : true;
+			this.drawBoundingBox(this.predCropRefs[this.cStore.CurrentPredictionCrop.uuid], this.cStore.CurrentPredictionCrop);
+		}
 	},
 	async handleEnter() {
 		await this.cStore.submit();
@@ -113,10 +120,12 @@ export default defineComponent({
 	},
 	decodeDigit(event: KeyboardEvent) {
 		const label_num = +event.key;
-		this.cStore.CurrentPredictionCrop.label = (this.pStore.labels?.find((label) => label.label == label_num) != undefined) ? label_num : this.cStore.CurrentPredictionCrop.label;
-		this.drawBoundingBox(this.predCropRefs[this.cStore.CurrentPredictionCrop.uuid], this.cStore.CurrentPredictionCrop)
-		this.cStore.CurrentPredictionCrop.approved = true;
-		this.handle_right_bracket();
+		if (this.cStore.CurrentPredictionCrop) {
+			this.cStore.CurrentPredictionCrop.label = (this.pStore.labels?.find((label) => label.label == label_num) != undefined) ? label_num : this.cStore.CurrentPredictionCrop.label;
+			this.drawBoundingBox(this.predCropRefs[this.cStore.CurrentPredictionCrop.uuid], this.cStore.CurrentPredictionCrop)
+			this.cStore.CurrentPredictionCrop.approved = true;
+			this.handle_right_bracket();
+		}
 	},
 	handleKeyPress(event: KeyboardEvent) {
 		switch(true) {
