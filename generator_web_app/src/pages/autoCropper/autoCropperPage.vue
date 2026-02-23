@@ -259,6 +259,12 @@ export default defineComponent({
 									</BListGroupItem>
 									<BListGroupItem>
 										<span>
+											<strong>Survey</strong>: 
+											{{ CurrentSurvey?.name }}
+										</span>
+									</BListGroupItem>
+									<BListGroupItem>
+										<span>
 											<strong>Schema</strong>: 
 											{{ CurrentSchema?.name }}
 										</span>
@@ -282,32 +288,38 @@ export default defineComponent({
 					<div class="d-flex flex-column flex-grow-1 w-100 h-100 bg-body-tertiary rounded-top-3 shadow">
 						<div class="p-3">
 							<h3>Session Settings</h3>
-								<label for="min-score">Minium Score: {{ cStore.minConfidence }}</label>
-								<BFormInput 
-									id="min-score"
-									v-model="cStore.minConfidence" 
-									type="range"
-									min="0.001"
-									max="0.999"
-									step="0.01"
-								/>
-								<label for="max-score">Maximum Score: {{ cStore.maxConfidence }}</label>
-								<BFormInput 
-									id="max-score"
-									v-model="cStore.maxConfidence" 
-									type="range"
-									min="0.001"
-									max="0.999"
-									step="0.01"
-								/>
-								<label for="batch-size">Batch Size: {{ cStore.batch_size }}</label>
-								<BFormInput 
-									id="batch-size"
-									v-model="cStore.batch_size"
-									placeholder="batch size"
-									size="sm"
-									type="number"
-								/>
+								<BTabs content-class="mt-3">
+									<BTab title="general settings">
+										<label for="min-score">Minium Score: {{ cStore.minConfidence }}</label>
+										<BFormInput 
+											id="min-score"
+											v-model="cStore.minConfidence" 
+											type="range"
+											min="0.001"
+											max="0.999"
+											step="0.01"
+										/>
+										<label for="max-score">Maximum Score: {{ cStore.maxConfidence }}</label>
+										<BFormInput 
+											id="max-score"
+											v-model="cStore.maxConfidence" 
+											type="range"
+											min="0.001"
+											max="0.999"
+											step="0.01"
+										/>
+									</BTab>
+									<BTab title="advanced settings">
+										<label for="batch-size">Batch Size: {{ cStore.batch_size }}</label>
+										<BFormInput 
+											id="batch-size"
+											v-model="cStore.batch_size"
+											placeholder="batch size"
+											size="sm"
+											type="number"
+										/>
+									</BTab>
+								</BTabs>
 						</div>
 						<BButton
 							variant="primary"
