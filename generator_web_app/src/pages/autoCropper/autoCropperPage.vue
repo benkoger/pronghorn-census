@@ -5,13 +5,14 @@ import { useAutoCropperStore } from '@/modules/stores/cropperStore';
 import { Project, Survey, Schema, HerdUnit, Label, Model } from '@/types/generatorobjects';
 import { mapState } from 'pinia';
 import ProcessBreadCrumb  from '@/components/templates/ProcessBreadCrumb.vue';
-import { BListGroup } from 'bootstrap-vue-next';
+import SelectorList from '@/components/templates/SelectorList.vue';
 
 export default defineComponent({
 	name: 'autoCropper',
 	components: {
 		Crop: defineAsyncComponent(() => import('./autoCropper.vue')),
-		BreadCrumb: ProcessBreadCrumb
+		BreadCrumb: ProcessBreadCrumb,
+		SelectList: SelectorList
 	},
 	setup() {
 		const pStore = useProjectStore();
@@ -27,7 +28,7 @@ export default defineComponent({
 	data() {
 		return {
 			currentStep: 0,
-			steps: ['Project and Schema', 'Herd Unit and Survey', 'Labels and Model', 'Options', 'AutoCrop']
+			steps: ['Project and Model', 'Herd Unit and Survey', 'Labels', 'Options', 'AutoCrop']
 		};
 	},
 	computed: {
@@ -40,19 +41,20 @@ export default defineComponent({
 			CurrentModel: 'CurrentModel',
 		}
 	),
-	canProceed() {
+		canProceed() {
 			switch(this.currentStep) {
 				case 0:
 					return this.CurrentProject != undefined 
-					&& this.CurrentSchema != undefined;
+					&& this.CurrentModel != undefined;
 					break;
 				case 1:
 					return this.CurrentHerdUnit != undefined 
 					&& this.CurrentSurvey != undefined;
 					break;
 				case 2:
-					return this.CurrentLabels != undefined
-					&& this.CurrentModel != undefined;
+					return this.CurrentLabels.length > 0
+					&&this.CurrentHerdUnit != undefined
+					&&this.CurrentSurvey != undefined;
 				default:
 					return false;
 			};
@@ -60,85 +62,93 @@ export default defineComponent({
 	},
 	watch: {
 		CurrentProject(newValue: Project, oldValue: Project) {
-			if (newValue != oldValue && newValue != undefined) {
-				this.pStore.clear_state();
-				this.pStore.get_schemas();
-				this.pStore.get_project_herd_units();
-				this.pStore.get_surveys();
-				this.$router.push({name: 'auto-cropper', params: { projects: 'projects', uuid: newValue.uuid }})
-			} else {
-				this.pStore.clear_state();
-				this.$router.push({name: 'auto-cropper'});
-			}
-		},
-		CurrentSurvey(newValue: Survey, oldValue: Survey) {
 			const currentQuery = {...this.$route.query};
+			this.pStore.clear_models();
 			if (newValue !=oldValue && newValue != undefined) {
+				this.pStore.get_project_models();
+				this.pStore.get_project_herd_units();
 				const newQuery = {
 					...currentQuery,
-					survey: newValue.uuid,
-					herd_unit: undefined,
+					project: newValue.uuid,
 					model: undefined,
+					herd_unit: undefined,
+					survey: undefined,
+					labels: undefined,
 
 				};
 				this.$router.push({query: newQuery});
-				this.pStore.get_cropper_models();
 			} else {
+
 				const newQuery = {
 					...currentQuery,
-					survey: undefined,
-					herd_unit: undefined,
+					project: undefined,
 					model: undefined,
+					herd_unit: undefined,
+					survey: undefined,
+					labels: undefined,
 				};
 				this.$router.push({query: newQuery});
 			}
 		},
-		CurrentSchema(newValue: Schema, oldValue: Schema) {
-			const currentQuery = {...this.$route.query };
+		async CurrentModel(newValue: Model, oldValue: Model) {
+			this.pStore.clear_schemas();
 			this.pStore.clear_labels();
-			this.pStore.clear_models();
-			if (newValue != oldValue && newValue != undefined) {
+			const currentQuery = {...this.$route.query};
+			if (newValue !=oldValue && newValue != undefined) {
+				await this.pStore.get_model_schema();
+				this.pStore.get_schema_labels();
 				const newQuery = {
 					...currentQuery,
-					schema: newValue.uuid,
-					label: undefined,
-					model: undefined
+					model: newValue.uuid,
+					labels: undefined,
 				};
-				this.$router.push({query: newQuery})
-				this.pStore.get_labels();
+				this.$router.push({query: newQuery});
 			} else {
 				const newQuery = {
 					...currentQuery,
-					schema: undefined,
-					label: undefined,
 					model: undefined,
+					labels: undefined,
 				};
 				this.$router.push({query: newQuery});
 			}
 		},
 		CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
 			const currentQuery = {...this.$route.query };
-			this.pStore.clear_models();
+			this.pStore.clear_surveys();
 			if (newValue != oldValue && newValue != undefined) {
+				this.pStore.get_herd_unit_surveys();
 				const newQuery = {
 					...currentQuery,
 					herd_unit: newValue.uuid,
-					model: undefined,
+					survey: undefined
 				};
 				this.$router.push({query: newQuery})
-				this.pStore.get_cropper_models();	
 			} else {
 				const newQuery = {
 					...currentQuery,
 					herd_unit: undefined,
-					model: undefined,
+					survey: undefined
+				};
+				this.$router.push({query: newQuery});
+			}
+		},
+		CurrentSurvey(newValue: Survey, oldValue: Survey) {
+			const currentQuery = {...this.$route.query };
+			if (newValue != oldValue && newValue != undefined) {
+				const newQuery = {
+					...currentQuery,
+					survey: newValue.uuid
+				};
+				this.$router.push({query: newQuery})
+			} else {
+				const newQuery = {
+					...currentQuery,
+					survey: undefined
 				};
 				this.$router.push({query: newQuery});
 			}
 		}
 	},
-	methods: {
-	}
 });
 </script>
 <template>
@@ -152,73 +162,23 @@ export default defineComponent({
 			<BContainer fluid>
 				<BRow>
 					<BCol cols="6">
-						<h3>Project Selection</h3>
 						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="project in pStore.projects"
-									:key="project.uuid"
-									action
-									:active="CurrentProject?.uuid === project.uuid"
-									@click="pStore.set_current_project(project)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ project.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ project.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ project.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
+							<SelectList 
+								:items="pStore.projects"
+								:active-item="CurrentProject"
+								:select-action="pStore.set_current_project"
+								list-name="Project"
+								/>
 						</div>
 					</BCol>
 					<BCol cols="6">
-						<h3>Schema Selection</h3>
 						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="schema in pStore.schemas"
-									:key="schema.uuid"
-									action
-									:active="CurrentSchema?.uuid === schema.uuid"
-									@click="pStore.set_current_schema(schema)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ schema.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ schema.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ schema.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
+							<SelectList 
+								:items="pStore.models"
+								:active-item="CurrentModel"
+								:select-action="pStore.set_current_model"
+								listName="Model"
+							/>
 						</div>
 					</BCol>
 				</BRow>
@@ -228,153 +188,39 @@ export default defineComponent({
 			<BContainer fluid>
 				<BRow>
 					<BCol cols="6">
-						<h3>Herd Unit Selection</h3>
 						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="herd_unit in pStore.herd_units"
-									:key="herd_unit.uuid"
-									action
-									:active="CurrentHerdUnit?.uuid === herd_unit.uuid"
-									@click="pStore.set_current_herd_unit(herd_unit)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ herd_unit.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ herd_unit.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ herd_unit.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
+							<SelectList 
+								:items="pStore.herd_units"
+								:active-item="CurrentHerdUnit"
+								:select-action="pStore.set_current_herd_unit"
+								listName="Herd Unit"
+							/>
 						</div>
 					</BCol>
 					<BCol cols="6">
-						<h3>Survey Selection</h3>
 						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="survey in pStore.surveys"
-									:key="survey.uuid"
-									action
-									:active="CurrentSurvey?.uuid === survey.uuid"
-									@click="pStore.set_current_survey(survey)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ survey.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ survey.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ survey.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
+							<SelectList 
+								:items="pStore.surveys"
+								:active-item="CurrentSurvey"
+								:select-action="pStore.set_current_survey"
+								listName="Survey"
+							/>
 						</div>
 					</BCol>
 				</BRow>
 			</BContainer>
 		</div>
 		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
-			<BContainer fluid>
-				<BRow>
-					<BCol cols="6">
-						<h3>Label Selection</h3>
-						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="label in pStore.labels"
-									:key="label.uuid"
-									action
-									:active="pStore.label_idxs.includes(pStore.labels.indexOf(label))"
-									@click="pStore.set_current_labels(label)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ label.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ label.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ label.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
-						</div>
-					</BCol>
-					<BCol cols="6">
-						<h3>Model Selection</h3>
-						<div class="flex-grow-1 overflow-y-auto">
-							<BListGroup>
-								<BListGroupItem
-									v-for="model in pStore.models"
-									:key="model.uuid"
-									action
-									:active="CurrentModel?.uuid === model.uuid"
-									@click="pStore.set_current_model(model)"
-								>
-									<div class="d-flex justify-content-between align-items-flex-start flex-column">
-										<span class="mb-1 fw-bold">{{ model.name }}</span>
-										<div class="d-flex gap-4">
-											<small class="text-muted">Created: 
-												{{ model.created.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}
-											</small>
-											<small class="text-muted">Modified: 
-												{{ model.modified.toLocaleString('en-US', { 
-														year: 'numeric', 
-														month: 'numeric', 
-														day: 'numeric', 
-													}) 
-												}}</small>
-										</div>
-									</div>
-								</BListGroupItem>
-							</BListGroup> 
-						</div>
-					</BCol>
-				</BRow>
-			</BContainer>
+			<div class="flex-grow-1 overflow-y-auto">
+				<BContainer fluid>
+					<SelectList 
+						:items="pStore.labels"
+						:active-item="CurrentLabels"
+						:select-action="pStore.set_current_labels"
+						listName="Label"
+					/>
+				</BContainer>
+			</div>
 		</div>
 		<div v-if="currentStep == 3" class="d-flex flex-column h-100">
 			<BContainer fluid>
@@ -394,7 +240,7 @@ export default defineComponent({
 										:caption="label.name"
 										class="rounded-top-3"
 									/>
-								</BCarousel>
+								</BCarousel> 
 							</template>
 							<BCardBody>
 								<h3>Selection Summary</h3>

@@ -24,7 +24,7 @@ export default defineComponent({
 	transition: 'width 0.25s' 
 	}"
 >
-	<BNav vertical pills fill class="h-100 p-2 align-items-center">
+	<BNav vertical pills fill class="w-100 h-100 p-2">
 	<BNavItem to="/" :active="$route.path === '/' ">
 		<Icon icon="ic:round-dashboard" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3 d-none d-md-inline">Dashboard</span>

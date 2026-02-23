@@ -29,7 +29,6 @@ export async function createImage(options: createImageOptions): Promise<Image> {
             body: JSON.stringify(options),
         });
         if (!response.ok) throw new ApiError(await response.json());
-        
 
         return new Image(await response.json() as ImageIntf);
 }

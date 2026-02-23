@@ -20,6 +20,7 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
         activeCropId: '',
         loading: false,
         bootStrapped: false,
+        already_reviewed: false,
         hoveredUuid: '',
         deletedAnnotations: [] as Annotation[],
         selectedShapeName: '',
@@ -42,7 +43,7 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
     },
     actions: {
         async getReviewedArea(increment: boolean = true) {
-            const resp = await fetchReviewedArea(pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid);
+            const resp = await fetchReviewedArea(pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, this.already_reviewed);
             const image = await this.getReviewedAreaImage(resp)
             if (image == undefined) return;
             if (resp == undefined) return;

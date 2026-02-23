@@ -33,7 +33,10 @@ export default defineComponent({
 				}
 			} else {
 				this.create({
-
+					title: 'Authentication failed',
+					body: 'You must be authenticated to access this resource',
+					variant: 'danger',
+					position: 'bottom-start'
 				})
 			}
 		},

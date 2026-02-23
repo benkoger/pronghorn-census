@@ -172,15 +172,7 @@ def get_survey_herdunits(survey_id: str):
 	return jsonify(serialized_herd_units), 201
 	
 # TODO: move this endpoint to projects router
-@bp.route('/api/v1/request/projects/<string:project_id>/models/all', methods=['GET'])
-@login_required
-def get_project_models(project_id: str):
-	try:
-		models = base.get_project_models(UUID(project_id))
-	except Exception as e:
-		abort(404, e)
-	serialized_models = [model.serialize() for model in models]
-	return jsonify(serialized_models), 201
+
 
 # TODO: Move this endpoint to models router
 @bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/<string:herd_unit_id>/schemas/<string:schema_id>/models/all', methods=['GET'])
@@ -417,8 +409,10 @@ def get_ra_batch():
 	data = request.get_json()
 	try:
 		ra = base.get_crop_to_review(
-			cast(User, current_user), 
-			UUID(data['survey_id']))
+				cast(User, current_user), 
+				UUID(data['survey_id']),
+				data['reviewed']
+			)
 	except Exception as e:
 		abort(404, str(e))
 

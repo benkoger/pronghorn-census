@@ -7,7 +7,7 @@ import {
 	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User, Schema,
 	Label, HerdUnit, Survey, Model, Annotation
 } from '@/types/generatorobjects.ts';
-import type { PredictionIntf, User_intf, ImageIntf, PredictionCrop_intf, ReviewedArea_intf, Annotation_intf } from '@/types/generatorobjects.ts';
+import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf, ReviewedAreaIntf, AnnotationIntf } from '@/types/generatorobjects.ts';
 import type { apiError } from '@/modules/api/errors.ts';
 
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
@@ -29,7 +29,7 @@ export async function authUser(external_id: string): Promise<User | undefined> {
 			credentials: 'include',
 		});
 		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const user = new User(await response.json() as User_intf);
+		const user = new User(await response.json() as UserIntf);
 		return user;
 	} catch (error: any) {
 		console.error("Error: ", error)
@@ -65,7 +65,7 @@ export async function getCurrentUser(): Promise<User | undefined> {
 			credentials: 'include',
 		});
 		if (response.status == 401) return undefined;
-		const user = new User(await response.json() as User_intf);
+		const user = new User(await response.json() as UserIntf);
 		return user;
 	} catch (error: any) {
 		console.error("Error: ", error)
@@ -146,161 +146,6 @@ export async function getProjects(): Promise<Project[] | undefined> {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
-// Schema Crud
-
-export async function getProjectSchemas(project_id: string | undefined): Promise<Schema[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/${project_id}/schemas/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let schemas = [];
-		for (const schema of resp) schemas.push(new Schema(schema));
-		return schemas;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Label Crud
-
-export async function getSchemaLabels(project_id: string | undefined, schema_id: string | undefined): Promise<Label[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/${project_id}/schemas/${schema_id}/labels/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let labels = [];
-		for (const label of resp) labels.push(new Label(label));
-		return labels;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Herd Unit Crud
-
-export async function getProjectHerdUnits(project_id: string | undefined): Promise<HerdUnit[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/${project_id}/herd_units/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let herd_units = [];
-		for (const herd_unit of resp) herd_units.push(new HerdUnit(herd_unit));
-		return herd_units;
-	} catch (error: any) {
-		console.error("There was an error fetching the data:", error);
-		return undefined;
-	}
-}
-
-export async function getCropperHerdUnits(survey_id: string | undefined): Promise<HerdUnit[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/surveys/${survey_id}/herd_units/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let herd_units = [];
-		for (const herd_unit of resp) herd_units.push(new HerdUnit(herd_unit));
-		return herd_units;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Model Crud
-
-export async function getProjectModels(project_id: string | undefined): Promise<Model[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/${project_id}/models/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let models = [];
-		for (const model of resp) models.push(new Model(model));
-		return models;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-export async function getCropperModels(survey_id: string | undefined, herd_unit_id: string | undefined, schema_id: string | undefined): Promise<Model[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/surveys/${survey_id}/herd_units/${herd_unit_id}/schemas/${schema_id}/models/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let models = [];
-		for (const model of resp) models.push(new Model(model));
-		return models;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Survey Crud
-
-export async function getProjectSurveys(project_id: string | undefined): Promise<Survey[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/${project_id}/surveys/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let surveys = [];
-		for (const survey of resp) surveys.push(new Survey(survey));
-		return surveys;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
 // Auto Cropping
 
 export async function fetchAutoCropperBatch(survey_id: string | undefined, herd_unit_id: string | undefined, size: number,
@@ -336,7 +181,7 @@ export async function fetchAutoCropperBatch(survey_id: string | undefined, herd_
 		return [images as Image[], predictions as Prediction[][]];
 	} catch (error: any) {
 		console.error("Error: ", error)
- 		return undefined;
+		return undefined;
 	}
 
 }
@@ -361,7 +206,7 @@ export async function fetchPredCrops(image_id: string | undefined, survey_id: st
 		const resp = await response.json();
 		const pred_crops: PredictionCrop[] = []
 		for (const row of resp) {
-			const predCrop = row as PredictionCrop_intf
+			const predCrop = row as PredictionCropIntf
 			pred_crops.push(new PredictionCrop(
 				predCrop,
 				`${api_url}/request/image/${image_id}/pred_crop/${predCrop.uuid}`));
@@ -392,7 +237,7 @@ export async function closeImage(image_id: string): Promise<boolean> {
 		}
 	} catch (error: any) {
 		console.error("Error: ", error);
-		  
+
 		return false;
 	}
 }
@@ -416,7 +261,7 @@ export async function setPredicionsReviewed(prediction_ids: string[]): Promise<b
 		}
 	} catch (error: any) {
 		console.error("Error: ", error);
-		  
+
 		return false;
 	}
 }
@@ -444,7 +289,7 @@ export async function autoCrop(image_uuid: string, predictions: Prediction[], he
 		}
 	} catch (error: any) {
 		console.error("Error: ", error)
-		  
+
 		return false;
 	}
 }
@@ -466,7 +311,7 @@ export async function closeCropSession(): Promise<boolean> {
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		  
+
 		return false;
 	}
 
@@ -475,7 +320,7 @@ export async function closeCropSession(): Promise<boolean> {
 //---------------------------------------------------------------------------------------------------------------------------//
 // Area reviewing
 
-export async function fetchReviewedArea(herd_unit_id: string | undefined, survey_id: string | undefined): Promise<ReviewedArea | undefined> {
+export async function fetchReviewedArea(herd_unit_id: string | undefined, survey_id: string | undefined, reviewed: boolean): Promise<ReviewedArea | undefined> {
 	try {
 		const response = await fetch(`${api_url}/create/reviewed-area-batch`, {
 			method: 'POST',
@@ -486,17 +331,18 @@ export async function fetchReviewedArea(herd_unit_id: string | undefined, survey
 			body: JSON.stringify({
 				'herd_unit_id': herd_unit_id,
 				'survey_id': survey_id,
+				'reviewed': reviewed
 			}),
 		});
 		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
 
 		const resp = await response.json();
-		let revieweArea = new ReviewedArea(resp as ReviewedArea_intf);
+		let revieweArea = new ReviewedArea(resp as ReviewedAreaIntf);
 		return revieweArea as ReviewedArea;
 
 	} catch (error: any) {
 		console.error("Error: ", error)
-		  
+
 		return undefined;
 	}
 }
@@ -518,7 +364,7 @@ export async function getReviewedAreaPresignedGetUrl(ra_key: string): Promise<st
 		return resp as string;
 	} catch (error: any) {
 		console.error("Error: ", error)
- 		return undefined;
+		return undefined;
 	}
 }
 
@@ -539,7 +385,7 @@ export async function getReviewedAreaAnnotations(ra_id: string): Promise<Annotat
 
 	} catch (error: any) {
 		console.error("Error: ", error)
- 		return undefined;
+		return undefined;
 	}
 }
 
@@ -565,6 +411,6 @@ export async function submitApprovedAreaAnnotations(reviewedArea: ReviewedArea, 
 
 	} catch (error: any) {
 		console.error("Error: ", error)
- 		return false;
+		return false;
 	}
 }

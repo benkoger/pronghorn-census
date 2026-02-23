@@ -72,13 +72,12 @@ def get_crops(image_id: str):
 	'''
 	try:
 		crops = base.get_image_crops(UUID(image_id))
-		if not crops:
-			abort(404, 'No crops found')
 	except ValueError as e:
 		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
 	except (DatabaseError, Exception):
 		abort(500)
-
 
 	return [crop.serialize() for crop in crops], 200
 
@@ -107,11 +106,10 @@ def get_predictions(image_id: str):
 	'''
 	try:
 		predictions = base.get_image_predictions(UUID(image_id))
-
-		if not predictions:
-			abort(404, 'No predictions found')
 	except ValueError as e:
 		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
 	except (DatabaseError, Exception):
 		abort(500)
 

@@ -39,6 +39,9 @@ def create_app():
 	from app.routes import bp
 	app.register_blueprint(bp)
 
+	from app.routers.projects import projectBp
+	app.register_blueprint(projectBp)
+
 	from app.routers.models import modelBp
 	app.register_blueprint(modelBp)
 
@@ -50,6 +53,9 @@ def create_app():
 
 	from app.routers.herdunits import herdunitBp
 	app.register_blueprint(herdunitBp)
+
+	from app.routers.schemas import schemaBp
+	app.register_blueprint(schemaBp)
 
 	return app
 

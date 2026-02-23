@@ -3,16 +3,18 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from flask import Blueprint,  abort, request
-from app.extensions import base 
-from flask_pydantic import validate
-from .herdunit_validators import CreateHerdUnit
-from datetime import date, datetime
-from flask_login import (
-	login_required,
-) 
-from typing import cast, List
 from uuid import UUID
+
+from flask import Blueprint, abort
+from flask_login import login_required
+from flask_pydantic import validate
+from psycopg.errors import DatabaseError
+
+from app.extensions import base
+from database import ObjectNotFound
+
+
+from .herdunit_validators import CreateHerdUnit
 
 herdunitBp = Blueprint('herd_units', __name__, url_prefix='/api/v1/herd-units')
 
@@ -45,6 +47,39 @@ def get_by_id(herd_unit_id: str):
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@herdunitBp.get('/<string:herd_unit_id>/surveys')
+@login_required
+def get_surveys(herd_unit_id: str):
+	'''
+	Retrieve all surveys associated with a herd unit.
+	---
+	parameters:
+		- name: survye_id
+		in: path
+		type: string
+		required: true
+	responses:
+		200:
+			description: List of surveys.
+		400:
+			description: Invalid UUID format.
+		404:
+			description: No surveys found.
+		500:
+			description: Database error.
+	'''
+	try:
+		surveys = base.get_herd_unit_surveys(UUID(herd_unit_id))
+
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception) as e:
+		abort(500)
+
+	return [survey.serialize() for survey in surveys], 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
