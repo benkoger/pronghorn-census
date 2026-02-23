@@ -256,7 +256,10 @@ export default defineComponent({
 				this.current_file_part++;
 			
 			// Complete multipart upload
-			try {
+			this.current_file_num++;
+			this.current_file_part = 0;
+			}
+		try {
 				await completeMultiPartUpload(
 					image_key,
 					partArray,
@@ -264,18 +267,13 @@ export default defineComponent({
 				);
 			} catch (error: any) {
 				console.error(error) 
-				console.log(image_key)
-				console.log(uploadId)
 				this.create({
 						title: 'Upload failed',
-						body: `The upload has failed with a status of ${response.status}`,
+						body: `The upload has failed with a status of ${error.message}`,
 						variant: 'danger',
 						position: 'bottom-start'
 					});
 				return;
-			}
-			this.current_file_num++;
-			this.current_file_part = 0;
 			}
 
 		}

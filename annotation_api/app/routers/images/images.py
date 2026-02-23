@@ -331,7 +331,7 @@ def complete_upload():
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.post('abort-multipart-upload')
+@imageBp.post('/abort-multipart-upload')
 @login_required 
 def abort_upload():
 	'''
