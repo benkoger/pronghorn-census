@@ -263,7 +263,15 @@ export default defineComponent({
 					uploadId
 				);
 			} catch (error: any) {
-				console.error(error)
+				console.error(error) 
+				console.log(image_key)
+				console.log(uploadId)
+				this.create({
+						title: 'Upload failed',
+						body: `The upload has failed with a status of ${response.status}`,
+						variant: 'danger',
+						position: 'bottom-start'
+					});
 				return;
 			}
 			this.current_file_num++;
