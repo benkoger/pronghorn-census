@@ -1,11 +1,10 @@
 from flask import jsonify
 
 def handle_generic_http(error):
-	print(error)
+	print(f'uhoh: {error}')
 	return jsonify({'error': error.name,
 					'code': error.code,
 					'message': error.description}), error.code 
-
 
 def internal_service_error(error): 
 	print(f'uhoh: {error}')

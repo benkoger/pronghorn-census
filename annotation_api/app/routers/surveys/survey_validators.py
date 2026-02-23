@@ -8,7 +8,7 @@ class CreateSurvey(BaseModel):
     herd_unit_ids: List[Union[int, UUID]]
     survey_date: datetime
     name: str
-    additional_info: str
+    additional_info: Optional[str]
 
 class UpdateSurvey(BaseModel):
     survey_date: Optional[datetime] = None

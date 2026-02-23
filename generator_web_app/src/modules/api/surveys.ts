@@ -4,33 +4,25 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { HerdUnit, Survey } from '@/types/generatorobjects.ts';
-import type { HerdUnitIntf, Survey_intf } from '@/types/generatorobjects.ts';
-import type { apiError } from '@/modules/api/apiV1Methods';
-
-const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
-
-const api_url: URL = new URL(api_url_base);
+import type { HerdUnitIntf, SurveyIntf } from '@/types/generatorobjects.ts';
+import { ApiError } from '@/modules/api/errors.ts'
+import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function getSurveyHerdUnits(survey_id: string): Promise<HerdUnit[] | undefined> {
-    try {
-        const response = await fetch(`${api_url}/surveys/${survey_id}/herd-units`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-        if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-        const resp = await response.json();
-        let herd_units = [];
-        for (const herd_unit of resp) herd_units.push(new HerdUnit(herd_unit as HerdUnitIntf));
-        return herd_units;
-    } catch (error: any) {
-        console.error("Error: ", error)
-        return undefined;
-    }
+    const response = await fetch(`${api_url}/surveys/${survey_id}/herd-units`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+    if (!response.ok) throw new ApiError(await response.json());
+    const resp = await response.json();
+    let herd_units = [];
+    for (const herd_unit of resp) herd_units.push(new HerdUnit(herd_unit as HerdUnitIntf));
+    return herd_units;
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -51,8 +43,8 @@ export async function createSurvey(project_id: number, herd_unit_id: number, nam
             'additional_info': additional_info
         }),
     });
-    if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
+    if (!response.ok) throw new ApiError(await response.json());
     const resp = await response.json();
-    let survey = new Survey(resp as Survey_intf);
+    let survey = new Survey(resp as SurveyIntf);
     return survey;
 }

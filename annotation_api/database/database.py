@@ -6,9 +6,10 @@
 from datetime import datetime, date
 from functools import wraps
 import os
-from typing import Any, Callable, Dict, List, Optional, Reversible, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
+from .errors import *
 
 from cropgenerator.generatorobjects import (
 	Annotation,
@@ -18,7 +19,6 @@ from cropgenerator.generatorobjects import (
 	Model,
 	Organization,
 	Prediction,
-	PredictionCrop,
 	Project,
 	ReviewedArea,
 	Role,
@@ -563,7 +563,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~# 
 
 	@connect
-	def _get_project(self, cursor: psycopg.Cursor[Project], project_id: int | UUID) -> Project | None:
+	def _get_project(self, cursor: psycopg.Cursor[Project], project_id: int | UUID) -> Project:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -576,10 +576,15 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (project_id,))
 			case _:
 				raise TypeError('project_id MUST be an integer or a UUID')
-		project = cursor.fetchone()
-		return project if isinstance(project, Project) else None
 		
-	def get_project(self, project_id: int | UUID) -> Project | None:
+		project = cursor.fetchone()
+		if not project:
+			raise ObjectNotFound('Project', project_id)
+
+		return project 
+	
+		
+	def get_project(self, project_id: int | UUID) -> Project:
 		''' Query the database for a project 
 		
 		Args:
@@ -588,7 +593,65 @@ class Database:
 		return self._get_project(project_id=project_id)
 		
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_project_models(self, cursor: psycopg.Cursor[Model], project_id: int | UUID) -> list[Model]:
+		'''
+		
+		'''
+		project = self._get_project(cursor, project_id)
+		query = sql.SQL(''' 
+			SELECT m.* FROM projectmanagement.models M
+			JOIN projectmanagement.projects_models PM ON PM.model_id = M.model_id
+			WHERE PM.project_id = %s; 
+		''') 
+
+		cursor.row_factory = class_row(Model)
+		cursor.execute(query, (project.project_id,))
 	
+		models = cursor.fetchall()
+		if len(models) == 0:
+			raise ObjectNotFound('Models associated with project', project_id)
+
+		return models
+	
+	def get_project_models(self, project_id: Project | int | UUID) -> list[Model]:
+		'''
+		
+		'''
+		return self._get_project_models(project_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_project_herd_units(self, cursor: psycopg.Cursor[HerdUnit], project_id: int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		project = self._get_project(cursor, project_id)
+		query = sql.SQL('''
+			SELECT HU.* FROM projectmanagement.herd_units HU JOIN
+			projectmanagement.projects_herd_units PHU ON PHU.herd_unit_id = HU.herd_unit_id
+			WHERE PHU.project_id = %s; 
+		''')
+
+		cursor.row_factory = class_row(HerdUnit)
+		cursor.execute(query, (project.project_id,))
+
+		herd_units = cursor.fetchall()
+		if len(herd_units) == 0:
+			raise ObjectNotFound('Herd units associated with project', project_id)
+		
+		return herd_units
+
+	def get_project_herd_units(self, project_id: Project | int | UUID) -> list[HerdUnit]:
+		'''
+		
+		'''
+		return self._get_project_herd_units(project_id)
+	
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
 	@connect
 	def _update_project(self, cursor: psycopg.Cursor[Project], project_id: Project | int | UUID, name: str | None = None) -> bool:
 		''' Internal helper function, do not call directly
@@ -667,7 +730,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
 	@connect 
-	def _get_schema(self, cursor: psycopg.Cursor[Schema], schema_id: int | UUID) -> Schema | None:
+	def _get_schema(self, cursor: psycopg.Cursor[Schema], schema_id: int | UUID) -> Schema:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -681,16 +744,44 @@ class Database:
 			case _:
 				raise TypeError('schema_id MUST be an integer or a UUID')
 		schema = cursor.fetchone()
-		return schema if isinstance(schema, Schema) else None
+		if not schema:
+			raise ObjectNotFound('Schema', schema_id)
 
-	def get_schema(self, schema_id: int | UUID):
+		return schema 
+
+	def get_schema(self, schema_id: int | UUID) -> Schema:
 		''' Query the database for a schema 
 		
 		Args:
 			schema_id: either the schema's internal database id or its universally unique identifier
 		'''
-		return self._get_schema(schema_id=schema_id)
+		return self._get_schema(schema_id)
 	
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_schema_labels(self, cursor: psycopg.Cursor[Label], schema_id: int | UUID) -> list[Label]:
+		'''
+		
+		'''
+		schema = self._get_schema(cursor, schema_id)
+		print(schema)
+		query = sql.SQL(' SELECT * FROM projectmanagement.labels WHERE schema_id = %s; ')
+		
+		
+		cursor.row_factory = class_row(Label)
+		cursor.execute(query, (schema.schema_id,))
+		labels = cursor.fetchall() 
+		if len(labels) == 0:
+			raise ObjectNotFound('labels for schema', schema_id)
+		return labels 
+
+	def get_schema_labels(self, schema_id: Project | int | UUID) -> list[Label]:
+		'''
+		
+		'''
+		return self._get_schema_labels(schema_id)
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
@@ -945,7 +1036,7 @@ class Database:
 		herd_unit = cursor.fetchone()
 
 		if not herd_unit:
-			raise Exception('uh oh spaghettios')
+			raise Exception('Herd Unit was not found')
 
 		return herd_unit
 	
@@ -956,6 +1047,33 @@ class Database:
 			herd_unit_id: either the herd unit's internal database id or its universally unique identifier
 		'''
 		return self._get_herd_unit(herd_unit_id=herd_unit_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_herd_unit_surveys(self, cursor: psycopg.Cursor[Survey], herd_unit_id: int | UUID) -> list[Survey]:
+		'''
+		
+		'''
+		herd_unit = self._get_herd_unit(herd_unit_id)
+
+		cursor.row_factory = class_row(Survey)
+		query = sql.SQL('''
+			SELECT S.* FROM projectmanagement.surveys as S JOIN
+			projectmanagement.surveys_herd_units AS SHU ON SHU.survey_id = S.survey_id
+			WHERE SHU.herd_unit_id = %s; ''')
+		cursor.execute(query, (herd_unit.herd_unit_id,))
+		surveys = cursor.fetchall()
+		if len(surveys) == 0:
+			raise ObjectNotFound('Surveys for herd unit', herd_unit_id) 
+
+		return surveys
+
+	def get_herd_unit_surveys(self, survey_id: int | UUID) -> list[Survey]:
+		'''
+		
+		'''
+		return self._get_herd_unit_surveys(survey_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1093,7 +1211,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _get_model(self, cursor: psycopg.Cursor[Model], model_id: int | UUID) -> Model | None:
+	def _get_model(self, cursor: psycopg.Cursor[Model], model_id: int | UUID) -> Model:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -1107,15 +1225,41 @@ class Database:
 			case _:
 				raise TypeError('model_id MUST be an integer or a UUID')
 		model = cursor.fetchone()
-		return model if isinstance(model, Model) else None    
+		if not model:
+			raise ObjectNotFound('Model', model_id)
+
+		return model 
 	
-	def get_model(self, model_id: int | UUID):
+	def get_model(self, model_id: int | UUID) -> Model:
 		''' Query the database for a model
 		
 		Args:
 			model_id: either the models's internal database id or its universally unique identifier
 		'''
-		return self._get_model(model_id = model_id)
+		return self._get_model(model_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_model_schema(self, cursor: psycopg.Cursor[Schema], model_id: int | UUID) -> Schema:
+		'''
+		'''
+		model = self._get_model(model_id)
+		
+		cursor.row_factory = class_row(Schema)
+		query = sql.SQL(' SELECT * FROM projectmanagement.schemas WHERE schema_id = %s; ')
+		cursor.execute(query, (model.schema_id,))
+
+		schema = cursor.fetchone()
+		if not schema:
+			raise ObjectNotFound('Schema for model', model_id)
+		
+		return schema
+
+	def get_model_schema(self, model_id: int | UUID) -> Schema:
+		'''
+		'''
+		return self._get_model_schema(model_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1534,23 +1678,24 @@ class Database:
 		'''
 		
 		'''
+		survey = self._get_survey(cursor, survey_id)
+		
 		cursor.row_factory = class_row(HerdUnit)
-		survey = self._get_survey(survey_id)
 		query = sql.SQL('''
 			SELECT H.* FROM projectmanagement.herd_units as H JOIN
 			projectmanagement.surveys_herd_units AS SHU ON SHU.herd_unit_id = H.herd_unit_id
 			WHERE SHU.survey_id = %s; ''')
 		cursor.execute(query, (survey.survey_id,))
 		herd_units = cursor.fetchall()
-		if herd_units is None:
-			raise Exception('No herd units found')
+		if len(herd_units) == 0:
+			raise ObjectNotFound('Herd units for survey', survey_id)
 		return herd_units
 
 	def get_survey_herd_units(self, survey_id: int | UUID) -> list[HerdUnit]:
 		'''
 		
 		'''
-		return self._get_cropping_herd_units(survey_id = survey_id)
+		return self._get_cropping_herd_units(survey_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1638,7 +1783,11 @@ class Database:
 		'''
 		
 		'''
-		cursor.row_factory = class_row(Image)
+		if isinstance(parameters['survey_id'], str):
+			parameters['survey_id'] = self._get_survey(cursor, UUID(parameters['survey_id'])).survey_id
+
+		if isinstance(parameters['herd_unit_id'], str):
+			parameters['herd_unit_id'] = self._get_herd_unit(cursor, UUID(parameters['herd_unit_id'])).herd_unit_id
 
 		query_1 = sql.SQL(''' 
 			INSERT INTO core.images (
@@ -1651,7 +1800,8 @@ class Database:
 			) 
 			RETURNING *; 
 		''')
-		
+
+		cursor.row_factory = class_row(Image)
 		cursor.execute(query_1, parameters)
 
 		image = cursor.fetchone()
@@ -1684,8 +1834,9 @@ class Database:
 			case _:
 				raise TypeError('image_ids must be an int, or uuid or a list')
 		image = cursor.fetchone()
-		if image is None:
-			raise Exception('Could not find image')
+		if not image:
+			raise ObjectNotFound('Image', image_id)
+
 		return image 
 	
 	def get_image(self, image_id: int | UUID) -> Image:
@@ -1701,22 +1852,21 @@ class Database:
 		'''
 
 		'''
-		cursor.row_factory = class_row(ReviewedArea)
+		image = self._get_image(cursor, image_id)
 		query = sql.SQL(' SELECT * FROM core.reviewed_area WHERE image_id = %s; ')
 
-		match image_id: 
-			case int():
-				cursor.execute(query, (image_id,))
-			case UUID():
-				db_id = self.get_image(image_id).image_id
-				cursor.execute(query, (db_id,))
-			case _:
-				raise TypeError('image_id must be an integer, or UUID!')
+		cursor.row_factory = class_row(ReviewedArea)
+		cursor.execute(query, (image.image_id,))
 		
-		return cursor.fetchall()
+		crops = cursor.fetchall()
+		if len(crops) == 0:
+			raise ObjectNotFound('Crops for image', image_id)
+		
+		return crops
 
 	def get_image_crops(self, image_id: int | UUID) -> List[ReviewedArea]:
 		'''
+
 		'''
 		return self._get_image_crops(image_id)
 
@@ -1726,19 +1876,17 @@ class Database:
 	def _get_image_predictions(self, cursor: psycopg.Cursor[Prediction], image_id: int | UUID) -> List[Prediction]:
 		'''
 		'''
-		cursor.row_factory = class_row(Prediction)
+		image = self._get_image(cursor, image_id)
 		query = sql.SQL(' SELECT * FROM core.predictions WHERE image_id = %s; ')
 
-		match image_id:
-			case int():
-				cursor.execute(query, (image_id,))
-			case UUID():
-				db_id = self.get_image(image_id).image_id
-				cursor.execute(query, (db_id,))
-			case _:
-				raise TypeErorr('image_id must be an integer, or UUID!')
-
-		return cursor.fetchall()
+		cursor.row_factory = class_row(Prediction)
+		cursor.execute(query, (image.image_id,))
+			
+		predictions = cursor.fetchall()
+		if len(predictions) == 0:
+			raise ObjectNotFound('Predctions for image', image_id)
+		
+		return predictions
 
 	def get_image_predictions(self, image_id: int | UUID) -> List[Prediction]:
 		'''
@@ -2610,38 +2758,6 @@ class Database:
 		return self._get_project_schemas(project_id = project_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-	# Relationship Management - projectmanagement <-> projectmanagement: projects <-> herdunits
-	
-	@connect 
-	def _get_project_herd_units(self, cursor: psycopg.Cursor[HerdUnit], project_id: Project | int | UUID) -> list[HerdUnit]:
-		'''
-		
-		'''
-		cursor.row_factory = class_row(HerdUnit)
-		query = sql.SQL('''
-			SELECT herd_units.herd_unit_id, name, created, modified, uuid FROM projectmanagement.herd_units as herd_units JOIN
-			projectmanagement.projects_herd_units AS projects_herd_units ON projects_herd_units.herd_unit_id = herd_units.herd_unit_id
-			WHERE projects_herd_units.project_id = %s; ''')
-		match project_id:
-			case Project():
-				cursor.execute(query, (project_id.project_id,))
-			case int():
-				cursor.execute(query, (project_id,))
-			case _:
-				project = self._get_project(project_id)
-				cursor.execute(query, (project.project_id,))
-		herd_units = cursor.fetchall()
-		if herd_units is None:
-			raise Exception('Project has no associated herd units')
-		return herd_units
-
-	def get_project_herd_units(self, project_id: Project | int | UUID) -> list[HerdUnit]:
-		'''
-		
-		'''
-		return self._get_project_herd_units(project_id = project_id)
-	
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Relationship Management - projectmanagement <-> projectmanagement: surveys <-> herdunits
 
 	@connect
@@ -2694,37 +2810,6 @@ class Database:
 		return self._get_project_surveys(project_id = project_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-	# Relationship Management - projectmanagement <-> projectmanagement: projects <-> models
-	
-	@connect
-	def _get_project_models(self, cursor: psycopg.Cursor[Model], project_id: Project | int | UUID) -> list[Model]:
-		'''
-		
-		'''
-		cursor.row_factory = class_row(Model)
-		query = sql.SQL(''' SELECT models.model_id, schema_id, name, created, modified, uuid FROM projectmanagement.models AS models
-							JOIN projectmanagement.projects_models AS projects_models ON projects_models.model_id = models.model_id
-							WHERE projects_models.project_id = %s; ''') 
-		match project_id:
-			case Project():
-				cursor.execute(query, (project_id.project_id,))
-			case int():
-				cursor.execute(query, (project_id,))
-			case _:
-				project = self._get_project(project_id)
-				cursor.execute(query, (project.project_id,))
-		models = cursor.fetchall()
-		if models is None:
-			raise Exception('Project has no models')
-		return models
-	
-	def get_project_models(self, project_id: Project | int | UUID) -> list[Model]:
-		'''
-		
-		'''
-		return self._get_project_models(project_id = project_id)
-
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Relationship Management - projectmanagement <-> projectmanagement: schemas, herdunits, and surveys 
 
 	@connect
@@ -2751,35 +2836,6 @@ class Database:
 		
 		'''
 		return self._get_cropping_models(survey_id = survey_id, herd_unit_id = herd_unit_id, schema_id = schema_id)
-
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-	# Relationship Management - projectmanagement <-> projectmanagement: schemas <-> labels
-
-	@connect
-	def _get_schema_labels(self, cursor: psycopg.Cursor[Label], schema_id: Schema | int | UUID) -> list[Label]:
-		'''
-		
-		'''
-		cursor.row_factory = class_row(Label)
-		query = sql.SQL(' SELECT * FROM projectmanagement.labels WHERE schema_id = %s; ')
-		match schema_id:
-			case Schema():
-				cursor.execute(query, (schema_id.schema_id,))
-			case int():
-				cursor.execute(query, (schema_id,))
-			case _:
-				schema = self._get_schema(schema_id)
-				cursor.execute(query, (schema.schema_id,))
-		labels = cursor.fetchall() 
-		if labels is None:
-			raise Exception('Schema has no associated labels')
-		return labels 
-
-	def get_schema_labels(self, schema_id: Project | int | UUID) -> list[Label]:
-		'''
-		
-		'''
-		return self._get_schema_labels(schema_id = schema_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Relationship Management - core <-> core: reviewed_area <-> annotations
@@ -2844,14 +2900,14 @@ class Database:
 		'''
 		
 		'''
-		cursor.row_factory = dict_row
-		herd_unit = self.get_herd_unit(herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
-		survey = self.get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
-		user = self.get_user(user_id) if not isinstance(user_id, User) else user_id
-		model = self.get_model(model_id) if not isinstance(model_id, Model) else model_id
+		herd_unit = self._get_herd_unit(cursor, herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
+		survey = self._get_survey(cursor, survey_id) if not isinstance(survey_id, Survey) else survey_id
+		user = self._get_user(cursor, user_id) if not isinstance(user_id, User) else user_id
+		model = self._get_model(cursor, model_id) if not isinstance(model_id, Model) else model_id
 		if not herd_unit or not survey or not user or not model:
 			raise Exception('Could not fetch batch')
 
+		cursor.row_factory = dict_row
 		query = sql.SQL(''' 
             WITH SelectedImageIds AS (
                 SELECT DISTINCT I.image_id, I.herd_unit_id, I.survey_id, P.score
@@ -3043,25 +3099,24 @@ class Database:
 
 	@connect
 	def _get_crop_to_review(self, cursor: psycopg.Cursor[ReviewedArea], user_id: Union[User, int, UUID], 
-								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
+								survey_id: Union[Survey, int, UUID], reviewed: bool) -> ReviewedArea:
 		''' Fetch a batch of reviewed areas that have yet to be reviewed.
 
 		'''
-		cursor.row_factory = class_row(ReviewedArea)
-		survey = self.get_survey(survey_id) if not isinstance(survey_id, Survey) else survey_id
-		user = self.get_user(user_id) if not isinstance(user_id, User) else user_id
-		if not survey or not user:
-			raise Exception('Could not fetch batch')
+		survey = self._get_survey(cursor, survey_id) if not isinstance(survey_id, Survey) else survey_id
+		user = self._get_user(cursor, user_id) if not isinstance(user_id, User) else user_id
 
+		cursor.row_factory = class_row(ReviewedArea)
 		query = sql.SQL(''' SELECT RA.* FROM core.reviewed_area as RA
 							JOIN core.images as I on ra.image_id = I.image_id
 								AND I.survey_id = %(survey_id)s
 								AND I.opened_by_user_id = 0
-								AND RA.reviewed_by_user_id = 0
+								AND RA.reviewed_by_user_id = %(reviewed)s
 							LIMIT 1;
 						''')
 		params = {
 			'survey_id' : survey.survey_id,
+			'reviewed': 1 if reviewed else 0
 		}
 		
 		cursor.execute(query, params)
@@ -3076,11 +3131,11 @@ class Database:
 		return result
 	
 	def get_crop_to_review(self, user_id: Union[User, int, UUID],
-								survey_id: Union[Survey, int, UUID]) -> ReviewedArea:
+								survey_id: Union[Survey, int, UUID], reviewed: bool) -> ReviewedArea:
 		'''
 
 		'''
-		return self._get_crop_to_review(user_id=user_id, survey_id=survey_id)
+		return self._get_crop_to_review(user_id, survey_id, reviewed)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get annotations for crop 

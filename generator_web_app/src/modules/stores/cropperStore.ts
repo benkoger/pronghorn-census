@@ -38,13 +38,19 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		CurrentPredictions(state): Prediction[] { return this.currentBatch?.predictions[state.imageIdx] },
 		CurrentPredictionIds(): string[] {
 			const ids: string[] = [];
+			if (this.CurrentPredictions == undefined) return[];
 			for (const pred of this.CurrentPredictions) {
 				ids.push(pred.uuid);
 			}
 			return ids;
 		},
 		CurrentPredictionCrops(state): PredictionCrop[] { return this.currentBatch?.predictionCrops[state.imageIdx] },
-		CurrentPredictionCrop(): PredictionCrop { return this.CurrentPredictionCrops[this.activePredIdx] },
+		CurrentPredictionCrop(): PredictionCrop | undefined { 
+			if (this.CurrentPredictionCrop != undefined) {
+				return this.CurrentPredictionCrops[this.activePredIdx] 
+			}
+
+		},
 		NextPredictionCrops(state): boolean {
 			const predcrops: boolean = (this.currentBatch?.predictionCrops[state.imageIdx + 1] != undefined) ? true : false;
 			return predcrops;
@@ -56,6 +62,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		currentImage(state): Image { return this.currentImages[state.imageIdx] },
 		imageNum: (state) => state.imageIdx + 1,
 		approvedPredictions(): Prediction[] {
+			if (this.approvedPredictions == undefined) return [];
 			const newPredictions: Prediction[] = [];
 			for (let i = 0; i < this.CurrentPredictionCrops.length; i++) {
 				if (this.CurrentPredictionCrops[i].approved) {

@@ -3,15 +3,18 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from flask import Blueprint,  abort, request
-from app.extensions import base 
-from flask_pydantic import validate
-from .model_validators import CreateModel
 from datetime import datetime
-from flask_login import (
-	login_required,
-) 
 from uuid import UUID
+
+from flask import Blueprint, abort, request
+from flask_login import login_required
+from flask_pydantic import validate
+from psycopg.errors import DatabaseError
+
+from app.extensions import base
+from database import ObjectNotFound
+
+from .model_validators import CreateModel
 
 modelBp = Blueprint('models', __name__, url_prefix='/api/v1/models')
 
@@ -103,6 +106,34 @@ def get_readme():
 
 	'''
 	return ''
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@modelBp.get('/<string:model_id>/schema')
+@login_required
+def get_schema(model_id: str):
+	'''
+	Retrieve the schema for a specific model
+	---
+	responses:
+	  200:
+		description: The model's schema.
+	  404:
+		description: No model / schema found.
+	  500:
+		description: Database error.
+	'''
+	try:
+		project = base.get_model_schema(UUID(model_id))
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
+	
+	return project.serialize(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

@@ -1,19 +1,20 @@
 # Endpoints for managing images in the API 
 # Author: Michael B. Lance
-# Created: February 3, 2026
-# Updated: February 11, 2026
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from flask import Blueprint,  abort, request, current_app
-from .image_validators import CreateImage, UpdateImage
-from app.extensions import base, s3 
-from botocore.exceptions import ClientError
-from flask_pydantic import validate
-from flask_login import (
-	login_required,
-) 
 from uuid import UUID
+
+from botocore.exceptions import ClientError
+from flask import Blueprint, abort, current_app, request
+from flask_login import login_required
+from flask_pydantic import validate
+from psycopg.errors import DatabaseError, UniqueViolation
+
+from app.extensions import base, s3
+from database import ObjectNotFound
+
+from .image_validators import *
 
 imageBp = Blueprint('images', __name__, url_prefix='/api/v1/images')
 
@@ -22,40 +23,35 @@ imageBp = Blueprint('images', __name__, url_prefix='/api/v1/images')
 #---------------------------------------------------------------------------------------------------------------------------#
 # GET
 
-@imageBp.get('/all')
-@login_required
-def get_all():
-	'''
-
-	'''
-	return ''
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
 @imageBp.get('/<string:image_id>')
 @login_required
 def get_by_id(image_id: str):
 	'''
-	Request an image object from the database using its UUID
+	Request an image object from the database using its UUID.
 	---
 	parameters:
-		- name: image_id
+	  - name: image_id
 		in: path
 		type: string
 		required: true
-
 	responses:
-		200:
-			description: The requested image was found
-		404:
-			description: Not found
+	  200:
+		description: The requested image was found.
+	  400:
+		description: Invalid UUID format provided.
+	  404:
+		description: No image record found for the provided ID.
 	'''
-	image = base.get_image(UUID(image_id))
+	try:
+		image = base.get_image(UUID(image_id))
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception) as e:
+		abort(500)
 
-	if image is None:
-		abort(404, '')
-	else:
-		return image.serialize()
+	return image.serialize(), 200
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -64,12 +60,24 @@ def get_by_id(image_id: str):
 @login_required
 def get_crops(image_id: str):
 	'''
-	
+	Retrieve crops for a specific image
+	---
+	responses:
+	  200:
+		description: List of crops.
+	  404:
+		description: No crops found.
+	  500:
+		description: Database error.
 	'''
-	crops = base.get_image_crops(UUID(image_id))
-
-	if len(crops) == 0:
-		abort(404, 'No crops found')
+	try:
+		crops = base.get_image_crops(UUID(image_id))
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
 
 	return [crop.serialize() for crop in crops], 200
 
@@ -79,12 +87,31 @@ def get_crops(image_id: str):
 @login_required
 def get_predictions(image_id: str):
 	'''
-
+	Retrieve all predictions associated with an image.
+	---
+	parameters:
+		- name: image_id
+		in: path
+		type: string
+		required: true
+	responses:
+		200:
+			description: List of predictions.
+		400:
+			description: Invalid UUID format.
+		404:
+			description: No predictions found.
+		500:
+			description: Database error.
 	'''
-	predictions = base.get_image_predictions(UUID(image_id))
-
-	if len(predictions) == 0:
-		abort(404, 'No predictions found')
+	try:
+		predictions = base.get_image_predictions(UUID(image_id))
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
 
 	return [pred.serialize() for pred in predictions], 200
 
@@ -94,11 +121,31 @@ def get_predictions(image_id: str):
 @login_required
 def get_annotations(image_id: str):
 	'''
+	Retrieve all annotations associated with an image.
+	---
+	parameters:
+		- name: image_id
+		in: path
+		type: string
+		required: true
+	responses:
+		200:
+			description: List of annotations.
+		400:
+			description: Invalid UUID format.
+		404:
+			description: No annotations found.
+		500:
+			description: Database error.
 	'''
-	annotations = base.get_image_annotations(UUID(image_id))
-
-	if len(annotations) == 0:
-		abort(404, 'No annotations found')
+	try:
+		annotations = base.get_image_annotations(UUID(image_id))
+		if not annotations:
+			abort(404, 'No annotations found')
+	except ValueError as e:
+		abort(400, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
 	
 	return [annot.serialize() for annot in annotations], 200
 
@@ -110,26 +157,50 @@ def get_annotations(image_id: str):
 @login_required
 def create(body: CreateImage):
 	'''
-
+	Create a new image record.
+	---
+	responses:
+		201:
+			description: Created successfully.
+		409:
+			description: Image already exists (Unique Violation).
+		500:
+			description: Database error.
 	'''
 	try:
 		image = base.create_image(body.model_dump())
-	except Exception as e:
+	except UniqueViolation:
+		abort(409, 'Image already exists')
+	except (DatabaseError, Exception):
 		abort(500)
 
 	return image.serialize(), 201
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.post('/<string:image_id>/presigned_url')
+@imageBp.post('/presigned-get-url')
 @login_required
-def create_presigned_get(image_id: str):
+def create_presigned_get():
 	'''
+	Generate a presigned GET URL for an image.
+	---
+	responses:
+		201:
+			description: Presigned URL generated.
+		400:
+			description: Invalid ID format.
+		404:
+			description: Image record not found.
+		500:
+			description: Storage or database error.
 	'''
 	data = request.get_json()
-	image = base.get_image(UUID(image_id))
-
 	try:
+		image = base.get_image(UUID(data['image_id']))
+
+		if not image:
+			abort(404, 'Image not found')
+
 		response = s3.generate_presigned_url(
 			'get_object',
 			Params = {
@@ -138,8 +209,153 @@ def create_presigned_get(image_id: str):
 			},
 			ExpiresIn = data['expires_in']
 		)
+	except ValueError as e:
+		abort(400, str(e))
 	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status, e.response.get('Error', {}).get('Message'))
+	except (DatabaseError, Exception):
 		abort(500)
+
+	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('/presigned-put-url')
+@validate()
+@login_required
+def create_chunk_presigned_put(body: CreatePresignedPut):
+	'''
+	Generates a pre-signed URL for a single file chunk (UploadPart).
+	---
+	responses:
+		201:
+			description: URL generated.
+		400:
+			description: Missing data or invalid UUID.
+		404:
+			description: Image not found.
+		500:
+			description: Storage/Database error.
+	'''
+	data = body.model_dump()
+	try: 
+		image_id = UUID(data['image_id']) if isinstance(data['image_id'], str) else data['image_id']
+		image = base._get_image(image_id)
+		
+		if image is None:
+			abort(404, 'Image not found')
+
+		response = s3.generate_presigned_url(
+			ClientMethod='upload_part', 
+			Params = {
+				'Bucket': current_app.config['BUCKET_NAME'],
+				'Key': image.img_key, 
+				'UploadId': data['upload_id'],
+				'PartNumber': data['part_number'],
+				'ContentLength': data['chunk_size'],
+				'ContentMD5' : data['chunk_md5'],
+			},
+			ExpiresIn=3600,
+		)
+	except (ValueError, KeyError):
+		abort(400)
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status)
+	except (DatabaseError, Exception):
+		abort(500)
+	
+	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('/create-multipart-upload')
+@login_required
+def create_multipart_upload():
+	'''
+	Initiates a new multipart upload.
+	---
+	responses:
+		201:
+			description: Multipart upload started.
+		500:
+			description: system error.
+	'''
+	data = request.get_json()
+	try: 
+		response = s3.create_multipart_upload(
+			Bucket = current_app.config['BUCKET_NAME'],
+			Key = data['image_key'],
+			ContentType = 'image/jpeg',
+		)
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status)
+	except Exception:
+		abort(500)
+	
+	return response['UploadId'], 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.route('/complete-multipart-upload', methods=['POST'])
+@login_required
+def complete_upload():
+	'''
+	Completes a new multipart upload.
+	---
+	responses:
+		201:
+			description: Multipart upload finished.
+		500:
+			description: S3 or system error.
+	'''
+	data = request.get_json()
+	try:
+		response = s3.complete_multipart_upload(
+			Bucket = current_app.config['BUCKET_NAME'],
+			Key = data['image_key'],
+			MultipartUpload={
+				'Parts': data['parts']
+			},
+			UploadId = data['upload_id'],
+		)
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status)
+	except Exception:
+		abort(500)
+
+	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('abort-multipart-upload')
+@login_required 
+def abort_upload():
+	'''
+	Aborts a multipart upload.
+	---
+	responses:
+		201:
+			description: Multipart upload started.
+		500:
+			description: S3 or system error.
+	'''
+	data = request.get_json()
+	try:
+		response = s3.abort_multipart_upload(
+			Bucket = current_app.config['BUCKET_NAME'],
+			Key = data['image_key'],
+			UploadId = data['upload_id'],
+		)
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status)
+	except Exception:
+		abort(500)
+
 	return response, 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -153,12 +369,32 @@ def create_presigned_get(image_id: str):
 @login_required
 def update(body: UpdateImage, image_id: str):
 	'''
-
+	Update image record metadata.
+	---
+	parameters:
+		- name: image_id
+		in: path
+		type: string
+		required: true
+	responses:
+		200:
+			description: Record updated.
+		400:
+			description: Invalid UUID.
+		404:
+			description: Not found.
+		500:
+			description: Database error.
 	'''
 	try: 
 		image = base.update_image(UUID(image_id), body.model_dump())
-	except:
+	except ValueError as e:
+		abort(400, str(e))
+	except (DatabaseError, Exception):
 		abort(500)
+
+	if image is None:
+		abort(404, 'Image not found')
 
 	return image.serialize(), 200
 
@@ -172,10 +408,22 @@ def delete_image(image_id: str):
 	
 	'''
 	try:
-		res = base.delete_image(UUID(image_id))
-	except:
+		image = base.get_image(UUID(image_id))
+		if not image:
+			abort(404, 'Image not found')
+
+		s3.delete_object(
+			Bucket=current_app.config['BUCKET_NAME'], 
+			Key=image.img_key
+		)
+
+		base.delete_image(UUID(image_id))
+	except ValueError as e:
+		abort(400, str(e))
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status, e.response.get('Error', {}).get('Message'))
+	except (DatabaseError, Exception):
 		abort(500)
-	if res:
-		return '', 204
-	else:
-		abort(404, 'Could not find the image to delete')
+
+	return '', 204

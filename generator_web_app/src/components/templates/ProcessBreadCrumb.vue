@@ -1,42 +1,48 @@
-<script>
-export default {
-	props: {
-		steps: { type: Array, required: true },
-		modelValue: { type: Number, default: 0 },
-		nextText: { type: String, default: 'Next' },
-		showButtons: { type: Boolean, default: false },
-		canContinue: { type: Boolean, default: true }
-	},
-	emits: ['update:modelValue'],
-	computed: {
-		isLastStep() {
-			return this.modelValue === this.steps.length - 1;
+<script lang="ts">
+	import { defineComponent, type PropType } from 'vue';
+
+	export default defineComponent({
+		name: 'ProcessBreadCrumb',
+		props: {
+			steps: { 
+				type: Array as PropType<string[]>, 
+				required: true 
+			},
+			modelValue: { type: Number, default: 0 },
+			nextText: { type: String, default: 'Next' },
+			showButtons: { type: Boolean, default: false },
+			canContinue: { type: Boolean, default: true }
 		},
-		isFirstStep() {
-			return this.modelValue === 0;
+		emits: ['update:modelValue'],
+		computed: {
+			isLastStep() {
+				return this.modelValue === this.steps.length - 1;
+			},
+			isFirstStep() {
+				return this.modelValue === 0;
+			},
+			breadcrumbItems() {
+				return this.steps.map((label, index) => ({
+					text: label,
+					active: index === this.modelValue,
+					disabled: index > this.modelValue && !this.canContinue,
+					onClick: (e: Event) => {
+						e.preventDefault();
+						this.updateStep(index);
+					}
+				}));
+			}
 		},
-		breadcrumbItems() {
-			return this.steps.map((label, index) => ({
-				text: label,
-				active: index === this.modelValue,
-				disabled: index > this.modelValue && !this.canContinue,
-				onClick: (event) => {
-					event.preventDefault();
-					this.updateStep(index);
-				}
-			}));
-    	}
-	},
-	methods: {
-    	updateStep(newStep) {
-			this.$emit('update:modelValue', newStep);
-    	}
-	}
-};
+		methods: {
+			updateStep(newStep: number) {
+				this.$emit('update:modelValue', newStep);
+			}
+		}
+	});
 </script>
 <template>
 	<nav>
-    	<BBreadcrumb :items="breadcrumbItems" />
+		<BBreadcrumb :items="breadcrumbItems" />
 	</nav>
 	<div
 			v-if="showButtons" 

@@ -32,15 +32,15 @@ export interface coord {
     y: number
 }
 
-export interface Box_intf {
+export interface BoxIntf {
     top_left: coord;
     bottom_right: coord;
 }
 
-export class Box implements Box_intf {
+export class Box implements BoxIntf {
     top_left: coord;
     bottom_right: coord;
-    constructor(box: Box_intf) {
+    constructor(box: BoxIntf) {
         this.top_left = box.top_left;
         this.bottom_right = box.bottom_right;
     }
@@ -93,6 +93,13 @@ export class HerdUnit implements HerdUnitIntf {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
+
+export type CGObject = {
+    name: string;
+    uuid: string;
+    created: Date;
+    modified: Date;
+}
 
 export interface ImageIntf {
     image_id: number;
@@ -179,7 +186,7 @@ export class Prediction implements PredictionIntf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Annotation_intf {
+export interface AnnotationIntf {
     annotation_id: number;
     label_id: number;
     image_id: number;
@@ -190,7 +197,7 @@ export interface Annotation_intf {
     uuid: string;
 }
 
-export class Annotation implements Annotation_intf {
+export class Annotation implements AnnotationIntf {
     annotation_id: number;
     label_id: number;
     image_id: number;
@@ -200,7 +207,7 @@ export class Annotation implements Annotation_intf {
     modified: Date;
     uuid: string;
 
-    constructor(annotation: Annotation_intf) {
+    constructor(annotation: AnnotationIntf) {
         this.annotation_id = annotation.annotation_id;
         this.label_id = annotation.label_id;
         this.image_id = annotation.image_id;
@@ -214,7 +221,7 @@ export class Annotation implements Annotation_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface ReviewedArea_intf {
+export interface ReviewedAreaIntf {
     reviewed_area_id: number;
     image_id: number;
     ra_key: string;
@@ -228,7 +235,7 @@ export interface ReviewedArea_intf {
     url: string;
 }
 
-export class ReviewedArea implements ReviewedArea_intf {
+export class ReviewedArea implements ReviewedAreaIntf {
     reviewed_area_id: number;
     image_id: number;
     ra_key: string;
@@ -241,7 +248,7 @@ export class ReviewedArea implements ReviewedArea_intf {
     uuid: string;
     url: string;
 
-    constructor(crop: ReviewedArea_intf) {
+    constructor(crop: ReviewedAreaIntf) {
 
         this.reviewed_area_id = crop.reviewed_area_id;
         this.ra_key = crop.ra_key;
@@ -259,7 +266,7 @@ export class ReviewedArea implements ReviewedArea_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface PredictionCrop_intf {
+export interface PredictionCropIntf {
     image_id: number;
     pred_id: number;
     name: string;
@@ -271,7 +278,7 @@ export interface PredictionCrop_intf {
     uuid: string;
 }
 
-export class PredictionCrop implements PredictionCrop_intf {
+export class PredictionCrop implements PredictionCropIntf {
     image_id: number;
     pred_id: number;
     name: string;
@@ -284,7 +291,7 @@ export class PredictionCrop implements PredictionCrop_intf {
     uuid: string;
     drawBox: boolean = false;
 
-    constructor(predcrop: PredictionCrop_intf, url: string) {
+    constructor(predcrop: PredictionCropIntf, url: string) {
         this.image_id = predcrop.image_id;
         this.pred_id = predcrop.pred_id;
         this.name = predcrop.name;
@@ -299,20 +306,20 @@ export class PredictionCrop implements PredictionCrop_intf {
 }
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Role_intf {
+export interface RoleIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 }
 
-export class Role implements Role_intf {
+export class Role implements RoleIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 
-    constructor(role: Role_intf) {
+    constructor(role: RoleIntf) {
         this.name = role.name;
         this.created = new Date(role.created);
         this.modified = new Date(role.modified);
@@ -322,7 +329,7 @@ export class Role implements Role_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface User_intf {
+export interface UserIntf {
     username: string;
     status: string;
     created: Date;
@@ -330,7 +337,7 @@ export interface User_intf {
     last_login: Date;
     locale: string;
     uuid: string;
-    roles: Role_intf[];
+    roles: RoleIntf[];
 }
 
 export class User {
@@ -343,7 +350,7 @@ export class User {
     roles: Role[];
     uuid: string;
 
-    constructor(usr: User_intf) {
+    constructor(usr: UserIntf) {
         this.username = usr.username;
         this.status = usr.status;
         this.created = new Date(usr.created);
@@ -360,7 +367,7 @@ export class User {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Organization_intf {
+export interface OrganizationIntf {
     name: string;
     created: Date;
     modified: Date;
@@ -368,14 +375,14 @@ export interface Organization_intf {
     uuid: string;
 }
 
-export class Organization implements Organization_intf {
+export class Organization implements OrganizationIntf {
     name: string;
     created: Date;
     modified: Date;
     logo_url: string | undefined;
     uuid: string;
 
-    constructor(Org: Organization_intf) {
+    constructor(Org: OrganizationIntf) {
         this.name = Org.name;
         this.created = new Date(Org.created);
         this.modified = new Date(Org.modified);
@@ -386,7 +393,7 @@ export class Organization implements Organization_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Project_intf {
+export interface ProjectIntf {
     project_id: number;
     name: string;
     created: Date;
@@ -394,14 +401,14 @@ export interface Project_intf {
     uuid: string;
 }
 
-export class Project implements Project_intf {
+export class Project implements ProjectIntf {
     project_id: number;
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 
-    constructor(Proj: Project_intf) {
+    constructor(Proj: ProjectIntf) {
         this.project_id = Proj.project_id;
         this.name = Proj.name;
         this.created = new Date(Proj.created);
@@ -412,20 +419,20 @@ export class Project implements Project_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Schema_intf {
+export interface SchemaIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 }
 
-export class Schema implements Schema_intf {
+export class Schema implements SchemaIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 
-    constructor(Schem: Schema_intf) {
+    constructor(Schem: SchemaIntf) {
         this.name = Schem.name;
         this.created = new Date(Schem.created);
         this.modified = new Date(Schem.modified);
@@ -435,7 +442,7 @@ export class Schema implements Schema_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Label_intf {
+export interface LabelIntf {
     label_id: number;
     label: number;
     name: string;
@@ -446,7 +453,7 @@ export interface Label_intf {
     uuid: string;
 }
 
-export class Label implements Label_intf {
+export class Label implements LabelIntf {
     label_id: number;
     label: number;
     name: string;
@@ -456,7 +463,7 @@ export class Label implements Label_intf {
     modified: Date;
     uuid: string;
 
-    constructor(lbl: Label_intf) {
+    constructor(lbl: LabelIntf) {
         this.label_id = lbl.label_id;
         this.label = lbl.label;
         this.name = lbl.name;
@@ -470,7 +477,8 @@ export class Label implements Label_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Survey_intf {
+export interface SurveyIntf {
+    survey_id: number
     survey_date: Date;
     name: string;
     additional_info: string;
@@ -479,7 +487,8 @@ export interface Survey_intf {
     uuid: string;
 }
 
-export class Survey implements Survey_intf {
+export class Survey implements SurveyIntf {
+    survey_id: number;
     survey_date: Date;
     name: string;
     additional_info: string;
@@ -487,7 +496,8 @@ export class Survey implements Survey_intf {
     modified: Date;
     uuid: string;
 
-    constructor(srvy: Survey_intf) {
+    constructor(srvy: SurveyIntf) {
+        this.survey_id = srvy.survey_id;
         this.survey_date = new Date(srvy.survey_date);
         this.name = srvy.name;
         this.additional_info = srvy.additional_info;
@@ -499,19 +509,19 @@ export class Survey implements Survey_intf {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface Model_intf {
+export interface ModelIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
 }
 
-export class Model implements Model_intf {
+export class Model implements ModelIntf {
     name: string;
     created: Date;
     modified: Date;
     uuid: string;
-    constructor(mdl: Model_intf) {
+    constructor(mdl: ModelIntf) {
         this.name = mdl.name;
         this.created = new Date(mdl.created);
         this.modified = new Date(mdl.modified);
