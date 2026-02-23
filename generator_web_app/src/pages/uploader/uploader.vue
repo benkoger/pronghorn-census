@@ -294,11 +294,9 @@ export default defineComponent({
 		this.cancel_upload_confirmation = true;
 	},
 	resume_upload() {
-		console.log('called')
 		if (this.resolve_cancel) {
 			this.resolve_cancel(false);
 			this.resolve_cancel = null;
-			console.log('resume')
 		}
 	},
 	cancel_upload() {

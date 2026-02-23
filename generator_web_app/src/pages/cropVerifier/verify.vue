@@ -390,7 +390,6 @@ export default defineComponent({
 										//@ts-ignore
 										cvs.currentBoxConfs[annot.uuid].fill = '';
 									}"
-									@click="console.log('clicked')"
 								>
 									<div class="d-flex flex-column">
 										<span

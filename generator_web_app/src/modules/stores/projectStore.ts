@@ -139,7 +139,6 @@ export const useProjectStore = defineStore('pStore', {
 				const idx = this.labels.indexOf(label)
 				if (this.label_idxs.includes(idx)) {
 					if (this.label_idxs.length > 1) {
-						console.log(idx);
 						this.label_idxs.splice(this.label_idxs.indexOf(idx), 1);
 					} else {
 						this.label_idxs = [];

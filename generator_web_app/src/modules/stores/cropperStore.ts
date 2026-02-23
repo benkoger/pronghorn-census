@@ -46,7 +46,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		},
 		CurrentPredictionCrops(state): PredictionCrop[] { return this.currentBatch?.predictionCrops[state.imageIdx] },
 		CurrentPredictionCrop(): PredictionCrop | undefined { 
-			if (this.CurrentPredictionCrop != undefined) {
+			if (this.CurrentPredictionCrops != undefined) {
 				return this.CurrentPredictionCrops[this.activePredIdx] 
 			}
 

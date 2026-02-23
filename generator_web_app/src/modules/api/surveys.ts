@@ -28,7 +28,6 @@ export async function getSurveyHerdUnits(survey_id: string): Promise<HerdUnit[] 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function createSurvey(project_id: number, herd_unit_id: number, name: string, survey_date: string, additional_info: string): Promise<Survey> {
-    console.log(survey_date)
     const response = await fetch(`${api_url}/surveys`, {
         method: 'POST',
         credentials: 'include',
