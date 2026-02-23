@@ -254,11 +254,10 @@ export default defineComponent({
 				});
 
 				this.current_file_part++;
-			
-			// Complete multipart upload
-			this.current_file_num++;
-			this.current_file_part = 0;
 			}
+		// Complete multipart upload
+		this.current_file_num++;
+		this.current_file_part = 0;
 		try {
 				await completeMultiPartUpload(
 					image_key,
@@ -275,7 +274,6 @@ export default defineComponent({
 					});
 				return;
 			}
-
 		}
 		// Upload process complete
 		this.current_file_num = 0;
