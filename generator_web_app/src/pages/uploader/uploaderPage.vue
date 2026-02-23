@@ -59,30 +59,50 @@ export default defineComponent({
 	},
 	watch: {
 		CurrentProject(newValue: Project, oldValue: Project) {
-			if(newValue != oldValue && newValue != undefined) {
-				this.pStore.clear_state();
-				this.pStore.get_project_children();
-				this.$router.push({name: 'upload', params: { projects: 'projects', uuid: newValue.uuid }})
+			const currentQuery = {...this.$route.query};
+			this.pStore.clear_state();
+			if (newValue !=oldValue && newValue != undefined) {
+				this.pStore.get_project_herd_units();
+				const newQuery = {
+					...currentQuery,
+					project: newValue.uuid,
+					model: undefined,
+					herd_unit: undefined,
+					survey: undefined,
+					labels: undefined,
+
+				};
+				this.$router.push({query: newQuery});
 			} else {
-				this.pStore.clear_state();
-				this.$router.push({name: 'upload'});
+
+				const newQuery = {
+					...currentQuery,
+					project: undefined,
+					model: undefined,
+					herd_unit: undefined,
+					survey: undefined,
+					labels: undefined,
+				};
+				this.$router.push({query: newQuery});
 			}
 		},
 		CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
 			const currentQuery = {...this.$route.query };
-			if(newValue != oldValue && newValue != undefined) {
+			this.pStore.clear_surveys();
+			if (newValue != oldValue && newValue != undefined) {
+				this.pStore.get_herd_unit_surveys();
 				const newQuery = {
 					...currentQuery,
 					herd_unit: newValue.uuid,
+					survey: undefined
 				};
 				this.$router.push({query: newQuery})
 			} else {
 				const newQuery = {
 					...currentQuery,
 					herd_unit: undefined,
-				}
-				this.pStore.labels = [];
-				this.pStore.label_idxs = [];
+					survey: undefined
+				};
 				this.$router.push({query: newQuery});
 			}
 		},
