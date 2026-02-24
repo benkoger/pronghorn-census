@@ -18,8 +18,6 @@ export default defineComponent({
       uStore.getBrowserPreference();
       uStore.first_login = false; 
     } else {
-      console.log('alive')
-      console.log(uStore.theme)
       uStore.setTheme(uStore.theme);
     } 
     return { uStore }
@@ -39,7 +37,7 @@ export default defineComponent({
       <main 
         class="d-flex flex-column overflow-y-auto p-4 bg-body"
         :style="{ 
-          height: '95vh',
+          height: '94vh',
           marginLeft: uStore.nav_toggled ? '12rem' : '4.5rem', 
           transition: 'margin-left 0.2s' 
         }"

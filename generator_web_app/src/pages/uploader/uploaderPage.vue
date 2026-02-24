@@ -4,12 +4,14 @@ import { useProjectStore } from '@/modules/stores/projectStore';
 import { Project, HerdUnit } from '@/types/generatorobjects';
 import { mapState } from 'pinia';
 import ProcessBreadCrumb  from '@/components/templates/ProcessBreadCrumb.vue';
+import SelectorList from '@/components/templates/SelectorList.vue';
 
 export default defineComponent({
 	name: "Uploader-Utility",
 	components: {
 		Upload: defineAsyncComponent(() => import('@/pages/uploader/uploader.vue')),
 		BreadCrumb: ProcessBreadCrumb,
+		SelectList: SelectorList
 	},
 	setup() {
 		const pStore = useProjectStore();
@@ -25,7 +27,6 @@ export default defineComponent({
 		return {
 			currentStep: 0,
 			steps: ['Project', 'Herd Unit', 'Survey', 'Upload'],
-			newHerdUnit: false,
 			newHerdUnitName: '',
 			newSurvey: false,
 			newSurveyName: '',
@@ -41,7 +42,6 @@ export default defineComponent({
 			}
 		),
 		canProceed() {
-			
 			switch(this.currentStep) {
 				case 0:
 					return this.CurrentProject !== undefined;
@@ -74,7 +74,6 @@ export default defineComponent({
 				};
 				this.$router.push({query: newQuery});
 			} else {
-
 				const newQuery = {
 					...currentQuery,
 					project: undefined,
@@ -108,28 +107,24 @@ export default defineComponent({
 		},
 	},
 	methods: {
-		toggleNewHerdUnit() {
-			if (this.CurrentHerdUnit) this.pStore.set_current_herd_unit(this.CurrentHerdUnit);
-			this.newHerdUnit = !this.newHerdUnit;
-			this.newHerdUnitName = '';
-		},
 		toggleNewSurvey() {
 			if (this.CurrentSurvey) this.pStore.set_current_survey(this.CurrentSurvey);
 			this.newSurvey = !this.newSurvey;
 		},
 		async submitNewHerdUnit() {
 			if (this.CurrentProject) {
-				await this.pStore.create_herd_unit(this.CurrentProject?.project_id, this.newHerdUnitName)
-				this.newHerdUnit = false;
+				await this.pStore.create_herd_unit(this.CurrentProject?.project_id, this.newHerdUnitName);
+				this.newHerdUnitName = '';
+				this.currentStep++;
 			}
-			
 		},
 		async submitNewSurvey() {
 			if (this.CurrentProject && this.CurrentHerdUnit) {
 				await this.pStore.create_survey(this.CurrentProject.project_id, this.CurrentHerdUnit.herd_unit_id,
 					this.newSurveyName, new Date(this.newSurveyDate).toISOString(), this.newSurveyAdditionalInfo
 				);
-				this.newSurvey = false;
+				this.newSurveyName, this.newSurveyDate, this.newSurveyAdditionalInfo = '', '', '';
+				this.currentStep++;
 			}
 		}
 	}
@@ -143,152 +138,49 @@ export default defineComponent({
 		:canContinue="canProceed"
 	>
 		<div v-if="currentStep === 0" class="d-flex flex-column">
-			<h3>Project Selection</h3>
 			<div class="flex-grow-1 overflow-y-auto">
-				<BListGroup>
-					<BListGroupItem
-						v-for="project in pStore.projects"
-						:key="project.uuid"
-						action
-						:active="CurrentProject?.uuid === project.uuid"
-						@click="pStore.set_current_project(project)"
-					>
-						<div class="d-flex justify-content-between align-items-flex-start flex-column">
-							<span class="mb-1 fw-bold">{{ project.name }}</span>
-							<div class="d-flex gap-4">
-								<small class="text-muted">Created: 
-									{{ project.created.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}
-								</small>
-								<small class="text-muted">Modified: 
-									{{ project.modified.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}</small>
-							</div>
-						</div>
-					</BListGroupItem>
-				</BListGroup> 
+				<SelectList 
+					:items="pStore.projects"
+					:active-item="CurrentProject"
+					:select-action="pStore.set_current_project"
+					list-name="Project"
+				/>
 			</div>
 		</div>
 		<div v-if="currentStep === 1" class="d-flex flex-column h-100">
-			<h3>Herd Unit Selection</h3>
 			<div class="flex-grow-1 overflow-y-auto">
-				<BListGroup>
-					<BListGroupItem
-						v-for="herd_unit in pStore.herd_units"
-						:key="herd_unit.uuid"
-						action
-						:active="CurrentHerdUnit?.uuid === herd_unit.uuid"
-						@click="pStore.set_current_herd_unit(herd_unit)"
-					>
-						<div class="d-flex justify-content-between align-items-flex-start flex-column">
-							<span class="mb-1 fw-bold">{{ herd_unit.name }}</span>
-							<div class="d-flex gap-4">
-								<small class="text-muted">Created: 
-									{{ herd_unit.created.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}
-								</small>
-								<small class="text-muted">Modified: 
-									{{ herd_unit.modified.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}</small>
-							</div>
-						</div>
-					</BListGroupItem>
-					<BListGroupItem v-if="newHerdUnit">
-						<BForm 
-							@submit.prevent="submitNewHerdUnit"
-							class="d-flex flex-row align-items-center flex-wrap"
-						>
-							<label class="visually-hidden" for="herd-unit-name">Name</label>
-							
-							<BFormInput
-								id="herd-unit-name"
-								placeholder="Name"
-								class="w-auto me-2"
-								required
-								v-model="newHerdUnitName"
-							></BFormInput>
-							<span class="text-info">A new herd unit will be created and
-								associated with the project: <strong>{{ CurrentProject?.name }}</strong>.
-							</span>
-							<BButton variant="outline-danger" class="ms-auto" @click="toggleNewHerdUnit()">Cancel</BButton>
-							<BButton type="submit" variant="primary" class="ms-3">Create</BButton>
-						</BForm>
-					</BListGroupItem>
-				</BListGroup>
-				<div class="d-flex justify-content-end">
-					<BButton
-						id="AddHerdUnit"
-						class="m-2"
-						variant="outline-primary"
-						@click="toggleNewHerdUnit()"
-					>
-						<Icon icon="material-symbols:add"/>
-					</BButton>
-				</div>
-				
+				<SelectList list-name="Herd Unit Selection" :select-action="pStore.set_current_herd_unit"
+					:items="pStore.herd_units" :active-item="CurrentHerdUnit"
+					allow-create :createAction="submitNewHerdUnit"
+				>
+					<label class="visually-hidden" for="herd-unit-name">Name</label>
+					<BFormInput
+						id="herd-unit-name"
+						placeholder="Name"
+						class="w-auto me-2"
+						required
+						v-model="newHerdUnitName"
+					></BFormInput>
+					<span class="text-info">A new herd unit will be created and
+						associated with the project: <strong>{{ CurrentProject?.name }}</strong>.
+					</span>
+				</SelectList>
 			</div>
 		</div>
 		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
-			<h3>Survey Selection</h3>
 			<div class="flex-grow-1 overflow-y-auto">
-				<BListGroup>
-					<BListGroupItem
-						v-for="survey in pStore.surveys"
-						:key="survey.uuid"
-						action
-						:active="CurrentSurvey?.uuid === survey.uuid"
-						@click="pStore.set_current_survey(survey)"
-					>
-						<div class="d-flex justify-content-between align-items-flex-start flex-column">
-							<span class="mb-1 fw-bold">{{ survey.name }}</span>
-							<div class="d-flex gap-4">
-								<small class="text-muted">Created: 
-									{{ survey.created.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}
-								</small>
-								<small class="text-muted">Modified: 
-									{{ survey.modified.toLocaleString('en-US', { 
-											year: 'numeric', 
-											month: 'numeric', 
-											day: 'numeric', 
-										}) 
-									}}</small>
-							</div>
-						</div>
-					</BListGroupItem>
-					<BListGroupItem v-if="newSurvey">
-						<BForm 
-							@submit.prevent="submitNewSurvey"
-							class="d-flex flex-row align-items-center flex-wrap"
-						>
-							<label class="visually-hidden" for="survey-name">Name</label>
+				<SelectList list-name="Survey Selection" :select-action="pStore.set_current_survey"
+					:items="pStore.surveys" :active-item="CurrentSurvey"
+					allow-create :create-action="submitNewSurvey"
+				>
+					<label class="visually-hidden" for="survey-name">Name</label>
 							<BFormInput
 								id="survey-name"
 								placeholder="name"
 								class="w-auto me-2"
 								required
 								v-model="newSurveyName"
-							></BFormInput>
+							/>
 							<label class="visually-hidden" for="survey-date">Survey Date</label>
 							<BFormInput
 								type="date"
@@ -296,30 +188,16 @@ export default defineComponent({
 								v-model="newSurveyDate"
 								required
 								class="w-auto m-2"
-							></BFormInput>
+							/>
 							<label class="visually-hidden" for="additional-info">Additional Info</label>
 							<BFormTextarea
 								id="additional-info"
 								placeholder="Additional Info"
 								v-model="newSurveyAdditionalInfo"
 								class="w-50 m-2"
-								required
-							></BFormTextarea>
-							<BButton variant="outline-danger" class="ms-auto" @click="toggleNewSurvey()">Cancel</BButton>
-							<BButton type="submit" variant="primary" class="ms-3">Create</BButton>
-						</BForm>
-					</BListGroupItem>
-				</BListGroup>
-				<div class="d-flex justify-content-end">
-					<BButton
-						id="AddHerdUnit"
-						class="m-2"
-						variant="outline-primary"
-						@click="toggleNewSurvey()"
-					>
-						<Icon icon="material-symbols:add"/>
-					</BButton>
-				</div>
+							/>
+				</SelectList>
+
 			</div>
 		</div>
 		<Upload v-if="currentStep === 3 " />

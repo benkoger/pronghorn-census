@@ -32,7 +32,7 @@ const router = createRouter({
       },
     },
     {
-      path: '/auto-cropper/:projects?/:uuid?',
+      path: '/auto-cropper/',
       name: 'auto-cropper',
       component: () => import('@/pages/autoCropper/autoCropperPage.vue'),
       meta: {
@@ -41,7 +41,7 @@ const router = createRouter({
       },
     },
     {
-      path: '/crop-verifier/:projects?/:uuid?',
+      path: '/crop-verifier/',
       name: 'crop-verifier',
       component: () => import('@/pages/cropVerifier/cropVerifierPage.vue'),
       meta: {
@@ -68,7 +68,7 @@ const router = createRouter({
       },
     },
     {
-      path: '/upload/:projects?/:uuid?',
+      path: '/upload/',
       name: 'upload',
       component: () => import('@/pages/uploader/uploaderPage.vue'),
       meta: {

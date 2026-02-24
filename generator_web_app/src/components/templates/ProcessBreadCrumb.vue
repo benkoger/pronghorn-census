@@ -55,6 +55,7 @@
 			<BButton
 				v-if="!isFirstStep" 
 				variant="outline-secondary" 
+				size="sm"
 				:disabled="modelValue === 0"
 				@click="updateStep(modelValue - 1)"
 			>
@@ -63,6 +64,7 @@
 			<BButton 
 				v-if="!isLastStep"
 				variant="primary" 
+				size="sm"
 				:disabled="!canContinue"
 				@click="updateStep(modelValue + 1)"
 			>
