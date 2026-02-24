@@ -9,6 +9,10 @@ import type { Ref } from 'vue';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+export interface remoteLink {
+    
+}
+
 export interface konvaBoxConf {
     width: number;
     height: number;

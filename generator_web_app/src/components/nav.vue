@@ -3,14 +3,12 @@ import { defineComponent } from 'vue';
 import { ref } from 'vue';
 import { Icon } from '@iconify/vue';
 import { useUserStore } from '@/modules/stores/userStore';
-import { usePreferenceStore } from '@/modules/stores/preferencesStore';
 
 export default defineComponent({
 	name: 'Nav',
 	setup() {
 		const uStore = useUserStore();
-		const pStore = usePreferenceStore();
-		return { uStore, pStore }
+		return { uStore }
 	}
 })
 </script>

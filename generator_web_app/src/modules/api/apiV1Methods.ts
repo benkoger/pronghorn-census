@@ -10,6 +10,7 @@ import {
 import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf, ReviewedAreaIntf, AnnotationIntf } from '@/types/generatorobjects.ts';
 import type { apiError } from '@/modules/api/errors.ts';
 
+
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
 export const api_url: URL = new URL(api_url_base);
