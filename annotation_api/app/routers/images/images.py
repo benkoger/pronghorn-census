@@ -7,7 +7,7 @@ from uuid import UUID
 
 from botocore.exceptions import ClientError
 from flask import Blueprint, abort, current_app, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
 
@@ -382,13 +382,31 @@ def update(body: UpdateImage, image_id: str):
 		image = base.update_image(UUID(image_id), body.model_dump())
 	except ValueError as e:
 		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
 	except (DatabaseError, Exception):
 		abort(500)
 
-	if image is None:
-		abort(404, 'Image not found')
-
 	return image.serialize(), 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.patch('/close-user-images')
+@login_required
+def close_user_images():
+	'''
+
+	'''
+	try:
+		base.close_user_images(current_user.user_id)
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
+	
+	return '', 204
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #DELETE

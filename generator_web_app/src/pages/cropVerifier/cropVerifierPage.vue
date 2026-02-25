@@ -205,12 +205,12 @@ export default defineComponent({
 			<BContainer fluid class="h-100">
 				<div class="d-flex flex-column w-100 bg-body-secondary p-2 rounded-3 shadow">
 					<h3>session settings</h3>
-					  	<BFormCheckbox
+						<BFormCheckbox
 							id="checkbox-1"
 							v-model="cvStore.already_reviewed"
 							name="checkbox-1"
-							value="accepted"
-							unchecked-value="not_accepted"
+							value="true"
+							unchecked-value="false"
 						>
 							Review crops that have already been approved
 						</BFormCheckbox>

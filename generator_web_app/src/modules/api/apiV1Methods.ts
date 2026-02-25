@@ -4,10 +4,10 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import {
-	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User, Schema,
-	Label, HerdUnit, Survey, Model, Annotation
+	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User,
+	Label, Annotation
 } from '@/types/generatorobjects.ts';
-import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf, ReviewedAreaIntf, AnnotationIntf } from '@/types/generatorobjects.ts';
+import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf } from '@/types/generatorobjects.ts';
 import type { apiError } from '@/modules/api/errors.ts';
 
 
@@ -219,30 +219,6 @@ export async function fetchPredCrops(image_id: string | undefined, survey_id: st
 	}
 }
 
-export async function closeImage(image_id: string): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/update/image/set-closed`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				'image_id': image_id,
-			}),
-		});
-		if (!response.ok) {
-			throw new Error(`${(await response.json() as apiError).message}`);
-		} else {
-			return true;
-		}
-	} catch (error: any) {
-		console.error("Error: ", error);
-
-		return false;
-	}
-}
-
 export async function setPredicionsReviewed(prediction_ids: string[]): Promise<boolean> {
 	try {
 		const response = await fetch(`${api_url}/update/predictions/set-reviewed`, {
@@ -295,58 +271,8 @@ export async function autoCrop(image_uuid: string, predictions: Prediction[], he
 	}
 }
 
-export async function closeCropSession(): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/end/crop_session`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		});
-		if (!response.ok) {
-			throw new Error(`${(await response.json() as apiError).message}`);
-		} else {
-			return true;
-		}
-
-	} catch (error: any) {
-		console.error("Error: ", error)
-
-		return false;
-	}
-
-}
-
 //---------------------------------------------------------------------------------------------------------------------------//
 // Area reviewing
-
-export async function fetchReviewedArea(herd_unit_id: string | undefined, survey_id: string | undefined, reviewed: boolean): Promise<ReviewedArea | undefined> {
-	try {
-		const response = await fetch(`${api_url}/create/reviewed-area-batch`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'herd_unit_id': herd_unit_id,
-				'survey_id': survey_id,
-				'reviewed': reviewed
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
-
-		const resp = await response.json();
-		let revieweArea = new ReviewedArea(resp as ReviewedAreaIntf);
-		return revieweArea as ReviewedArea;
-
-	} catch (error: any) {
-		console.error("Error: ", error)
-
-		return undefined;
-	}
-}
 
 export async function getReviewedAreaPresignedGetUrl(ra_key: string): Promise<string | undefined> {
 	try {

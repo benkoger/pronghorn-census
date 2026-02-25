@@ -7,8 +7,9 @@
 import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
 import { Annotation, Box, Label, ReviewedArea, type cropVerifierBatch, type tempRect } from '@/types/generatorobjects';
-import { fetchReviewedArea, getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl, closeCropSession, submitApprovedAreaAnnotations } from '@/modules/api/apiV1Methods';
-import { getReviewedArea } from '@/modules/api/verifier.ts';
+import { getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl } from '@/modules/api/apiV1Methods';
+import { closeUserImages } from '@/modules/api/images.ts';
+import { getReviewedArea, submitReviewedArea } from '@/modules/api/verifier.ts';
 import { useImage, type KonvaNodeConstructor } from 'vue-konva';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -79,6 +80,7 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
         //--------------------------------------------------------------------------------------//
         async bootStrap() {
             this.loading = true;
+            await closeUserImages();
             await this.getReviewedArea();
             await this.getAnnotations(this.activeCropId);
             this.loading = false;
@@ -189,14 +191,19 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
         async endSession() {
             this.$reset();
             this.bootStrapped = false;
-            await closeCropSession();
+            await closeUserImages();
         },
         //--------------------------------------------------------------------------------------//
         async submit() {
             if (this.loading) return;
+            if (this.currentCrop == undefined || this.currentImage == undefined) return;
             this.loading = true;
-            const transformedAnnotations = this.transformedAnnotations()
-            await submitApprovedAreaAnnotations(this.currentCrop, transformedAnnotations, this.deletedAnnotations)
+            await submitReviewedArea({
+                reviewed_area_id: this.currentCrop.reviewed_area_id,
+                image_id: this.currentCrop.image_id,
+                annotations: this.transformedAnnotations(),
+                deleted_annotations: this.deletedAnnotations
+            });
             this.loading = false;
             await this.nextImage();
         },
@@ -240,6 +247,7 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
             this.activeCropId = this.cropIds[this.cropIdx - 1];
 
             this.loading = false;
-        }
+        },
+        
     }
 })

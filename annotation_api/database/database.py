@@ -26,7 +26,7 @@ from cropgenerator.generatorobjects import (
 	Survey,
 	User,
 )
-import psycopg
+
 from psycopg import Cursor
 from psycopg.rows import class_row, dict_row
 import psycopg.sql as sql
@@ -2142,7 +2142,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _get_annotation_exists(self, cursor: Cursor, annotation_id: Annotation | int | UUID) -> bool:
+	def _get_annotation_exists(self, cursor: Cursor, annotation_id: int | UUID) -> bool:
 		'''
 
 		'''
@@ -2151,12 +2151,8 @@ class Database:
 		match annotation_id:
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('annotation_id')), (annotation_id,))
-			case Annotation():
-				cursor.execute(query.format(id_field = sql.Identifier('annotation_id')), (annotation_id.annotation_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (annotation_id,))
-			case _: 
-				raise TypeError('annotation_id must be of type int, Annotation or uuid')
 
 		result = cursor.fetchone()
 		
@@ -2165,7 +2161,7 @@ class Database:
 
 		return result[0]
 
-	def get_annotation_exists(self, anntoation_id: Annotation | int | UUID):
+	def get_annotation_exists(self, anntoation_id: int | UUID):
 		'''
 
 		'''
@@ -2174,7 +2170,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _update_annotation(self, cursor: Cursor, annotation_id: Annotation | int | UUID, label_id: int | None, image_id: int | None, 
+	def _update_annotation(self, cursor: Cursor, annotation_id: int | UUID, label_id: int | None, image_id: int | None, 
 		pred_id: int | None, herd_unit_id: int | None, box_tx: int | None, box_ty: int | None, box_bx: int | None,
 		box_by: int | None):
 		'''
@@ -2194,11 +2190,6 @@ class Database:
 		)
 
 		match annotation_id:
-			case Annotation():
-				cursor.execute(query.format(
-					augmented_field = sql.SQL(f""), # TODO: Complete this field
-					id_field = sql.Identifier('annotation_id')
-				), (annotation_id.annotation_id,))
 			case int():
 				cursor.execute(query.format(
 					augmented_field = kw_augmented_field,
@@ -2209,12 +2200,10 @@ class Database:
 					augmented_field = kw_augmented_field,
 					id_field = sql.Identifier('uuid')
 				), (annotation_id,))
-			case _:
-				raise TypeError('annotation_id must be an Annotation, int, or UUID')
 		
 		return True
 
-	def update_annotation(self, annotation_id: Annotation | int | UUID, label_id: int | None=None, image_id: int | None=None, 
+	def update_annotation(self, annotation_id: int | UUID, label_id: int | None=None, image_id: int | None=None, 
 		pred_id: int | None=None, herd_unit_id: int | None=None, box_tx: int | None=None, box_ty: int | None=None, box_bx: int | None=None,
 		box_by: int | None=None):
 		'''
@@ -3028,32 +3017,6 @@ class Database:
 		return self._get_auto_crop_batch(survey_id = survey_id, herd_unit_id = herd_unit_id, batch_size = batch_size, user_id = user_id, labels = labels, score = score, model_id = model_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-	# Functionality - Set image closed
-
-	@connect
-	def _close_image(self, cursor: Cursor, image_id: Image | int | UUID) -> bool:
-		'''
-		
-		'''
-		query = sql.SQL(' UPDATE core.images SET opened_by_user_id = 0 WHERE {id_field} = %s; ')
-		match image_id: 
-			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('image_id')), (image_id,))
-			case Image():
-				cursor.execute(query.format(id_field = sql.Identifier('image_id')), (image_id.image_id,))
-			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (image_id,))
-			case _:
-				raise TypeError('image_id must be of type Image, int, or UUID')
-		return True if cursor.rowcount > 0 else False
-
-	def close_image(self, image_id: Image | int | UUID) -> bool:
-		'''
-		
-		'''
-		return self._close_image(image_id = image_id)
-
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Delcare predictions as reviewed
 
 	@connect
@@ -3083,26 +3046,25 @@ class Database:
 	# Functionality - Close previously opened images
 
 	@connect
-	def _set_user_open_images_closed(self, cursor: Cursor, user_id: User | int | UUID) -> bool:
+	def _close_user_images(self, cursor: Cursor, user_id: int | UUID) -> bool:
 		'''
 		
 		'''
 		query = sql.SQL(' UPDATE core.images SET opened_by_user_id = 0 WHERE opened_by_user_id = %s; ')
 		match user_id:
-			case User():
-				cursor.execute(query, (user_id.user_id,))
 			case int():
 				cursor.execute(query, (user_id,))
 			case UUID():
 				user = self._get_user(user_id)
 				cursor.execute(query, (user.user_id,))
+
 		return True if cursor.rowcount > 0 else False
 	
-	def set_user_open_images_closed(self, user_id: User | int | UUID) -> bool:
+	def close_user_images(self, user_id: int | UUID) -> bool:
 		'''
 		
 		'''
-		return self._set_user_open_images_closed(user_id = user_id)
+		return self._close_user_images(user_id = user_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get Images by survey
@@ -3139,21 +3101,21 @@ class Database:
 	# Functionality - Get crops to review
 
 	@connect
-	def _get_crop_to_review(self, cursor: Cursor[ReviewedArea], parameters: dict, user: User) :
+	def _get_crop_to_review(self, cursor: Cursor[ReviewedArea], parameters: dict, user_id: int | UUID) :
 		''' Fetch a batch of reviewed areas that have yet to be reviewed.
 
 		'''
 		reviewed_area = self._get_reviewed_areas(cursor, parameters)[0]
 
-		self._update_image(cursor, reviewed_area.image_id, {'opened_by_user_id': user.user_id})
+		self._update_image(cursor, reviewed_area.image_id, {'opened_by_user_id': user_id})
 
 		return reviewed_area
 	
-	def get_crop_to_review(self, parameters: dict, user: User) -> ReviewedArea:
+	def get_crop_to_review(self, parameters: dict, user_id: int | UUID) -> ReviewedArea:
 		'''
 
 		'''
-		return self._get_crop_to_review(parameters, user)
+		return self._get_crop_to_review(parameters, user_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get annotations for crop 

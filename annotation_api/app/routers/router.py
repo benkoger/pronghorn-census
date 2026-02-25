@@ -227,16 +227,6 @@ def get_pred_crop(image_id: str, pred_crop_id: str):
 	_, encoded_img = cv2.imencode('.webp', crop)
 	return Response(encoded_img.tobytes(), mimetype='image/webp'), 201
 
-@bp.route('/api/v1/update/image/set-closed', methods=["POST"])
-@login_required
-def no_annotations():
-	'''
-	
-	'''
-	data = request.get_json()
-	res = base.close_image(UUID(data['image_id']))
-	return '', 201 if res  else abort(500, 'Update failed!')
-
 @bp.route('/api/v1/create/reviewed-area-and-annotations', methods=["PUT"])
 @login_required
 def create_reviewed_area_and_annotations():
@@ -304,7 +294,7 @@ def create_reviewed_area_and_annotations():
 			ContentType='image/jpeg'
 		)
 
-	res_3 = base.close_image(image)
+	res_3 = base.update_image(image.image_id, {'opened_by_user_id': 0})
 
 	return '', 201 if res_1 and res_3 else abort(500)
 
@@ -318,43 +308,6 @@ def mark_predictions_reviewed():
 	res = base.set_predictions_reviewed(ids, cast(User, current_user).user_id)
 
 	return '', 201 if res else abort(500)
-
-@bp.route('/api/v1/end/crop_session', methods=['POST'])
-@login_required
-def close_crop_session():
-	'''
-	
-	'''
-	try:
-		base.set_user_open_images_closed(current_user.user_id)
-	except Exception as e:
-		abort(500, e)
-	return '', 201 
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Crop Review
-# This route name is kinda bad, but it cant be called getRA because thats a different kind of endpoint 
-# @bp.route('/api/v1/create/reviewed-area-batch', methods=['POST'])
-# @login_required
-# def get_ra_batch():
-# 	'''
-
-# 	'''
-# 	data = request.get_json()
-# 	try:
-# 		ra = base.get_crop_to_review(
-# 				cast(User, current_user), 
-# 				UUID(data['survey_id']),
-# 				data['reviewed']
-# 			)
-# 	except Exception as e:
-# 		abort(404, str(e))
-
-# 	# set image open 
-# 	user_id = cast(User, current_user).user_id
-
-# 	base.update_image(ra.image_id, {'opened_by_user_id':user_id})
-# 	return ra.serialize(), 201
 
 @bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
 @login_required
@@ -383,82 +336,4 @@ def get_ra_annotations(reviewed_area_id: str):
 	annotations = base.get_crop_annotations(UUID(reviewed_area_id))
 	return [annot.serialize() for annot in annotations], 201
 
-@bp.route('/api/v1/update/reviewed-area/approve-annotations', methods=['POST', 'PUT'])
-@login_required
-def approve_annotations():
-	'''
-	
-	'''
-	data = request.get_json()
-	reviewed_area = data['reviewed_area']
-	res_1 = False
-	res_2 = False
-
-	# loop over incoming annotation data
-	for annot in data['annotations']:
-		res_i = False
-		# check if annotation in the database
-		if base.get_annotation_exists(UUID(annot['uuid'])):
-			
-			# TODO: check if annotation still inersects prediction in threshold
-			# update annotation
-			res_i = base.update_annotation(
-				annot['annotation_id'],
-				label_id=annot['label_id'],
-				box_tx=annot['dimensions']['top_left']['x'],
-				box_ty=annot['dimensions']['top_left']['y'],
-				box_bx=annot['dimensions']['bottom_right']['x'],
-				box_by=annot['dimensions']['bottom_right']['y'],	
-			)
-		# else
-		else:
-			# create annotation
-			res_i = base.create_annotation(
-				label_id = annot['label_id'],
-				image_id = annot['image_id'], 
-				herd_unit_id = annot['herd_unit_id'],
-				box_tx = annot['dimensions']['top_left']['x'],
-				box_ty = annot['dimensions']['top_left']['y'],
-				box_bx = annot['dimensions']['bottom_right']['x'],
-				box_by = annot['dimensions']['bottom_right']['y'],
-				user_id = cast(User, current_user),
-				uuid = annot['uuid']
-			)
-
-		if res_i == False:
-			abort(500, 'failed to make or update annotations')
-
-	# loop over deleted annotations
-	for annot in data['deleted_annotations']:
-		base.delete_annotation(annot['annotation_id'])
-
-	# set crop reviewed 
-	res_1 = base.update_reviewed_area(reviewed_area['reviewed_area_id'], reviewed_by_user_id = cast(User, current_user).user_id)
-
-	# set image closedp rout
-	res_2 = base.update_image(reviewed_area['image_id'], {'opened_by_user_id':0})
-
-	if res_1 == False or res_2 == False:
-		abort(500, 'failed to set image crop reviewed and image closed')
-
-	return '', 201
-
-
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Inference
-
-@bp.route('/api/v1/get/survey/<string:survey_id>/images/all', methods=['GET'])
-@login_required
-def get_survey_images(survey_id: str):
-	'''
-	
-	'''
-	try:
-		images = base.get_survey_images(UUID(survey_id))
-		serialized_images = [image.serialize() for image in images]
-	except Exception as e:
-		print(e)
-		abort(500, e)
-	return jsonify(serialized_images), 201
 
