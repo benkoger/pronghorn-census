@@ -10,18 +10,20 @@ from app.extensions import base, cache, login_manager, session_manager
 from config import s3_config
 from config import FlaskConfig, cache_config, s3_config
 
+#---------------------------------------------------------------------------------------------------------------------------#
+
 def create_app():
 	app = Flask(__name__)
 	app.config.from_object(FlaskConfig)
 
 	CORS(app, resources={
 		r'/api/*': {
-			'origins': [
-				app.config['ORIGIN_URL'],
-			],
+			'origins': app.config['ORIGIN_URLS'],
 			'supports_credentials': True     
 		}
 	})
+
+	# Register s3 service app wide
 	setattr(app, 's3', client(
         's3',
         config=s3_config,
@@ -36,26 +38,8 @@ def create_app():
 	app.errorhandler(HTTPException)(errors.handle_generic_http)
 	app.errorhandler(500)(errors.internal_service_error)
 
-	from app.routes import bp
+	from app.routers import bp
 	app.register_blueprint(bp)
-
-	from app.routers.projects import projectBp
-	app.register_blueprint(projectBp)
-
-	from app.routers.models import modelBp
-	app.register_blueprint(modelBp)
-
-	from app.routers.images import imageBp
-	app.register_blueprint(imageBp)
-
-	from app.routers.surveys import surveyBp
-	app.register_blueprint(surveyBp)
-
-	from app.routers.herdunits import herdunitBp
-	app.register_blueprint(herdunitBp)
-
-	from app.routers.schemas import schemaBp
-	app.register_blueprint(schemaBp)
 
 	return app
 

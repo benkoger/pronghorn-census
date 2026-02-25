@@ -8,8 +8,6 @@ import type { HerdUnitIntf, SurveyIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-
-
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function getHerdUnitSurveys(herd_unit_id: string): Promise<Survey[]> {

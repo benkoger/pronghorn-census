@@ -9,22 +9,37 @@
 
 from datetime import datetime
 import io
-from uuid import UUID
-import cv2
-from flask import Blueprint, Response, abort, jsonify, request, session, current_app
-from cropgenerator import auto_crop, create_subcrop
-from cropgenerator.generatorobjects import Prediction, User, ReviewedArea, Annotation
-from app.extensions import login_manager, cache, base, s3 
-from database import Database
 from typing import cast
-from flask_login import (
-	current_user,
-	login_required,
-	login_user,
-	logout_user,
-) 
+from uuid import UUID
+
+from cropgenerator import auto_crop, create_subcrop
+from cropgenerator.generatorobjects import Annotation, Prediction, ReviewedArea, User
+import cv2
+from flask import Blueprint, Response, abort, current_app, jsonify, request, session
+from flask_login import current_user, login_required, login_user, logout_user
+
+from app.extensions import base, cache, login_manager, s3
+from .herdunits import herdunitBp
+from .images import imageBp
+from .models import modelBp
+from .projects import projectBp
+from .schemas import schemaBp
+from .surveys import surveyBp
+from .cropverifier import verifierBp
+from .reviewedarea import raBp
+
+#---------------------------------------------------------------------------------------------------------------------------#
 
 bp = Blueprint('app', __name__)
+
+bp.register_blueprint(herdunitBp)
+bp.register_blueprint(imageBp)
+bp.register_blueprint(modelBp)
+bp.register_blueprint(projectBp)
+bp.register_blueprint(schemaBp)
+bp.register_blueprint(surveyBp)
+bp.register_blueprint(verifierBp)
+bp.register_blueprint(raBp)
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # User session management
@@ -92,9 +107,6 @@ def get_user_organizations():
 	return jsonify(serialized_organizations), 201 
 
 #---------------------------------------------------------------------------------------------------------------------------#
-# Role CRUD
-
-#---------------------------------------------------------------------------------------------------------------------------#
 # Project CRUD
 
 @bp.route('/api/v1/projects/create', methods = ['POST'])
@@ -118,84 +130,6 @@ def get_all_projects():
 	projects = base.get_user_projects(cast(User, current_user))
 	serialized_projects = [project.serialize() for project in projects] 
 	return jsonify(serialized_projects), 201
-
-# @bp.route('/app/v1/projects/update/<string:project_id>', methods = ['PUT'])
-# @login_required
-# def update_project(project_id: str):
-# 	pass
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Schema CRUD
-
-@bp.route('/api/v1/request/projects/<string:project_id>/schemas/all', methods=['GET'])
-@login_required
-def get_project_schemas(project_id: str):
-	schemas = base.get_project_schemas(UUID(project_id))
-	serialized_schemas = [schema.serialize() for schema in schemas] if schemas else None
-	return jsonify(serialized_schemas), 201
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Label CRUD
-
-# @bp.route('/app/v1/create/label')
-# @login_required
-# def create_label():
-# 	pass
-
-@bp.route('/api/v1/request/projects/<string:project_id>/schemas/<string:schema_id>/labels/all', methods=['GET'])
-@login_required
-def get_schema_labels(project_id: str, schema_id: str):
-	labels = base.get_schema_labels(UUID(schema_id))
-	serialized_labels = [label.serialize() for label in labels]
-	return jsonify(serialized_labels), 201
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Herd Unit Crud
-# TODO: move this endpoint to project router 
-@bp.route('/api/v1/request/projects/<string:project_id>/herd_units/all', methods=['GET'])
-@login_required
-def get_project_herdunits(project_id: str):
-	herd_units = base.get_project_herd_units(UUID(project_id))
-	serialized_herd_units = [herd_unit.serialize() for herd_unit in herd_units]
-	if serialized_herd_units is None:
-		abort(404, 'No Herd Units Found')
-	return jsonify(serialized_herd_units), 201
-
-# TODO: remove this enpdoint, replaced by /surveys/id/herd_unit in survey router
-@bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/all', methods=['GET'])
-@login_required
-def get_survey_herdunits(survey_id: str):
-	herd_units = base.get_cropping_herd_units(UUID(survey_id))
-	serialized_herd_units = [herd_unit.serialize() for herd_unit in herd_units] 
-	if serialized_herd_units is None:
-		abort(404, 'No Herd Units Found')
-	return jsonify(serialized_herd_units), 201
-	
-# TODO: move this endpoint to projects router
-
-
-# TODO: Move this endpoint to models router
-@bp.route('/api/v1/request/surveys/<string:survey_id>/herd_units/<string:herd_unit_id>/schemas/<string:schema_id>/models/all', methods=['GET'])
-@login_required
-def get_cropper_models(survey_id: str, herd_unit_id: str, schema_id: str):
-	models = base.get_cropping_models(UUID(survey_id), UUID(herd_unit_id), UUID(schema_id))
-	serialized_models = [model.serialize() for model in models]
-	if serialized_models is None:
-		abort(404, 'No Models Found')
-	return jsonify(serialized_models), 201
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Survey Crud
-
-#TODO: replace with get all surveys with query parameters
-@bp.route('/api/v1/request/projects/<string:project_id>/surveys/all', methods=['GET'])
-@login_required
-def get_project_surveys(project_id: str):
-	surveys = base.get_projects_surveys(UUID(project_id))
-	serialized_surveys = [survey.serialize() for survey in surveys]
-	if serialized_surveys is None:
-		abort(404)
-	return jsonify(serialized_surveys), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Prediction Crud
@@ -400,27 +334,27 @@ def close_crop_session():
 #---------------------------------------------------------------------------------------------------------------------------#
 # Crop Review
 # This route name is kinda bad, but it cant be called getRA because thats a different kind of endpoint 
-@bp.route('/api/v1/create/reviewed-area-batch', methods=['POST'])
-@login_required
-def get_ra_batch():
-	'''
+# @bp.route('/api/v1/create/reviewed-area-batch', methods=['POST'])
+# @login_required
+# def get_ra_batch():
+# 	'''
 
-	'''
-	data = request.get_json()
-	try:
-		ra = base.get_crop_to_review(
-				cast(User, current_user), 
-				UUID(data['survey_id']),
-				data['reviewed']
-			)
-	except Exception as e:
-		abort(404, str(e))
+# 	'''
+# 	data = request.get_json()
+# 	try:
+# 		ra = base.get_crop_to_review(
+# 				cast(User, current_user), 
+# 				UUID(data['survey_id']),
+# 				data['reviewed']
+# 			)
+# 	except Exception as e:
+# 		abort(404, str(e))
 
-	# set image open 
-	user_id = cast(User, current_user).user_id
+# 	# set image open 
+# 	user_id = cast(User, current_user).user_id
 
-	base.update_image(ra.image_id, {'opened_by_user_id':user_id})
-	return ra.serialize(), 201
+# 	base.update_image(ra.image_id, {'opened_by_user_id':user_id})
+# 	return ra.serialize(), 201
 
 @bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
 @login_required

@@ -125,18 +125,10 @@ def get_annotations(image_id: str):
 	---
 	parameters:
 		- name: image_id
-		in: path
-		type: string
-		required: true
-	responses:
-		200:
-			description: List of annotations.
-		400:
-			description: Invalid UUID format.
-		404:
-			description: No annotations found.
-		500:
-			description: Database error.
+		  in: path
+		  type: string
+		  required: true
+	
 	'''
 	try:
 		annotations = base.get_image_annotations(UUID(image_id))

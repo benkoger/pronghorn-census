@@ -6,8 +6,9 @@
 
 import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
-import { Annotation, Box, Label, ReviewedArea, type cropVerifierBatch, type konvaBoxConf, type tempRect } from '@/types/generatorobjects';
+import { Annotation, Box, Label, ReviewedArea, type cropVerifierBatch, type tempRect } from '@/types/generatorobjects';
 import { fetchReviewedArea, getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl, closeCropSession, submitApprovedAreaAnnotations } from '@/modules/api/apiV1Methods';
+import { getReviewedArea } from '@/modules/api/verifier.ts';
 import { useImage, type KonvaNodeConstructor } from 'vue-konva';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -43,7 +44,13 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
     },
     actions: {
         async getReviewedArea(increment: boolean = true) {
-            const resp = await fetchReviewedArea(pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, this.already_reviewed);
+            if (pStore.CurrentHerdUnit === undefined || pStore.CurrentSurvey === undefined) return;
+			console.log('here')
+            const resp = await getReviewedArea({
+                'herd_unit_id': [pStore.CurrentHerdUnit.herd_unit_id], 
+                'survey_id': [pStore.CurrentSurvey.survey_id], 
+                'include_reviewed': this.already_reviewed
+            });
             const image = await this.getReviewedAreaImage(resp)
             if (image == undefined) return;
             if (resp == undefined) return;
