@@ -18,9 +18,10 @@ export async function checkAuth(): Promise<boolean> {
 		},
 		credentials: 'include',
 	});
-	if (!response.ok) throw new ApiError(await response.json());
+	if (response.status == 401) return false;
+	if (!response.ok) {throw new ApiError(await response.json());}
 
-	else return true;
+	return true;
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//

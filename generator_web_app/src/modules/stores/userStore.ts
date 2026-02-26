@@ -5,9 +5,8 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, deauthUser } from '@/modules/api/user';
+import { authUser, checkAuth, getCurrentUser, deauthUser } from '@/modules/api/users';
 import { User, Organization } from '@/types/generatorobjects.ts';
-import { ref } from 'vue'
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
