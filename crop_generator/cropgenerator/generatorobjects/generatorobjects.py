@@ -21,7 +21,7 @@ from typing import Optional, List
 
 class CgOBJ(ABC):
 	@abstractmethod
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		pass
 	
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -38,7 +38,7 @@ class Project(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'project_id': self.project_id,
 			'name': self.name,
@@ -58,7 +58,7 @@ class Schema(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'schema_id': self.schema_id,
 			'name': self.name,
@@ -82,7 +82,7 @@ class Label(CgOBJ):
 	color: str
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'label_id': self.label_id,
 			'label': self.label,
@@ -105,7 +105,7 @@ class HerdUnit(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'herd_unit_id': self.herd_unit_id,
 			'name': self.name,
@@ -126,7 +126,7 @@ class Model(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'model_id': self.model_id,
 			'schema_id': self.schema_id,
@@ -149,7 +149,7 @@ class Survey(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'survey_id': self.survey_id,
 			'survey_date': self.survey_date,
@@ -171,7 +171,7 @@ class Role(CgOBJ):
 	modified: datetime
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'role_id': self.role_id,
 			'name': self.name,
@@ -189,7 +189,7 @@ class Organization(CgOBJ):
 	logo_url: str | None
 	uuid: UUID
 
-	def serialize(self):
+	def to_dict(self):
 		return {
 			'organization_id': self.organization_id,
 			'name': self.name,
@@ -224,17 +224,25 @@ class User(UserMixin, CgOBJ):
 		else:
 			return False
 
-	def serialize(self):
+	def to_dict(self):
+		fmt = lambda dt: dt.strftime('%Y-%m-%d %H:%M:%S%z') if dt else None
 		return {
 			'user_id': self.user_id,
 			'username': self.username,
 			'status': self.status,
-			'created': self.created,
-			'modified': self.modified,
-			'last_login': self.last_login,
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'last_login': fmt(self.last_login),
 			'locale': self.locale,
 			'uuid': self.id,
 			'roles': self.roles
+		}
+
+	def to_cache(self):
+		return {
+			**self.to_dict(),
+			'external_auth_id': self.external_auth_id,
+			'external_auth_provider': self.external_auth_provider,
 		}
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -284,7 +292,7 @@ class Box(CgOBJ):
 		# Calculate the IoU:
 		return intersection/union
 	
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'top_left': {'x': self.top_left[0], 'y': self.top_left[1]},
 			'bottom_right': {'x': self.bottom_right[0], 'y': self.bottom_right[1]},
@@ -349,7 +357,7 @@ class Image(CgOBJ):
 			raise Exception(f'{self.name} has no image data')
 		return self.img_encoded.tobytes()
 		
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'image_id': self.image_id,
 			'herd_unit_id': self.herd_unit_id,
@@ -378,12 +386,12 @@ class Prediction(CgOBJ):
 		self.created = created 
 		self.uuid = uuid
 	
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'pred_id': self.pred_id,
 			'image_id': self.image_id,
 			'model_id': self.model_id,
-			'dimensions': self.dimensions.serialize(),
+			'dimensions': self.dimensions.to_dict(),
 			'score': self.score,
 			'label': self.label,
 			'created': self.created,
@@ -406,13 +414,13 @@ class Annotation(CgOBJ):
 		self.modified = modified
 		self.uuid = uuid
 	
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'annotation_id': self.annotation_id,
 			'label_id': self.label_id,
 			'image_id': self.image_id,
 			'herd_unit_id': self.herd_unit_id,
-			'dimensions': self.dimensions.serialize(),
+			'dimensions': self.dimensions.to_dict(),
 			'created': self.created,
 			'modified': self.modified,
 			'uuid': self.uuid
@@ -437,12 +445,12 @@ class ReviewedArea(Image):
 		self.uuid = uuid
 		self.ra_key = ra_key
 
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'reviewed_area_id': self.reviewed_area_id,
 			'image_id': self.image_id,
 			'name': self.name,
-			'dimensions': self.dimensions.serialize(),
+			'dimensions': self.dimensions.to_dict(),
 			'created': self.created,
 			'modified': self.modified,
 			'reviewed_area_length_px': self.reviewed_area_length_px,
@@ -464,15 +472,15 @@ class PredictionCrop(Image):
 		self.approved = False
 		self.uuid = uuid
 	
-	def serialize(self) -> dict:
+	def to_dict(self) -> dict:
 		return {
 			'image_id': self.image_id,
 			'pred_id': self.pred_id,
 			'name': self.name,
 			'score': self.score,
 			'label': self.label,
-			'dimensions': self.dimensions.serialize(),
-			'boundingBox': self.boundingBox.serialize(),
+			'dimensions': self.dimensions.to_dict(),
+			'boundingBox': self.boundingBox.to_dict(),
 			'approved': self.approved,
 			'uuid': self.uuid,
 		}
@@ -481,7 +489,7 @@ class PredictionCrop(Image):
 class CropgenJSONPRovider(JSONProvider):
 	def default(self, obj):
 		if isinstance(obj, CgOBJ):
-			return obj.serialize()
+			return obj.to_dict()
 		raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 

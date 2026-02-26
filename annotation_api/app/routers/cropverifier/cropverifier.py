@@ -57,9 +57,10 @@ def get(query: RAQuery):
 
 	print(reviewed_areas)
 
-	return reviewed_areas.serialize(), 200
+	return reviewed_areas.to_dict(), 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
+# PUT
 
 @verifierBp.put('/submit')
 @login_required

@@ -42,7 +42,7 @@ def get_by_id(survey_id: str):
 	if survey is None:
 		abort(404, f'survey with ID{survey_id} was not found')
 	else:
-		return survey.serialize()
+		return survey.to_dict()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -56,7 +56,7 @@ def get_annotations(survey_id: str):
 	if len(annotations) == 0:
 		abort(404, f'no annotaitons found for survey {survey_id}')
 	
-	return [annotation.serialize() for annotation in annotations], 200
+	return [annotation.to_dict() for annotation in annotations], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -71,7 +71,7 @@ def get_herd_units(survey_id: str):
 	if len(herd_units) == 0:
 		abort(404, f'no herd units found for survey {survey_id}')
 
-	return [herd_unit.serialize() for herd_unit in herd_units]
+	return [herd_unit.to_dict() for herd_unit in herd_units]
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -118,7 +118,7 @@ def create(body: CreateSurvey):
 	except Exception as e: 
 		abort(500)
 
-	return survey.serialize(), 201
+	return survey.to_dict(), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # PUT
@@ -138,7 +138,7 @@ def update(body: UpdateSurvey, survey_id: str):
 	except Exception as e:
 		abort(500)
 
-	return survey.serialize(), 200
+	return survey.to_dict(), 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Delete

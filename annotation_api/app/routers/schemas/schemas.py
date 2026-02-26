@@ -48,6 +48,6 @@ def get_crops(schema_id: str):
 		print(e)
 		abort(500)
 
-	return [label.serialize() for label in labels], 200
+	return [label.to_dict() for label in labels], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#

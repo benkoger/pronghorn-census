@@ -18,47 +18,38 @@ export const api_url: URL = new URL(api_url_base);
 //---------------------------------------------------------------------------------------------------------------------------//
 // User authentication
 export async function authUser(external_id: string): Promise<User | undefined> {
-	try {
-		const response = await fetch(`${api_url}/authenticate`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'external-id': external_id
-			}),
-			credentials: 'include',
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const user = new User(await response.json() as UserIntf);
-		return user;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
+	const response = await fetch(`${api_url}/users/authenticate`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			'external_id': external_id
+		}),
+		credentials: 'include',
+	});
+	if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
+
+	return new User(await response.json() as UserIntf);
+	
 }
 
 export async function checkAuth(): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/check_auth`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		});
-		if (response.status == 401) return false;
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		else return true;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return false;
-	}
+	const response = await fetch(`${api_url}/users/check-auth`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		credentials: 'include',
+	});
+	if (response.status == 401) return false;
+	if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
+	else return true;
 }
 
 export async function getCurrentUser(): Promise<User | undefined> {
 	try {
-		const response = await fetch(`${api_url}/users/getCurrentUser`, {
+		const response = await fetch(`${api_url}/users/get-current-user`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',

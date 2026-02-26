@@ -7,9 +7,10 @@
 import { defineStore } from 'pinia';
 import { useProjectStore } from '@/modules/stores/projectStore';
 import { Annotation, Box, Label, ReviewedArea, type cropVerifierBatch, type tempRect } from '@/types/generatorobjects';
-import { getReviewedAreaAnnotations, getReviewedAreaPresignedGetUrl } from '@/modules/api/apiV1Methods';
+import { getReviewedAreaAnnotations } from '@/modules/api/apiV1Methods';
 import { closeUserImages } from '@/modules/api/images.ts';
-import { getReviewedArea, submitReviewedArea } from '@/modules/api/verifier.ts';
+import { getReviewedArea, submitReviewedArea,  } from '@/modules/api/verifier.ts';
+import { getRAPresignedUrl } from '@/modules/api/reviewedarea.ts';
 import { useImage, type KonvaNodeConstructor } from 'vue-konva';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -72,7 +73,7 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
         //--------------------------------------------------------------------------------------//
         async getReviewedAreaImage(crop: ReviewedArea | undefined) {
             if (crop == undefined) return;
-            const resp = await getReviewedAreaPresignedGetUrl(crop.ra_key);
+            const resp = await getRAPresignedUrl(crop.ra_key);
             if (resp == undefined) return;
             crop.url = resp;
             return await useImage(resp);

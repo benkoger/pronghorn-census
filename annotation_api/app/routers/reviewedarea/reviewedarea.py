@@ -55,7 +55,42 @@ def get(query: RAQuery):
 
 	print(reviewed_areas)
 
-	return [ra.serialize() for ra in reviewed_areas]
+	return [ra.to_dict() for ra in reviewed_areas]
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#---------------------------------------------------------------------------------------------------------------------------#
+# POST
 
+@raBp.post('/presigned-get-url')
+@login_required
+def create_ra_presigned_get():
+	'''
+	Generate a presigned GET URL for a reviewed area.
+	---
+	responses:
+		201:
+			description: Presigned URL generated.
+		400:
+			description: Invalid ID format.
+		404:
+			description: Image record not found.
+		500:
+			description: Storage or database error.
+	'''
+	data = request.get_json()
+	try:
+		response = s3.generate_presigned_url(
+			'get_object',
+			Params={'Bucket': current_app.config['BUCKET_NAME'],
+					'Key': data['ra_key']
+			},
+			ExpiresIn=3600,
+		)
+	except ValueError as e:
+		abort(400, str(e))
+	except ClientError as e:
+		status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', 500)
+		abort(status, e.response.get('Error', {}).get('Message'))
+	except (DatabaseError, Exception):
+		abort(500)
+		
+	return response, 201

@@ -35,3 +35,21 @@ export async function getReviewedAreas(options: getReviewedAreasOptions): Promis
     for (const reviewed_area of resp) reviewed_areas.push(new ReviewedArea(reviewed_area as ReviewedAreaIntf));
     return reviewed_areas;
 }   
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
+export async function getRAPresignedUrl(ra_key: string): Promise<string> {
+    const response = await fetch(`${api_url}/reviewed-area/presigned-get-url`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            'ra_key': ra_key
+        }),
+    });
+    if (!response.ok) throw new ApiError(await response.json());
+
+    return await response.text();
+}

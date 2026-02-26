@@ -1,9 +1,6 @@
-# Attempt at RESTful CRUD app for crop generator and census server
-# Based on https://https://www.digitalocean.com/community/tutorials/create-a-rest-app-using-flask-on-ubuntu 
-# because I have never done this before
+# Core router for the API
 # Author: Michael B. Lance
-# Created: April 7, 2025
-# Updated: January 29, 2025
+
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -16,7 +13,7 @@ from cropgenerator import auto_crop, create_subcrop
 from cropgenerator.generatorobjects import Annotation, Prediction, ReviewedArea, User
 import cv2
 from flask import Blueprint, Response, abort, current_app, jsonify, request, session
-from flask_login import current_user, login_required, login_user, logout_user
+from flask_login import current_user, login_required
 
 from app.extensions import base, cache, login_manager, s3
 from .herdunits import herdunitBp
@@ -27,6 +24,7 @@ from .schemas import schemaBp
 from .surveys import surveyBp
 from .cropverifier import verifierBp
 from .reviewedarea import raBp
+from .users import userBp
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -40,71 +38,7 @@ bp.register_blueprint(schemaBp)
 bp.register_blueprint(surveyBp)
 bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# User session management
-
-@login_manager.user_loader
-def load_user(session_user_id):
-	user = base.get_user(UUID(session_user_id))
-	return user 
-
-@login_manager.unauthorized_handler
-def unathorizated_callback():
-	abort(401, 'unathorized, are you logged in? Should you be accessing this?')
-
-@bp.route('/api/v1/authenticate', methods=['POST'])
-def authenticate():
-	'''
-	'''
-	req_data = request.get_json()
-	if not req_data or 'external-id' not in req_data:
-		abort(400, 'malformed request')
-	try:
-		user = base.get_user(req_data['external-id'])
-		print(user.username)
-	except Exception as e:
-		abort(401, str(e))
-	else:
-		login_user(user)
-		if not user.last_login:
-			user.last_login = base.login_user(user)
-		else:
-			base.login_user(user)
-		return user.serialize(), 201
-
-@bp.route('/api/v1/check_auth', methods=["GET"])
-@login_required
-def check_auth():
-	return Response('true'), 201
-
-@bp.route('/api/v1/users/getCurrentUser', methods = ['GET'])
-@login_required
-def getCurrentUser():
-	try:
-		user = base.get_user(UUID(current_user.id))
-	except Exception:
-		abort(500)
-	return cast(User, user).serialize(), 201
-@bp.route('/api/v1/deauthenticate', methods=["POST"])
-@login_required
-def logout():
-	logout_user()
-	return '', 200
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# # Organization CRUD
-# @bp.route('/app/v1/create/organization')
-# @login_required
-# def create_organization():
-# 	pass
-
-@bp.route('/api/v1/request/organizations/all')
-@login_required
-def get_user_organizations():
-	organizations = base.get_user_organizations(cast(User, current_user))
-	serialized_organizations = [organization.serialize() for organization in organizations] if organizations else None
-	return jsonify(serialized_organizations), 201 
+bp.register_blueprint(userBp)
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Project CRUD
@@ -114,7 +48,7 @@ def get_user_organizations():
 def create_project():
 	data = request.get_json()
 	project = base.create_project(name = data['name'],)
-	return project.serialize(), 201 
+	return project.to_dict(), 201 
 
 @bp.route('/api/v1/projects/request/<string:project_id>', methods=['GET'])
 @login_required
@@ -122,14 +56,14 @@ def get_project(project_id: str):
 	project = base.get_project(project_id = UUID(project_id))
 	if not project:
 		abort(404, 'project not found')
-	return project.serialize()
+	return project.to_dict()
 	
 @bp.route('/api/v1/request/projects/all')
 @login_required
 def get_all_projects():
 	projects = base.get_user_projects(cast(User, current_user))
-	serialized_projects = [project.serialize() for project in projects] 
-	return jsonify(serialized_projects), 201
+	to_dictd_projects = [project.to_dict() for project in projects] 
+	return jsonify(to_dictd_projects), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Prediction Crud
@@ -153,7 +87,7 @@ def create_prediction():
 	)
 	if prediction is None:
 		abort(500)
-	return prediction.serialize(), 201
+	return prediction.to_dict(), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Auto Cropping
@@ -201,18 +135,18 @@ def create_prediction_crops():
 
 	image.set_image(img_data)
 	pred_crops = create_subcrop(image, data['predictions'])
-	serialized_pred_crops = [] 
+	to_dictd_pred_crops = [] 
 
 	for crop in pred_crops: # Save crop image data into the session cache
 		cache.set(crop.uuid,  crop.get_image(), 3600)
-		serialized_pred_crops.append(crop.serialize())
+		to_dictd_pred_crops.append(crop.to_dict())
 	
-	json_pred_crop_data = jsonify(serialized_pred_crops)
+	json_pred_crop_data = jsonify(to_dictd_pred_crops)
 	
 	if 'pred_crop_data' not in session:
 		session['pred_crop_data'] = []
 	
-	session['pred_crop_data'] + serialized_pred_crops #type: ignore
+	session['pred_crop_data'] + to_dictd_pred_crops #type: ignore
 	return json_pred_crop_data, 201
 
 @bp.route('/api/v1/request/image/<string:image_id>/pred_crop/<string:pred_crop_id>', methods=['GET'])
@@ -309,31 +243,12 @@ def mark_predictions_reviewed():
 
 	return '', 201 if res else abort(500)
 
-@bp.route('/api/v1/create/reviewed-area/presigned-get-url', methods=['POST'])
-@login_required
-def create_ra_presigned_get():
-	'''
-	'''
-	data = request.get_json()
-	try:
-		response = s3.generate_presigned_url(
-			'get_object',
-			Params={'Bucket': current_app.config['BUCKET_NAME'],
-					'Key': data['ra_key']
-			},
-			ExpiresIn=3600,
-		)
-	except Exception as e:
-		print(e)
-		abort(500)
-	return jsonify(response), 201
-
 @bp.route('/api/v1/get/reviewed-area/<string:reviewed_area_id>/annotations', methods=['GET'])
 @login_required
 def get_ra_annotations(reviewed_area_id: str):
 	'''
 	'''
 	annotations = base.get_crop_annotations(UUID(reviewed_area_id))
-	return [annot.serialize() for annot in annotations], 201
+	return [annot.to_dict() for annot in annotations], 201
 
 

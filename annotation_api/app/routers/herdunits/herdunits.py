@@ -43,7 +43,7 @@ def get_by_id(herd_unit_id: str):
 		abort(404, f'Herd Unit with ID {herd_unit_id} was not found!')
 		
 	else:
-		return herd_unit.serialize()
+		return herd_unit.to_dict()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -79,7 +79,7 @@ def get_surveys(herd_unit_id: str):
 	except (DatabaseError, Exception) as e:
 		abort(500)
 
-	return [survey.serialize() for survey in surveys], 200
+	return [survey.to_dict() for survey in surveys], 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
@@ -97,4 +97,4 @@ def create(body: CreateHerdUnit):
 		print(e)
 		abort(500)
 
-	return herd_unit.serialize(), 201
+	return herd_unit.to_dict(), 201
