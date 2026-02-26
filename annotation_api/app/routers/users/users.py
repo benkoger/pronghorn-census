@@ -13,9 +13,8 @@ from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
 
-from annotation_api.database.errors import ObjectNotFound
 from app.extensions import base, cache, login_manager
-from database import AuthorizationFailure, UserNotFound
+from database import AuthorizationFailure, UserNotFound, ObjectNotFound
 
 from .user_validators import *
 
