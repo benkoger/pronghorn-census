@@ -33,9 +33,7 @@ export default defineComponent({
 		<Icon icon="mynaui:bounding-box-solid" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3">Verify</span>
 	</BNavItem>
-	<BNavItem to="/upload" :active="$route.path.startsWith('/upload')"
-		v-if="uStore.user?.roles.find((role) => role.name == 'admin')"
-	>
+	<BNavItem to="/upload" :active="$route.path.startsWith('/upload')">
 		<Icon icon="material-symbols:upload" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3">Upload</span>
 	</BNavItem>
