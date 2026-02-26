@@ -55,8 +55,6 @@ def get(query: RAQuery):
 		print(e)
 		abort(404, str(e))
 
-	print(reviewed_areas)
-
 	return reviewed_areas.to_dict(), 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
