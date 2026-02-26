@@ -5,19 +5,19 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort, current_app, request, Response
+from cropgenerator.generatorobjects import User
+from flask import Blueprint, abort
 from flask_login import current_user, login_required
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
+from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
 
-from cropgenerator.generatorobjects import User
-
+from annotation_api.database.errors import ObjectNotFound
 from app.extensions import base, cache, login_manager
 from database import AuthorizationFailure, UserNotFound
 
 from .user_validators import *
-from msgpack import unpackb, packb
 
 userBp = Blueprint('users', __name__, url_prefix='/api/v1/users')
 
@@ -36,6 +36,8 @@ def load(session_user_id: str):
 		cache.set(user_key, packb(user_obj.to_cache()), timeout=3600)
 	except UserNotFound as e:
 		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
 	
 	return user_obj
 
@@ -51,15 +53,40 @@ def unathorizated_callback():
 def check_auth():
 	return 'true', 201
 
-@userBp.route('/get-current-user', methods = ['GET'])
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@userBp.get('/current-user')
 @login_required
-def getCurrentUser():
+def get_current_user():
 	try:
 		user = base.get_user(UUID(current_user.id))
-	except Exception:
+	except UserNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
 		abort(500)
+
 	return user.to_dict(), 201
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@userBp.get('/has-role')
+@login_required
+@validate()
+def check_role(query: RoleQuery):
+	'''
+	'''
+	role_id = UUID(query.role_id) if isinstance(query.role_id, str) else query.role_id
+	try:
+		role = base.get_role(role_id)
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
+
+	if role in current_user.roles:
+		return 'true', 200
+	else:
+		return 'false'
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
@@ -78,6 +105,8 @@ def authenticate(body: Authenticate):
 		login_user(user)
 		
 		return user.to_dict(), 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @userBp.post('/deauthenticate')
 @login_required

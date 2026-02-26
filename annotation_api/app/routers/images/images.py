@@ -215,7 +215,7 @@ def create_presigned_get():
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @imageBp.post('/presigned-put-url')
-@roles_required('admin')
+# @roles_required('admin')
 @validate()
 @login_required
 def create_chunk_presigned_put(body: CreatePresignedPut):

@@ -5,7 +5,7 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, getUserOrganizations, deauthUser } from '../api/apiV1Methods.ts';
+import { authUser, checkAuth, getCurrentUser, deauthUser } from '@/modules/api/user';
 import { User, Organization } from '@/types/generatorobjects.ts';
 import { ref } from 'vue'
 
@@ -45,9 +45,6 @@ export const useUserStore = defineStore('userStore', {
         },
         async check_auth() {
             this.logged_in = (await checkAuth()) ? true : false;
-        },
-        async get_user_organizations() {
-            this.organizations = await getUserOrganizations();
         },
         toggle_nav(value: boolean) {
             this.nav_toggled = value;

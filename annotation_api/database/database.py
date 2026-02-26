@@ -254,7 +254,7 @@ class Database:
 		role = cursor.fetchone()
 		return role
 	
-	def create_role(self, name: str) -> Role | None:
+	def create_role(self, name: str) -> Role:
 		''' Insert a new role object into the database
 
 		Args:
@@ -265,37 +265,30 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_role(self, cursor: Cursor[Role], role_ids: int | UUID | str | list[int | UUID | str]) -> Role | list[Role] | None:
+	def _get_role(self, cursor: Cursor[Role], role_id: int | UUID  ) -> Role:
 		''' Internal helper function, do not call directly
 		
 		'''
 		cursor.row_factory = class_row(Role)
 		query = sql.SQL(' SELECT * FROM usermanagement.roles WHERE {id_field} = %s; ')
-		match role_ids:
-			case list() if isinstance(role_ids[0], int):
-				cursor.executemany(query.format(id_field = sql.Identifier('role_id')), [(role_id,) for role_id in role_ids])
-			case list() if isinstance(role_ids[0], UUID):
-				cursor.executemany(query.format(id_field = sql.Identifier('uuid')), [(role_id,) for role_id in role_ids])
-			case list() if isinstance(role_ids[0], str):
-				cursor.executemany(query.format(id_field = sql.Identifier('name')), [(role_id,) for role_id in role_ids])
+		match role_id:
 			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('role_id')), (role_ids,))
+				cursor.execute(query.format(id_field = sql.Identifier('role_id')), (role_id,))
 			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (role_ids,))
-			case str():
-				cursor.execute(query.format(id_field = sql.Identifier('name')), (role_ids,))
-			case _:
-				raise TypeError('role_id must be a Role, int, uuid, string, or a list consisting of ONE of the three')
-		roles = cursor.fetchall() 
-		return roles if cursor.rowcount > 1 else roles[0] 
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (role_id,))
+		
+		role = cursor.fetchone() 
 
-	def get_role(self, role_ids: int | UUID) -> Role | None:
-		''' Request a role, or roles object(s) from the database
+		if not role:
+			raise ObjectNotFound('Role', role_id)
 
-		Args:
-			role_ids: an integer, uuid, or role name, or a list consisting entirely of one of those 3 types
+		return role
+
+	def get_role(self, role_id: int | UUID) -> Role | None:
+		''' 
+
 		'''
-		return self._get_role(role_ids = role_ids)
+		return self._get_role(role_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
