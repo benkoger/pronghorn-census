@@ -2347,7 +2347,7 @@ class Database:
 
 		cursor.row_factory = class_row(ReviewedArea)
 		cursor.execute(query.format(parameter_field = query_params), placeholders)
-
+ 
 		return cursor.fetchall()
 		
 
@@ -2951,21 +2951,37 @@ class Database:
 	# Functionality - Get crops to review
 
 	@connect
-	def _get_crop_to_review(self, cursor: Cursor[ReviewedArea], parameters: dict, user_id: int | UUID) :
+	def _get_crop_to_review(self, cursor: Cursor[ReviewedArea], parameters: dict, user_id: int | UUID) -> List[ReviewedArea]:
 		''' Fetch a batch of reviewed areas that have yet to be reviewed.
 
 		'''
-		reviewed_area = self._get_reviewed_areas(cursor, parameters)[0]
+		reviewed_areas = self._get_reviewed_areas(cursor, parameters)
 
-		self._update_image(cursor, reviewed_area.image_id, {'opened_by_user_id': user_id})
+		if len(reviewed_areas) > 0:
+			self._update_image(cursor, reviewed_areas[0].image_id, {'opened_by_user_id': user_id})
 
-		return reviewed_area
+		return reviewed_areas
 	
-	def get_crop_to_review(self, parameters: dict, user_id: int | UUID) -> ReviewedArea:
+	def get_crop_to_review(self, parameters: dict, user_id: int | UUID) -> List[ReviewedArea]:
 		'''
 
 		'''
 		return self._get_crop_to_review(parameters, user_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_crop_to_review_selection_count(self, cursor, paramaters: dict) -> int:
+		'''
+
+		'''
+		return len(self._get_reviewed_areas(cursor, paramaters))
+
+	def get_crop_to_review_selection_count(self, paramaters: dict) -> int:
+		'''
+
+		'''
+		return self._get_crop_to_review_selection_count(paramaters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Get annotations for crop 
@@ -2986,8 +3002,7 @@ class Database:
 			case UUID():
 				ra = self._get_reviewed_area(ra_id)
 				cursor.execute(query, (ra.reviewed_area_id,))
-			case _:
-				raise TypeError('ra_id must be of type ReviewedArea, int, or UUID')
+
 		annotations = cursor.fetchall()
 		if annotations is None:
 			raise Exception('Crop has no annotations')

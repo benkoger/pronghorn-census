@@ -47,24 +47,23 @@ export const useCropVerifierStore = defineStore('cropVerifierStore', {
     actions: {
         async getReviewedArea(increment: boolean = true) {
             if (pStore.CurrentHerdUnit === undefined || pStore.CurrentSurvey === undefined) return;
-			console.log('here')
             const resp = await getReviewedArea({
                 'herd_unit_id': [pStore.CurrentHerdUnit.herd_unit_id], 
                 'survey_id': [pStore.CurrentSurvey.survey_id], 
                 'include_reviewed': this.already_reviewed
             });
-            const image = await this.getReviewedAreaImage(resp)
+            if (resp.length == 0) return;
+
+            const image = await this.getReviewedAreaImage(resp[0])
             if (image == undefined) return;
             if (resp == undefined) return;
 
-            let cropId = '';
             if (increment) {
-                this.activeCropId = resp.uuid;
-                cropId = resp.uuid;
+                this.activeCropId = resp[0].uuid;
             }
 
-            this.batch.crops[cropId] = {
-                crop: resp,
+            this.batch.crops[resp[0].uuid] = {
+                crop: resp[0],
                 image: image,
                 annotations: {},
                 annotationBoxes: {}

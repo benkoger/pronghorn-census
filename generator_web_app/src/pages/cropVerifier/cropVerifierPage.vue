@@ -203,26 +203,44 @@ export default defineComponent({
 		</div>
 		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
 			<BContainer fluid class="h-100">
-				<div class="d-flex flex-column w-100 bg-body-secondary p-2 rounded-3 shadow">
-					<h3>session settings</h3>
-						<BFormCheckbox
-							id="checkbox-1"
-							v-model="cvStore.already_reviewed"
-							name="checkbox-1"
-							value="true"
-							unchecked-value="false"
-						>
-							Review crops that have already been approved
-						</BFormCheckbox>
-						<BButton
-							variant="primary"
-							class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
-							size="lg"
-							@click="currentStep += 1"
-						>
-							Start Reviewing
-						</BButton>
-				</div>
+				<BRow gutter-x="2" class="h-100">
+					<BCol cols="2" class="d-flex">	
+						<div class="flex-column bg-body-secondary rounded-3 shadow flex-grow-1">
+
+						</div>
+					</BCol>
+					<BCol cols="10" class="d-flex">
+						<div class="d-flex flex-column bg-body-secondary rounded-3 shadow flex-grow-1">
+							<div class="m-2">
+								<h3>Cropper session settings</h3>
+								<BTabs content-class="mt-3">
+									<BTab title="general settings">
+										<BFormCheckbox
+											id="checkbox-1"
+											v-model="cvStore.already_reviewed"
+											name="checkbox-1"
+											value="true"
+											unchecked-value="false"
+										>
+											Include Annotations that have already been approved
+										</BFormCheckbox>
+									</BTab>
+									<BTab title="advanced settings">
+
+									</BTab>
+								</BTabs>
+							</div>
+							<BButton
+								variant="primary"
+								class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
+								size="lg"
+								@click="currentStep += 1"
+							>
+								Start Reviewing
+							</BButton>
+						</div>
+					</BCol>
+				</BRow>
 			</BContainer>
 		</div>
 		<Validate v-if="currentStep === 3"/>
