@@ -50,7 +50,7 @@ def get_by_id(project_id: str):
 	except (DatabaseError, Exception) as e:
 		abort(500)
 	
-	return project.serialize(), 200
+	return project.to_dict(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -70,7 +70,7 @@ def get_models(project_id: str):
 	  200:
 		description: List of models.
 	  404:
-		description: No models found.
+		description: No project found.
 	  500:
 		description: Database error.
 	'''
@@ -83,7 +83,7 @@ def get_models(project_id: str):
 	except (DatabaseError, Exception):
 		abort(500)
 	
-	return [model.serialize() for model in models], 200
+	return [model.to_dict() for model in models], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -97,7 +97,7 @@ def get_herd_units(project_id: str):
 	  200:
 		description: List of herd units.
 	  404:
-		description: No herd units found.
+		description: No project found.
 	  500:
 		description: Database error.
 	'''
@@ -111,4 +111,4 @@ def get_herd_units(project_id: str):
 		print(e)
 		abort(500)
 	
-	return [herd_unit.serialize() for herd_unit in herd_units], 200
+	return [herd_unit.to_dict() for herd_unit in herd_units], 200

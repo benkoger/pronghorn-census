@@ -41,12 +41,12 @@
 	});
 </script>
 <template>
-	<nav>
+	<nav class="m-0">
 		<BBreadcrumb :items="breadcrumbItems" />
 	</nav>
 	<div
 			v-if="showButtons" 
-			class="d-flex m-1"
+			class="d-flex"
 			:class="{ 
 				'justify-content-between': !isFirstStep, 
 				'justify-content-end': isFirstStep 
@@ -55,9 +55,11 @@
 			<BButton
 				v-if="!isFirstStep" 
 				variant="outline-secondary" 
+				size="sm"
 				:disabled="modelValue === 0"
 				@click="updateStep(modelValue - 1)"
 			>
+				<Icon icon="mdi:arrow-back" />
 				Back
 			</BButton>
 			<BButton 
@@ -67,6 +69,7 @@
 				@click="updateStep(modelValue + 1)"
 			>
 				{{ nextText }}
+				<Icon icon="mdi:arrow-right" />
 			</BButton>
 		</div>
 	<div class="mt-1 flex-grow-1 overflow-auto">

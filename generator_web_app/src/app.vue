@@ -4,7 +4,6 @@ import Header from './components/header.vue';
 import Nav from './components/nav.vue';
 import { RouterView } from 'vue-router';
 import { useUserStore } from './modules/stores/userStore';
-import { usePreferenceStore } from './modules/stores/preferencesStore';
 
 export default defineComponent({
   name: 'App',
@@ -15,18 +14,17 @@ export default defineComponent({
   },
   setup() {
     const uStore = useUserStore();
-    const pref_store = usePreferenceStore();
-    if (pref_store.first_login) {
-      pref_store.getBrowserPreference();
-      pref_store.first_login = false; 
+    if (uStore.first_login) {
+      uStore.getBrowserPreference();
+      uStore.first_login = false; 
     } else {
-      pref_store.setTheme(pref_store.theme);
+      uStore.setTheme(uStore.theme);
     } 
-    return { uStore, pref_store }
+    return { uStore }
   },
   async mounted() {
     if (this.uStore.logged_in) {
-      await this.uStore.getCurrentUser()
+      await this.uStore.getCurrentUser();
     }
   }
 })
@@ -39,7 +37,7 @@ export default defineComponent({
       <main 
         class="d-flex flex-column overflow-y-auto p-4 bg-body"
         :style="{ 
-          height: '95vh',
+          height: '94vh',
           marginLeft: uStore.nav_toggled ? '12rem' : '4.5rem', 
           transition: 'margin-left 0.2s' 
         }"

@@ -4,123 +4,16 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import {
-	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User, Schema,
-	Label, HerdUnit, Survey, Model, Annotation
+	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User,
+	Label, Annotation
 } from '@/types/generatorobjects.ts';
-import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf, ReviewedAreaIntf, AnnotationIntf } from '@/types/generatorobjects.ts';
+import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf } from '@/types/generatorobjects.ts';
 import type { apiError } from '@/modules/api/errors.ts';
+
 
 const api_url_base = import.meta.env.VITE_API_URL || 'https://pronghorn-count.arcc.uwyo.edu/api/v1';
 
 export const api_url: URL = new URL(api_url_base);
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// User authentication
-export async function authUser(external_id: string): Promise<User | undefined> {
-	try {
-		const response = await fetch(`${api_url}/authenticate`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'external-id': external_id
-			}),
-			credentials: 'include',
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const user = new User(await response.json() as UserIntf);
-		return user;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-export async function checkAuth(): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/check_auth`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		});
-		if (response.status == 401) return false;
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		else return true;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return false;
-	}
-}
-
-export async function getCurrentUser(): Promise<User | undefined> {
-	try {
-		const response = await fetch(`${api_url}/users/getCurrentUser`, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include',
-		});
-		if (response.status == 401) return undefined;
-		const user = new User(await response.json() as UserIntf);
-		return user;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-export async function deauthUser(): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/deauthenticate`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			credentials: 'include'
-		});
-		if (response.status == 200) {
-			return true;
-		} else {
-			return false;
-		}
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return false;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Organization Crud
-
-export async function getUserOrganizations(): Promise<Organization[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/organizations/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let organizations = [];
-		for (const organization of resp) organizations.push(new Organization(organization));
-		return organizations;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
-
-//---------------------------------------------------------------------------------------------------------------------------//
-// Role Crud
-
-//---------------------------------------------------------------------------------------------------------------------------//
-//  User Crud
 
 //---------------------------------------------------------------------------------------------------------------------------//
 // Project Crud
@@ -218,30 +111,6 @@ export async function fetchPredCrops(image_id: string | undefined, survey_id: st
 	}
 }
 
-export async function closeImage(image_id: string): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/update/image/set-closed`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				'image_id': image_id,
-			}),
-		});
-		if (!response.ok) {
-			throw new Error(`${(await response.json() as apiError).message}`);
-		} else {
-			return true;
-		}
-	} catch (error: any) {
-		console.error("Error: ", error);
-
-		return false;
-	}
-}
-
 export async function setPredicionsReviewed(prediction_ids: string[]): Promise<boolean> {
 	try {
 		const response = await fetch(`${api_url}/update/predictions/set-reviewed`, {
@@ -294,58 +163,8 @@ export async function autoCrop(image_uuid: string, predictions: Prediction[], he
 	}
 }
 
-export async function closeCropSession(): Promise<boolean> {
-	try {
-		const response = await fetch(`${api_url}/end/crop_session`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		});
-		if (!response.ok) {
-			throw new Error(`${(await response.json() as apiError).message}`);
-		} else {
-			return true;
-		}
-
-	} catch (error: any) {
-		console.error("Error: ", error)
-
-		return false;
-	}
-
-}
-
 //---------------------------------------------------------------------------------------------------------------------------//
 // Area reviewing
-
-export async function fetchReviewedArea(herd_unit_id: string | undefined, survey_id: string | undefined, reviewed: boolean): Promise<ReviewedArea | undefined> {
-	try {
-		const response = await fetch(`${api_url}/create/reviewed-area-batch`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				'herd_unit_id': herd_unit_id,
-				'survey_id': survey_id,
-				'reviewed': reviewed
-			}),
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`);
-
-		const resp = await response.json();
-		let revieweArea = new ReviewedArea(resp as ReviewedAreaIntf);
-		return revieweArea as ReviewedArea;
-
-	} catch (error: any) {
-		console.error("Error: ", error)
-
-		return undefined;
-	}
-}
 
 export async function getReviewedAreaPresignedGetUrl(ra_key: string): Promise<string | undefined> {
 	try {

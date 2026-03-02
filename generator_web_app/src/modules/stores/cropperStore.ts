@@ -5,10 +5,11 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { useProjectStore } from '@/modules/stores/projectStore';
-import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects';
-import type { autoCropperBatch } from '@/types/generatorobjects';
-import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, closeImage, closeCropSession, setPredicionsReviewed } from '../api/apiV1Methods';
+import { useProjectStore } from '@/modules/stores/projectStore.ts';
+import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects.ts';
+import type { autoCropperBatch } from '@/types/generatorobjects.ts';
+import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, setPredicionsReviewed } from '../api/apiV1Methods';
+import { updateImage, closeUserImages } from '@/modules/api/images.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
@@ -108,7 +109,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		},
 		async bootstrap() {
 			this.loading = true;
-			await closeCropSession();
+			await closeUserImages();
 			await this.getbatch(0);
 			await this.getPredCrops(this.batchIdx, this.imageIdx);
 			this.loading = false;
@@ -180,7 +181,6 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 				}
 				await autoCrop(this.currentImage.uuid, this.approvedPredictions, pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, pStore.labels)
 			}
-			await closeImage(this.currentImage.uuid);
 			await setPredicionsReviewed(this.CurrentPredictionIds);
 			this.loading = false;
 			await this.nextImage();
@@ -188,7 +188,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		async endSession() {
 			this.$reset();
 			this.bootStrapped = false;
-			await closeCropSession();
+			await closeUserImages();
 		}
 	}
 })

@@ -1,14 +1,12 @@
 <script lang="ts">
 import { defineComponent } from 'vue';
 import { useUserStore } from '@/modules/stores/userStore';
-import { usePreferenceStore } from '@/modules/stores/preferencesStore';
 
 export default defineComponent({
     name: 'Dashboard',
     setup() {
-        const user_store = useUserStore();
-		const pref_store = usePreferenceStore();
-        return { user_store, pref_store }
+        const uStore = useUserStore();
+        return { uStore }
     }
 })
 </script>

@@ -7,7 +7,7 @@
 import { mean } from 'lodash';
 import type { Ref } from 'vue';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------------------//s
 
 export interface konvaBoxConf {
     width: number;
@@ -58,7 +58,7 @@ export class Box implements BoxIntf {
     getHeight(): number {
         return Math.abs(this.top_left.y - this.bottom_right.y);
     }
-    serialize() {
+    to_dict() {
         return [this.top_left.x, this.top_left.y, this.bottom_right.x, this.bottom_right.y];
 
     }

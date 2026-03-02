@@ -33,12 +33,15 @@ export default defineComponent({
     },
     computed: {
 		...mapState(useProjectStore, {
-			CurrentProject: 'CurrentProject',
-			CurrentModel: 'CurrentModel', 
-			CurrentSurvey: 'CurrentSurvey',
-			CurrentHerdUnit: 'CurrentHerdUnit'
-		}
-	),
+				CurrentProject: 'CurrentProject',
+				CurrentModel: 'CurrentModel', 
+				CurrentSurvey: 'CurrentSurvey',
+				CurrentHerdUnit: 'CurrentHerdUnit',
+			}
+		),
+		...mapState(useCropVerifierStore, {
+			alreadyReviewed: 'alreadyReviewed'
+		}),
 	canProceed() {
 			switch(this.currentStep) {
 				case 0:
@@ -123,7 +126,7 @@ export default defineComponent({
 				this.$router.push({query: newQuery});
 			}
 		},
-		CurrentSurvey(newValue: Survey, oldValue: Survey) {
+		async CurrentSurvey(newValue: Survey, oldValue: Survey) {
 			const currentQuery = {...this.$route.query };
 			if (newValue != oldValue && newValue != undefined) {
 				const newQuery = {
@@ -131,12 +134,18 @@ export default defineComponent({
 					survey: newValue.uuid
 				};
 				this.$router.push({query: newQuery})
+				await this.cvStore.getReviewCount();
 			} else {
 				const newQuery = {
 					...currentQuery,
 					survey: undefined
 				};
 				this.$router.push({query: newQuery});
+			}
+		},
+		async alreadyReviewed(newValue: boolean, oldValue: boolean) {
+			if (newValue != oldValue) {
+				await this.cvStore.getReviewCount();
 			}
 		}
 	},
@@ -203,26 +212,50 @@ export default defineComponent({
 		</div>
 		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
 			<BContainer fluid class="h-100">
-				<div class="d-flex flex-column w-100 bg-body-secondary p-2 rounded-3 shadow">
-					<h3>session settings</h3>
-					  	<BFormCheckbox
-							id="checkbox-1"
-							v-model="cvStore.already_reviewed"
-							name="checkbox-1"
-							value="accepted"
-							unchecked-value="not_accepted"
-						>
-							Review crops that have already been approved
-						</BFormCheckbox>
-						<BButton
-							variant="primary"
-							class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
-							size="lg"
-							@click="currentStep += 1"
-						>
-							Start Reviewing
-						</BButton>
-				</div>
+				<BRow gutter-x="2" class="h-100">
+					<BCol cols="4" class="d-flex">	
+						<div class="flex-column bg-body-secondary rounded-3 shadow flex-grow-1">
+							<div class="m-4">
+								<h3>Session Details</h3>
+								<ul>
+									<li><strong>Crops in selection</strong>: {{ cvStore.needingReviewed }}</li>
+								</ul>
+								<p></p>
+							</div>
+						</div>
+					</BCol>
+					<BCol cols="8" class="d-flex">
+						<div class="d-flex flex-column bg-body-secondary rounded-3 shadow flex-grow-1">
+							<div class="m-4">
+								<h3>Cropper session settings</h3>
+								<BTabs content-class="mt-3">
+									<BTab title="general settings">
+										<BFormCheckbox
+											id="checkbox-1"
+											v-model="cvStore.alreadyReviewed"
+											name="checkbox-1"
+											value="true"
+											unchecked-value="false"
+										>
+											Include Annotations that have already been approved
+										</BFormCheckbox>
+									</BTab>
+									<BTab title="advanced settings">
+
+									</BTab>
+								</BTabs>
+							</div>
+							<BButton
+								variant="primary"
+								class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
+								size="lg"
+								@click="currentStep += 1"
+							>
+								Start Reviewing
+							</BButton>
+						</div>
+					</BCol>
+				</BRow>
 			</BContainer>
 		</div>
 		<Validate v-if="currentStep === 3"/>

@@ -19,7 +19,7 @@ class TestModels(APITester):
             'herd_unit': 1,
             'label': 2, 
         }
-        query_string= urllib.parse.urlencode(params)
+        query_string = urllib.parse.urlencode(params)
 
         response = auth_client.get(f'/api/v1/models/training?{query_string}')
         assert response.status_code == 200

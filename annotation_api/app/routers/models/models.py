@@ -44,7 +44,7 @@ def get_by_id(model_id: str):
 	if model is None:
 		abort(404, f'Model with ID {model_id} was not found!')
 	else:
-		return model.serialize()
+		return model.to_dict()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -133,7 +133,7 @@ def get_schema(model_id: str):
 		print(e)
 		abort(500)
 	
-	return project.serialize(), 200
+	return project.to_dict(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -194,7 +194,7 @@ def create(body: CreateModel):
 		print(e)
 		abort(500)
 
-	return model.serialize(), 201
+	return model.to_dict(), 201
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -319,7 +319,7 @@ def update(model_id: str):
 		print(f'error: {e}')
 		abort(500)
 
-	return model.serialize(), 200
+	return model.to_dict(), 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # DELETE

@@ -15,7 +15,7 @@ class FlaskConfig:
 	PERMANENT_SESSION_LIFETIME = 86400 # 24 hours
 	SESSION_USE_SIGNER = (os.environ.get('SESSION_USE_SIGNER') or 'true').lower() in ['true', '1', 't', 'y', 'yes']
 	SESSION_REDIS = redis.from_url(os.environ.get('SESSION_REDIS'))
-	ORIGIN_URL = os.environ.get('ORIGIN_URL')
+	ORIGIN_URLS = os.environ.get('ORIGIN_URL').split(' ') #pyright: ignore 
 	BUCKET_NAME = os.environ.get('BUCKET_NAME')
 
 db_config = {

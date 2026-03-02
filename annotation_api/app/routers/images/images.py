@@ -7,11 +7,12 @@ from uuid import UUID
 
 from botocore.exceptions import ClientError
 from flask import Blueprint, abort, current_app, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, s3
+from app.decorators import roles_required
 from database import ObjectNotFound
 
 from .image_validators import *
@@ -51,7 +52,7 @@ def get_by_id(image_id: str):
 	except (DatabaseError, Exception) as e:
 		abort(500)
 
-	return image.serialize(), 200
+	return image.to_dict(), 200
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -79,7 +80,7 @@ def get_crops(image_id: str):
 	except (DatabaseError, Exception):
 		abort(500)
 
-	return [crop.serialize() for crop in crops], 200
+	return [crop.to_dict() for crop in crops], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -113,7 +114,7 @@ def get_predictions(image_id: str):
 	except (DatabaseError, Exception):
 		abort(500)
 
-	return [pred.serialize() for pred in predictions], 200
+	return [pred.to_dict() for pred in predictions], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -125,18 +126,10 @@ def get_annotations(image_id: str):
 	---
 	parameters:
 		- name: image_id
-		in: path
-		type: string
-		required: true
-	responses:
-		200:
-			description: List of annotations.
-		400:
-			description: Invalid UUID format.
-		404:
-			description: No annotations found.
-		500:
-			description: Database error.
+		  in: path
+		  type: string
+		  required: true
+	
 	'''
 	try:
 		annotations = base.get_image_annotations(UUID(image_id))
@@ -147,7 +140,7 @@ def get_annotations(image_id: str):
 	except (DatabaseError, Exception):
 		abort(500)
 	
-	return [annot.serialize() for annot in annotations], 200
+	return [annot.to_dict() for annot in annotations], 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #POST
@@ -174,7 +167,7 @@ def create(body: CreateImage):
 	except (DatabaseError, Exception):
 		abort(500)
 
-	return image.serialize(), 201
+	return image.to_dict(), 201
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -222,6 +215,7 @@ def create_presigned_get():
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @imageBp.post('/presigned-put-url')
+# @roles_required('admin')
 @validate()
 @login_required
 def create_chunk_presigned_put(body: CreatePresignedPut):
@@ -390,13 +384,31 @@ def update(body: UpdateImage, image_id: str):
 		image = base.update_image(UUID(image_id), body.model_dump())
 	except ValueError as e:
 		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
 	except (DatabaseError, Exception):
 		abort(500)
 
-	if image is None:
-		abort(404, 'Image not found')
+	return image.to_dict(), 200
 
-	return image.serialize(), 200
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.patch('/close-user-images')
+@login_required
+def close_user_images():
+	'''
+
+	'''
+	try:
+		base.close_user_images(current_user.user_id)
+	except ValueError as e:
+		abort(400, str(e))
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except (DatabaseError, Exception):
+		abort(500)
+	
+	return '', 204
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #DELETE

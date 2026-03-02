@@ -5,19 +5,26 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, getUserOrganizations, deauthUser } from '../api/apiV1Methods.ts';
+import { authUser, checkAuth, getCurrentUser, deauthUser } from '@/modules/api/users';
 import { User, Organization } from '@/types/generatorobjects.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export const useUserStore = defineStore('userStore', {
     state: () => ({
+        first_login: true,
+        theme: 'dark',
         logged_in: false,
         user: undefined as User | undefined,
         organizations: undefined as Organization[] | undefined,
         organization_idx: undefined as number | undefined,
         nav_toggled: false
     }),
+    persist: {
+        storage: localStorage,
+        key: 'user-preferences',
+        pick: ['theme', 'first_login']
+    },
     getters: {
         CurrentOrganization: (state) => (state.organizations && state.organization_idx) ? state.organizations[state.organization_idx] : undefined,
         CurrentUser: (state) => state.user
@@ -38,9 +45,6 @@ export const useUserStore = defineStore('userStore', {
         async check_auth() {
             this.logged_in = (await checkAuth()) ? true : false;
         },
-        async get_user_organizations() {
-            this.organizations = await getUserOrganizations();
-        },
         toggle_nav(value: boolean) {
             this.nav_toggled = value;
         },
@@ -59,6 +63,21 @@ export const useUserStore = defineStore('userStore', {
             this.user = undefined;
             this.organizations = undefined;
             this.organization_idx = undefined;
+        },
+        initializeTheme() {
+            const savedTheme = this.theme || (this.getBrowserPreference() ? 'dark' : 'light');
+            this.setTheme(savedTheme);
+        },
+        getBrowserPreference(): boolean {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        },
+        setTheme(theme: string) {
+            this.theme = theme;
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        },
+        toggleTheme() {
+            const newTheme = this.theme === 'light' ? 'dark' : 'light';
+            this.setTheme(newTheme);
         }
     },
 })
