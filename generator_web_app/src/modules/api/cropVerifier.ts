@@ -38,6 +38,26 @@ export async function getReviewedArea(options: getReviewedAreaOptions): Promise<
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+export async function getCountNeedingReviewed(options: getReviewedAreaOptions): Promise<number> {
+	const params = new URLSearchParams()
+	options.herd_unit_id.forEach(id => params.append('herd_unit_id', id.toString()));
+	options.survey_id.forEach(id => params.append('survey_id', id.toString()));
+	params.append('include_reviewed', options.include_reviewed.toString());
+
+	const response = await fetch(`${api_url}/verifier/needing-reviewed?${params}`, {
+		method: 'GET',
+		credentials: 'include',
+		headers: {
+			'Cotnent-Type': 'application/json'
+		}
+	});
+	if (!response.ok) throw new ApiError(await response.json());
+	const resp = await response.json();
+	return resp.count;
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
 export interface submitOptions {
 	reviewed_area_id: number | string,
 	image_id: number | string,

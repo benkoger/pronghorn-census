@@ -62,7 +62,7 @@ def get(query: RAQuery):
 @verifierBp.get('/needing-reviewed')
 @login_required
 @validate()
-def get_selection_count(query, RAQuery):
+def get_selection_count(query: RAQuery):
 	'''
 
 	'''
@@ -73,7 +73,7 @@ def get_selection_count(query, RAQuery):
 	except (DatabaseError, Exception):
 		abort(500)
 
-	return count
+	return {'count': count}, 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # PUT
