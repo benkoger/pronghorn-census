@@ -18,7 +18,9 @@ def create_app():
 
 	CORS(app, resources={
 		r'/api/*': {
-			'origins': app.config['ORIGIN_URLS'],
+			'origins': [
+				app.config['ORIGIN_URL']
+				],
 			'supports_credentials': True     
 		}
 	})
