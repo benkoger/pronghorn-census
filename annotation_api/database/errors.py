@@ -11,6 +11,12 @@ class ObjectNotFound(Exception):
 		self.message = f"{object_type} with ID {str(object_id)} not found."
 		super().__init__(self.message)
 
+class FailedToCreate(Exception):
+	'''Raised when an object fails to be created'''
+	def __init__(self, object_type: str):
+		self.message = f"Failed to create {object_type}"
+		super().__init__(self.message)
+
 class AuthorizationFailure(Exception):
 	'''Raised when an authorization attempt fails'''
 	def __init__(self):

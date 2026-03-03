@@ -6,6 +6,7 @@
 #---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint,  abort, request, current_app
+from psycopg import DatabaseError
 from .survey_validators import CreateSurvey, UpdateSurvey
 from app.extensions import base
 from datetime import date, datetime
@@ -65,13 +66,26 @@ def get_annotations(survey_id: str):
 def get_herd_units(survey_id: str):
 	'''
 	'''
-	
-	herd_units = base.get_survey_herd_units(UUID(survey_id))
+	try:
+		herd_units = base.get_survey_herd_units(UUID(survey_id))
+	except( DatabaseError, Exception):
+		abort(500)
 
-	if len(herd_units) == 0:
-		abort(404, f'no herd units found for survey {survey_id}')
+	return [herd_unit.to_dict() for herd_unit in herd_units], 200
 
-	return [herd_unit.to_dict() for herd_unit in herd_units]
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@surveyBp.get('/<string:survey_id>/images')
+@login_required
+def get_images(survey_id: str):
+	'''
+	'''
+	try:
+		images = base.get_survey_images(UUID(survey_id))
+	except (DatabaseError, Exception):
+		abort(500)
+
+	return [image.to_dict() for image in images], 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
