@@ -2036,23 +2036,29 @@ class Database:
 	# Core - Annotations
 
 	@connect
-	def _create_annotation(self, cursor: Cursor[Annotation], label_id: Label | int | UUID, image_id: Image | int | UUID,
-						herd_unit_id: HerdUnit | int | UUID, box_tx: int, box_ty: int, box_bx: int, box_by: int, user_id: User | int | UUID, uuid: UUID | None, returning: bool) -> Annotation | None:
+	def _create_annotation(self, cursor: Cursor[Annotation], parameters: dict) -> Annotation:
 		'''
 		
-		
 		'''
-		cursor.row_factory = class_row(Annotation)
-		user = self._get_user(user_id) if not isinstance(user_id, User) else user_id
+		if isinstance(parameters['user_id'], str):
+			parameters['user_id'] = self._get_user(cursor, UUID(parameters['user_id'])).user_id
 
-		# stop gap until I have time to be creative
-		uuid = UUID() if uuid is None else uuid
+		if isinstance(parameters['herd_unit_id'], str):
+			parameters['herd_unit_id'] = self._get_herd_unit(cursor, parameters['herd_unit_id']).herd_unit_id
 
-		cursor.execute(sql.SQL(''' INSERT INTO core.annotations (label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, uuid)
-						 		   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *; '''), (label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, user.user_id, uuid))
-		if returning:
-			annotation = cursor.fetchone()
-			return annotation if isinstance(annotation, Annotation) else None
+
+		query_1 = sql.SQL(''' 
+			INSERT INTO core.annotations (
+				label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, uuid
+			)
+			VALUES (
+				%(label_id)s, %(survey_id)s, %(herd_unit_id)s, %s, %s, %s, %s, %s, %s
+			) 
+			RETURNING *; 
+		''')
+
+
+		
 
 	def create_annotation(self, label_id: Label | int | UUID, image_id: Image | int | UUID,
 						herd_unit_id: HerdUnit | int | UUID, box_tx: int, box_ty: int, box_bx: int, box_by: int, user_id: User | int | UUID, uuid: UUID | None=None, returning: bool=False) -> Annotation | None:
