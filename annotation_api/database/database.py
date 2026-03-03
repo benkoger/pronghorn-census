@@ -1569,7 +1569,7 @@ class Database:
 		return self._get_survey_annotations(survey_id) 
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
+	
 	@connect 
 	def _get_survey_annotated_images(
 		self,
