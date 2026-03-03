@@ -63,7 +63,6 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		currentImage(state): Image { return this.currentImages[state.imageIdx] },
 		imageNum: (state) => state.imageIdx + 1,
 		approvedPredictions(): Prediction[] {
-			if (this.approvedPredictions == undefined) return [];
 			const newPredictions: Prediction[] = [];
 			for (let i = 0; i < this.CurrentPredictionCrops.length; i++) {
 				if (this.CurrentPredictionCrops[i].approved) {
@@ -179,6 +178,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 				if (pStore.CurrentHerdUnit == undefined || pStore.CurrentSurvey == undefined || pStore.labels.length == 0) {
 					throw new Error('HerdUnit, Survey, or labels are undefined!');
 				}
+				console.log('there')
 				await autoCrop(this.currentImage.uuid, this.approvedPredictions, pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, pStore.labels)
 			}
 			await setPredicionsReviewed(this.CurrentPredictionIds);
