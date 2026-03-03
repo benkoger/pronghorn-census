@@ -1,0 +1,99 @@
+services:
+  db:
+    container_name: prong_gres
+    image: postgres:18
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pronghorn_count -d testing"]
+      interval: 5s
+      timeout: 5s 
+      retries: 5
+    restart: always
+    environment:
+      POSTGRES_USER: pronghorn_count
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: testing
+    volumes:
+      - type: bind
+        source: ./local_db/restore.sh
+        target: /docker-entrypoint-initdb.d/restore.sh
+      - ./local_db/dev-bootstrap:/dev-bootstrap:Z
+    networks:
+      - dev_pronghorn_app_network
+    ports:
+      - "5432:5432"
+    command: ["postgres", "-c", "listen_addresses=*"]
+  pronghorn-api-dev:
+    depends_on:
+      db:
+        condition: service_healthy
+    container_name: prong_dev_api
+    build:
+      context: .
+      dockerfile: development.prongapi.containerfile
+    environment:
+      ORIGIN_URL: ${ORIGIN_URL}
+      ROOT: ${ROOT}
+      HERD_UNIT: ${HERD_UNIT}
+      CROP_FOLDER: ${CROP_FOLDER}
+      IMAGES: ${CROP_FOLDER}
+      SECRET_KEY: ${SECRET_KEY}
+      VALKEY_HOST: ${VALKEY_HOST}
+      SESSION_REDIS: ${SESSION_REDIS}
+      VALKEY_PASS: ${VALKEY_PASS}
+      AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS} 
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      BUCKET_NAME: ${BUCKET_NAME}
+      NUM_API_WORKERS: ${NUM_API_WORKERS}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      FLASK_APP: /app/app.py
+    volumes:
+      - ./annotation_api:/app:Z
+      - ./requirements.txt:/app/requirements.txt:Z
+      - ./crop_generator:/venv/crop_generator:Z
+    command: > 
+      /bin/bash -c "source /venv/api_env/bin/activate && python -u /app/app.py"
+    networks: 
+      - dev_pronghorn_app_network
+    ports: 
+      - 8000:8000
+  valkey:
+    container_name: prong_dev_valkey
+    image: docker.io/valkey/valkey:8.1.1
+    healthcheck:
+      test: valkey-cli ping || exit 1
+    restart: always
+    command: valkey-server --requirepass ${VALKEY_PASS}
+    ports:
+      - "6379:6379"
+    networks: 
+      - dev_pronghorn_app_network
+  web-app-dev:
+    container_name: prong_dev_webapp
+    build:
+      context: .
+      dockerfile: development.prongwebapp.containerfile  
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    volumes:
+    - ./generator_web_app/src:/app/src:Z
+    develop:
+      watch:
+        - path: ./generator_web_app/package.json
+          target: /app/package.json
+          action: restart
+        - path: ./generator_web_app/vite.config.ts
+          target: /app/vite.config.ts
+          action: restart
+    networks: 
+      - dev_pronghorn_app_network
+    ports: 
+      - 5173:5173
+
+networks: 
+  dev_pronghorn_app_network:
+    driver: bridge
