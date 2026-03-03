@@ -1774,7 +1774,7 @@ class Database:
 		if isinstance(parameters['herd_unit_id'], str):
 			parameters['herd_unit_id'] = self._get_herd_unit(cursor, UUID(parameters['herd_unit_id'])).herd_unit_id
 
-		query_1 = sql.SQL(''' 
+		query = sql.SQL(''' 
 			INSERT INTO core.images (
 				herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px,
 				area, viewshed_polygon, has_detection, dem_name, bbox_wsen
@@ -1787,12 +1787,12 @@ class Database:
 		''')
 
 		cursor.row_factory = class_row(Image)
-		cursor.execute(query_1, parameters)
+		cursor.execute(query, parameters)
 
 		image = cursor.fetchone()
 
 		if not image: 
-			raise Exception('Image creation failed')
+			raise FailedToCreate('Image')
 
 		return image
 
@@ -2036,7 +2036,7 @@ class Database:
 	# Core - Annotations
 
 	@connect
-	def _create_annotation(self, cursor: Cursor[Annotation], parameters: dict) -> Annotation:
+	def _create_annotation(self, cursor: Cursor[Annotation], reviewed_area_id: int | UUID, parameters: dict) -> Annotation:
 		'''
 		
 		'''
@@ -2046,26 +2046,48 @@ class Database:
 		if isinstance(parameters['herd_unit_id'], str):
 			parameters['herd_unit_id'] = self._get_herd_unit(cursor, parameters['herd_unit_id']).herd_unit_id
 
+		if isinstance(reviewed_area_id, str):
+			reviewed_area_id = self._get_reviewed_area(cursor, reviewed_area_id).reveiwed_area_id
+
+		parameters['uuid'] = UUID() if parameters['uuid'] is None else parameters['uuid']
 
 		query_1 = sql.SQL(''' 
 			INSERT INTO core.annotations (
 				label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, uuid
 			)
 			VALUES (
-				%(label_id)s, %(survey_id)s, %(herd_unit_id)s, %s, %s, %s, %s, %s, %s
+				%(label_id)s, %(image_id)s, %(herd_unit_id)s, %(box_tx)s, %(box_ty)s, 
+				%(box_bx)s, %(box_by)s, %(user_id)s, %(uuid)s
 			) 
 			RETURNING *; 
 		''')
+	
+		cursor.row_factory = class_row(Annotation)
+		cursor.execute(query_1, parameters)
 
+		annotation = cursor.fetchone()
 
-		
+		if not annotation:
+			raise FailedToCreate('Annotation')
 
-	def create_annotation(self, label_id: Label | int | UUID, image_id: Image | int | UUID,
-						herd_unit_id: HerdUnit | int | UUID, box_tx: int, box_ty: int, box_bx: int, box_by: int, user_id: User | int | UUID, uuid: UUID | None=None, returning: bool=False) -> Annotation | None:
+		query_2 = sql.SQL('''
+			INSERT INTO core.annotations_reviewed_area (
+				reviewed_area_id, annotation_id
+			)
+			VALUES (
+				%s, %s
+			)
+		''')
+
+		cursor.execute(query_2, (reviewed_area_id, annotation.annotation_id))
+
+		return annotation
+
+	def create_annotation(self, reviewed_area_id: int | UUID, parameters: dict) -> Annotation:
 		'''
 		
 		'''
-		return self._create_annotation(label_id = label_id, image_id = image_id, herd_unit_id = herd_unit_id, box_tx = box_tx, box_ty = box_ty, box_bx = box_bx, box_by = box_by, user_id = user_id, uuid=uuid, returning = returning )
+		return self._create_annotation(reviewed_area_id, parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# TODO: replace with create_annotation -- not a nessacary function 

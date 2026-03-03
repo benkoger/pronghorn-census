@@ -108,19 +108,23 @@ def approve_annotations(body: ApproveAnnotations):
 			else:
 				# create annotation
 				base.create_annotation(
-					label_id = annot['label_id'],
-					image_id = annot['image_id'], 
-					herd_unit_id = annot['herd_unit_id'],
-					box_tx = annot['dimensions']['top_left']['x'],
-					box_ty = annot['dimensions']['top_left']['y'],
-					box_bx = annot['dimensions']['bottom_right']['x'],
-					box_by = annot['dimensions']['bottom_right']['y'],
-					user_id = current_user.user_id,
-					uuid = annot['uuid']
+					data['reviewed_area_id'],
+					{
+						'label_id': annot['label_id'],
+						'image_id': annot['image_id'], 
+						'herd_unit_id': annot['herd_unit_id'],
+						'box_tx': annot['dimensions']['top_left']['x'],
+						'box_ty': annot['dimensions']['top_left']['y'],
+						'box_bx': annot['dimensions']['bottom_right']['x'],
+						'box_by': annot['dimensions']['bottom_right']['y'],
+						'user_id': current_user.user_id,
+						'uuid': annot['uuid']
+					}
 				)
 		except ObjectNotFound as e:
 			abort(404, str(e))
-		except (DatabaseError, Exception):
+		except (DatabaseError, Exception) as e:
+			print(e)
 			abort(500)
 
 	# loop over deleted annotations
@@ -134,7 +138,8 @@ def approve_annotations(body: ApproveAnnotations):
 
 		# set image closed
 		base.update_image(data['image_id'], {'opened_by_user_id':0})
-	except (DatabaseError, Exception):
+	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 
 	return '', 201
