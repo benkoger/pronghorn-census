@@ -123,8 +123,7 @@ def approve_annotations(body: ApproveAnnotations):
 				)
 		except ObjectNotFound as e:
 			abort(404, str(e))
-		except (DatabaseError, Exception) as e:
-			print(e)
+		except (DatabaseError, Exception):
 			abort(500)
 
 	# loop over deleted annotations
@@ -138,8 +137,7 @@ def approve_annotations(body: ApproveAnnotations):
 
 		# set image closed
 		base.update_image(data['image_id'], {'opened_by_user_id':0})
-	except (DatabaseError, Exception) as e:
-		print(e)
+	except (DatabaseError, Exception):
 		abort(500)
 
 	return '', 201
