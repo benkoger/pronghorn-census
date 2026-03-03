@@ -31,6 +31,7 @@ This tool is designed to be easily and rapidly scalable using containerization t
 In the interest of performance and scalability we opted not to use an ORM (Object Relational Mapper), and instead write our own SQL queries to be executed using the excellent [psycopg3](https://pypi.org/project/psycopg/) package. Our abstraction layer is a semi typed OOP module that makes use of a decorated private interface wrapped into a context manager that handles the connection pool. Effectively the entire context of the connection is abstracted away from the API layer. The database layer also automatically associates rows from Postgres to their class defined in the crop generator, effectively emulating one of the benefits of an ORM while avoiding the performance related drawbacks.
 
 ```python
+	#THIS BLOCK IS OUTDATED 
 
 	import database as db # Generic name for increased performance
 
