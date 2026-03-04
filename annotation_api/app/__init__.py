@@ -9,6 +9,7 @@ import app.errors as errors
 from app.extensions import base, cache, login_manager, session_manager
 from config import s3_config
 from config import FlaskConfig, cache_config, s3_config
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -24,6 +25,10 @@ def create_app():
 			'supports_credentials': True     
 		}
 	})
+
+	app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+    )
 
 	# Register s3 service app wide
 	setattr(app, 's3', client(
