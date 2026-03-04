@@ -15,7 +15,7 @@ import cv2
 from flask import Blueprint, Response, abort, current_app, jsonify, request, session
 from flask_login import current_user, login_required
 
-from app.extensions import base, cache, login_manager, s3
+from app.extensions import base, cache, s3
 from .herdunits import herdunitBp
 from .images import imageBp
 from .models import modelBp
@@ -25,6 +25,7 @@ from .surveys import surveyBp
 from .cropverifier import verifierBp
 from .reviewedarea import raBp
 from .users import userBp
+from .oauth2 import authBp
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -39,6 +40,7 @@ bp.register_blueprint(surveyBp)
 bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)
 bp.register_blueprint(userBp)
+bp.register_blueprint(authBp)
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Project CRUD

@@ -1,4 +1,4 @@
-# Endpoints for managing users in the API 
+# Endpoints for managing legacy manual token users in the API 
 # Author: Michael B. Lance
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -7,16 +7,15 @@ from uuid import UUID
 
 from cropgenerator.generatorobjects import User
 from flask import Blueprint, abort
-from flask_login import current_user, login_required
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import base, cache, login_manager
-from database import AuthorizationFailure, UserNotFound, ObjectNotFound
-
-from .user_validators import *
+from database import AuthorizationFailure, ObjectNotFound, UserNotFound
+from database.view_models.users import *
 
 userBp = Blueprint('users', __name__, url_prefix='/api/v1/users')
 
@@ -90,14 +89,15 @@ def check_role(query: RoleQuery):
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
 
-@userBp.post('/authenticate')
+@userBp.post('/authenticate/manual-token')
 @validate()
 def authenticate(body: Authenticate):
-	'''
+	''' Legacy manual token aut
 	'''
 
 	try:
-		user = base.login_user(body.external_id)
+		user = base.get_user(body.email)
+		base.login_user(body.external_auth_id)
 	except AuthorizationFailure as e:
 		abort(401, str(e))
 	else:

@@ -17,6 +17,19 @@ class FlaskConfig:
 	SESSION_REDIS = redis.from_url(os.environ.get('SESSION_REDIS'))
 	ORIGIN_URL = os.environ.get('ORIGIN_URL') #pyright: ignore 
 	BUCKET_NAME = os.environ.get('BUCKET_NAME')
+	OAUTH2_PROVIDERS = {
+		'google': {
+			'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
+			'client_secret': os.environ.get('GOOGLE_CLIENT_SECRET'),
+			'authorize_url': 'https://accounts.google.com/o/oauth2/auth',
+			'token_url': 'https://accounts.google.com/o/oauth2/token',
+			'userinfo': {
+				'url': 'https://www.googleapis.com/oauth2/v3/userinfo',
+				'email': lambda json: json['email'],
+			},
+			'scopes': ['https://www.googleapis.com/auth/userinfo.email'],
+		}
+	}
 
 db_config = {
 	'dbname': os.environ.get('DB_NAME'),

@@ -1,0 +1,23 @@
+from datetime import datetime
+from typing import List, Optional, Union
+from uuid import UUID
+
+from pydantic import BaseModel
+
+class CreateUser(BaseModel):
+	username: str
+	email: str
+	external_auth_id: str
+	external_auth_provider: str 
+	status: str = 'invited'
+	locale: str
+	roles: Optional[List[str]] = None
+	project_ids: Optional[List[Union[int, UUID]]] = None
+	organization_ids: Optional[List[Union[int, UUID]]] = None
+
+class Authenticate(BaseModel):
+	email: str
+	external_auth_id: str
+
+class RoleQuery(BaseModel):
+	role_id: Union[int, str]

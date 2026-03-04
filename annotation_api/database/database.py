@@ -3,7 +3,7 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from functools import wraps
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
@@ -26,6 +26,8 @@ from cropgenerator.generatorobjects import (
 	Survey,
 	User,
 )
+
+from .view_models import *
 
 from psycopg import Cursor
 from psycopg.rows import class_row, dict_row
@@ -167,6 +169,30 @@ class Database:
 		return self._get_organization(organization_ids = organization_ids)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_many_organizations(self, cursor: Cursor[Organization], organization_ids: List[Union[int, UUID]]) -> List[Organization]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(Organization)
+		ints = [i for i in organization_ids if isinstance(i, int)]
+		uuids = [str(i) for i in organization_ids if not isinstance(i, int)]
+		query = sql.SQL('''
+			SELECT * FROM usermanagement.organizations
+			WHERE organization_id = ANY(%s)
+			OR uuid = ANY(%s::uuid[])
+			)
+		''')
+
+		cursor.execute(query, (ints, uuids))
+
+		return cursor.fetchall()
+
+	def get_many_organizations(self, organization_ids: List[Union[int, UUID]]) -> List[Organization]:
+		'''
+		'''
+		return self._get_many_organizations(organization_ids)
 
 	@connect
 	def _update_organization(self, cursor: Cursor[Organization], orgId: Organization | int | UUID,
@@ -357,42 +383,48 @@ class Database:
 	# User Management - Users
 
 	@connect
-	def _create_user(self, cursor: Cursor[User], username: str, external_auth_id: str, external_auth_provider, locale: str) -> User | None:
+	def _create_user(self, cursor: Cursor[User], parameters: CreateUser ) -> User:
 		''' Internal helper function, do not call directly
 		
 		'''  
+		query_1 = sql.SQL('''
+			INSERT INTO usermanagement.users (
+				username, email, external_auth_id, external_auth_provider,
+				status, locale
+			)
+			VALUES (
+				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
+				%(status)s, %(locale)s
+			)
+			RETURNING *;+
+		''')
+
 		cursor.row_factory = class_row(User)
-		cursor.execute(sql.SQL(''' INSERT INTO usermanagement.users (username, external_auth_id, external_auth_provider, locale)
-								   VALUES (%s, %s, %s, %s) RETURNING *; '''), (username, external_auth_id, external_auth_provider, locale))
-		user = cursor.fetchone()    
-		return user if isinstance(user, User) else None
-	
-	def create_user(self, username: str, external_auth_id: str, external_auth_provider, locale: str, 
-					roles: list[ Role | str | int | UUID] | None = None, organizations: list[Organization | int | UUID] | None = None) -> User | None:
-		''' Insert a new user object into the database
-		
-		Args:
-			username: the human readable identifier
-			external_auth_id: unique key used to verify the user with an identity provider
-			external_auth_provider: name of the identity service provider
-			locale: the user's locale (ex: en_us)
-			roles: a list of either role objects, names, ids, or uuids
-			organizations: a list of eith organization objects, names, ids, or uuids
-		'''
-		user = self._create_user(username = username, external_auth_id = external_auth_id, external_auth_provider = external_auth_provider, locale = locale)
-		if isinstance(user, User):
-			if roles:
-				self._add_roles_user(user, roles)
-				role_objs = self._get_user_roles(user)
-				if role_objs is not None:
-					user.roles = [role for role in role_objs]
-			# if organizations:
-			# 	self._add_user_organizations(user.user_id, organizations)
+		cursor.execute(query_1, parameters.model_dump())
+
+		user = cursor.fetchone()
+
+		if not user:
+			raise FailedToCreate('user')
+
+		#TODO: Finish associating projects with users and organizations with users (and roles with users)
+		# if parameters.project_ids:
+		# 	projects = self._get_many_projects(cursor, parameters.project_ids)
+
+		# if parameters.organization_ids:
+		# 	orgainizations = self._get_many_organizations(cursor, parameters.organization_ids)
 		return user
+
+	def create_user(self, parameters: CreateUser) -> User:
+		''' 
+
+		'''
+		return self._create_user(parameters)
+		
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_user(self, cursor: Cursor[User], user_id: int | UUID ) -> User:
+	def _get_user(self, cursor: Cursor[User], user_id: int | UUID | str ) -> User:
 		''' Internal helper function, do not call directly
 		
 		'''  
@@ -401,16 +433,19 @@ class Database:
 		match user_id:
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('user_id')), (user_id,))
+			case str():
+				cursor.execute(query.format(id_field = sql.Identifier('email')), (user_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (user_id,))
-		
+			
+
 		user = cursor.fetchone()
 		if not user:
 			raise UserNotFound
 
 		return user
 		
-	def get_user(self, user_id: int | UUID ) -> User:
+	def get_user(self, user_id: int | UUID | str ) -> User:
 		''' Query the database for a user
 		
 		Args:
@@ -425,8 +460,31 @@ class Database:
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+	@connect 
+	def _activate_user(self, cursor: Cursor, email: str, external_id: str, provider: str) -> None:
+		'''
+
+		'''
+		self._update_user(cursor, {
+			'status': 'active',
+			'email': email,
+			'external_auth_id': external_id,
+			'external_auth_provider': provider,
+			'last_login': datetime.now(timezone.utc)
+		})
+
+		return
+
+	def activate_user(self, email: str, external_id: str, provider: str) -> None:
+		'''
+		
+		'''
+		return self._activate_user(email, external_id, provider)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
 	@connect
-	def _login_user(self, cursor: Cursor[User], external_auth_id: str) -> User:
+	def _login_user(self, cursor: Cursor[User], external_auth_id: str) -> None:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -440,9 +498,8 @@ class Database:
 			raise AuthorizationFailure
 
 		self._update_user(cursor, user.user_id, {'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S%z')})
-		return user
 	
-	def login_user(self, external_auth_id: str) -> User:
+	def login_user(self, external_auth_id: str) -> None:
 		''' 
 
 		'''
@@ -467,7 +524,7 @@ class Database:
 				for key, value in parameters.items() 
 				if key in set([
 					'username', 'external_auth_id', 'external_auth_provider', 
-					'status', 'locale', 'last_login'
+					'status', 'locale', 'last_login', 'email'
 				]) 
 				and value is not None
 			]
@@ -588,9 +645,35 @@ class Database:
 		return self._get_project(project_id=project_id)
 		
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	
+	@connect 
+	def _get_many_projects(self, cursor: Cursor[Project], project_ids: List[Union[int, UUID]]) -> List[Project]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(Project)
+		ints = [i for i in project_ids if isinstance(i, int)]
+		uuids = [str(i) for i in project_ids if not isinstance(i, int)]
+		query = sql.SQL('''
+			SELECT * FROM projectmanagement.projects
+			WHERE project_id = ANY(%s)
+			OR uuid = ANY(%s::uuid[])
+			)
+		''')
+
+		cursor.execute(query, (ints, uuids))
+
+		return cursor.fetchall()
+
+	def get_many_projects(self, project_ids: List[Union[int, UUID]]) -> List[Project]:
+		'''
+		'''
+		return self._get_many_projects(project_ids)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_project_models(self, cursor: Cursor[Model], project_id: int | UUID) -> list[Model]:
+	def _get_project_models(self, cursor: Cursor[Model], project_id: int | UUID) -> List[Model]:
 		'''
 		
 		'''
@@ -606,7 +689,7 @@ class Database:
 
 		return cursor.fetchall()
 	
-	def get_project_models(self, project_id: Project | int | UUID) -> list[Model]:
+	def get_project_models(self, project_id: Project | int | UUID) -> List[Model]:
 		'''
 		
 		'''
