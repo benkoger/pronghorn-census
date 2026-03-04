@@ -8,7 +8,7 @@ load_dotenv()
 
 class FlaskConfig:
 	SECRET_KEY = os.environ.get('SECRET_KEY')
-	SESSION_COOKIE_SAMESITE = 'Lax'
+	SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE') or 'Lax'
 	SESSION_COOKIE_SECURE = (os.environ.get('SESSION_COOKIE_SECURE') or 'true').lower() in ['true', '1', 't', 'y', 'yes']
 	SESSION_TYPE = 'redis'
 	SESSION_PERMANENT = (os.environ.get('SESSION_PERMANENT') or 'true').lower() in ['true', '1', 't', 'y', 'yes']
