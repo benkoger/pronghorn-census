@@ -203,7 +203,7 @@ class User(UserMixin, CgOBJ):
 	def __init__(
 			self, user_id: int, username: str, email: str, external_auth_id: str, external_auth_provider: str, 
 			status: str, created: datetime, modified: datetime, last_login: datetime,  locale: str,
-			uuid: UUID, roles: Optional[list[Role]]=None
+			uuid: UUID, password_hash: Optional[str]=None, roles: Optional[list[Role]]=None
 		):
 		self.id = str(uuid) # this is this way to make Flask-Login happy
 		self.user_id = user_id

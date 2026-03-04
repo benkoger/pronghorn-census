@@ -8,7 +8,7 @@ load_dotenv()
 
 class FlaskConfig:
 	SECRET_KEY = os.environ.get('SECRET_KEY')
-	SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE') or 'Strict'
+	SESSION_COOKIE_SAMESITE = 'Lax'
 	SESSION_COOKIE_SECURE = (os.environ.get('SESSION_COOKIE_SECURE') or 'true').lower() in ['true', '1', 't', 'y', 'yes']
 	SESSION_TYPE = 'redis'
 	SESSION_PERMANENT = (os.environ.get('SESSION_PERMANENT') or 'true').lower() in ['true', '1', 't', 'y', 'yes']
@@ -17,6 +17,8 @@ class FlaskConfig:
 	SESSION_REDIS = redis.from_url(os.environ.get('SESSION_REDIS'))
 	ORIGIN_URL = os.environ.get('ORIGIN_URL') #pyright: ignore 
 	BUCKET_NAME = os.environ.get('BUCKET_NAME')
+	SESSION_COOKIE_DOMAIN = None 
+	SESSION_COOKIE_PATH = '/'
 	OAUTH2_PROVIDERS = {
 		'google': {
 			'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
@@ -27,7 +29,7 @@ class FlaskConfig:
 				'url': 'https://www.googleapis.com/oauth2/v3/userinfo',
 				'email': lambda json: json['email'],
 			},
-			'scopes': ['https://www.googleapis.com/auth/userinfo.email'],
+			'scopes': ['openid', 'email', 'profile'],
 		}
 	}
 

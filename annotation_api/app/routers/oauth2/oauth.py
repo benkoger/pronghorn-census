@@ -35,10 +35,11 @@ def oauth2_authorize(provider: str):
 		abort(404, 'Oauth Provider not found')
 
 	session['oauth2_state'] = secrets.token_urlsafe(16)
+	session.modified = True
 
 	query_string = urlencode({
 		'client_id': provider_data['client_id'],
-		'redirect_uri': url_for('oauth2_callback', provider=provider, 
+		'redirect_uri': url_for('.oauth2_callback', provider=provider, 
 									_external=True),
 		'response_type': 'code',
 		'scope': ' '.join(provider_data['scopes']),
@@ -53,6 +54,11 @@ def oauth2_authorize(provider: str):
 def oauth2_callback(provider: str):
 	'''
 	'''
+	print("--- DEBUGGING 401 ---")
+	print(f"Incoming Cookies: {request.cookies}")
+	print(f"Session Keys in Redis: {list(session.keys())}")
+	print(f"Expected State (Session): {session.get('oauth2_state')}")
+	print(f"Received State (URL): {request.args.get('state')}")
 	provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
 	if not provider_data:
 		abort(404, 'Oauth Provider not found')
@@ -74,7 +80,7 @@ def oauth2_callback(provider: str):
 		'client_secret': provider_data['client_secret'],
 		'code': request.args['code'],
 		'grant_type': 'authorization_code',
-		'redirect_uri': url_for('oauth2_callback', provider=provider,
+		'redirect_uri': url_for('.oauth2_callback', provider=provider,
 									_external=True)
 	}, headers={'Accept': 'application/json'})
 
@@ -97,14 +103,16 @@ def oauth2_callback(provider: str):
 		user = base.get_user(email)
 	except UserNotFound as e:
 		abort(403, 'You must first be invited to access this resource')
-	except (DatabaseError, Exception):
+	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 
 	if user.status == 'invited':
-		base.activate_user(user.email, response.json().get('sub'), provider)
+		base.activate_user(user.email, user.user_id, response.json().get('sub'), provider)
 	else:
 		base.login_user(user.external_auth_id)
 
 	login_user(user)
 
-	return user.to_dict(), 201
+	frontend_url = current_app.config.get('ORIGIN_URL')
+	return redirect(f"{frontend_url}/dashboard")

@@ -1,8 +1,9 @@
 <script lang="ts">
 import { defineComponent } from 'vue'; 
-import { useUserStore } from '@/modules/stores/userStore';
+import { useUserStore } from '@/modules/stores/userStore.ts';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from "bootstrap-vue-next";
+import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 export default defineComponent({
 	name: 'Authenticate',
@@ -18,12 +19,13 @@ export default defineComponent({
 	},
 	data() {
 		return {
-			auth_token: '',
+			password: '',
+			google_auth: `${api_url}/authorize/google`
 		};
 	},
 	methods: {
 		async submitAuthRequest() {
-			await this.uStore.authenticate(this.auth_token)
+			await this.uStore.authenticate(this.password)
 			if (this.uStore.logged_in) {
 				if (this.redirection_path) {
 					this.router.push(this.redirection_path);
@@ -62,14 +64,14 @@ export default defineComponent({
 				<BForm @submit.prevent="submitAuthRequest">
 					<BFormGroup
 						id="token-group"
-						label="Authentication Token"
+						label="Password"
 						label-for="token-input"
 						description="The auth token is a temporary stop-gap until Oauth 2.0 is implemented."
 					>
 						<BFormInput 
 							id="token-input"
 							type="password"
-							v-model="auth_token" 
+							v-model="password" 
 							autocomplete="off"
 							required
 						/>
@@ -84,5 +86,12 @@ export default defineComponent({
 				</BForm>
 			</div>	
 		</div>
+		<a 
+			:href="google_auth"
+			class="btn btn-light btn-lg d-flex align-items-center shadow-sm border rounded-pill px-4 py-2 mt-4"
+		>
+			<Icon icon="material-icon-theme:google"/>
+			Sign in with google
+		</a>
 	</div>
 </template>

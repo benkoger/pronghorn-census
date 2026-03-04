@@ -461,11 +461,14 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _activate_user(self, cursor: Cursor, email: str, external_id: str, provider: str) -> None:
+	def _activate_user(self, cursor: Cursor, email: str, user_id: int | UUID, external_id: str, provider: str) -> None:
 		'''
 
 		'''
-		self._update_user(cursor, {
+		if isinstance(user_id, UUID):
+			user_id = self._get_user(cursor, user_id).user_id
+
+		self._update_user(cursor, user_id, {
 			'status': 'active',
 			'email': email,
 			'external_auth_id': external_id,
@@ -475,11 +478,11 @@ class Database:
 
 		return
 
-	def activate_user(self, email: str, external_id: str, provider: str) -> None:
+	def activate_user(self, email: str, user_id: int | UUID, external_id: str, provider: str) -> None:
 		'''
 		
 		'''
-		return self._activate_user(email, external_id, provider)
+		return self._activate_user(email, user_id, external_id, provider)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -524,7 +527,7 @@ class Database:
 				for key, value in parameters.items() 
 				if key in set([
 					'username', 'external_auth_id', 'external_auth_provider', 
-					'status', 'locale', 'last_login', 'email'
+					'status', 'locale', 'last_login', 'email', 'password_hash'
 				]) 
 				and value is not None
 			]
