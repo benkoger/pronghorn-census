@@ -28,7 +28,7 @@ export default defineComponent({
         :style="{height: '6vh'}"
         >
         <div>
-            <h3 class="m-0">AIerial Survey Annotation Tools</h3>
+            <h3 class="m-0">AIrial Survey Tools</h3>
             <p v-if="isDev" class="text-warning m-0 small">Development Mode</p>
         </div>
 

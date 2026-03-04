@@ -487,14 +487,19 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _login_user(self, cursor: Cursor[User], external_auth_id: str) -> None:
+	def _login_user(self, cursor: Cursor[User], user_id: int | UUID) -> None:
 		''' Internal helper function, do not call directly
 		
 		'''
 		cursor.row_factory = class_row(User)
-		query = sql.SQL(' SELECT * FROM usermanagement.users WHERE external_auth_id = %s ')
-		
-		cursor.execute(query, (external_auth_id,))
+		query = sql.SQL(' SELECT * FROM usermanagement.users WHERE {id_field} = %s ')
+
+		match user_id:
+			case int():
+				cursor.execute(query.format(id_field = sql.Identifier('user_id')), (user_id,))
+			case UUID():
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (user_id,))
+
 		user = cursor.fetchone()
 
 		if not user:
@@ -502,11 +507,11 @@ class Database:
 
 		self._update_user(cursor, user.user_id, {'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S%z')})
 	
-	def login_user(self, external_auth_id: str) -> None:
+	def login_user(self, user_id: int | UUID) -> None:
 		''' 
 
 		'''
-		return self._login_user(external_auth_id)
+		return self._login_user(user_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

@@ -19,13 +19,14 @@ export default defineComponent({
 	},
 	data() {
 		return {
+			email: '',
 			password: '',
 			google_auth: `${api_url}/authorize/google`
 		};
 	},
 	methods: {
 		async submitAuthRequest() {
-			await this.uStore.authenticate(this.password)
+			await this.uStore.authenticate(this.email, this.password)
 			if (this.uStore.logged_in) {
 				if (this.redirection_path) {
 					this.router.push(this.redirection_path);
@@ -57,19 +58,28 @@ export default defineComponent({
 }); 
 </script>
 <template>
-	<div class="d-flex h-100 w-100 flex-column justify-content-center align-items-center">
-		<div class="bg-body-secondary rounded-3 shadow  d-flex flex-column">
-			<h2 class="bg-body-tertiary text-center rounded-top-3 p-2">Authentication Required</h2>
-			<div class="p-4 d-flex justify-content-center">
+	<BContainer class="h-100">
+		<BRow align-v="center" align-h="center" class="h-100">
+			<BCol lg="4">
+				<h2 class="bg-body-tertiary text-center rounded-top-3 p-2 mb-0 ">Sign in</h2>
 				<BForm @submit.prevent="submitAuthRequest">
 					<BFormGroup
-						id="token-group"
-						label="Password"
-						label-for="token-input"
-						description="The auth token is a temporary stop-gap until Oauth 2.0 is implemented."
+						id="classic-auth"
+						class="p-4 bg-body-secondary"
 					>
+						<label for="email-input">Email:</label>
+						<BFormInput
+							class="mb-2"
+							id="email-input"
+							type="email"
+							v-model="email"
+							required
+						/>
+
+						<label for="password-input">Password:</label>
 						<BFormInput 
-							id="token-input"
+							class="mb-2"
+							id="password-input"
 							type="password"
 							v-model="password" 
 							autocomplete="off"
@@ -77,21 +87,25 @@ export default defineComponent({
 						/>
 					</BFormGroup>
 					<BButton
-					type="submit"
-					variant="primary"
-					class="w-100 mt-auto"
+						type="submit"
+						variant="primary"
+						size="lg"
+						class="w-100 mt-auto rounded-top-0"
+					>
+						Submit
+					</BButton>
+					</BForm>
+				<a 
+					:href="google_auth"
+					class="btn btn-light gap-2 btn-lg d-flex align-items-center 
+					justify-content-center shadow-sm border px-4 py-2 
+					mt-4"
 				>
-					Authenticate
-				</BButton>
-				</BForm>
-			</div>	
-		</div>
-		<a 
-			:href="google_auth"
-			class="btn btn-light btn-lg d-flex align-items-center shadow-sm border rounded-pill px-4 py-2 mt-4"
-		>
-			<Icon icon="material-icon-theme:google"/>
-			Sign in with google
-		</a>
-	</div>
+					<Icon icon="material-icon-theme:google"/>
+					Sign in with Google
+				</a>
+			</BCol>
+		</BRow>
+	</BContainer>
+			
 </template>

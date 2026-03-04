@@ -41,14 +41,15 @@ export async function getCurrentUser(): Promise<User> {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export async function authUser(external_id: string): Promise<User> {
+export async function authUser(email:string, password: string): Promise<User> {
 	const response = await fetch(`${api_url}/users/authenticate`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
 		},
 		body: JSON.stringify({
-			'external_id': external_id
+			'email': email,
+			'password': password
 		}),
 		credentials: 'include',
 	});

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Authenticate from '@/components/authenticate.vue';
+import Authenticate from '@/pages/authenticate.vue';
 import { useUserStore } from '@/modules/stores/userStore';
 
 

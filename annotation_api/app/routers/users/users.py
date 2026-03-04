@@ -89,15 +89,21 @@ def check_role(query: RoleQuery):
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
 
-@userBp.post('/authenticate/manual-token')
+@userBp.post('/authenticate')
 @validate()
-def authenticate(body: Authenticate):
+def authenticate(body: LegacyAuth):
 	''' Legacy manual token aut
 	'''
 
 	try:
 		user = base.get_user(body.email)
-		base.login_user(body.external_auth_id)
+		print(user)
+		if not user.password_hash:
+			abort(400)
+
+		if check_password_hash(body.password, user.password_hash):
+			base.login_user(user.user_id)
+			
 	except AuthorizationFailure as e:
 		abort(401, str(e))
 	else:

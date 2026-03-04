@@ -15,9 +15,9 @@ class CreateUser(BaseModel):
 	project_ids: Optional[List[Union[int, UUID]]] = None
 	organization_ids: Optional[List[Union[int, UUID]]] = None
 
-class Authenticate(BaseModel):
+class LegacyAuth(BaseModel):
 	email: str
-	external_auth_id: str
+	password: str
 
 class RoleQuery(BaseModel):
 	role_id: Union[int, str]

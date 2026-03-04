@@ -9,15 +9,12 @@ import secrets
 from urllib.parse import urlencode
 from uuid import UUID
 
-from cropgenerator.generatorobjects import User
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
-from flask_login import current_user, login_required, login_user, logout_user
-from flask_pydantic import validate
-from msgpack import packb, unpackb
-from psycopg.errors import DatabaseError, UniqueViolation
+from flask_login import login_user
+from psycopg.errors import DatabaseError
 import requests
 
-from app.extensions import base, cache, login_manager
+from app.extensions import base
 from database.errors import *
 from database.view_models.users import *
 
@@ -53,12 +50,8 @@ def oauth2_authorize(provider: str):
 @authBp.get('/callback/<string:provider>')
 def oauth2_callback(provider: str):
 	'''
+
 	'''
-	print("--- DEBUGGING 401 ---")
-	print(f"Incoming Cookies: {request.cookies}")
-	print(f"Session Keys in Redis: {list(session.keys())}")
-	print(f"Expected State (Session): {session.get('oauth2_state')}")
-	print(f"Received State (URL): {request.args.get('state')}")
 	provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
 	if not provider_data:
 		abort(404, 'Oauth Provider not found')
@@ -101,7 +94,7 @@ def oauth2_callback(provider: str):
 
 	try:
 		user = base.get_user(email)
-	except UserNotFound as e:
+	except UserNotFound:
 		abort(403, 'You must first be invited to access this resource')
 	except (DatabaseError, Exception) as e:
 		print(e)
@@ -110,7 +103,7 @@ def oauth2_callback(provider: str):
 	if user.status == 'invited':
 		base.activate_user(user.email, user.user_id, response.json().get('sub'), provider)
 	else:
-		base.login_user(user.external_auth_id)
+		base.login_user(user.user_id)
 
 	login_user(user)
 

@@ -217,6 +217,7 @@ class User(UserMixin, CgOBJ):
 		self.last_login = last_login
 		self.locale = locale
 		self.uuid = uuid
+		self.password_hash = password_hash
 		self.roles = roles
 	
 	def getId(self) -> str:

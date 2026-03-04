@@ -30,8 +30,8 @@ export const useUserStore = defineStore('userStore', {
         CurrentUser: (state) => state.user
     },
     actions: {
-        async authenticate(external_id: string) {
-            this.user = await authUser(external_id) as User;
+        async authenticate(email: string, password: string) {
+            this.user = await authUser(email, password) as User;
             this.logged_in = (this.user) ? true : false;
         },
         async deuathenticate() {
