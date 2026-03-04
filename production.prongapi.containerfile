@@ -42,4 +42,4 @@ WORKDIR /app
 
 COPY ./annotation_api .
 
-CMD ["gunicorn", "--forwarded-allow-ips="*"", "-c", "gunicorn.py", "app:create_app()"]
+CMD ["gunicorn", "--forwarded-allow-ips=\"*\"", "-c", "gunicorn.py", "app:create_app()"]
