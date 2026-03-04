@@ -20,6 +20,8 @@ services:
       NUM_API_WORKERS: ${NUM_API_WORKERS}
       SESSION_REDIS: ${SESSION_REDIS}
       ORIGIN_URL: ${APPLICATION_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     networks: 
       - pronghorn_app_network 
   valkey:

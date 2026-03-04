@@ -180,8 +180,9 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 				}
 				console.log('there')
 				await autoCrop(this.currentImage.uuid, this.approvedPredictions, pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, pStore.labels)
+				await setPredicionsReviewed(this.CurrentPredictionIds);
 			}
-			await setPredicionsReviewed(this.CurrentPredictionIds);
+			
 			this.loading = false;
 			await this.nextImage();
 		},
