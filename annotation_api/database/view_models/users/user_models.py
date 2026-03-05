@@ -20,4 +20,4 @@ class LegacyAuth(BaseModel):
 	password: str
 
 class RoleQuery(BaseModel):
-	role_id: Union[int, str]
+	role_name: str

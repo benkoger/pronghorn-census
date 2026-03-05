@@ -291,7 +291,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_role(self, cursor: Cursor[Role], role_id: int | UUID  ) -> Role:
+	def _get_role(self, cursor: Cursor[Role], role_id: int | UUID | str  ) -> Role:
 		''' Internal helper function, do not call directly
 		
 		'''
@@ -302,7 +302,9 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('role_id')), (role_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (role_id,))
-		
+			case str():
+				cursor.execute(query.format(id_field = sql.Identifier('name')), (role_id,))
+
 		role = cursor.fetchone() 
 
 		if not role:
@@ -310,7 +312,7 @@ class Database:
 
 		return role
 
-	def get_role(self, role_id: int | UUID) -> Role | None:
+	def get_role(self, role_id: int | UUID | str) -> Role:
 		''' 
 
 		'''

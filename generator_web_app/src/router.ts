@@ -23,9 +23,9 @@ const router = createRouter({
       },
     },
     {
-      path: '/user/:uuid?',
-      name: 'user',
-      component: () => import('@/pages/user.vue'),
+      path: '/users/:uuid?',
+      name: 'users',
+      component: () => import('@/pages/users.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,

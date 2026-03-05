@@ -41,6 +41,23 @@ export async function getCurrentUser(): Promise<User> {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+export async function getUserHasRole(role_name: string): Promise<boolean> {
+	const params = new URLSearchParams();
+	params.append('role_name', role_name.toString());
+
+	const response = await fetch(`${api_url}/users/role-check?${params}`, {
+		method: 'GET',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	});
+	if (!response.ok) throw new ApiError(await response.json());
+	
+	return true;
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
 export async function authUser(email:string, password: string): Promise<User> {
 	const response = await fetch(`${api_url}/users/authenticate`, {
 		method: 'POST',

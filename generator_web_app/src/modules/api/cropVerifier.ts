@@ -17,7 +17,7 @@ export interface getReviewedAreaOptions {
 }
 
 export async function getReviewedArea(options: getReviewedAreaOptions): Promise<ReviewedArea[]> {
-	const params = new URLSearchParams()
+	const params = new URLSearchParams();
 	options.herd_unit_id.forEach(id => params.append('herd_unit_id', id.toString()));
 	options.survey_id.forEach(id => params.append('survey_id', id.toString()));
 	params.append('include_reviewed', options.include_reviewed.toString());

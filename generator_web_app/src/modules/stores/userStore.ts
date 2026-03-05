@@ -5,7 +5,7 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, deauthUser } from '@/modules/api/users';
+import { authUser, checkAuth, getCurrentUser, deauthUser, getUserHasRole } from '@/modules/api/users';
 import { User, Organization } from '@/types/generatorobjects.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -16,9 +16,11 @@ export const useUserStore = defineStore('userStore', {
         theme: 'dark',
         logged_in: false,
         user: undefined as User | undefined,
+        is_admin: false,
         organizations: undefined as Organization[] | undefined,
         organization_idx: undefined as number | undefined,
-        nav_toggled: false
+        nav_toggled: false,
+
     }),
     persist: {
         storage: localStorage,
@@ -44,6 +46,9 @@ export const useUserStore = defineStore('userStore', {
         },
         async check_auth() {
             this.logged_in = (await checkAuth()) ? true : false;
+        },
+        async check_admin() {
+            this.is_admin = await getUserHasRole('admin');
         },
         toggle_nav(value: boolean) {
             this.nav_toggled = value;

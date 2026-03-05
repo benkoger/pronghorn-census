@@ -67,18 +67,18 @@ def get_current_user():
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@userBp.get('/has-role')
+@userBp.get('/role-check')
 @login_required
 @validate()
 def check_role(query: RoleQuery):
 	'''
 	'''
-	role_id = UUID(query.role_id) if isinstance(query.role_id, str) else query.role_id
 	try:
-		role = base.get_role(role_id)
+		role = base.get_role(query.role_name)
 	except ObjectNotFound as e:
 		abort(404, str(e))
-	except (DatabaseError, Exception):
+	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 
 	if role in current_user.roles:

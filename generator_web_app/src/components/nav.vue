@@ -7,6 +7,9 @@ export default defineComponent({
 	setup() {
 		const uStore = useUserStore();
 		return { uStore }
+	},
+	async mounted() {
+		await this.uStore.check_admin();
 	}
 })
 </script>
@@ -22,7 +25,7 @@ export default defineComponent({
 >
 	<BNav vertical pills fill class="w-100 h-100 p-2">
 	<BNavItem to="/" :active="$route.path === '/' ">
-		<Icon icon="ic:round-dashboard" width="24" height="24" />
+		<Icon icon="material-symbols:dashboard-rounded" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3 d-none d-md-inline">Dashboard</span>
 	</BNavItem>
 	<BNavItem to="/auto-cropper/" :active="$route.path.startsWith('/auto-cropper')">
@@ -41,12 +44,15 @@ export default defineComponent({
 		<Icon icon="wpf:statistics" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3">Statistics</span>
 	</BNavItem>
-	<BNavItem :to="{ name: 'user', params: { uuid: uStore.user?.uuid }}">
-		<Icon icon="iconamoon:profile-fill" width="24" height="24" />
-		<span v-if="uStore.nav_toggled" class="ms-3">User</span>
+	<BNavItem 
+		v-if="uStore.is_admin"
+		to="/users"
+	>
+		<Icon icon="fa7-solid:users" width="24" height="24" />
+		<span v-if="uStore.nav_toggled" class="ms-2">Users</span>
 	</BNavItem>
 	<BNavItem to="/settings" :active="$route.path.startsWith('/settings')">
-		<Icon icon="ic:outline-settings" width="24" height="24" />
+		<Icon icon="material-symbols:settings-rounded" width="24" height="24" />
 		<span v-if="uStore.nav_toggled" class="ms-3">Settings</span>
 	</BNavItem>
 	</BNav>
