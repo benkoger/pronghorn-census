@@ -11,9 +11,10 @@ from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 from app.extensions import base, cache, login_manager
+from app.decorators import roles_required
 from database import AuthorizationFailure, ObjectNotFound, UserNotFound
 from database.view_models.users import *
 
@@ -46,6 +47,22 @@ def unathorizated_callback():
 #---------------------------------------------------------------------------------------------------------------------------#
 # Get
 
+@userBp.get('')
+@login_required
+def get_all():
+	'''
+
+	'''
+	try:
+		users = base.get_users()
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
+
+	return [user.to_dict() for user in users], 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
 @userBp.get('/check-auth')
 @login_required
 def check_auth():
@@ -73,6 +90,7 @@ def get_current_user():
 def check_role(query: RoleQuery):
 	'''
 	'''
+	print('I tried at all')
 	try:
 		role = base.get_role(query.role_name)
 	except ObjectNotFound as e:
@@ -84,7 +102,7 @@ def check_role(query: RoleQuery):
 	if role in current_user.roles:
 		return 'true', 200
 	else:
-		return 'false'
+		return 'false', 200
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
@@ -118,3 +136,22 @@ def authenticate(body: LegacyAuth):
 def logout():
 	logout_user()
 	return '', 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@userBp.post('')
+@login_required
+@validate()
+def create(body: CreateUser):
+	'''
+
+	'''
+	try:
+		user = base.create_user(body)
+	except UniqueViolation:
+		abort(409, 'User already exists')
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
+
+	return user.to_dict(), 201

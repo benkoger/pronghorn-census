@@ -26,6 +26,26 @@ export async function checkAuth(): Promise<boolean> {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+export async function getAllUsers(): Promise<User[]> {
+	const response = await fetch(`${api_url}/users`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		credentials: 'include',
+	});
+	if (!response.ok) throw new ApiError(await response.json());
+	
+	const resp = await response.json();
+	let users = [];
+	
+	for (const user of resp)  users.push(new User(user as UserIntf));
+
+	return users
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
 export async function getCurrentUser(): Promise<User> {
 	const response = await fetch(`${api_url}/users/current-user`, {
 		method: 'GET',

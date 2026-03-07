@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class CreateUser(BaseModel):
 	username: str
 	email: str
+	password: str
 	external_auth_id: str
 	external_auth_provider: str 
 	status: str = 'invited'

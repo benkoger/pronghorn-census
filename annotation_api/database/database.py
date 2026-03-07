@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 import uuid
 from .errors import *
+from werkzeug.security import generate_password_hash
 
 from cropgenerator.generatorobjects import (
 	Annotation,
@@ -392,14 +393,20 @@ class Database:
 		query_1 = sql.SQL('''
 			INSERT INTO usermanagement.users (
 				username, email, external_auth_id, external_auth_provider,
-				status, locale
+				status, locale, passowrd_hash
 			)
 			VALUES (
 				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
-				%(status)s, %(locale)s
+				%(status)s, %(locale)s, %(password_hash)s
 			)
 			RETURNING *;+
 		''')
+
+		placeholders = parameters.model_dump()
+
+		placeholders['password_hash'] = generate_password_hash(
+			placeholders['password']
+		)
 
 		cursor.row_factory = class_row(User)
 		cursor.execute(query_1, parameters.model_dump())
@@ -461,6 +468,22 @@ class Database:
 		
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	#TODO: Users should be queried by organization
+	@connect
+	def _get_users(self, cursor: Cursor[User]) -> List[User]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(User)
+		query = sql.SQL('SELECT * FROM usermanagement.users WHERE user_id != 0;')
+
+		return cursor.execute(query).fetchall()
+
+	def get_users(self):
+		return self._get_users()
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#		
 
 	@connect 
 	def _activate_user(self, cursor: Cursor, email: str, user_id: int | UUID, external_id: str, provider: str) -> None:

@@ -95,7 +95,12 @@ export class HerdUnit implements HerdUnitIntf {
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export type CGObject = {
-    name: string;
+    name?: string;
+    username?: string;
+    status?: string;
+    last_login?: Date | string;
+    locale?: string;
+    roles?: CGObject[] | any[];
     uuid: string;
     created: Date;
     modified: Date;
@@ -340,7 +345,7 @@ export interface UserIntf {
     roles: RoleIntf[];
 }
 
-export class User {
+export class User implements UserIntf {
     username: string;
     status: string;
     created: Date;
