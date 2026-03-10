@@ -17,7 +17,8 @@ export const useOrgStore = defineStore('orgStore', {
 		bootstrapped: false,
 	}),
 	getters: {
-	
+		SelectedUser: (state) => (state.user_idx != undefined) ? state.users[state.user_idx] : undefined,
+
 	},
 	actions: {
 		async bootstrap() {
@@ -26,6 +27,14 @@ export const useOrgStore = defineStore('orgStore', {
 		},
 		async get_users() {
 			this.users = await getAllUsers();
+		},
+		select_user(user: User) {
+			const idx = this.users.indexOf(user);
+			if (this.user_idx == idx) {
+				this.user_idx = undefined;
+				return;
+			}
+			this.user_idx = idx;
 		}
 	}
 })

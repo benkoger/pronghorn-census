@@ -11,7 +11,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash,generate_password_hash
 
 from app.extensions import base, cache, login_manager
 from app.decorators import roles_required
@@ -28,14 +28,15 @@ def load(session_user_id: str):
 	cached_user = cache.get(user_key)
 
 	if cached_user:
-		return User(**unpackb(cached_user))
+		user = User(**unpackb(cached_user))
 
 	try:
 		user_obj = base.get_user(UUID(session_user_id))
 		cache.set(user_key, packb(user_obj.to_cache()), timeout=3600)
 	except UserNotFound as e:
 		abort(404, str(e))
-	except (DatabaseError, Exception):
+	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 	
 	return user_obj
@@ -66,21 +67,16 @@ def get_all():
 @userBp.get('/check-auth')
 @login_required
 def check_auth():
-	return 'true', 201
+	return 'true', 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 @userBp.get('/current-user')
 @login_required
 def get_current_user():
-	try:
-		user = base.get_user(UUID(current_user.id))
-	except UserNotFound as e:
-		abort(404, str(e))
-	except (DatabaseError, Exception):
-		abort(500)
-
-	return user.to_dict(), 201
+	'''
+	'''
+	return current_user.to_dict(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -90,16 +86,8 @@ def get_current_user():
 def check_role(query: RoleQuery):
 	'''
 	'''
-	print('I tried at all')
-	try:
-		role = base.get_role(query.role_name)
-	except ObjectNotFound as e:
-		abort(404, str(e))
-	except (DatabaseError, Exception) as e:
-		print(e)
-		abort(500)
 
-	if role in current_user.roles:
+	if current_user.roles and query.role_name in current_user.roles:
 		return 'true', 200
 	else:
 		return 'false', 200
@@ -115,19 +103,22 @@ def authenticate(body: LegacyAuth):
 
 	try:
 		user = base.get_user(body.email)
-		print(user)
 		if not user.password_hash:
 			abort(400)
 
-		if check_password_hash(body.password, user.password_hash):
+		if check_password_hash(user.password_hash, body.password):
 			base.login_user(user.user_id)
-			
+		else:
+			raise AuthorizationFailure
+
 	except AuthorizationFailure as e:
 		abort(401, str(e))
-	else:
-		login_user(user)
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
 		
-		return user.to_dict(), 201
+	login_user(user)
+	return user.to_dict(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

@@ -23,7 +23,9 @@ class CgOBJ(ABC):
 	@abstractmethod
 	def to_dict(self) -> dict:
 		pass
-	
+
+fmt = lambda dt: dt.strftime('%Y-%m-%d %H:%M:%S%z') if isinstance(dt, datetime) else None	
+
 #---------------------------------------------------------------------------------------------------------------------------#
 # Project Management -- For Database use only
 
@@ -42,9 +44,9 @@ class Project(CgOBJ):
 		return {
 			'project_id': self.project_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 
 @dataclass
@@ -62,9 +64,9 @@ class Schema(CgOBJ):
 		return {
 			'schema_id': self.schema_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 
 @dataclass
@@ -89,9 +91,9 @@ class Label(CgOBJ):
 			'name': self.name,
 			'image_link': self.image_link,
 			'color': self.color,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 
 @dataclass
@@ -109,9 +111,9 @@ class HerdUnit(CgOBJ):
 		return {
 			'herd_unit_id': self.herd_unit_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 
 @dataclass
@@ -131,9 +133,9 @@ class Model(CgOBJ):
 			'model_id': self.model_id,
 			'schema_id': self.schema_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 	
 @dataclass
@@ -155,9 +157,9 @@ class Survey(CgOBJ):
 			'survey_date': self.survey_date,
 			'name': self.name,
 			'additional_info': self.additional_info,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 	
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -175,9 +177,9 @@ class Role(CgOBJ):
 		return {
 			'role_id': self.role_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 	
 @dataclass
@@ -193,17 +195,17 @@ class Organization(CgOBJ):
 		return {
 			'organization_id': self.organization_id,
 			'name': self.name,
-			'created': self.created,
-			'modified': self.modified,
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
 			'logo_url': self.logo_url,
-			'uuid': self.uuid
+			'uuid': str(self.uuid)
 		}
 
 class User(UserMixin, CgOBJ):
 	def __init__(
 			self, user_id: int, username: str, email: str, external_auth_id: str, external_auth_provider: str, 
 			status: str, created: datetime, modified: datetime, last_login: datetime,  locale: str,
-			uuid: UUID, password_hash: Optional[str]=None, roles: Optional[list[Role]]=None
+			uuid: UUID, password_hash: Optional[str]=None, roles: Optional[set[str]]=None
 		):
 		self.id = str(uuid) # this is this way to make Flask-Login happy
 		self.user_id = user_id
@@ -230,7 +232,6 @@ class User(UserMixin, CgOBJ):
 			return False
 
 	def to_dict(self):
-		fmt = lambda dt: dt.strftime('%Y-%m-%d %H:%M:%S%z') if dt else None
 		return {
 			'user_id': self.user_id,
 			'username': self.username,
@@ -240,8 +241,7 @@ class User(UserMixin, CgOBJ):
 			'modified': fmt(self.modified),
 			'last_login': fmt(self.last_login),
 			'locale': self.locale,
-			'uuid': self.id,
-			'roles': self.roles
+			'uuid': str(self.uuid),
 		}
 
 	def to_cache(self):
@@ -249,6 +249,7 @@ class User(UserMixin, CgOBJ):
 			**self.to_dict(),
 			'external_auth_id': self.external_auth_id,
 			'external_auth_provider': self.external_auth_provider,
+			'roles': self.roles
 		}
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -376,7 +377,7 @@ class Image(CgOBJ):
 			'modified': self.modified,
 			'image_length_px': self.image_length_px,
 			'image_width_px': self.image_width_px,
-			'uuid': self.uuid
+			'uuid': str(self.uuid)
 		}
 
 class Prediction(CgOBJ):
@@ -400,9 +401,9 @@ class Prediction(CgOBJ):
 			'dimensions': self.dimensions.to_dict(),
 			'score': self.score,
 			'label': self.label,
-			'created': self.created,
+			'created': fmt(self.created),
 			'reviewed_by_user_id': self.reviewed_by_user_id,
-			'uuid': self.uuid
+			'uuid': str(self.uuid)
 		}
 	
 class Annotation(CgOBJ):
@@ -427,9 +428,9 @@ class Annotation(CgOBJ):
 			'image_id': self.image_id,
 			'herd_unit_id': self.herd_unit_id,
 			'dimensions': self.dimensions.to_dict(),
-			'created': self.created,
-			'modified': self.modified,
-			'uuid': self.uuid
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
+			'uuid': str(self.uuid)
 		}
 
 
@@ -457,12 +458,12 @@ class ReviewedArea(Image):
 			'image_id': self.image_id,
 			'name': self.name,
 			'dimensions': self.dimensions.to_dict(),
-			'created': self.created,
-			'modified': self.modified,
+			'created': fmt(self.created),
+			'modified': fmt(self.modified),
 			'reviewed_area_length_px': self.reviewed_area_length_px,
 			'reviewed_area_width_px': self.reviewed_area_width_px,
 			'ra_key': self.ra_key,
-			'uuid': self.uuid,
+			'uuid': str(self.uuid),
 		}
 	
 class PredictionCrop(Image):
@@ -488,7 +489,7 @@ class PredictionCrop(Image):
 			'dimensions': self.dimensions.to_dict(),
 			'boundingBox': self.boundingBox.to_dict(),
 			'approved': self.approved,
-			'uuid': self.uuid,
+			'uuid': str(self.uuid),
 		}
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -497,6 +498,5 @@ class CropgenJSONPRovider(JSONProvider):
 		if isinstance(obj, CgOBJ):
 			return obj.to_dict()
 		raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
-
 
 #---------------------------------------------------------------------------------------------------------------------------#

@@ -438,7 +438,13 @@ class Database:
 		
 		'''  
 		cursor.row_factory = class_row(User)
-		query = sql.SQL('SELECT * FROM usermanagement.users WHERE {id_field} = %s')
+		query = sql.SQL('''
+			SELECT U.*, R.name as roles FROM usermanagement.users AS U 
+			JOIN usermanagement.users_roles AS RU ON RU.user_id = U.user_id
+			JOIN usermanagement.roles AS R ON R.role_id = RU.role_id
+			
+			WHERE U.{id_field} = %s
+		''')
 		match user_id:
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('user_id')), (user_id,))
@@ -446,11 +452,12 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('email')), (user_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (user_id,))
-			
 
 		user = cursor.fetchone()
 		if not user:
 			raise UserNotFound
+
+		roles = self._get_user_roles(cursor, user)
 
 		return user
 		
@@ -460,12 +467,7 @@ class Database:
 		Args:
 			user_id: The user's unique database id 
 		'''
-		user = self._get_user(user_id = user_id)
-		role_objs = self._get_user_roles(user)
-		if role_objs is not None:
-			user.roles = [role for role in role_objs]
-		return user
-		
+		return self._get_user(user_id = user_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -516,21 +518,8 @@ class Database:
 		''' Internal helper function, do not call directly
 		
 		'''
-		cursor.row_factory = class_row(User)
-		query = sql.SQL(' SELECT * FROM usermanagement.users WHERE {id_field} = %s ')
 
-		match user_id:
-			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('user_id')), (user_id,))
-			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (user_id,))
-
-		user = cursor.fetchone()
-
-		if not user:
-			raise AuthorizationFailure
-
-		self._update_user(cursor, user.user_id, {'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S%z')})
+		self._update_user(cursor, user_id, {'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S%z')})
 	
 	def login_user(self, user_id: int | UUID) -> None:
 		''' 

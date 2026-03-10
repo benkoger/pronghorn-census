@@ -342,7 +342,6 @@ export interface UserIntf {
     last_login: Date;
     locale: string;
     uuid: string;
-    roles: RoleIntf[];
 }
 
 export class User implements UserIntf {
@@ -352,7 +351,6 @@ export class User implements UserIntf {
     modified: Date;
     last_login: Date;
     locale: string;
-    roles: Role[];
     uuid: string;
 
     constructor(usr: UserIntf) {
@@ -362,10 +360,6 @@ export class User implements UserIntf {
         this.modified = new Date(usr.modified);
         this.last_login = new Date(usr.last_login);
         this.locale = usr.locale;
-        this.roles = [];
-        if (usr.roles != undefined) {
-            for (const role of usr.roles) this.roles.push(new Role(role));
-        }
         this.uuid = usr.uuid;
     }
 }

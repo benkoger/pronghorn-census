@@ -73,6 +73,7 @@ export default defineComponent({
 							id="email-input"
 							type="email"
 							v-model="email"
+							autocomplete="off"
 							required
 						/>
 
