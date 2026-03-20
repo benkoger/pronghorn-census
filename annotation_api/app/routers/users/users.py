@@ -11,7 +11,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
-from werkzeug.security import check_password_hash,generate_password_hash
+from werkzeug.security import check_password_hash
 
 from app.extensions import base, cache, login_manager
 from app.decorators import roles_required
@@ -29,7 +29,7 @@ def load(session_user_id: str):
 
 	if cached_user:
 		user = User(**unpackb(cached_user))
-
+		return user
 	try:
 		user_obj = base.get_user(UUID(session_user_id))
 		cache.set(user_key, packb(user_obj.to_cache()), timeout=3600)
@@ -46,7 +46,7 @@ def unathorizated_callback():
 	abort(401, 'unathorized, are you logged in? Should you be accessing this?')
 
 #---------------------------------------------------------------------------------------------------------------------------#
-# Get
+# GET
 
 @userBp.get('')
 @login_required
@@ -77,6 +77,23 @@ def get_current_user():
 	'''
 	'''
 	return current_user.to_dict(), 200
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@userBp.get('/<string:user_id>/organizations')
+@login_required
+def get_orgs(user_id: str):
+	'''
+	
+	'''
+	try:
+		orgs = base.get_user_organizations(UUID(user_id))
+		print(orgs[0].to_dict)
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
+
+	return [org.to_dict() for org in orgs]
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -118,6 +135,8 @@ def authenticate(body: LegacyAuth):
 		abort(500)
 		
 	login_user(user)
+	
+
 	return user.to_dict(), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -146,3 +165,5 @@ def create(body: CreateUser):
 		abort(500)
 
 	return user.to_dict(), 201
+
+#---------------------------------------------------------------------------------------------------------------------------#

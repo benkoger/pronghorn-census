@@ -26,6 +26,7 @@ from .cropverifier import verifierBp
 from .reviewedarea import raBp
 from .users import userBp
 from .oauth2 import authBp
+from .organizations import orgBp
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
@@ -41,6 +42,7 @@ bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)
 bp.register_blueprint(userBp)
 bp.register_blueprint(authBp)
+bp.register_blueprint(orgBp)
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Project CRUD

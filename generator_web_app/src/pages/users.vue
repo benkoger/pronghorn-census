@@ -42,7 +42,6 @@
 						:active-item="SelectedUssr"
 						:select-action="oStore.select_user"
 						list-name="Users"
-						allow-create 
 					>
 				</SelectList>
 				</div>

@@ -9,7 +9,7 @@ export default defineComponent({
 		return { uStore }
 	},
 	async mounted() {
-		await this.uStore.check_admin();
+		await this.uStore.start_up();
 	}
 })
 </script>

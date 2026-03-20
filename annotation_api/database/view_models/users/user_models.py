@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
 
@@ -12,9 +11,9 @@ class CreateUser(BaseModel):
 	external_auth_provider: str 
 	status: str = 'invited'
 	locale: str
-	roles: Optional[List[str]] = None
 	project_ids: Optional[List[Union[int, UUID]]] = None
-	organization_ids: Optional[List[Union[int, UUID]]] = None
+	organization_ids: List[Union[int, UUID]]
+	role_ids: List[Union[int, UUID]]
 
 class LegacyAuth(BaseModel):
 	email: str

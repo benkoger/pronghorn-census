@@ -141,33 +141,35 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_organization(self, cursor: Cursor[Organization], organization_ids: int | UUID | list[int | UUID]) -> list[Organization] | Organization | None:
+	def _get_organization(self, cursor: Cursor[Organization], organization_id: int | UUID) -> Organization:
 		''' Internal helper function, do not call directly
 		
 		'''
 		cursor.row_factory = class_row(Organization)
 		query = sql.SQL('SELECT * FROM usermanagement.organizations WHERE {id_field} = %s; ')
-		match organization_ids:
-			case list() if isinstance(organization_ids[0], int):
-				cursor.executemany(query.format(id_field = sql.Identifier('organization_id')), [(org_id,) for org_id in organization_ids])
-			case list() if isinstance(organization_ids[0], UUID):
-				cursor.executemany(query.format(id_field = sql.Identifier('uuid')), [(org_id,) for org_id in organization_ids])
+		match organization_id:
 			case int():
-				cursor.execute(query.format(id_field = sql.Identifier('organization_id')), (organization_ids,))
+				cursor.execute(query.format(id_field = sql.Identifier('organization_id')), (organization_id,))
 			case UUID():
-				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (organization_ids,))
+				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (organization_id,))
 			case _:
 				raise TypeError('organization_ids must be an int, or uuid or a list')
-		organizations = cursor.fetchall()
-		return organizations if organizations and cursor.rowcount > 1 else organizations[0] if organizations else None
+		
+		organization = cursor.fetchone()
 
-	def get_organization(self, organization_ids: int | UUID) -> list[Organization] | Organization | None:
+		if not organization:
+			raise ObjectNotFound('organization', organization_id)
+
+		return organization
+
+
+	def get_organization(self, organization_id: int | UUID) -> Organization:
 		''' Request an organization, or organizations object(S) from the database
 
 		Args:
 			organization_ids: an integer, uuid, or role name, or a list consisting entirely of one of those 3 types
 		'''
-		return self._get_organization(organization_ids = organization_ids)
+		return self._get_organization(organization_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -194,6 +196,33 @@ class Database:
 		'''
 		'''
 		return self._get_many_organizations(organization_ids)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_organization_projects(self, cursor: Cursor[Project], org_id: Union[int, UUID]) -> List[Project]:
+		'''
+
+		'''
+		query = sql.SQL('''
+			SELECT P.* FROM projectmanagement.projects AS P
+			JOIN usermanagement.organizations_projects AS OP ON OP.project_id = P.project_id
+			WHERE OP.orgnaization_id = %s;
+		''')
+
+		org = self._get_organization(cursor, org_id)
+		cursor.row_factory = class_row(Project)
+		cursor.execute(query, (org.organization_id,))
+
+		return cursor.fetchall()
+
+	def get_organization_projects(self, org_id: Union[int, UUID]) -> List[Project]:
+		'''
+
+		'''
+		return self._get_organization_projects(org_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
 	def _update_organization(self, cursor: Cursor[Organization], orgId: Organization | int | UUID,
@@ -320,6 +349,38 @@ class Database:
 		return self._get_role(role_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_many_roles(self, cursor: Cursor[Role], parameters: GetRoles) -> List[Role]:
+		'''
+
+		'''
+		cursor.row_factory = class_row(Role)
+	
+		query = sql.SQL('''
+			SELECT * FROM usermanagement.roles
+			WHERE  role_id = ANY(%s)
+				OR uuid = ANY(%s::uuid[])
+		''')
+
+		model = parameters.model_dump()
+	
+		query += sql.SQL('''
+			
+		''')
+
+		ints = [i for i in model['role_id'] if isinstance(i, int)]
+		uuids = [str(i) for i in model['role_id'] if not isinstance(i, int)]
+	
+		return cursor.execute(query, (ints, uuids)).fetchall()
+
+	def get_many_roles(self, parameters: GetRoles) -> List[Role]:
+		'''
+
+		'''
+		return self._get_many_roles(parameters)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
 	@connect
 	def _update_role(self, cursor: Cursor[Role], role_id: Role | int | UUID | str, name: str | None = None) -> bool:
@@ -347,22 +408,12 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _delete_role(self, cursor: Cursor[Role], role_ids: Role | int | UUID | str | list[int | UUID | str]) -> bool:
+	def _delete_role(self, cursor: Cursor[Role], role_ids: int | UUID | str) -> bool:
 		''' Internal helper function, do not call directly
 		
 		'''
 		query = sql.SQL(' DELETE FROM usermanagement.roles WHERE {id_field} = %s; ') 
 		match role_ids:
-			case list() if isinstance(role_ids[0], Role):
-				cursor.executemany(query.format(id_field = sql.Identifier('role_id')), [(cast(Role, role).role_id,) for role in role_ids])
-			case list() if isinstance(role_ids[0], int):
-				cursor.executemany(query.format(id_field = sql.Identifier('role_id')), [(role_id,) for role_id in role_ids])
-			case list() if isinstance(role_ids[0], UUID):
-				cursor.executemany(query.format(id_field = sql.Identifier('uuid')), [(role_id,) for role_id in role_ids])
-			case list() if isinstance(role_ids[0], str):
-				cursor.executemany(query.format(id_field = sql.Identifier('role')), [(role_id,) for role_id in role_ids])
-			case Role():
-				cursor.execute(query.format(id_field = sql.Identifier('role_id')), (role_ids.role_id,))
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('role_id')), (role_ids,))
 			case UUID():
@@ -399,7 +450,24 @@ class Database:
 				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
 				%(status)s, %(locale)s, %(password_hash)s
 			)
-			RETURNING *;+
+			RETURNING *;
+		''')
+
+		query_2 = sql.SQL('''
+			INSERT INTO projectmanagement.projects_users (
+				project_id, user_id
+			)
+			VALUES (
+				%s, %s
+			)
+		''')
+		query_3 = sql.SQL('''
+			INSERT INTO usermanagement.organizations_users (
+				user_id, organziation_id, role_id
+			)
+			VALUES (
+				%s, %s, %s
+			)
 		''')
 
 		placeholders = parameters.model_dump()
@@ -416,12 +484,19 @@ class Database:
 		if not user:
 			raise FailedToCreate('user')
 
-		#TODO: Finish associating projects with users and organizations with users (and roles with users)
-		# if parameters.project_ids:
-		# 	projects = self._get_many_projects(cursor, parameters.project_ids)
+		projects = self._get_many_projects(cursor, parameters.project_ids)
 
-		# if parameters.organization_ids:
-		# 	orgainizations = self._get_many_organizations(cursor, parameters.organization_ids)
+		cursor.executemany(query_2, [(user.user_id, proj.project_id) for proj in projects])
+
+		# Organizations and Ids should be equal length and appear in the same order
+		orgs = self._get_many_organizations(cursor, parameters.organization_ids)
+		roles = self._get_many_roles(cursor, GetRoles(role_id=parameters.role_ids))
+		
+		if len(roles) != len(orgs):
+			raise InvalidModelState('create_user', 'Number of roles and nubmer of organizations must be equal.')
+
+		cursor.executemany(query_3, [(user.user_id, org.organization_id, role.role_id) for org, role in zip(orgs, roles)])
+
 		return user
 
 	def create_user(self, parameters: CreateUser) -> User:
@@ -439,9 +514,10 @@ class Database:
 		'''  
 		cursor.row_factory = class_row(User)
 		query = sql.SQL('''
-			SELECT U.*, R.name as roles FROM usermanagement.users AS U 
-			JOIN usermanagement.users_roles AS RU ON RU.user_id = U.user_id
-			JOIN usermanagement.roles AS R ON R.role_id = RU.role_id
+			SELECT U.*, R.name as roles, O.uuid as orgs FROM usermanagement.users AS U 
+			JOIN usermanagement.organizations_users AS OU ON OU.user_id = U.user_id
+			JOIN usermanagement.roles AS R ON R.role_id = OU.role_id
+			JOIN usermanagement.organizations O on O.organization_id = OU.organization_id
 			
 			WHERE U.{id_field} = %s
 		''')
@@ -456,8 +532,6 @@ class Database:
 		user = cursor.fetchone()
 		if not user:
 			raise UserNotFound
-
-		roles = self._get_user_roles(cursor, user)
 
 		return user
 		
@@ -484,6 +558,62 @@ class Database:
 
 	def get_users(self):
 		return self._get_users()
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect
+	def _get_user_roles(self, cursor: Cursor[Role], user_id: int | UUID) -> list[Role] | None:
+		''' Internal helper function, do not call directly
+		
+		'''
+		cursor.row_factory = class_row(Role)
+		query = sql.SQL(''' 
+			SELECT R.* FROM usermanagement.roles AS R JOIN usermanagement.organizations_users AS OU 
+			ON OU.role_id = R.role_id WHERE OU.user_id = %s; ''')
+		match user_id:
+			case int():
+				cursor.execute(query, (user_id,))
+			case _:
+				user = self._get_user(user_id)
+				cursor.execute(query, (user.user_id,))
+		roles = cursor.fetchall()
+		return roles
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def get_user_roles(self, user_id: User| int | UUID) -> list[Role] | Role | None:
+		''' Request all roles associated with a user 
+
+		Args:
+			user_id: The user's unique database id 
+		'''
+		return self._get_user_roles(user_id = user_id)
+
+	@connect
+	def _get_user_organizations(self, cursor: Cursor[Organization], user_id: int | UUID) -> list[Organization]:
+		'''
+		
+		'''
+		query = sql.SQL('''
+			SELECT O.* FROM usermanagement.organizations AS O
+			JOIN usermanagement.organizations_users AS OU ON OU.organization_id = O.organization_id
+			WHERE OU.user_id = %s; 
+		''')
+		match user_id:
+			case int():
+				cursor.execute(query, (user_id,))
+			case _:
+				user = self._get_user(cursor, user_id)
+				cursor.execute(query, (user.user_id,))
+
+		cursor.row_factory = class_row(Organization)
+		return cursor.fetchall()
+	
+	def get_user_organizations(self, user_id: int | UUID) -> list[Organization]:
+		'''
+		
+		'''
+		return self._get_user_organizations(user_id)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#		
 
@@ -1632,7 +1762,7 @@ class Database:
 			case _:
 				raise TypeError('survey_id MUST be an integer or a UUID')
 		survey = cursor.fetchone()
-		if survey is None:
+		if not survey:
 			raise Exception('Could not find survey')
 		else:
 			return survey
@@ -2480,7 +2610,7 @@ class Database:
 
 		cursor.row_factory = class_row(ReviewedArea)
 		cursor.execute(query.format(parameter_field = query_params), placeholders)
- 
+
 		return cursor.fetchall()
 		
 
@@ -2538,151 +2668,6 @@ class Database:
 		'''
 		return self._update_reviewed_area(reviewed_area_id, image_id, name, ra_key, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px, reviewed_area_width_px, reviewed_by_user_id)
 
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-	# Relationship Management - usermanagement <-> usermanagement: users <-> roles
-
-	@connect
-	def _add_roles_user(self, cursor: Cursor, user_id: User | int | UUID, role_ids: Role | int | UUID | str | list[Role | int | UUID | str]) -> bool:
-		''' Internal helper function, do not call directly
-		
-		'''
-		query = sql.SQL('''INSERT INTO usermanagement.users_roles (user_id, role_id) VALUES (%s, %s); ''')
-		roles_objs = role_ids if isinstance(role_ids, Role) or (isinstance(role_ids, list) and isinstance(role_ids[0], Role)) else self._get_role(role_ids)
-		match user_id:
-			case User():
-				cursor.executemany(query, [(user_id.user_id, cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user_id.user_id, roles_objs.role_id))
-			case int():
-				cursor.executemany(query, [(int(user_id), cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user_id, roles_objs.role_id))
-			case UUID():
-				user = self.get_user(user_id)
-				cursor.executemany(query, [(user.user_id, cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user.user_id, roles_objs.role_id))
-			case _:
-				raise TypeError('user_id must be a User object, int, or uuidm, and role_ids must be a Role object, int, UUID, str, or a list consisting entirely of ONE of the four ')
-		return True if cursor.rowcount > 0 else False
-
-	def add_roles_user(self, user_id: User | int | UUID, role_ids: list[Role | int | UUID ] | Role | int | UUID) -> bool:
-		''' Grant a user a role
-
-		Args:
-			user_id: either a User object, a database id, or a universally unique identifier 
-			role_ids: either a Role object, a database id, or a universally unique identifier or a list consisting of ONE of the three
-		'''
-		return self._add_roles_user(user_id = user_id, role_ids = role_ids)
-	
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-	@connect
-	def _get_user_roles(self, cursor: Cursor[Role], user_id: User| int | UUID) -> list[Role] | None:
-		''' Internal helper function, do not call directly
-		
-		'''
-		cursor.row_factory = class_row(Role)
-		query = sql.SQL(''' 
-			SELECT roles.role_id, name, created, modified, uuid FROM usermanagement.roles AS roles JOIN usermanagement.users_roles AS users_roles 
-			ON users_roles.role_id = roles.role_id WHERE users_roles.user_id = %s; ''')
-		match user_id:
-			case User():
-				cursor.execute(query, (user_id.user_id,))
-			case int():
-				cursor.execute(query, (user_id,))
-			case _:
-				user = self._get_user(user_id)
-				cursor.execute(query, (user.user_id,))
-		roles = cursor.fetchall()
-		return roles
-
-	def get_user_roles(self, user_id: User| int | UUID) -> list[Role] | Role | None:
-		''' Request all roles associated with a user 
-
-		Args:
-			user_id: The user's unique database id 
-		'''
-		return self._get_user_roles(user_id = user_id)
-
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-	@connect
-	def _remove_roles_user(self, cursor: Cursor, user_id: User | int | UUID, role_ids: Role | int | UUID | str | list[Role] | list[int] | list[UUID] | list[str]) -> bool:
-		''' Internal helper function, do not call directly
-		
-		'''
-		query = sql.SQL(' DELETE FROM usermanagement.users_roles WHERE user_id = %s AND role_id = %s; ')
-		roles_objs = role_ids if isinstance(cast(list, role_ids)[0], Role) else self._get_role(role_ids)
-		match user_id:
-			case User():
-				cursor.executemany(query, [(user_id.user_id, cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user_id.user_id, cast(Role, roles_objs).role_id))
-			case int():
-				cursor.executemany(query, [(user_id, cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user_id, cast(Role, roles_objs).role_id))
-			case _:
-				user = self._get_user(user_id)
-				cursor.executemany(query, [(user.user_id, cast(Role, role).role_id) for role in roles_objs]) if isinstance(roles_objs, list) else cursor.execute(query, (user.user_id, cast(Role, roles_objs).role_id))
-		return True if cursor.rowcount > 0 else False
-				
-	def remove_roles_user(self, user_id: User | int | UUID, role_ids: Role | int | UUID | str | list[Role | int | UUID | str]) -> bool:
-		''' Remove a user from a role 
-		
-		'''
-		return self._remove_roles_user(user_id = user_id, role_ids = role_ids)
-
-	@connect
-	def _get_organization_users(self, cursor: Cursor[User], organization_id: Organization | int | UUID ) -> list[User] | User | None:
-		''' Internal helper function, do not call directly
-		
-		''' 
-		cursor.row_factory = class_row(User)
-		query = sql.SQL(''' 
-			SELECT users.user_id, username, external_auth_id, external_auth_provider, status, created, 
-			modified, last_login, locale, uuid FROM usermanagement.users AS users JOIN usermanagement.organizations_users 
-			as orgs_users ON orgs_users.user_id = users.user_id WHERE orgs_users.organization_id = %s; ''')
-		match organization_id:
-			case Organization():
-				cursor.execute(query, (organization_id.organization_id,))
-			case int():
-				cursor.execute(query, (organization_id,))
-			case _:
-				org = self._get_organization(organization_id)
-				cursor.execute(query, (org.organization_id))
-		users = cursor.fetchall()
-		return users[0] if len(users) == 1 and isinstance(users[0], User) else users if all(isinstance(user, User) for user in users) else None
-	
-	def get_organization_users(self, organization_id: Organization | int | UUID ) -> list[User] | User | None:
-		'''
-		
-		'''
-		return self._get_organization_users(organization_id = organization_id)
-	
-	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-	@connect
-	def _get_user_organizations(self, cursor: Cursor[Organization], user_id: User | int | UUID) -> list[Organization]:
-		'''
-		
-		'''
-		cursor.row_factory = class_row(Organization)
-		query = sql.SQL('''
-			SELECT organizations.organization_id, name, created, modified, logo_url, uuid FROM usermanagement.organizations 
-			AS organizations JOIN usermanagement.organization_users as org_users on org_users.organization_id = organizations.organization_id
-			WHERE org_users.user_id = %s; ''')
-		match user_id:
-			case User():
-				cursor.execute(query, (user_id.user_id,))
-			case int():
-				cursor.execute(query, (user_id,))
-			case _:
-				user = self._get_user(user_id)
-				cursor.execute(query, (user.user_id))
-		orgs = cursor.fetchall()
-		if orgs is None:
-			raise Exception('User has no organizations')
-		return orgs
-	
-	def get_user_organizations(self, user_id: User | int | UUID) -> list[Organization]:
-		'''
-		
-		'''
-		return self._get_user_organizations(user_id = user_id)
-	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 

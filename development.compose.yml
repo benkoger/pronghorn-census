@@ -22,6 +22,34 @@ services:
     ports:
       - "5432:5432"
     command: ["postgres", "-c", "listen_addresses=*"]
+
+  spicedb-migrate:
+    image: authzed/spicedb:latest
+    environment:
+      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI} 
+    command: migrate head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  spicedb:
+    container_name: prong_spicedb
+    image: authzed/spicedb:latest
+    environment:
+      SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL}
+      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+    command: serve
+    ports:
+      - "50051:50051"
+      - "50052:50052"
+      - "9090:9090"
+    depends_on:
+      spicedb-migrate:
+        condition: service_completed_successfully
+
   pronghorn-api-dev:
     depends_on:
       db:
@@ -63,6 +91,7 @@ services:
       - dev_pronghorn_app_network
     ports: 
       - 8000:8000
+
   valkey:
     container_name: prong_dev_valkey
     image: docker.io/valkey/valkey:8.1.1
@@ -74,6 +103,7 @@ services:
       - "6379:6379"
     networks: 
       - dev_pronghorn_app_network
+
   web-app-dev:
     container_name: prong_dev_webapp
     build:

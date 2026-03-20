@@ -14,7 +14,7 @@ class ObjectNotFound(Exception):
 class FailedToCreate(Exception):
 	'''Raised when an object fails to be created'''
 	def __init__(self, object_type: str):
-		self.message = f"Failed to create {object_type}"
+		self.message = f'Failed to create {object_type}'
 		super().__init__(self.message)
 
 class AuthorizationFailure(Exception):
@@ -26,3 +26,9 @@ class UserNotFound(Exception):
 	'''Raised when a user is not found'''
 	def __init__(self):
 		super().__init__('User not found')
+
+class InvalidModelState(Exception):
+	'''Raised when an illegal model state is passed to a database method'''
+	def __init__(self, method_name: str, state_violation: str):
+		self.message = f'Invalid model state for {method_name}: {state_violation}'
+		super().__init__(self.message)

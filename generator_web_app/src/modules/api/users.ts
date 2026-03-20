@@ -3,8 +3,8 @@
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-import { User } from '@/types/generatorobjects.ts';
-import type { UserIntf } from '@/types/generatorobjects.ts';
+import { User, Organization } from '@/types/generatorobjects.ts';
+import type { UserIntf, OrganizationIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
@@ -42,6 +42,26 @@ export async function getAllUsers(): Promise<User[]> {
 	for (const user of resp)  users.push(new User(user as UserIntf));
 
 	return users
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
+export async function getUserOrganizations(user_id: string): Promise<Organization[]> {
+	const response = await fetch(`${api_url}/users/${user_id}/organizations`, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		credentials: 'include',
+	});
+	if (!response.ok) throw new ApiError(await response.json());
+	
+	const resp = await response.json();
+	let orgs = [];
+
+	for (const org of resp) orgs.push(new Organization(org as OrganizationIntf));
+
+	return orgs
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//

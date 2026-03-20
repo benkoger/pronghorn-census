@@ -92,7 +92,8 @@ def oauth2_callback(provider: str):
 		abort(401)
 	email = provider_data['userinfo']['email'](response.json())
 
-	try:
+	try:	
+		print(email)
 		user = base.get_user(email)
 	except UserNotFound:
 		abort(403, 'You must first be invited to access this resource')
@@ -108,4 +109,4 @@ def oauth2_callback(provider: str):
 	login_user(user)
 
 	frontend_url = current_app.config.get('ORIGIN_URL')
-	return redirect(f"{frontend_url}/dashboard")
+	return redirect(f"{frontend_url}/")
