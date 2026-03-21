@@ -10,15 +10,21 @@ from flask_login import login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
-from app.extensions import base, s3
+from app.extensions import base
 from database import ObjectNotFound
-
-from .project_validators import *
+from database.view_models.projects import *
 
 projectBp = Blueprint('projects', __name__, url_prefix='/api/v1/projects')
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # GET
+
+@projectBp.get('/')
+@login_required
+def get_all():
+	'''
+	'''
+	return ''
 
 @projectBp.get('/<string:project_id>')
 @login_required

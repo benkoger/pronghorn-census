@@ -12,9 +12,7 @@ from psycopg.errors import DatabaseError
 
 from app.extensions import base
 from database import ObjectNotFound
-
-
-from .herdunit_validators import CreateHerdUnit
+from database.view_models.herd_units import *
 
 herdunitBp = Blueprint('herd_units', __name__, url_prefix='/api/v1/herd-units')
 

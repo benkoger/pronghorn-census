@@ -13,8 +13,7 @@ from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, s3
 from database import ObjectNotFound
-
-from .reviewedarea_validators import *
+from database.view_models.reviewed_areas import *
 
 raBp = Blueprint('reviewed-area', __name__, url_prefix='/api/v1/reviewed-area')
 

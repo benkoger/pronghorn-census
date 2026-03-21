@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Union, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
 class RAQuery(BaseModel):

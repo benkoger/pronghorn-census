@@ -7,14 +7,14 @@ from uuid import UUID
 
 from botocore.exceptions import ClientError
 from flask import Blueprint, abort, request
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, s3
 from database import ObjectNotFound
-
-from .cropverifier_validators import *
+from database.view_models.reviewed_areas import RAQuery
+from database.view_models.verifier import *
 
 verifierBp = Blueprint('verifier', __name__, url_prefix='/api/v1/verifier')
 

@@ -3,15 +3,23 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 from functools import wraps
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast, Union
 from uuid import UUID
 import uuid
-from .errors import *
-from werkzeug.security import generate_password_hash
 
+from authzed.api.v1 import (
+	Client,
+	ObjectReference,
+	Relationship,
+	RelationshipUpdate,
+	SubjectReference,
+	WriteRelationshipsRequest,
+	CheckPermissionRequest,
+	CheckPermissionResponse
+)
 from cropgenerator.generatorobjects import (
 	Annotation,
 	HerdUnit,
@@ -27,22 +35,30 @@ from cropgenerator.generatorobjects import (
 	Survey,
 	User,
 )
-
-from .view_models import *
-
+from grpc import ChannelCredentials
 from psycopg import Cursor
 from psycopg.rows import class_row, dict_row
 import psycopg.sql as sql
 from psycopg_pool import ConnectionPool
+from werkzeug.security import generate_password_hash
+
+from .errors import *
+from .view_models import *
+
+from .query_builder import QueryBuilder
 
 EXT_KEY = 'base' 
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
 class Database:
-	def __init__(self, db_config: dict[str, str]):
+	def __init__(self, db_config: Dict[str, str], spice_config: Dict[str, Union[str, ChannelCredentials]]):
 		self._config = db_config
 		self._pool = None
+		self._spice_client = Client(
+			cast(str, spice_config['spice_url']),
+			cast(ChannelCredentials, spice_config['bearer_token'])
+		)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	def init_app(self, app, app_attribute_name='database'):
@@ -98,6 +114,59 @@ class Database:
 				with conn.cursor() as cursor:    
 					return fn(self, cursor, *args, **kwargs)
 		return wrapper
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	
+	def _write_spice_relationships(self, updates: List[RelationshipUpdate]):
+		'''
+		
+		'''
+		return self._spice_client.WriteRelationships(
+			WriteRelationshipsRequest(
+				updates=updates
+			)
+		)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def _create_spice_update(self, object_type: str, object_id: str, subject_type: str, subject_id: str, relation: str) -> RelationshipUpdate:
+		'''
+
+		'''
+		return RelationshipUpdate(
+			operation=RelationshipUpdate.Operation.OPERATION_CREATE,
+			relationship=Relationship(
+				resource=ObjectReference(object_type=object_type, object_id=object_id),
+				relation=relation,
+				subject=SubjectReference(
+					object=ObjectReference(
+						object_type=subject_type,
+						object_id=subject_id,
+					)
+				)
+			)
+		)
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def _check_permissions(self, object_type: str, object_id: str, subject_type: str, subject_id: str, permission:str):
+		'''
+		'''
+		resp = self._spice_client.CheckPermission(
+			CheckPermissionRequest(
+				resource=ObjectReference(
+					object_type=object_type,
+					object_id=object_id
+				),
+				permission=permission,
+				subject=SubjectReference(
+					object=ObjectReference(
+						object_type=subject_type,
+						object_id=subject_id,
+					)
+				)
+			)
+		)
+		assert resp.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
@@ -484,7 +553,7 @@ class Database:
 		if not user:
 			raise FailedToCreate('user')
 
-		projects = self._get_many_projects(cursor, parameters.project_ids)
+		projects = self._get_projects(cursor, parameters.project_ids)
 
 		cursor.executemany(query_2, [(user.user_id, proj.project_id) for proj in projects])
 
@@ -799,7 +868,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
 	@connect 
-	def _get_many_projects(self, cursor: Cursor[Project], project_ids: List[Union[int, UUID]]) -> List[Project]:
+	def _get_projects(self, cursor: Cursor[Project], project_ids: List[Union[int, UUID]]) -> List[Project]:
 		'''
 
 		'''
@@ -817,10 +886,10 @@ class Database:
 
 		return cursor.fetchall()
 
-	def get_many_projects(self, project_ids: List[Union[int, UUID]]) -> List[Project]:
+	def get_projects(self, project_ids: List[Union[int, UUID]]) -> List[Project]:
 		'''
 		'''
-		return self._get_many_projects(project_ids)
+		return self._get_projects(project_ids)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -2592,7 +2661,7 @@ class Database:
 			params.append(sql.SQL('I.herd_unit_id = ANY(%(herd_unit_ids)s)'))
 			placeholders['herd_unit_ids'] = parameters['herd_unit_id']
 
-		if 'herd_unit_id' in parameters:
+		if 'survey_id' in parameters:
 			params.append(sql.SQL('I.survey_id = ANY(%(survey_ids)s)'))
 			placeholders['survey_ids'] = parameters['survey_id']
 
@@ -2619,6 +2688,7 @@ class Database:
 		
 		'''
 		return self._get_reviewed_areas(parameters)
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
@@ -2803,7 +2873,7 @@ class Database:
 			raise Exception('Could not find surveys for project')
 		return surveys
 				
-	def get_projects_surveys(self, project_id: Project | int | UUID) -> list[Survey]:
+	def get_project_surveys(self, project_id: Project | int | UUID) -> list[Survey]:
 		'''
 		
 		'''

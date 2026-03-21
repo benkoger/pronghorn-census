@@ -7,7 +7,7 @@
 
 from flask import Blueprint,  abort, request, current_app
 from psycopg import DatabaseError
-from .survey_validators import CreateSurvey, UpdateSurvey
+from database.view_models.surveys import *
 from app.extensions import base
 from datetime import date, datetime
 from flask_pydantic import validate

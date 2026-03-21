@@ -3,6 +3,7 @@ from botocore.config import Config
 from dotenv import load_dotenv
 import redis
 from boto3.s3.transfer import TransferConfig
+from grpcutil import insecure_bearer_token_credentials, bearer_token_credentials
 
 load_dotenv()
 
@@ -40,6 +41,11 @@ db_config = {
 	'host': os.environ.get('DB_HOST'),           
 	'port': os.environ.get('DB_PORT'),    
 	'options': '-c statement_timeout=5000'        
+}
+
+spice_config = {
+	'spice_url': os.environ.get('SPICE_URL'),
+	'bearer_token': insecure_bearer_token_credentials(os.environ.get('SPICEDB_GRPC_PRESHARED_KEY')) #pyright: ignore
 }
 
 cache_config={

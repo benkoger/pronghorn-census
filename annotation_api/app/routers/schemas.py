@@ -14,7 +14,7 @@ from psycopg.errors import DatabaseError, UniqueViolation
 from app.extensions import base
 from database import ObjectNotFound
 
-from .schema_validators import *
+from database.view_models.schemas import *
 
 schemaBp = Blueprint('schemas', __name__, url_prefix='/api/v1/schemas')
 

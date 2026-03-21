@@ -13,8 +13,7 @@ from psycopg.errors import DatabaseError
 
 from app.extensions import base
 from database import ObjectNotFound
-
-from .model_validators import CreateModel
+from database.view_models.models import *
 
 modelBp = Blueprint('models', __name__, url_prefix='/api/v1/models')
 

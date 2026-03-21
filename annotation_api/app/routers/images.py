@@ -11,11 +11,10 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
 
-from app.extensions import base, s3
 from app.decorators import roles_required
+from app.extensions import base, s3
 from database import ObjectNotFound
-
-from .image_validators import *
+from database.view_models.images import *
 
 imageBp = Blueprint('images', __name__, url_prefix='/api/v1/images')
 
