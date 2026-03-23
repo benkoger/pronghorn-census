@@ -1,0 +1,23 @@
+definition user {}
+
+definition organization {
+	relation admin: user
+	relation member: user
+}
+
+definition project {
+    relation parent: organization
+    relation manager: user
+
+    permission view = manager
+
+    permission edit = manager
+}
+
+definition herd_unit {
+	relation parent: project
+}
+
+definition survey { 
+  relation parent: herd_unit
+}
