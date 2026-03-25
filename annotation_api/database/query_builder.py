@@ -3,7 +3,7 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from typing import List, Union
+from typing import List, Tuple, Dict, Union
 from uuid import UUID
 
 import psycopg.sql as sql
@@ -13,7 +13,7 @@ import psycopg.sql as sql
 class QueryBuilder:
 	'''Still not an ORM -ML'''
 	@staticmethod
-	def filter_by_object_ids(prefix: sql.Composable, id_field: sql.Composable, ids: List[Union[int, UUID]]):
+	def filter_by_object_ids(prefix: sql.Composable, id_field: sql.Composable, ids: List[Union[int, UUID]]) -> Tuple[sql.Composable, Dict]:
 		'''
 		
 		'''

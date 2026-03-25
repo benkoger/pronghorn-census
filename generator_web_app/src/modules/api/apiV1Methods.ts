@@ -4,8 +4,7 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import {
-	Image, Prediction, ReviewedArea, PredictionCrop, Project, Organization, User,
-	Label, Annotation
+	Image, Prediction, ReviewedArea, PredictionCrop, Project, Label, Annotation
 } from '@/types/generatorobjects.ts';
 import type { PredictionIntf, UserIntf, ImageIntf, PredictionCropIntf } from '@/types/generatorobjects.ts';
 import type { apiError } from '@/modules/api/errors.ts';
@@ -18,25 +17,7 @@ export const api_url: URL = new URL(api_url_base);
 //---------------------------------------------------------------------------------------------------------------------------//
 // Project Crud
 
-export async function getProjects(): Promise<Project[] | undefined> {
-	try {
-		const response = await fetch(`${api_url}/request/projects/all`, {
-			method: 'GET',
-			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-		if (!response.ok) throw new Error(`${(await response.json() as apiError).message}`)
-		const resp = await response.json();
-		let projects = [];
-		for (const project of resp) projects.push(new Project(project));
-		return projects;
-	} catch (error: any) {
-		console.error("Error: ", error)
-		return undefined;
-	}
-}
+
 
 //---------------------------------------------------------------------------------------------------------------------------//
 // Auto Cropping

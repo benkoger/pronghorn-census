@@ -10,13 +10,30 @@ import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+export async function getAllProjects(): Promise<Project[]> {
+  const response = await fetch(`${api_url}/projects/`, {
+	  method: 'GET',
+	  credentials: 'include',
+	  headers: {
+		  'Content-Type': 'application/json',
+	  },
+	});
+	if (!response.ok) throw new ApiError(await response.json());
+	const resp = await response.json();
+	let projects = [];
+	for (const project of resp) projects.push(new Project(project));
+	return projects;
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
 export async function getProjectModels(project_id: string): Promise<Model[] | undefined> {
-    const response = await fetch(`${api_url}/projects/${project_id}/models`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
+  const response = await fetch(`${api_url}/projects/${project_id}/models`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
             'Content-Type': 'application/json',
-        },
+    },
     });
     if (!response.ok) throw new ApiError(await response.json());
 
@@ -30,12 +47,12 @@ export async function getProjectModels(project_id: string): Promise<Model[] | un
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function getProjectHerdUnits(project_id: string): Promise<HerdUnit[]> {
-    const response = await fetch(`${api_url}/projects/${project_id}/herd-units`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+  const response = await fetch(`${api_url}/projects/${project_id}/herd-units`, {
+    method: 'GET',
+    credentials: 'include',
+      headers: {
+           'Content-Type': 'application/json',
+      },
     });
     if (!response.ok) throw new ApiError(await response.json());
 

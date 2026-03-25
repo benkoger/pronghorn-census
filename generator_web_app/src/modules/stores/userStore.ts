@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { authUser, checkAuth, getCurrentUser, deauthUser, getUserHasRole, getUserOrganizations } from '@/modules/api/users';
+import { authUser, checkAuth, getCurrentUser, deauthUser, getUserHasRole, getUserOrganizations,
+ setActiveOrg } from '@/modules/api/users';
 import { Organization, User } from '@/types/generatorobjects.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
@@ -23,7 +24,7 @@ export const useUserStore = defineStore('userStore', {
 	persist: {
 		storage: localStorage,
 		key: 'user-preferences',
-		pick: ['theme', 'first_login']
+		pick: ['theme', 'first_login', 'organization_idx']
 	},
 	getters: {
 		CurrentUser: (state) => state.user,
@@ -32,8 +33,8 @@ export const useUserStore = defineStore('userStore', {
 	},
 	actions: {
 		async authenticate(email: string, password: string) {
-			this.user = await authUser(email, password) as User;
-			this.logged_in = (this.user) ? true : false;
+			this.logged_in = await authUser(email, password);
+      this.get_current_user();
 		},
 		async start_up() {
 			await this.check_admin();
@@ -60,12 +61,13 @@ export const useUserStore = defineStore('userStore', {
 		async check_admin() {
 			this.is_admin = await getUserHasRole('admin');
 		},
-		set_organization(org: Organization | undefined) {
+		async set_organization(org: Organization | undefined) {
 			if (org != undefined) {
 				const idx = this.organizations.indexOf(org);
 				if (idx != undefined) {
 					this.organization_idx = idx;
-					this.check_admin();
+          await setActiveOrg(org.uuid);
+					await this.check_admin();
 				}
 			}
 		},

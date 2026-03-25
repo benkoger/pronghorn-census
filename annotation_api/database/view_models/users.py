@@ -21,3 +21,4 @@ class LegacyAuth(BaseModel):
 
 class RoleQuery(BaseModel):
 	role_name: str
+

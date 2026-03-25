@@ -6,7 +6,7 @@
 from uuid import UUID
 
 from cropgenerator.generatorobjects import User
-from flask import Blueprint, abort
+from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from msgpack import packb, unpackb
@@ -17,6 +17,7 @@ from app.extensions import base, cache, login_manager
 from app.decorators import roles_required
 from database import AuthorizationFailure, ObjectNotFound, UserNotFound
 from database.view_models.users import *
+from database.view_models.organizations import SetActiveOrg
 
 userBp = Blueprint('users', __name__, url_prefix='/api/v1/users')
 
@@ -112,43 +113,6 @@ def check_role(query: RoleQuery):
 #---------------------------------------------------------------------------------------------------------------------------#
 # POST
 
-@userBp.post('/authenticate')
-@validate()
-def authenticate(body: LegacyAuth):
-	''' Legacy manual token aut
-	'''
-
-	try:
-		user = base.get_user(body.email)
-		if not user.password_hash:
-			abort(400)
-
-		if check_password_hash(user.password_hash, body.password):
-			base.login_user(user.user_id)
-		else:
-			raise AuthorizationFailure
-
-	except AuthorizationFailure as e:
-		abort(401, str(e))
-	except (DatabaseError, Exception) as e:
-		print(e)
-		abort(500)
-		
-	login_user(user)
-	
-
-	return user.to_dict(), 200
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-@userBp.post('/deauthenticate')
-@login_required
-def logout():
-	logout_user()
-	return '', 200
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
 @userBp.post('')
 @login_required
 @validate()
@@ -167,3 +131,20 @@ def create(body: CreateUser):
 	return user.to_dict(), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
+# PATCH
+
+@userBp.patch('/set-active-organization')
+@login_required
+@validate()
+def set_org(body: SetActiveOrg):
+	'''
+
+	'''
+	if isinstance(body.org_id, int):
+		org_id = base.get_organization(body.org_id).uuid
+	else: 
+		org_id = body.org_id
+
+	session['active_org_uuid'] = org_id 
+
+	return '', 200

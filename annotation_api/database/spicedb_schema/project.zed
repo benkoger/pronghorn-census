@@ -1,8 +1,0 @@
-definition project {
-    relation shared_with: organization
-    relation manager: user
-
-    permission view = manager + shared_with->is_member
-
-    permission edit = manager + shared_with->is_admin
-}

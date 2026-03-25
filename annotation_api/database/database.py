@@ -18,8 +18,9 @@ from authzed.api.v1 import (
 	SubjectReference,
 	WriteRelationshipsRequest,
 	CheckPermissionRequest,
-	CheckPermissionResponse
-)
+	CheckPermissionResponse,
+	LookupResourcesRequest
+) 
 from cropgenerator.generatorobjects import (
 	Annotation,
 	HerdUnit,
@@ -104,7 +105,7 @@ class Database:
 		def wrapper(self, *args, **kwargs):
 
 			has_cursor = 'cursor' in kwargs or (len(args) > 0 and args[0].__class__.__name__ == 'Cursor')
-        
+		
 			if has_cursor:
 				return fn(self, *args, **kwargs)
 
@@ -129,7 +130,7 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _create_spice_update(self, object_type: str, object_id: str, subject_type: str, subject_id: str, relation: str) -> RelationshipUpdate:
+	def _create_spice_update(self, object_type: str, object_id: str, subject_id: str, relation: str) -> RelationshipUpdate:
 		'''
 
 		'''
@@ -140,7 +141,7 @@ class Database:
 				relation=relation,
 				subject=SubjectReference(
 					object=ObjectReference(
-						object_type=subject_type,
+						object_type='user',
 						object_id=subject_id,
 					)
 				)
@@ -148,10 +149,10 @@ class Database:
 		)
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _check_permissions(self, object_type: str, object_id: str, subject_type: str, subject_id: str, permission:str):
+	def _check_permissions(self, object_type: str, object_id: str, subject_id: str, permission:str):
 		'''
 		'''
-		resp = self._spice_client.CheckPermission(
+		return self._spice_client.CheckPermission(
 			CheckPermissionRequest(
 				resource=ObjectReference(
 					object_type=object_type,
@@ -160,16 +161,33 @@ class Database:
 				permission=permission,
 				subject=SubjectReference(
 					object=ObjectReference(
-						object_type=subject_type,
+						object_type='user',
 						object_id=subject_id,
 					)
 				)
 			)
 		)
-		assert resp.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def _lookup_resource(self, resource_type: str, permission: str, subject_id: str):
+		'''
+		'''
+		return self._spice_client.LookupResources(
+			LookupResourcesRequest(
+				resource_object_type=resource_type,
+				permission=permission,
+				subject=SubjectReference(
+					object=ObjectReference(
+						object_type='user', 
+						object_id=subject_id
+					)
+				)
+			)
+		)
 	
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
 	@connect
 	def _bootstrap(self, cursor: Cursor) -> bool:
 			try:
@@ -221,8 +239,6 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('organization_id')), (organization_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (organization_id,))
-			case _:
-				raise TypeError('organization_ids must be an int, or uuid or a list')
 		
 		organization = cursor.fetchone()
 
@@ -230,8 +246,6 @@ class Database:
 			raise ObjectNotFound('organization', organization_id)
 
 		return organization
-
-
 	def get_organization(self, organization_id: int | UUID) -> Organization:
 		''' Request an organization, or organizations object(S) from the database
 
@@ -868,28 +882,38 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
 	@connect 
-	def _get_projects(self, cursor: Cursor[Project], project_ids: List[Union[int, UUID]]) -> List[Project]:
+	def _get_projects(self, cursor: Cursor[Project], parameters: ProjectQuery) -> List[Project]:
 		'''
 
 		'''
-		cursor.row_factory = class_row(Project)
-		ints = [i for i in project_ids if isinstance(i, int)]
-		uuids = [str(i) for i in project_ids if not isinstance(i, int)]
+
 		query = sql.SQL('''
-			SELECT * FROM projectmanagement.projects
-			WHERE project_id = ANY(%s)
-			OR uuid = ANY(%s::uuid[])
-			)
+			SELECT P.* FROM projectmanagement.projects as P
+			JOIN usermanagement.organizations_projects as OP ON OP.project_id = P.project_id
+			WHERE OP.organization_id = %(org_id)s
 		''')
+		if isinstance(parameters.organization_id, UUID):
+			org_id = self._get_organization(cursor, parameters.organization_id).organization_id
+		else:
+			org_id = parameters.organization_id
 
-		cursor.execute(query, (ints, uuids))
+		if parameters.project_id:
+			p_filters, data = QueryBuilder.filter_by_object_ids(
+				sql.Identifier('P'),
+				sql.Identifier('project_id'),
+				parameters.project_id
+			)
+			cursor.row_factory = class_row(Project)
+			return cursor.execute(query + sql.SQL('AND') + p_filters, {**data, 'org_id': org_id}).fetchall()
 
-		return cursor.fetchall()
+		else:
+			cursor.row_factory = class_row(Project)
+			return cursor.execute(query, {'org_id': org_id}).fetchall()
 
-	def get_projects(self, project_ids: List[Union[int, UUID]]) -> List[Project]:
+	def get_projects(self, parameters: ProjectQuery) -> List[Project]:
 		'''
 		'''
-		return self._get_projects(project_ids)
+		return self._get_projects(parameters)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -2979,11 +3003,11 @@ class Database:
 
 		cursor.row_factory = dict_row
 		query = sql.SQL(''' 
-            WITH SelectedImageIds AS (
-                SELECT DISTINCT I.image_id, I.herd_unit_id, I.survey_id, P.score
-                FROM core.images I
-                INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
-                WHERE I.herd_unit_id = %(herd_unit_id)s
+			WITH SelectedImageIds AS (
+				SELECT DISTINCT I.image_id, I.herd_unit_id, I.survey_id, P.score
+				FROM core.images I
+				INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
+				WHERE I.herd_unit_id = %(herd_unit_id)s
 					AND I.survey_id = %(survey_id)s
 					AND I.opened_by_user_id = 0
 					AND P.model_id = %(model_id)s
@@ -2991,42 +3015,42 @@ class Database:
 					AND P.label = ANY(%(labels)s)
 					AND P.score > %(score)s
 				ORDER BY P.score DESC
-                LIMIT %(batch_size)s
-            )
-            SELECT json_agg(row_to_json(img_preds))
-            FROM (
-                SELECT
+				LIMIT %(batch_size)s
+			)
+			SELECT json_agg(row_to_json(img_preds))
+			FROM (
+				SELECT
 					I.image_id,
-                    I.name,
-                    I.in_training,
+					I.name,
+					I.in_training,
 					I.crops_generated,
 					I.created,
 					I.modified,
 					I.image_length_px,
 					I.image_width_px,
 					I.uuid,
-                    json_agg(
-                        json_build_object(
+					json_agg(
+						json_build_object(
 							'pred_id', P.pred_id,
 							'image_id', P.image_id,
 							'model_id', P.model_id,
 							'dimensions', json_build_object('top_left', json_build_array(P.box_tx, P.box_ty), 'bottom_right', json_build_array(P.box_bx, P.box_by)),
-                            'score', P.score,
-                            'label', P.label,
+							'score', P.score,
+							'label', P.label,
 							'created', P.created,
 							'uuid', P.uuid
-                        )
-                        ORDER BY P.score DESC
-                    ) AS predictions
-                FROM core.images I
-                INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
-                WHERE I.image_id IN (SELECT image_id FROM SelectedImageIds)
-                    AND P.label = ANY(%(labels)s)
-                    AND P.score > %(score)s
-                    AND P.model_id = %(model_id)s
+						)
+						ORDER BY P.score DESC
+					) AS predictions
+				FROM core.images I
+				INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
+				WHERE I.image_id IN (SELECT image_id FROM SelectedImageIds)
+					AND P.label = ANY(%(labels)s)
+					AND P.score > %(score)s
+					AND P.model_id = %(model_id)s
 				GROUP BY I.image_id 
-            ) AS img_preds;
-        ''')
+			) AS img_preds;
+		''')
 		params = {
 			'herd_unit_id': herd_unit.herd_unit_id,
 			'survey_id': survey.survey_id,

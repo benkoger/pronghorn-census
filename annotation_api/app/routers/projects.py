@@ -5,7 +5,7 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort
+from flask import Blueprint, abort, session
 from flask_login import login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
@@ -21,10 +21,18 @@ projectBp = Blueprint('projects', __name__, url_prefix='/api/v1/projects')
 
 @projectBp.get('/')
 @login_required
-def get_all():
+@validate()
+def get_all(query: ProjectQuery):
 	'''
+
 	'''
-	return ''
+	try:
+		query.organization_id = UUID(session.get('active_org_uuid')) 
+		projects = base.get_projects(query)
+	except (DatabaseError, Exception) as e:
+		print(e)
+		abort(500)
+	return [proj.to_dict() for proj in projects], 200
 
 @projectBp.get('/<string:project_id>')
 @login_required

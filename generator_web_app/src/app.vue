@@ -3,7 +3,10 @@ import { defineComponent } from 'vue';
 import Header from './components/header.vue';
 import Nav from './components/nav.vue';
 import { RouterView } from 'vue-router';
+import { mapState } from 'pinia';
+import type { Organization } from './types/generatorobjects';
 import { useUserStore } from './modules/stores/userStore';
+import { useProjectStore } from './modules/stores/projectStore';
 
 export default defineComponent({
   name: 'App',
@@ -14,18 +17,32 @@ export default defineComponent({
   },
   setup() {
     const uStore = useUserStore();
+    const pStore = useProjectStore();
     if (uStore.first_login) {
       uStore.getBrowserPreference();
       uStore.first_login = false; 
     } else {
       uStore.setTheme(uStore.theme);
     } 
-    return { uStore }
+    return { uStore, pStore }
   },
   async mounted() {
     if (this.uStore.logged_in) {
       await this.uStore.get_current_user();
       await this.uStore.get_organizations();
+    }
+  },
+  computed: {
+    ...mapState(useUserStore, {
+      CurrentOrganization: 'CurrentOrganization',
+    }
+  )
+  },
+  watch: {
+    CurrentOrganization(newValue: Organization, oldValue: Organization) {
+      if (newValue != oldValue && newValue != undefined) {
+        this.pStore.$reset();
+      }
     }
   }
 })

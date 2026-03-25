@@ -4,10 +4,9 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from "pinia";
-import { getProjects } from '@/modules/api/apiV1Methods.ts';
 import { Project, Schema, Label, HerdUnit, Model, Survey } from '@/types/generatorobjects.ts';
 import { createSurvey } from '@/modules/api/surveys.ts';
-import { getProjectModels, getProjectHerdUnits } from '@/modules/api/projects.ts';
+import { getProjectModels, getAllProjects, getProjectHerdUnits } from '@/modules/api/projects.ts';
 import { createHerdUnit, getHerdUnitSurveys } from '@/modules/api/herdunits.ts';
 import { getModelSchema } from '@/modules/api/models.ts';
 import { getSchemaLabels } from '@/modules/api/schemas.ts';
@@ -67,7 +66,7 @@ export const useProjectStore = defineStore('pStore', {
 			if (this.schemas) return this.schemas.find(schema => schema.uuid === id) as Schema;
 		},
 		async get_projects() {
-			this.projects = await getProjects() as Project[];
+			this.projects = await getAllProjects() as Project[];
 		},
 		async get_schema_labels() {
 			if (this.CurrentSchema) this.labels = await getSchemaLabels(this.CurrentSchema.uuid) as Label[];

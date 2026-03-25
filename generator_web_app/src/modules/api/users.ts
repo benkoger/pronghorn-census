@@ -98,8 +98,8 @@ export async function getUserHasRole(role_name: string): Promise<boolean> {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
-export async function authUser(email:string, password: string): Promise<User> {
-	const response = await fetch(`${api_url}/users/authenticate`, {
+export async function authUser(email:string, password: string): Promise<boolean> {
+	const response = await fetch(`${api_url}/authenticate`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -112,13 +112,13 @@ export async function authUser(email:string, password: string): Promise<User> {
 	});
 	if (!response.ok) throw new ApiError(await response.json());
 
-	return new User(await response.json() as UserIntf);
+	return true;
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function deauthUser(): Promise<boolean> {
-	const response = await fetch(`${api_url}/users/deauthenticate`, {
+	const response = await fetch(`${api_url}/deauthenticate`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -128,4 +128,22 @@ export async function deauthUser(): Promise<boolean> {
 	if (!response.ok) throw new ApiError(await response.json());
 
 	return true;
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
+export async function setActiveOrg(org_id: string): Promise<boolean> {
+  const response = await fetch(`${api_url}/users/set-active-organization`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({
+      'org_id': org_id
+    }),
+  });
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
 }

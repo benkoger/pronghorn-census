@@ -112,7 +112,7 @@ def oauth2_callback(provider: str):
 
 	orgs = base.get_user_organizations(current_user.user_id)
 
-	session['active_organization_id'] = orgs[0].uuid
+	session['active_org_uuid'] = orgs[0].uuid
 
 
 	frontend_url = current_app.config.get('ORIGIN_URL')
@@ -147,7 +147,7 @@ def authenticate(body: LegacyAuth):
 	
 	orgs = base.get_user_organizations(current_user.user_id)
 
-	session['active_organization_id'] = orgs[0].uuid
+	session['active_org_uuid'] = orgs[0].uuid
 
 	return '', 200
 

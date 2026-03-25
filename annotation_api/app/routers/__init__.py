@@ -21,7 +21,7 @@ from .cropverifier import verifierBp
 from .herd_units import herdunitBp
 from .images import imageBp
 from .models import modelBp
-from .oauth2 import authBp
+from .authenticate import authBp
 from .organizations import orgBp
 from .projects import projectBp
 from .reviewedarea import raBp
@@ -44,16 +44,6 @@ bp.register_blueprint(raBp)
 bp.register_blueprint(userBp)
 bp.register_blueprint(authBp)
 bp.register_blueprint(orgBp)
-
-#---------------------------------------------------------------------------------------------------------------------------#
-# Project CRUD
-	
-@bp.route('/api/v1/request/projects/all')
-@login_required
-def get_all_projects():
-	projects = base.get_user_projects(cast(User, current_user))
-	to_dictd_projects = [project.to_dict() for project in projects] 
-	return jsonify(to_dictd_projects), 201
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Prediction Crud
