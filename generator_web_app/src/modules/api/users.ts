@@ -7,6 +7,7 @@ import { User, Organization } from '@/types/generatorobjects.ts';
 import type { UserIntf, OrganizationIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
+import { getActivePinia, type Pinia, type Store } from 'pinia';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
@@ -126,6 +127,18 @@ export async function deauthUser(): Promise<boolean> {
 		credentials: 'include'
 	});
 	if (!response.ok) throw new ApiError(await response.json());
+  
+  // Reset state of pinia stores
+  interface ExtendedPina extends Pinia {
+    _s: Map<string, Store>;
+  }
+
+  const pinia = getActivePinia() as ExtendedPina;
+
+  pinia._s.forEach((store: Store, name: string) => {
+    if (name != 'userStore') store.$reset();
+  })
+
 
 	return true;
 }

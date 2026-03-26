@@ -1,24 +1,54 @@
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
-import { useUserStore } from '@/modules/stores/userStore';
-import { BButton, BTooltip } from 'bootstrap-vue-next'; // Import BVN components
+  import { defineComponent } from 'vue';
+  import type { Organization } from '@/types/generatorobjects';  
+  import { useUserStore } from '@/modules/stores/userStore';
+  import { BButton, BTooltip } from 'bootstrap-vue-next';
+  import { mapState } from 'pinia';
+  import { useRouter } from 'vue-router'; 
+  import { getActivePinia, type Pinia, type Store } from 'pinia';
+  
 
-export default defineComponent({
-	name: 'header_component',
-	components: { BButton, BTooltip },
-	setup() {
-		const isDev = import.meta.env.DEV;
-		const uStore = useUserStore();    
+  export default defineComponent({
+  	name: 'header_component',
+	  components: { BButton, BTooltip },
+	  setup() {
+		  const isDev = import.meta.env.DEV;
+		  const uStore = useUserStore();    
+      const router = useRouter();
+  
+		  return { uStore, isDev, router }
+	  },
+    computed: {
+      ...mapState(useUserStore, {
+        CurrentOrganization: 'CurrentOrganization',
+        }
+      )
+    },
+    watch: {
+      CurrentOrganization(newValue: Organization, oldValue: Organization) {
+        if (newValue != oldValue && newValue != undefined) {
+          // Reset state of pinia stores
+          interface ExtendedPina extends Pinia {
+            _s: Map<string, Store>;
+          }     
 
-		return { uStore, isDev }
+          const pinia = getActivePinia() as ExtendedPina;
+
+          pinia._s.forEach((store: Store, name: string) => {
+            if (name != 'userStore') store.$reset();
+          })
+ 
+          this.router.push('/');
+        }
+    }
 	},
-	methods: {
-		async logout() {
-			await this.uStore.deuathenticate();
-			this.$router.push('/authenticate')
-		}
-	}
-})
+	  methods: {
+		  async logout() {
+			  await this.uStore.deuathenticate();
+			  this.$router.push('/authenticate')
+		  }
+	  }
+  })
 </script>
 
 <template>
