@@ -14,8 +14,8 @@ export const useUserStore = defineStore('userStore', {
 		first_login: true,
 		theme: 'dark',
 		logged_in: false,
-		organizations: [] as Organization[],
-		organization_idx: 0,
+		organizations: {} as Record<number, Organization>,
+		organization_idx: 1, // set to id when user is logged in
 		user: undefined as User | undefined,
 		is_admin: false,
 		nav_toggled: false,
@@ -34,7 +34,11 @@ export const useUserStore = defineStore('userStore', {
 	actions: {
 		async authenticate(email: string, password: string) {
 			this.logged_in = await authUser(email, password);
-      this.get_current_user();
+      await this.get_current_user();
+      if (this.user != undefined)
+        {
+          this.organization_idx = this.user.default_org_id;
+        }
 		},
 		async start_up() {
 			await this.check_admin();
@@ -49,9 +53,12 @@ export const useUserStore = defineStore('userStore', {
 			if (this.user != undefined) this.logged_in = true;
 		},
 		async get_organizations() {
-			console.log('here')
 			if (this.user) {
-				this.organizations = await getUserOrganizations(this.user.uuid);
+				const orgs = await getUserOrganizations(this.user.uuid);
+
+        orgs.forEach((org: Organization) => {
+          this.organizations[org.organization_id] = org;
+        })
 			}
 
 		},
@@ -63,7 +70,7 @@ export const useUserStore = defineStore('userStore', {
 		},
 		async set_organization(org: Organization | undefined) {
 			if (org != undefined) {
-				const idx = this.organizations.indexOf(org);
+				const idx = org.organization_id;
 				if (idx != undefined) {
 					this.organization_idx = idx;
           await setActiveOrg(org.uuid);

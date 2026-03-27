@@ -7,7 +7,6 @@
 
 import secrets
 from urllib.parse import urlencode
-from uuid import UUID
 
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -18,7 +17,9 @@ from werkzeug.security import check_password_hash
 
 from app.extensions import base
 from database import AuthorizationFailure, UserNotFound
-from database.view_models.users import *
+from database.view_models.users import (
+		LegacyAuth
+	)
 
 authBp = Blueprint('oauth2', __name__, url_prefix='/api/v1/')
 
@@ -95,7 +96,7 @@ def oauth2_callback(provider: str):
 	email = provider_data['userinfo']['email'](response.json())
 
 	try:	
-		print(email)
+		
 		user = base.get_user(email)
 	except UserNotFound:
 		abort(403, 'You must first be invited to access this resource')

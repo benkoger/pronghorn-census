@@ -205,7 +205,7 @@ class User(UserMixin, CgOBJ):
 	def __init__(
 			self, user_id: int, username: str, email: str, external_auth_id: str, external_auth_provider: str, 
 			status: str, created: datetime, modified: datetime, last_login: datetime,  locale: str,
-			uuid: UUID, password_hash: Optional[str]=None, roles: Optional[set[str]]=None, orgs: Optional[set[str]]=None
+			uuid: UUID, default_org_id: int, password_hash: Optional[str]=None, roles: Optional[List[str]]=None,
 		):
 		self.id = str(uuid) # this is this way to make Flask-Login happy
 		self.user_id = user_id
@@ -221,7 +221,7 @@ class User(UserMixin, CgOBJ):
 		self.uuid = uuid
 		self.password_hash = password_hash
 		self.roles = roles
-		self.orgs = orgs
+		self.default_org_id = default_org_id
 	
 	def getId(self) -> str:
 		return self.id
@@ -241,6 +241,7 @@ class User(UserMixin, CgOBJ):
 			'created': fmt(self.created),
 			'modified': fmt(self.modified),
 			'last_login': fmt(self.last_login),
+			'default_org_id': self.default_org_id,
 			'locale': self.locale,
 			'uuid': str(self.uuid),
 		}
@@ -250,7 +251,8 @@ class User(UserMixin, CgOBJ):
 			**self.to_dict(),
 			'external_auth_id': self.external_auth_id,
 			'external_auth_provider': self.external_auth_provider,
-			'roles': self.roles
+			'roles': self.roles,
+			'default_org_id': self.default_org_id
 		}
 
 #---------------------------------------------------------------------------------------------------------------------------#

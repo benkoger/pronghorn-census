@@ -340,6 +340,7 @@ export interface UserIntf {
     created: Date;
     modified: Date;
     last_login: Date;
+    default_org_id: number;
     locale: string;
     uuid: string;
 }
@@ -350,6 +351,7 @@ export class User implements UserIntf {
     created: Date;
     modified: Date;
     last_login: Date;
+    default_org_id: number;
     locale: string;
     uuid: string;
 
@@ -358,36 +360,40 @@ export class User implements UserIntf {
         this.status = usr.status;
         this.created = new Date(usr.created);
         this.modified = new Date(usr.modified);
+        this.default_org_id = usr.default_org_id;
         this.last_login = new Date(usr.last_login);
         this.locale = usr.locale;
         this.uuid = usr.uuid;
-    }
+  }
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export interface OrganizationIntf {
-    name: string;
-    created: Date;
-    modified: Date;
-    logo_url: string | undefined;
-    uuid: string;
+  organization_id: number;
+  name: string;
+  created: Date;
+  modified: Date;
+  logo_url: string | undefined;
+  uuid: string;
 }
 
 export class Organization implements OrganizationIntf {
-    name: string;
-    created: Date;
-    modified: Date;
-    logo_url: string | undefined;
-    uuid: string;
+  organization_id: number;
+  name: string;
+  created: Date;
+  modified: Date;
+  logo_url: string | undefined;
+  uuid: string;
 
-    constructor(Org: OrganizationIntf) {
-        this.name = Org.name;
-        this.created = new Date(Org.created);
-        this.modified = new Date(Org.modified);
-        this.logo_url = Org.logo_url;
-        this.uuid = Org.uuid;
-    }
+  constructor(Org: OrganizationIntf) {
+    this.organization_id = Org.organization_id;  
+    this.name = Org.name;
+    this.created = new Date(Org.created);
+    this.modified = new Date(Org.modified);
+    this.logo_url = Org.logo_url;
+    this.uuid = Org.uuid;
+  }
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//

@@ -95,10 +95,13 @@ export async function getUserHasRole(role_name: string): Promise<boolean> {
 	});
 	if (!response.ok) throw new ApiError(await response.json());
 	
-	return true;
+	const resp = await response.json();
+
+  return resp
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
+
 export async function authUser(email:string, password: string): Promise<boolean> {
 	const response = await fetch(`${api_url}/authenticate`, {
 		method: 'POST',

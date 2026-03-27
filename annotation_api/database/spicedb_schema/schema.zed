@@ -3,11 +3,14 @@ definition user {}
 definition organization {
 	relation admin: user
 	relation member: user
+
+  permission access = admin + member 
 }
 
 definition project {
     relation parent: organization
     relation manager: user
+    relation annotator: user
 
     permission view = manager
 
@@ -16,8 +19,12 @@ definition project {
 
 definition herd_unit {
 	relation parent: project
+
+  permission view = parent->view
 }
 
 definition survey { 
   relation parent: herd_unit
+
+  permission view = parent->view
 }

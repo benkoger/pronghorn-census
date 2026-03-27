@@ -21,7 +21,7 @@ export async function getAllProjects(): Promise<Project[]> {
 	if (!response.ok) throw new ApiError(await response.json());
 	const resp = await response.json();
 	let projects = [];
-	for (const project of resp) projects.push(new Project(project));
+	for (const project of resp) projects.push(new Project(project as ProjectIntf));
 	return projects;
 }
 

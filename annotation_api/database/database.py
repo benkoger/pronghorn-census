@@ -6,12 +6,15 @@
 from datetime import date, datetime, timezone
 from functools import wraps
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast, Iterable
 from uuid import UUID
 import uuid
+from flask_login import current_user
 
 from authzed.api.v1 import (
-	Client,
+	BulkCheckPermissionRequest,
+	BulkCheckPermissionRequestItem,
+	InsecureClient,
 	ObjectReference,
 	Relationship,
 	RelationshipUpdate,
@@ -43,7 +46,14 @@ import psycopg.sql as sql
 from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash
 
-from .errors import *
+from .errors import (
+	ObjectNotFound,
+	FailedToCreate,
+	UserNotFound,
+	InvalidModelState,
+	AccessDenied
+)
+
 from .view_models import *
 
 from .query_builder import QueryBuilder
@@ -56,9 +66,10 @@ class Database:
 	def __init__(self, db_config: Dict[str, str], spice_config: Dict[str, Union[str, ChannelCredentials]]):
 		self._config = db_config
 		self._pool = None
-		self._spice_client = Client(
+		print(spice_config['bearer_token'])
+		self._spice_client = InsecureClient(
 			cast(str, spice_config['spice_url']),
-			cast(ChannelCredentials, spice_config['bearer_token'])
+			cast(str, spice_config['bearer_token']),
 		)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -147,9 +158,21 @@ class Database:
 				)
 			)
 		)
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _check_permissions(self, object_type: str, object_id: str, subject_id: str, permission:str):
+	def _bulk_check_permission(self, permissions: Iterable[BulkCheckPermissionRequestItem]):
+		'''
+
+		'''
+		return self._spice_client.BulkCheckPermission(
+				BulkCheckPermissionRequest(
+					items=permissions
+					)
+				)
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	def check_permission(self, object_type: str, object_id: str, subject_id: str, permission:str):
 		'''
 		'''
 		return self._spice_client.CheckPermission(
@@ -243,7 +266,7 @@ class Database:
 		organization = cursor.fetchone()
 
 		if not organization:
-			raise ObjectNotFound('organization', organization_id)
+			raise ObjectNotFound('organization', str(organization_id))
 
 		return organization
 	def get_organization(self, organization_id: int | UUID) -> Organization:
@@ -421,7 +444,7 @@ class Database:
 		role = cursor.fetchone() 
 
 		if not role:
-			raise ObjectNotFound('Role', role_id)
+			raise ObjectNotFound('Role', str(role_id))
 
 		return role
 
@@ -532,7 +555,7 @@ class Database:
 			VALUES (
 				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
 				%(status)s, %(locale)s, %(password_hash)s
-			)
+			)No
 			RETURNING *;
 		''')
 
@@ -591,19 +614,17 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_user(self, cursor: Cursor[User], user_id: int | UUID | str ) -> User:
+	def _get_user(self, cursor: Cursor[User], user_id: Union[int, UUID, str]) -> User:
 		''' Internal helper function, do not call directly
 		
 		'''  
-		cursor.row_factory = class_row(User)
+
 		query = sql.SQL('''
-			SELECT U.*, R.name as roles, O.uuid as orgs FROM usermanagement.users AS U 
-			JOIN usermanagement.organizations_users AS OU ON OU.user_id = U.user_id
-			JOIN usermanagement.roles AS R ON R.role_id = OU.role_id
-			JOIN usermanagement.organizations O on O.organization_id = OU.organization_id
-			
+			SELECT U.* FROM usermanagement.users AS U 
 			WHERE U.{id_field} = %s
 		''')
+
+		cursor.row_factory = class_row(User)
 		match user_id:
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('user_id')), (user_id,))
@@ -618,13 +639,13 @@ class Database:
 
 		return user
 		
-	def get_user(self, user_id: int | UUID | str ) -> User:
+	def get_user(self, user_id: Union[int, UUID, str]) -> User:
 		''' Query the database for a user
 		
 		Args:
 			user_id: The user's unique database id 
 		'''
-		return self._get_user(user_id = user_id)
+		return self._get_user(user_id)
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -645,32 +666,39 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_user_roles(self, cursor: Cursor[Role], user_id: int | UUID) -> list[Role] | None:
+	def _get_user_roles(self, cursor: Cursor[Role], user_id: Union[int, UUID], org_id: Union[int, UUID]) -> list[Role]:
 		''' Internal helper function, do not call directly
 		
 		'''
-		cursor.row_factory = class_row(Role)
+		if isinstance(org_id, UUID):
+			org_id = self._get_organization(cursor, org_id).organization_id
+
 		query = sql.SQL(''' 
-			SELECT R.* FROM usermanagement.roles AS R JOIN usermanagement.organizations_users AS OU 
-			ON OU.role_id = R.role_id WHERE OU.user_id = %s; ''')
+			SELECT R.* FROM usermanagement.roles AS R 
+			JOIN usermanagement.organizations_users AS OU ON OU.role_id = R.role_id 
+			WHERE OU.user_id = %s
+			AND OU.organization_id = %s;
+			''')
 		match user_id:
 			case int():
-				cursor.execute(query, (user_id,))
+				cursor.execute(query, (user_id, org_id))
 			case _:
-				user = self._get_user(user_id)
-				cursor.execute(query, (user.user_id,))
+				user = self._get_user(cursor, user_id)
+				cursor.execute(query, (user.user_id, org_id))
+
+		cursor.row_factory = class_row(Role)
 		roles = cursor.fetchall()
 		return roles
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def get_user_roles(self, user_id: User| int | UUID) -> list[Role] | Role | None:
+	def get_user_roles(self, user_id: Union[int, UUID], org_id: Union[int, UUID]) -> list[Role]:
 		''' Request all roles associated with a user 
 
 		Args:
 			user_id: The user's unique database id 
 		'''
-		return self._get_user_roles(user_id = user_id)
+		return self._get_user_roles(user_id, org_id)
 
 	@connect
 	def _get_user_organizations(self, cursor: Cursor[Organization], user_id: int | UUID) -> list[Organization]:
@@ -861,14 +889,18 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('project_id')), (project_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (project_id,))
-			case _:
-				raise TypeError('project_id MUST be an integer or a UUID')
 		
 		project = cursor.fetchone()
 		if not project:
-			raise ObjectNotFound('Project', project_id)
+			raise ObjectNotFound('Project', str(project_id))
 
-		return project 
+		acl = self.check_permission('project', str(project.uuid), str(current_user.uuid), 'view')
+
+		if acl.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+
+			return project
+		else:
+			raise AccessDenied('project', str(project.uuid), current_user.uuid)
 	
 		
 	def get_project(self, project_id: int | UUID) -> Project:
@@ -1060,7 +1092,7 @@ class Database:
 				raise TypeError('schema_id MUST be an integer or a UUID')
 		schema = cursor.fetchone()
 		if not schema:
-			raise ObjectNotFound('Schema', schema_id)
+			raise ObjectNotFound('Schema', str(schema_id))
 
 		return schema 
 
@@ -1087,7 +1119,7 @@ class Database:
 		cursor.execute(query, (schema.schema_id,))
 		labels = cursor.fetchall() 
 		if len(labels) == 0:
-			raise ObjectNotFound('labels for schema', schema_id)
+			raise ObjectNotFound('labels for schema', str(schema_id))
 		return labels 
 
 	def get_schema_labels(self, schema_id: Project | int | UUID) -> list[Label]:
@@ -1379,7 +1411,7 @@ class Database:
 		cursor.execute(query, (herd_unit.herd_unit_id,))
 		surveys = cursor.fetchall()
 		if len(surveys) == 0:
-			raise ObjectNotFound('Surveys for herd unit', herd_unit_id) 
+			raise ObjectNotFound('Surveys for herd unit', str(herd_unit_id)) 
 
 		return surveys
 
@@ -1540,7 +1572,7 @@ class Database:
 				raise TypeError('model_id MUST be an integer or a UUID')
 		model = cursor.fetchone()
 		if not model:
-			raise ObjectNotFound('Model', model_id)
+			raise ObjectNotFound('Model', str(model_id))
 
 		return model 
 	
@@ -1566,7 +1598,7 @@ class Database:
 
 		schema = cursor.fetchone()
 		if not schema:
-			raise ObjectNotFound('Schema for model', model_id)
+			raise ObjectNotFound('Schema for model', str(model_id))
 		
 		return schema
 
@@ -1633,20 +1665,13 @@ class Database:
 		'''
 		query = sql.SQL(' DELETE FROM projectmanagement.models WHERE {id_field} = %s; ')
 		match model_ids:
-			case list() if isinstance(model_ids[0], HerdUnit):
-				cursor.executemany(query.format(id_field = sql.Identifier('model_id')), [(model.model_id,) for model in herd_unit_ids])
-			case list() if isinstance(model_ids[0], int):
-				cursor.executemany(query.format(id_field = sql.Identifier('model_id')), [(model_id,) for model_id in model_ids])
-			case list() if isinstance(model_ids[0], UUID):
-				cursor.executemany(query.format(id_field = sql.Identifier('uuid')), [(model_id,) for model_id in model_ids])
 			case Model():
 				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (model_ids.model_id,))
 			case int():
 				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (model_ids,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (model_ids,))
-			case _:
-				raise TypeError('model_id must be a Label, int, or uuid')
+		
 		return True if cursor.rowcount > 0 else False
 
 
@@ -2001,7 +2026,7 @@ class Database:
 		cursor.execute(query, (survey.survey_id,))
 		herd_units = cursor.fetchall()
 		if len(herd_units) == 0:
-			raise ObjectNotFound('Herd units for survey', survey_id)
+			raise ObjectNotFound('Herd units for survey', str(survey_id))
 		return herd_units
 
 	def get_survey_herd_units(self, survey_id: int | UUID) -> list[HerdUnit]:
@@ -2148,7 +2173,7 @@ class Database:
 
 		image = cursor.fetchone()
 		if not image:
-			raise ObjectNotFound('Image', image_id)
+			raise ObjectNotFound('Image', str(image_id))
 
 		return image 
 	
@@ -2173,7 +2198,7 @@ class Database:
 		
 		crops = cursor.fetchall()
 		if len(crops) == 0:
-			raise ObjectNotFound('Crops for image', image_id)
+			raise ObjectNotFound('Crops for image', str(image_id))
 		
 		return crops
 
@@ -2197,7 +2222,7 @@ class Database:
 			
 		predictions = cursor.fetchall()
 		if len(predictions) == 0:
-			raise ObjectNotFound('Predctions for image', image_id)
+			raise ObjectNotFound('Predctions for image', str(image_id))
 		
 		return predictions
 
@@ -2270,7 +2295,7 @@ class Database:
 		image = cursor.fetchone()
 
 		if not image:
-			raise ObjectNotFound('Image', image_id)
+			raise ObjectNotFound('Image', str(image_id))
 
 		return image
 	
@@ -2657,7 +2682,7 @@ class Database:
 		
 		reviewed_area = cursor.fetchone()
 		if not reviewed_area:
-			raise ObjectNotFound('Reviewed Area', reviewed_area_id)
+			raise ObjectNotFound('Reviewed Area', str(reviewed_area_id))
 		
 		return reviewed_area
 

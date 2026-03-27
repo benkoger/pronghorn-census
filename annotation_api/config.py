@@ -45,7 +45,7 @@ db_config = {
 
 spice_config = {
 	'spice_url': os.environ.get('SPICE_URL'),
-	'bearer_token': insecure_bearer_token_credentials(os.environ.get('SPICEDB_GRPC_PRESHARED_KEY')) #pyright: ignore
+	'bearer_token': os.environ.get('SPICEDB_GRPC_PRESHARED_KEY') #pyright: ignore
 }
 
 cache_config={

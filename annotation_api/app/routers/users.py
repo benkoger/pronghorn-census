@@ -7,17 +7,20 @@ from uuid import UUID
 
 from cropgenerator.generatorobjects import User
 from flask import Blueprint, abort, session
-from flask_login import current_user, login_required, login_user, logout_user
+from flask_login import current_user, login_required
 from flask_pydantic import validate
 from msgpack import packb, unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
-from werkzeug.security import check_password_hash
 
 from app.extensions import base, cache, login_manager
-from app.decorators import roles_required
-from database import AuthorizationFailure, ObjectNotFound, UserNotFound
-from database.view_models.users import *
+from database import UserNotFound
+from database.view_models.users import (
+		RoleQuery,
+		CreateUser
+		)
 from database.view_models.organizations import SetActiveOrg
+
+from authzed.api.v1 import CheckPermissionResponse
 
 userBp = Blueprint('users', __name__, url_prefix='/api/v1/users')
 
@@ -25,7 +28,7 @@ userBp = Blueprint('users', __name__, url_prefix='/api/v1/users')
 
 @login_manager.user_loader
 def load(session_user_id: str):
-	user_key = 'user_{}'.format(session_user_id)
+	user_key = f'user_{session_user_id}'
 	cached_user = cache.get(user_key)
 
 	if cached_user:
@@ -33,6 +36,14 @@ def load(session_user_id: str):
 		return user
 	try:
 		user_obj = base.get_user(UUID(session_user_id))
+
+		if 'active_org_uuid' in session:
+			org_id = UUID(session.get('active_org_uuid'))
+		else:
+			org_id = user_obj.default_org_id
+
+		user_obj.roles = [role.name for role in base.get_user_roles(user_obj.user_id, org_id)]
+
 		cache.set(user_key, packb(user_obj.to_cache()), timeout=3600)
 	except UserNotFound as e:
 		abort(404, str(e))
@@ -89,7 +100,6 @@ def get_orgs(user_id: str):
 	'''
 	try:
 		orgs = base.get_user_organizations(UUID(user_id))
-		print(orgs[0].to_dict)
 	except (DatabaseError, Exception) as e:
 		print(e)
 		abort(500)
@@ -104,6 +114,8 @@ def get_orgs(user_id: str):
 def check_role(query: RoleQuery):
 	'''
 	'''
+	print(current_user.roles)
+	print(session.get('active_org_uuid'))
 
 	if current_user.roles and query.role_name in current_user.roles:
 		return 'true', 200
@@ -145,6 +157,15 @@ def set_org(body: SetActiveOrg):
 	else: 
 		org_id = body.org_id
 
-	session['active_org_uuid'] = org_id 
+	res = base.check_permission('organization', str(org_id), str(current_user.uuid), 'access')
 
-	return '', 200
+	if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+
+		session['active_org_uuid'] = org_id
+
+		# Flush the user from the cache to force admin status to update 
+		user_key = f'user_{str(current_user.uuid)}'
+		cache.delete(user_key)
+		return '', 200
+	else:
+		abort(401)
