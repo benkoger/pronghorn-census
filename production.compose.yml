@@ -1,4 +1,17 @@
 services:
+  spicedb:
+    container_name: prong_spicedb
+    image: authzed/spicedb:latest
+    environment:
+      SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL}
+      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+    command: serve 
+    ports:
+      - "50051:50051"
+      - "50052:50052"
+      - "9090:9090" 
   pronghorn-api:
     container_name: prong_api
     build:
