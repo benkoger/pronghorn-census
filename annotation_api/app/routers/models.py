@@ -7,13 +7,16 @@ from datetime import datetime
 from uuid import UUID
 
 from flask import Blueprint, abort, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
 from app.extensions import base
 from database import ObjectNotFound
-from database.view_models.models import *
+from typing import cast
+
+from database.view_models.models import CreateModel
+from cropgenerator.generatorobjects import User
 
 modelBp = Blueprint('models', __name__, url_prefix='/api/v1/models')
 
@@ -123,7 +126,7 @@ def get_schema(model_id: str):
 		description: Database error.
 	'''
 	try:
-		project = base.get_model_schema(UUID(model_id))
+		project = base.get_model_schema(UUID(model_id), cast(User, current_user))
 	except ValueError as e:
 		abort(400, str(e))
 	except ObjectNotFound as e:
@@ -164,9 +167,7 @@ def get_training_set():
 			datetime.strptime(date_range[1], format_pattern)
 		)
 	
-	# call db method passing the params. method will handle null parameters
 	try:
-
 		data = base.get_model_training_data(
 			labels,
 			date_range,
@@ -174,7 +175,7 @@ def get_training_set():
 			herd_units
 		)
 	except Exception as e:
-		abort(404, 'bro what?')
+		abort(404, str(e))
 	return data, 200
 
 #---------------------------------------------------------------------------------------------------------------------------#

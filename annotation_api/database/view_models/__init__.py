@@ -9,3 +9,4 @@ from .schemas import *
 from .surveys import *
 from .users import *
 from .verifier import *
+from .autocropper import *

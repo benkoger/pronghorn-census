@@ -3,12 +3,10 @@
 
 #---------------------------------------------------------------------------------------------------------------------------#
 
-from uuid import UUID
-
 class ObjectNotFound(Exception):
 	'''Raised when an image UUID does not exist in the database.'''
 	def __init__(self, object_type: str, object_id: str):
-		self.message = f'{object_type} with ID {str(object_id)} not found.'
+		self.message = f'{object_type} with ID {object_id} not found.'
 		super().__init__(self.message)
 
 class FailedToCreate(Exception):
@@ -17,10 +15,11 @@ class FailedToCreate(Exception):
 		self.message = f'Failed to create {object_type}'
 		super().__init__(self.message)
 
-class AuthorizationFailure(Exception):
-	'''Raised when an authorization attempt fails'''
+class AuthenticationFailure(Exception):
+	'''Raised when an authentication attempt fails'''
 	def __init__(self):
-		super().__init__('Authorization Failure')
+		self.message = 'Username or Password is incorrect'
+		super().__init__('Authentication Failure')
 		
 class UserNotFound(Exception):
 	'''Raised when a user is not found'''
@@ -33,8 +32,8 @@ class InvalidModelState(Exception):
 		self.message = f'Invalid model state for {method_name}: {state_violation}'
 		super().__init__(self.message)
 
-class AccessDenied(Exception):
+class AuthorizationFailure(Exception):
 	'''Raised when a user attempts to access an object they are supposed to'''
-	def __init__(self, object_type: str, object_id: str, user_id: str):
-		self.message = f'User: {user_id} cannot access {object_type}: {object_id}'
+	def __init__(self, user_id: str, permission: str, object_type: str, object_id: str):
+		self.message = f'User: {user_id} does not have permission {permission} for {object_type}: {object_id}'
 		super().__init__(self.message)

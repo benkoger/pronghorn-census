@@ -9,6 +9,7 @@ import { Organization, User } from '@/types/generatorobjects.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
+
 export const useUserStore = defineStore('userStore', {
 	state: () => ({
 		first_login: true,
@@ -72,8 +73,8 @@ export const useUserStore = defineStore('userStore', {
 			if (org != undefined) {
 				const idx = org.organization_id;
 				if (idx != undefined) {
-					this.organization_idx = idx;
           await setActiveOrg(org.uuid);
+					this.organization_idx = idx;
 					await this.check_admin();
 				}
 			}

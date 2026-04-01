@@ -11,9 +11,9 @@ class CreateUser(BaseModel):
 	external_auth_provider: str 
 	status: str = 'invited'
 	locale: str
-	project_ids: Optional[List[Union[int, UUID]]] = None
-	organization_ids: List[Union[int, UUID]]
+	organization_id: Union[int, UUID]
 	role_ids: List[Union[int, UUID]]
+	current_user: UUID 	
 
 class LegacyAuth(BaseModel):
 	email: str

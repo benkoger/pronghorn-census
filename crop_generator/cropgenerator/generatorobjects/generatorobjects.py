@@ -1,9 +1,8 @@
 # Class definition for objects used in the crop_generator module and database
 # Author: Michael B. Lance
-# created: April 4, 2025
-# updated: February 3, 2026
 #---------------------------------------------------------------------------------------------------------------------------#
 
+from struct import pack
 import numpy as np
 from flask.json.provider import JSONProvider
 import cv2
@@ -12,19 +11,24 @@ from datetime import datetime
 import io
 import PIL.Image as PillowImage
 from dataclasses import dataclass
+from msgpack import packb
 from uuid import UUID
 from flask_login import UserMixin 
-from typing import Optional, List 
+from typing import Optional, List, Union 
 
 #---------------------------------------------------------------------------------------------------------------------------#
-# ABC for easy serialization of child classes
 
 class CgOBJ(ABC):
 	@abstractmethod
 	def to_dict(self) -> dict:
 		pass
 
-fmt = lambda dt: dt.strftime('%Y-%m-%d %H:%M:%S%z') if isinstance(dt, datetime) else None	
+	def to_cache(self):
+		return packb(self.to_dict())
+
+	def fmt_date(self, dt: Union[datetime, None]):
+		'''Convert datetime object to a string for serialization'''
+		return dt.strftime('%Y-%m-%d %H:%M:%S%z') if isinstance(dt, datetime) else None	
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Project Management -- For Database use only
@@ -44,8 +48,8 @@ class Project(CgOBJ):
 		return {
 			'project_id': self.project_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 
@@ -64,8 +68,8 @@ class Schema(CgOBJ):
 		return {
 			'schema_id': self.schema_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 
@@ -91,8 +95,8 @@ class Label(CgOBJ):
 			'name': self.name,
 			'image_link': self.image_link,
 			'color': self.color,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 
@@ -111,8 +115,8 @@ class HerdUnit(CgOBJ):
 		return {
 			'herd_unit_id': self.herd_unit_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 
@@ -133,8 +137,8 @@ class Model(CgOBJ):
 			'model_id': self.model_id,
 			'schema_id': self.schema_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 	
@@ -157,8 +161,8 @@ class Survey(CgOBJ):
 			'survey_date': self.survey_date,
 			'name': self.name,
 			'additional_info': self.additional_info,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 	
@@ -177,8 +181,8 @@ class Role(CgOBJ):
 		return {
 			'role_id': self.role_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 	
@@ -195,8 +199,8 @@ class Organization(CgOBJ):
 		return {
 			'organization_id': self.organization_id,
 			'name': self.name,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'logo_url': self.logo_url,
 			'uuid': str(self.uuid)
 		}
@@ -238,22 +242,22 @@ class User(UserMixin, CgOBJ):
 			'username': self.username,
 			'email': self.email,
 			'status': self.status,
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
-			'last_login': fmt(self.last_login),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
+			'last_login': self.fmt_date(self.last_login),
 			'default_org_id': self.default_org_id,
 			'locale': self.locale,
 			'uuid': str(self.uuid),
 		}
 
 	def to_cache(self):
-		return {
+		return packb({
 			**self.to_dict(),
 			'external_auth_id': self.external_auth_id,
 			'external_auth_provider': self.external_auth_provider,
 			'roles': self.roles,
 			'default_org_id': self.default_org_id
-		}
+		})
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Core 
@@ -349,9 +353,6 @@ class Image(CgOBJ):
 				self.image = None
 		elif isinstance(imageData, np.ndarray):
 			self.image = imageData
-		else:
-			print(f"Unsupported type: {type(imageData)}")
-			self.image = None
 
 	def get_image(self) -> Optional[np.ndarray]:
 		if self.image is not None:
@@ -404,7 +405,7 @@ class Prediction(CgOBJ):
 			'dimensions': self.dimensions.to_dict(),
 			'score': self.score,
 			'label': self.label,
-			'created': fmt(self.created),
+			'created': self.fmt_date(self.created),
 			'reviewed_by_user_id': self.reviewed_by_user_id,
 			'uuid': str(self.uuid)
 		}
@@ -431,8 +432,8 @@ class Annotation(CgOBJ):
 			'image_id': self.image_id,
 			'herd_unit_id': self.herd_unit_id,
 			'dimensions': self.dimensions.to_dict(),
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'uuid': str(self.uuid)
 		}
 
@@ -449,8 +450,8 @@ class ReviewedArea(Image):
 		self.dimensions = Box((area_tx, area_ty), (area_bx, area_by))
 		self.created = created
 		self.modified = modified
-		self.reviewed_area_length_px = abs(area_ty - area_by)
-		self.reviewed_area_width_px = abs(area_tx - area_bx)
+		self.reviewed_area_length_px = reviewed_area_length_px
+		self.reviewed_area_width_px = reviewed_area_width_px
 		self.reviewed_by_user_id = reviewed_by_user_id
 		self.uuid = uuid
 		self.ra_key = ra_key
@@ -461,8 +462,8 @@ class ReviewedArea(Image):
 			'image_id': self.image_id,
 			'name': self.name,
 			'dimensions': self.dimensions.to_dict(),
-			'created': fmt(self.created),
-			'modified': fmt(self.modified),
+			'created': self.fmt_date(self.created),
+			'modified': self.fmt_date(self.modified),
 			'reviewed_area_length_px': self.reviewed_area_length_px,
 			'reviewed_area_width_px': self.reviewed_area_width_px,
 			'ra_key': self.ra_key,

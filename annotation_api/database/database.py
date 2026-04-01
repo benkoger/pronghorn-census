@@ -9,7 +9,6 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast, Iterable
 from uuid import UUID
 import uuid
-from flask_login import current_user
 
 from authzed.api.v1 import (
 	BulkCheckPermissionRequest,
@@ -50,8 +49,7 @@ from .errors import (
 	ObjectNotFound,
 	FailedToCreate,
 	UserNotFound,
-	InvalidModelState,
-	AccessDenied
+	AuthorizationFailure,
 )
 
 from .view_models import *
@@ -66,7 +64,6 @@ class Database:
 	def __init__(self, db_config: Dict[str, str], spice_config: Dict[str, Union[str, ChannelCredentials]]):
 		self._config = db_config
 		self._pool = None
-		print(spice_config['bearer_token'])
 		self._spice_client = InsecureClient(
 			cast(str, spice_config['spice_url']),
 			cast(str, spice_config['bearer_token']),
@@ -129,7 +126,7 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
-	def _write_spice_relationships(self, updates: List[RelationshipUpdate]):
+	def write_spice_relationships(self, updates: List[RelationshipUpdate]):
 		'''
 		
 		'''
@@ -141,7 +138,7 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _create_spice_update(self, object_type: str, object_id: str, subject_id: str, relation: str) -> RelationshipUpdate:
+	def create_spice_update(self, object_type: str, object_id: str, subject_id: str, relation: str) -> RelationshipUpdate:
 		'''
 
 		'''
@@ -161,13 +158,13 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _bulk_check_permission(self, permissions: Iterable[BulkCheckPermissionRequestItem]):
+	def bulk_check_permission(self, permissions: Iterable[BulkCheckPermissionRequestItem]):
 		'''
 
 		'''
 		return self._spice_client.BulkCheckPermission(
 				BulkCheckPermissionRequest(
-					items=permissions
+					items=permissions,
 					)
 				)
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -193,7 +190,7 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def _lookup_resource(self, resource_type: str, permission: str, subject_id: str):
+	def create_lookup_resource(self, resource_type: str, permission: str, subject_id: str):
 		'''
 		'''
 		return self._spice_client.LookupResources(
@@ -543,7 +540,7 @@ class Database:
 	# User Management - Users
 
 	@connect
-	def _create_user(self, cursor: Cursor[User], parameters: CreateUser ) -> User:
+	def _create_user(self, cursor: Cursor[User], parameters: CreateUser, organization: Organization ) -> User:
 		''' Internal helper function, do not call directly
 		
 		'''  
@@ -560,14 +557,6 @@ class Database:
 		''')
 
 		query_2 = sql.SQL('''
-			INSERT INTO projectmanagement.projects_users (
-				project_id, user_id
-			)
-			VALUES (
-				%s, %s
-			)
-		''')
-		query_3 = sql.SQL('''
 			INSERT INTO usermanagement.organizations_users (
 				user_id, organziation_id, role_id
 			)
@@ -590,18 +579,11 @@ class Database:
 		if not user:
 			raise FailedToCreate('user')
 
-		projects = self._get_projects(cursor, parameters.project_ids)
-
-		cursor.executemany(query_2, [(user.user_id, proj.project_id) for proj in projects])
-
 		# Organizations and Ids should be equal length and appear in the same order
-		orgs = self._get_many_organizations(cursor, parameters.organization_ids)
 		roles = self._get_many_roles(cursor, GetRoles(role_id=parameters.role_ids))
 		
-		if len(roles) != len(orgs):
-			raise InvalidModelState('create_user', 'Number of roles and nubmer of organizations must be equal.')
 
-		cursor.executemany(query_3, [(user.user_id, org.organization_id, role.role_id) for org, role in zip(orgs, roles)])
+		cursor.executemany(query_2, [(user.user_id, organization.organization_id, role.role_id) for role in roles])
 
 		return user
 
@@ -609,7 +591,17 @@ class Database:
 		''' 
 
 		'''
-		return self._create_user(parameters)
+		org = self._get_organization(parameters.organization_id)
+		res = self.check_permission('organization', str(org.uuid), str(parameters.current_user), 'manage')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._create_user(parameters, org)
+		else:
+			raise AuthorizationFailure(
+					str(parameters.current_user),
+					'manage',
+					'organization',
+					str(org.uuid)
+					)
 		
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -894,13 +886,7 @@ class Database:
 		if not project:
 			raise ObjectNotFound('Project', str(project_id))
 
-		acl = self.check_permission('project', str(project.uuid), str(current_user.uuid), 'view')
-
-		if acl.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-
-			return project
-		else:
-			raise AccessDenied('project', str(project.uuid), current_user.uuid)
+		return project
 	
 		
 	def get_project(self, project_id: int | UUID) -> Project:
@@ -914,7 +900,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	
 	@connect 
-	def _get_projects(self, cursor: Cursor[Project], parameters: ProjectQuery) -> List[Project]:
+	def _get_projects(self, cursor: Cursor[Project], req: ProjectQuery, org: Organization) -> List[Project]:
 		'''
 
 		'''
@@ -924,33 +910,29 @@ class Database:
 			JOIN usermanagement.organizations_projects as OP ON OP.project_id = P.project_id
 			WHERE OP.organization_id = %(org_id)s
 		''')
-		if isinstance(parameters.organization_id, UUID):
-			org_id = self._get_organization(cursor, parameters.organization_id).organization_id
-		else:
-			org_id = parameters.organization_id
 
-		if parameters.project_id:
+		if req.project_id:
 			p_filters, data = QueryBuilder.filter_by_object_ids(
 				sql.Identifier('P'),
 				sql.Identifier('project_id'),
-				parameters.project_id
+				req.project_id
 			)
 			cursor.row_factory = class_row(Project)
-			return cursor.execute(query + sql.SQL('AND') + p_filters, {**data, 'org_id': org_id}).fetchall()
+			return cursor.execute(query + sql.SQL('AND') + p_filters, {**data, 'org_id': org.organization_id}).fetchall()
 
 		else:
 			cursor.row_factory = class_row(Project)
-			return cursor.execute(query, {'org_id': org_id}).fetchall()
+			return cursor.execute(query, {'org_id': org.organization_id}).fetchall()
 
-	def get_projects(self, parameters: ProjectQuery) -> List[Project]:
+	def get_projects(self, req: ProjectQuery, org: Organization) -> List[Project]:
 		'''
-		'''
-		return self._get_projects(parameters)
 
+		'''
+		return self._get_projects(req, org)
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_project_models(self, cursor: Cursor[Model], project_id: int | UUID) -> List[Model]:
+	def _get_project_models(self, cursor: Cursor[Model], project_id: UUID) -> List[Model]:
 		'''
 		
 		'''
@@ -966,16 +948,20 @@ class Database:
 
 		return cursor.fetchall()
 	
-	def get_project_models(self, project_id: Project | int | UUID) -> List[Model]:
+	def get_project_models(self, project_id: UUID, user: User) -> List[Model]:
 		'''
 		
 		'''
-		return self._get_project_models(project_id)
+		res = self.check_permission('project', str(project_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_project_models(project_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'project', str(project_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect 
-	def _get_project_herd_units(self, cursor: Cursor[HerdUnit], project_id: int | UUID) -> list[HerdUnit]:
+	def _get_project_herd_units(self, cursor: Cursor[HerdUnit], project_id: UUID) -> list[HerdUnit]:
 		'''
 		
 		'''
@@ -991,11 +977,15 @@ class Database:
 		
 		return cursor.fetchall()
 
-	def get_project_herd_units(self, project_id: Project | int | UUID) -> list[HerdUnit]:
+	def get_project_herd_units(self, project_id: UUID, user: User) -> list[HerdUnit]:
 		'''
 		
 		'''
-		return self._get_project_herd_units(project_id)
+		res = self.check_permission('project', str(project_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_project_herd_units(project_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'herd_unit', str(project_id))
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1096,7 +1086,7 @@ class Database:
 
 		return schema 
 
-	def get_schema(self, schema_id: int | UUID) -> Schema:
+	def get_schema(self, schema_id: UUID) -> Schema:
 		''' Query the database for a schema 
 		
 		Args:
@@ -1122,11 +1112,15 @@ class Database:
 			raise ObjectNotFound('labels for schema', str(schema_id))
 		return labels 
 
-	def get_schema_labels(self, schema_id: Project | int | UUID) -> list[Label]:
+	def get_schema_labels(self, schema_id: UUID, user: User) -> list[Label]:
 		'''
 		
 		'''
-		return self._get_schema_labels(schema_id)
+		res = self.check_permission('schema', str(schema_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_schema_labels(schema_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'schema', str(schema_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1397,7 +1391,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_herd_unit_surveys(self, cursor: Cursor[Survey], herd_unit_id: int | UUID) -> list[Survey]:
+	def _get_herd_unit_surveys(self, cursor: Cursor[Survey], herd_unit_id: UUID) -> list[Survey]:
 		'''
 		
 		'''
@@ -1415,11 +1409,15 @@ class Database:
 
 		return surveys
 
-	def get_herd_unit_surveys(self, survey_id: int | UUID) -> list[Survey]:
+	def get_herd_unit_surveys(self, herd_unit_id: UUID, user: User) -> list[Survey]:
 		'''
 		
 		'''
-		return self._get_herd_unit_surveys(survey_id)
+		res = self.check_permission('herd_unit', str(herd_unit_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_herd_unit_surveys(herd_unit_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'herd_unit', str(herd_unit_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1568,8 +1566,7 @@ class Database:
 				cursor.execute(query.format(id_field = sql.Identifier('model_id')), (model_id,))
 			case UUID():
 				cursor.execute(query.format(id_field = sql.Identifier('uuid')), (model_id,))
-			case _:
-				raise TypeError('model_id MUST be an integer or a UUID')
+
 		model = cursor.fetchone()
 		if not model:
 			raise ObjectNotFound('Model', str(model_id))
@@ -1587,7 +1584,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_model_schema(self, cursor: Cursor[Schema], model_id: int | UUID) -> Schema:
+	def _get_model_schema(self, cursor: Cursor[Schema], model_id: UUID) -> Schema:
 		'''
 		'''
 		model = self._get_model(model_id)
@@ -1602,10 +1599,14 @@ class Database:
 		
 		return schema
 
-	def get_model_schema(self, model_id: int | UUID) -> Schema:
+	def get_model_schema(self, model_id: UUID, user: User) -> Schema:
 		'''
 		'''
-		return self._get_model_schema(model_id)
+		res = self.check_permission('model', str(model_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_model_schema(model_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'model', str(model_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -2850,7 +2851,7 @@ class Database:
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	@connect
-	def _get_project_schemas(self, cursor: Cursor[Schema], project_id: Project | int | UUID) -> list[Schema] | None:
+	def _get_project_schemas(self, cursor: Cursor[Schema], project_id: UUID) -> list[Schema]:
 		'''
 		
 		'''
@@ -2859,23 +2860,22 @@ class Database:
 			SELECT schemas.schema_id, name, created, modified, uuid FROM projectmanagement.schemas AS schemas 
 			JOIN projectmanagement.projects_schemas AS projects_schemas ON projects_schemas.schema_id = schemas.schema_id 
 			WHERE projects_schemas.project_id =  %s; ''')
-		match project_id:
-			case Project():
-				cursor.execute(query, (cast(Project, project_id).project_id,))
-			case int():
-				cursor.execute(query, (project_id,))
-			case _:
-				project = self._get_project(project_id)
-				cursor.execute(query, (project.project_id,))
+		project = self._get_project(project_id)
+				
+		cursor.execute(query, (project.project_id,))
 		schemas = cursor.fetchall()
 		return schemas
 	
-	def get_project_schemas(self, project_id: Project | int | UUID) -> list[Schema] | None:
+	def get_project_schemas(self, project_id: UUID, user: User) -> list[Schema]:
 		'''
 		
 		'''
-		return self._get_project_schemas(project_id = project_id)
-	
+		res = self.check_permission('project', str(project_id), str(user.uuid), 'view')
+		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+			return self._get_project_schemas(project_id = project_id)
+		else:
+			raise AuthorizationFailure(str(user.uuid), 'view', 'project', str(project_id))
+
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Relationship Management - projectmanagement <-> projectmanagement: surveys <-> herdunits
 

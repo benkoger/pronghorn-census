@@ -16,7 +16,7 @@ import requests
 from werkzeug.security import check_password_hash
 
 from app.extensions import base
-from database import AuthorizationFailure, UserNotFound
+from database import AuthenticationFailure, UserNotFound
 from database.view_models.users import (
 		LegacyAuth
 	)
@@ -111,9 +111,9 @@ def oauth2_callback(provider: str):
 
 	login_user(user)
 
-	orgs = base.get_user_organizations(current_user.user_id)
-
-	session['active_org_uuid'] = orgs[0].uuid
+	default_org = base.get_organization(user.default_org_id)
+	session['active_org_uuid'] = str(default_org.uuid)
+	session[f'org_{default_org.uuid}'] = default_org.to_cache()
 
 
 	frontend_url = current_app.config.get('ORIGIN_URL')
@@ -136,19 +136,20 @@ def authenticate(body: LegacyAuth):
 		if check_password_hash(user.password_hash, body.password):
 			base.login_user(user.user_id)
 		else:
-			raise AuthorizationFailure
+			raise AuthenticationFailure
 
-	except AuthorizationFailure as e:
-		abort(401, str(e))
+	except AuthenticationFailure as e:
+		print(e)
+		abort(401)
 	except (DatabaseError, Exception) as e:
 		print(e)
 		abort(500)
 		
 	login_user(user)
 	
-	orgs = base.get_user_organizations(current_user.user_id)
-
-	session['active_org_uuid'] = orgs[0].uuid
+	default_org = base.get_organization(user.default_org_id)
+	session['active_org_uuid'] = str(default_org.uuid)
+	session[f'org_{default_org.uuid}'] = default_org.to_cache()
 
 	return '', 200
 

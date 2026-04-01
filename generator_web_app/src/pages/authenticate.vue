@@ -4,6 +4,7 @@ import { useUserStore } from '@/modules/stores/userStore.ts';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from "bootstrap-vue-next";
 import { api_url } from '@/modules/api/apiV1Methods.ts';
+import type { apiError } from '@/modules/api/errors';
 
 export default defineComponent({
 	name: 'Authenticate',
@@ -24,27 +25,7 @@ export default defineComponent({
 			google_auth: `${api_url}/authorize/google`
 		};
 	},
-	methods: {
-		async submitAuthRequest() {
-			await this.uStore.authenticate(this.email, this.password)
-			if (this.uStore.logged_in) {
-				if (this.redirection_path) {
-					this.router.push(this.redirection_path);
-				}
-				else {
-					this.router.push('/');
-				}
-			} else {
-				this.create({
-					title: 'Authentication failed',
-					body: 'You must be authenticated to access this resource',
-					variant: 'danger',
-					position: 'bottom-start'
-				})
-			}
-		},
-	},
-	async mounted() {        
+  async mounted() {        
 		if (this.uStore.logged_in == true) {
 			this.router.push('/')
 		} 
@@ -55,13 +36,34 @@ export default defineComponent({
 			position: 'bottom-start'
 		})
 	},
-}); 
+	methods: {
+		async submitAuthRequest() {
+      await this.uStore.authenticate(this.email, this.password).catch((e: apiError) => {
+        this.create({
+          title: `${e.error}`,
+          message: `${e.code}: ${e.message}`,
+          variant: 'danger',
+          position: 'bottom-start'
+        });
+        return;
+      });
+			if (this.uStore.logged_in) {
+        if (this.redirection_path) {
+					this.router.push(this.redirection_path);
+				}
+				else {
+					this.router.push('/');
+				}
+			}
+		},
+	}
+	}); 
 </script>
 <template>
 	<BContainer class="h-100">
 		<BRow align-v="center" align-h="center" class="h-100">
 			<BCol lg="4">
-				<h2 class="bg-body-tertiary text-center rounded-top-3 p-2 mb-0 ">Sign in</h2>
+      <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 mb-0 ">Sign in</h2>
 				<BForm @submit.prevent="submitAuthRequest">
 					<BFormGroup
 						id="classic-auth"
@@ -93,7 +95,7 @@ export default defineComponent({
 						size="lg"
 						class="w-100 mt-auto rounded-top-0"
 					>
-						Submit
+						Sign in
 					</BButton>
 					</BForm>
 				<a 

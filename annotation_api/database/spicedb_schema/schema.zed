@@ -4,7 +4,8 @@ definition organization {
 	relation admin: user
 	relation member: user
 
-  permission access = admin + member 
+  permission access = admin + member
+  permission manage = admin
 }
 
 definition project {
@@ -12,19 +13,34 @@ definition project {
     relation manager: user
     relation annotator: user
 
-    permission view = manager
-
-    permission edit = manager
+    permission view = manager + parent->manage
+    permission edit = manager + parent->manage
 }
 
 definition herd_unit {
 	relation parent: project
 
   permission view = parent->view
+  permission edit = parent->edit
+}
+
+definition model {
+  relation parent: project 
+
+  permission view = parent->view
+  permission edit = parent->edit 
 }
 
 definition survey { 
   relation parent: herd_unit
 
   permission view = parent->view
+  permission edit = parent->edit
+}
+
+definition schema {
+  relation parent: model
+
+  permission view = parent->view
+  permission edit = parent->edit
 }

@@ -5,14 +5,19 @@
 
 from uuid import UUID
 
+from cropgenerator.generatorobjects import Organization, User
 from flask import Blueprint, abort, session
-from flask_login import login_required
+from flask_login import login_required, current_user
 from flask_pydantic import validate
+from msgpack import unpackb
 from psycopg.errors import DatabaseError
+from typing import cast
 
 from app.extensions import base
 from database import ObjectNotFound
-from database.view_models.projects import *
+from database.view_models.projects import (
+		ProjectQuery,
+		)
 
 projectBp = Blueprint('projects', __name__, url_prefix='/api/v1/projects')
 
@@ -27,8 +32,11 @@ def get_all(query: ProjectQuery):
 
 	'''
 	try:
-		query.organization_id = UUID(session.get('active_org_uuid')) 
-		projects = base.get_projects(query)
+		org_id = session.get('active_org_uuid')
+		active_org = session.get(f'org_{org_id}')	
+		org = Organization(**unpackb(active_org))
+		
+		projects = base.get_projects(query, org)
 	except (DatabaseError, Exception) as e:
 		print(e)
 		abort(500)
@@ -62,6 +70,7 @@ def get_by_id(project_id: str):
 	except ObjectNotFound as e:
 		abort(404, str(e))
 	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 	
 	return project.to_dict(), 200
@@ -89,7 +98,7 @@ def get_models(project_id: str):
 		description: Database error.
 	'''
 	try:
-		models = base.get_project_models(UUID(project_id))
+		models = base.get_project_models(UUID(project_id), cast(User, current_user))
 	except ValueError as e:
 		abort(400, str(e))
 	except ObjectNotFound as e:
@@ -116,7 +125,7 @@ def get_herd_units(project_id: str):
 		description: Database error.
 	'''
 	try:
-		herd_units = base.get_project_herd_units(UUID(project_id))
+		herd_units = base.get_project_herd_units(UUID(project_id), cast(User, current_user))
 	except ValueError as e:
 		abort(400, str(e))
 	except ObjectNotFound as e:

@@ -6,6 +6,8 @@
   import { mapState } from 'pinia';
   import { useRouter } from 'vue-router'; 
   import { getActivePinia, type Pinia, type Store } from 'pinia';
+  import type { apiError } from '@/modules/api/errors';
+  import { useToast } from 'bootstrap-vue-next';
   
 
   export default defineComponent({
@@ -15,8 +17,9 @@
 		  const isDev = import.meta.env.DEV;
 		  const uStore = useUserStore();    
       const router = useRouter();
-  
-		  return { uStore, isDev, router }
+      const {create} = useToast();
+
+		  return { uStore, isDev, router, create }
 	  },
     computed: {
       ...mapState(useUserStore, {
@@ -40,13 +43,30 @@
  
           this.router.push('/');
         }
-    }
-	},
+      }
+	  },
 	  methods: {
 		  async logout() {
 			  await this.uStore.deuathenticate();
 			  this.$router.push('/authenticate')
-		  }
+		  }, 
+      async set_org(org: Organization) {
+          await this.uStore.set_organization(org).catch((e: apiError) => {
+            this.create({
+              title: `${e.error}`,
+              body: `${e.code}: ${e.message}`,
+              variant: 'danger',
+              position: 'bottom-start'
+            })
+            return;
+          });
+          this.create({
+            title: 'Changing Organization',
+            body: `Active organization changed to: ${this.uStore.CurrentOrganization?.name}`,
+            variant: 'success',
+            position: 'bottom-start'
+          })
+      }
 	  }
   })
 </script>
@@ -88,7 +108,7 @@
 				</template>
 				<BDropdownItemButton
 					v-for="org in uStore.organizations"
-					@click="uStore.set_organization(org)"
+					@click="set_org(org)"
 				>
 					<Icon icon="octicon:organization-16"/>
 					{{ org.name }}

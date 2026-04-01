@@ -6,9 +6,11 @@
 from uuid import UUID
 
 from flask import Blueprint, abort
-from flask_login import login_required
+from flask_login import current_user, login_required
+from cropgenerator.generatorobjects import User
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
+from typing import cast
 
 from app.extensions import base
 from database import ObjectNotFound
@@ -68,13 +70,14 @@ def get_surveys(herd_unit_id: str):
 			description: Database error.
 	'''
 	try:
-		surveys = base.get_herd_unit_surveys(UUID(herd_unit_id))
+		surveys = base.get_herd_unit_surveys(UUID(herd_unit_id), cast(User, current_user))
 
 	except ValueError as e:
 		abort(400, str(e))
 	except ObjectNotFound as e:
 		abort(404, str(e))
 	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 
 	return [survey.to_dict() for survey in surveys], 200

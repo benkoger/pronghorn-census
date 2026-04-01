@@ -5,11 +5,11 @@
 
 from uuid import UUID
 
-from cropgenerator.generatorobjects import User
+from cropgenerator.generatorobjects import User 
 from flask import Blueprint, abort, session
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from msgpack import packb, unpackb
+from msgpack import unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, cache, login_manager
@@ -44,7 +44,7 @@ def load(session_user_id: str):
 
 		user_obj.roles = [role.name for role in base.get_user_roles(user_obj.user_id, org_id)]
 
-		cache.set(user_key, packb(user_obj.to_cache()), timeout=3600)
+		cache.set(user_key, user_obj.to_cache(), timeout=3600)
 	except UserNotFound as e:
 		abort(404, str(e))
 	except (DatabaseError, Exception) as e:
@@ -133,6 +133,7 @@ def create(body: CreateUser):
 
 	'''
 	try:
+		body.current_user = current_user.uuid
 		user = base.create_user(body)
 	except UniqueViolation:
 		abort(409, 'User already exists')
@@ -146,26 +147,29 @@ def create(body: CreateUser):
 # PATCH
 
 @userBp.patch('/set-active-organization')
-@login_required
+@login_required 
 @validate()
 def set_org(body: SetActiveOrg):
 	'''
 
 	'''
-	if isinstance(body.org_id, int):
-		org_id = base.get_organization(body.org_id).uuid
-	else: 
-		org_id = body.org_id
+	organization = base.get_organization(body.org_id)
+	
 
-	res = base.check_permission('organization', str(org_id), str(current_user.uuid), 'access')
+	res = base.check_permission('organization', str(organization.uuid), str(current_user.uuid), 'access')
 
 	if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 
-		session['active_org_uuid'] = org_id
+		session['active_org_uuid'] = organization.uuid
 
 		# Flush the user from the cache to force admin status to update 
 		user_key = f'user_{str(current_user.uuid)}'
 		cache.delete(user_key)
+
+		# Cache the new organization in the session 
+		session[f'org_{organization.uuid}'] = organization.to_cache()
+
 		return '', 200
+
 	else:
 		abort(401)
