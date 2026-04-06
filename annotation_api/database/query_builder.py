@@ -13,24 +13,23 @@ import psycopg.sql as sql
 class QueryBuilder:
 	'''Still not an ORM -ML'''
 	@staticmethod
-	def filter_by_object_ids(prefix: sql.Composable, id_field: sql.Composable, ids: List[Union[int, UUID]]) -> Tuple[sql.Composable, Dict]:
+	def filter_by_object_ids(pfx: str, id_field: str, ids: Union[List[int], List[UUID], List[Union[int, UUID]]]) -> Tuple[sql.Composable, Dict]:
 		'''
 		
 		'''
-		pfx = prefix.as_string()
 		data = { f'{pfx}_ints': [], f'{pfx}_uuids': [] }
 
 		for id_val in ids:
 			if isinstance(id_val, int):
-				data['ints'].append(id_val)
+				data[f'{pfx}_ints'].append(id_val)
 			elif isinstance(id_val, UUID):
-				data['uuids'].append(id_val)
+				data[f'{pfx}_uuids'].append(id_val)
 
 		return sql.SQL(
-			'{prefix}.{ident} = ANY(%({i_keys})s) OR {prefix}.uuid = ANY(%({u_keys})s)'
+				'{prefix}.{ident} = ANY({i_placehodler}::int[]) OR {prefix}.uuid = ANY({u_placeholder}::uuid[])'
 			).format(
-				prefix=prefix, 
-				ident=id_field,
-				i_keys=sql.Identifier(f'{pfx}_ints'),
-				u_keys=sql.Identifier(f'{pfx}_uuids'),
+				prefix=sql.Identifier(pfx), 
+				ident=sql.Identifier(id_field),
+				i_placehodler=sql.Placeholder(f'{pfx}_ints'),
+				u_placeholder=sql.Placeholder(f'{pfx}_uuids'),
 			), data

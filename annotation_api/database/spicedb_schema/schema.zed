@@ -5,42 +5,57 @@ definition organization {
 	relation member: user
 
   permission access = admin + member
-  permission manage = admin
 }
 
 definition project {
     relation parent: organization
-    relation manager: user
-    relation annotator: user
 
-    permission view = manager + parent->manage
-    permission edit = manager + parent->manage
+    permission access = parent->access
 }
 
 definition herd_unit {
 	relation parent: project
 
-  permission view = parent->view
-  permission edit = parent->edit
+  permission acces = parent->access
 }
 
 definition model {
   relation parent: project 
 
-  permission view = parent->view
-  permission edit = parent->edit 
+  permission access = parent->access
 }
 
 definition survey { 
   relation parent: herd_unit
 
-  permission view = parent->view
-  permission edit = parent->edit
+  permission access = parent->access
 }
 
 definition schema {
   relation parent: model
 
-  permission view = parent->view
-  permission edit = parent->edit
+  permission access = parent->access
+}
+
+definition image {
+  relation parent: survey | herd_unit
+
+  permission access = parent->access
+}
+
+definition prediction {
+  relation parent: image
+
+  permission access = parent->access
+}
+
+definition reviewed_area {
+  relation parent: image
+
+  permission access = parent->access
+}
+
+definition annotations {
+  relation parent: image
+  permission access = parent->access
 }

@@ -10,3 +10,5 @@ from .surveys import *
 from .users import *
 from .verifier import *
 from .autocropper import *
+from .predictions import *
+from .labels import *

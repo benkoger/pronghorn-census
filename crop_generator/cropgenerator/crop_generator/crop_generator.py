@@ -6,12 +6,10 @@
 #---------------------------------------------------------------------------------------------------------------------------#
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from ..generatorobjects.generatorobjects import Box, HerdUnit, Model, Prediction, PredictionCrop, Image, ReviewedArea,\
+from ..generatorobjects.generatorobjects import Box, Prediction, PredictionCrop, Image, ReviewedArea,\
 Annotation
 from sklearn.cluster import KMeans
-from uuid import UUID
 from typing import Any, List
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -155,7 +153,7 @@ def auto_crop(image: Image, predictions: list[Prediction], labels_ids: dict[int,
 	
 #---------------------------------------------------------------------------------------------------------------------------#
 
-def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: int=150, drawBox: bool=False) -> list[PredictionCrop]:
+def create_subcrop(image: Image, predictions: list[Prediction], crop_size: int=150, drawBox: bool=False) -> list[PredictionCrop]:
 		crops = []
 		img = image.get_image()
 		if len(predictions) == 0:        
@@ -167,7 +165,7 @@ def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: i
 		img_height, img_width = img.shape[:2]
 
 		for pred in predictions:
-			box = pred['dimensions']['top_left'] + pred['dimensions']['bottom_right']
+			box = pred.dimensions.top_left + pred.dimensions.bottom_right
 			center_x = (box[0] + box[2]) / 2
 			center_y = (box[1] + box[3]) / 2
 
@@ -192,13 +190,13 @@ def create_subcrop(image: Image, predictions: list[dict[str, Any]], crop_size: i
 
 			crop = PredictionCrop(
 				image_id = image.image_id,
-				pred_id = pred['pred_id'],
-				name = f'{image.name}_pred_crop_{pred['uuid']}',
-				score = pred['score'],
-				label = pred['label'],
+				pred_id = pred.pred_id,
+				name = f'{image.name}_pred_crop_{pred.uuid}',
+				score = pred.score,
+				label = pred.label,
 				dimensions = Box((int(xmin), int(ymax)), (int(xmax), int(ymin))),
 				boundingBox = Box((int(box[0] - xmin), int(box[1] - ymin)), (int(box[2] - xmin), int(box[3] - ymin))),
-				uuid = pred['uuid']
+				uuid = pred.uuid
 			)
 			crop.set_image(img[ymin:ymax, xmin:xmax].copy())
 			crops.append(crop)

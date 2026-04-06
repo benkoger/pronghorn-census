@@ -37,3 +37,8 @@ class AuthorizationFailure(Exception):
 	def __init__(self, user_id: str, permission: str, object_type: str, object_id: str):
 		self.message = f'User: {user_id} does not have permission {permission} for {object_type}: {object_id}'
 		super().__init__(self.message)
+
+class BulkAuthorizationFailure(Exception):
+	'''Raised when one or more authorization checks fail'''
+	def __init__(self, user_id: str, permission: str):
+		self.message = f'User: {user_id} does not have permission {permission} for multiple objects'

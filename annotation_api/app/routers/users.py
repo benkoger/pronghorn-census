@@ -114,8 +114,6 @@ def get_orgs(user_id: str):
 def check_role(query: RoleQuery):
 	'''
 	'''
-	print(current_user.roles)
-	print(session.get('active_org_uuid'))
 
 	if current_user.roles and query.role_name in current_user.roles:
 		return 'true', 200

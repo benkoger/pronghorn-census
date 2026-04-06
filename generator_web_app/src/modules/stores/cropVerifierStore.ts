@@ -1,7 +1,5 @@
 // cross component state management for crop verification functionality
 // Author: Michael B. Lance
-// Created: October 1, 2025
-// Updated: November 20, 2025
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';

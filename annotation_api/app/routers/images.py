@@ -5,20 +5,26 @@
 
 from uuid import UUID
 
+from cropgenerator import create_subcrop
 from botocore.exceptions import ClientError
-from flask import Blueprint, abort, current_app, request
+from flask import Blueprint, abort, current_app, request, Response
+import cv2
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
 
-from app.decorators import roles_required
-from app.extensions import base, s3
+from app.extensions import base, s3, cache
 from database import ObjectNotFound
-from database.view_models.images import *
+from database.errors import AuthorizationFailure
+from database.view_models import (
+		CreateImage,
+		CreatePresignedPut,
+		UpdateImage,
+		CreatePredictionCrop,
+        PredictionQuery
+		)
 
 imageBp = Blueprint('images', __name__, url_prefix='/api/v1/images')
-
-#TODO: These endpoints require propper organizational and project checking
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # GET
@@ -49,10 +55,25 @@ def get_by_id(image_id: str):
 	except ObjectNotFound as e:
 		abort(404, str(e))
 	except (DatabaseError, Exception) as e:
+		print(e)
 		abort(500)
 
 	return image.to_dict(), 200
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.get('/prediction_crops/<string:prediction_id>')
+def get_prediction_crop(prediction_id: str): 
+	'''
+
+	'''
+	crop = cache.get(prediction_id)
+	if crop is None:
+		abort(404, f'Prediction crop: {prediction_id} was not found')
+
+	_, encoded_image= cv2.imencode('.webp', crop)
+	return Response(encoded_image.tobytes(), mimetype='image/webp'), 200
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -292,7 +313,7 @@ def create_multipart_upload():
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@imageBp.route('/complete-multipart-upload', methods=['POST'])
+@imageBp.post('/complete-multipart-upload')
 @login_required
 def complete_upload():
 	'''
@@ -350,6 +371,40 @@ def abort_upload():
 		abort(500)
 
 	return response, 201
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+@imageBp.post('/prediction_crops')
+@login_required
+@validate()
+def get_prediciton(body: CreatePredictionCrop):
+	'''
+
+	'''
+	try:
+		image = base.get_image(body.image_id)
+		predictions = base.get_predictions(PredictionQuery(prediction_id=body.prediction_id))
+		image_data = cache.get(image.uuid)
+		if not image_data:
+			image_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'],Key=image.img_key)['Body'].read()
+			cache.set(image.uuid, image_data, 500)
+
+		print('here')
+		image.set_image(image_data)
+		pred_crops = create_subcrop(image, predictions)
+
+		[cache.set(crop.uuid, crop.get_image(), 3600) for crop in pred_crops]
+
+
+	except ObjectNotFound as e:
+		abort(404, str(e))
+	except AuthorizationFailure as e:
+		abort(401, str(e))
+	except (DatabaseError, Exception) as e:
+		print(f'error: {e}')
+		abort(500)
+
+	return [crop.to_dict() for crop in pred_crops]
 
 #---------------------------------------------------------------------------------------------------------------------------#
 #PUT

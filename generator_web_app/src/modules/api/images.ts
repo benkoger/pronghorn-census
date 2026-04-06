@@ -3,12 +3,12 @@
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-import { Image } from '@/types/generatorobjects.ts';
-import type { ImageIntf } from '@/types/generatorobjects.ts';
+import { Image, type ImageIntf, PredictionCrop, type PredictionCropIntf, type Prediction } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 //---------------------------------------------------------------------------------------------------------------------------//
+//GET
 
 interface createImageOptions{
 	survey_id: string | number;
@@ -34,6 +34,7 @@ export async function createImage(options: createImageOptions): Promise<Image> {
 }
 
 //---------------------------------------------------------------------------------------------------------------------------//
+//POST
 
 interface presignedPutOptions {
 	upload_id: string;
@@ -118,7 +119,45 @@ export async function abortMultipartUpload(image_key: string, upload_id: string)
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export interface updateImageOptions {
+interface CreatePredCropsOptions {
+  image_id: string,
+  prediction_id: string[],
+
+}
+
+export async function createPredCrops(options: CreatePredCropsOptions): Promise<PredictionCrop[]> {
+  const response = await fetch(`${api_url}/images/prediction_crops`, {
+		method: 'POST',			
+    credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			'image_id': options.image_id,
+      'prediction_id': options.prediction_id
+		}),
+  });
+
+	if (!response.ok) throw new ApiError(await response.json());
+	
+  const resp = await response.json();
+	const pred_crops: PredictionCrop[] = []
+	
+  for (const row of resp) {
+		const predCrop = row as PredictionCropIntf
+		
+    pred_crops.push(new PredictionCrop(
+			predCrop,
+      `${api_url}/images/prediction_crops/${predCrop.uuid}`)
+    );
+	}
+
+	return pred_crops;
+}
+
+//---------------------------------------------------------------------------------------------------------------------------//
+
+interface updateImageOptions {
 	name?: string;
 	herd_unit_id?: number;
 	survey_id?: number;

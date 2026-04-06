@@ -50,6 +50,7 @@ from .errors import (
 	FailedToCreate,
 	UserNotFound,
 	AuthorizationFailure,
+	BulkAuthorizationFailure
 )
 
 from .view_models import *
@@ -157,6 +158,26 @@ class Database:
 		)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+	
+	def create_bulk_check_request(self, object_type: str, object_id: str, subject_id: str, permission:str):
+		'''
+
+		'''
+		return BulkCheckPermissionRequestItem(
+				resource=ObjectReference(
+					object_type=object_type,
+					object_id=object_id
+					),
+				permission=permission,
+				subject=SubjectReference(
+					object=ObjectReference(
+						object_type='user',
+						object_id=subject_id
+						)
+					)
+				)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 	def bulk_check_permission(self, permissions: Iterable[BulkCheckPermissionRequestItem]):
 		'''
@@ -171,6 +192,7 @@ class Database:
 
 	def check_permission(self, object_type: str, object_id: str, subject_id: str, permission:str):
 		'''
+
 		'''
 		return self._spice_client.CheckPermission(
 			CheckPermissionRequest(
@@ -646,6 +668,7 @@ class Database:
 	def _get_users(self, cursor: Cursor[User]) -> List[User]:
 		'''
 
+				self.crddeate_bulk_check_request('')
 		'''
 		cursor.row_factory = class_row(User)
 		query = sql.SQL('SELECT * FROM usermanagement.users WHERE user_id != 0;')
@@ -904,7 +927,6 @@ class Database:
 		'''
 
 		'''
-
 		query = sql.SQL('''
 			SELECT P.* FROM projectmanagement.projects as P
 			JOIN usermanagement.organizations_projects as OP ON OP.project_id = P.project_id
@@ -913,10 +935,10 @@ class Database:
 
 		if req.project_id:
 			p_filters, data = QueryBuilder.filter_by_object_ids(
-				sql.Identifier('P'),
-				sql.Identifier('project_id'),
-				req.project_id
-			)
+					'P',
+					'project_id',
+					req.project_id
+				)
 			cursor.row_factory = class_row(Project)
 			return cursor.execute(query + sql.SQL('AND') + p_filters, {**data, 'org_id': org.organization_id}).fetchall()
 
@@ -1228,6 +1250,27 @@ class Database:
 			label_id: either the label's internal database id or its universally unique identifier
 		'''
 		return self._get_label(label_id=label_id)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+	@connect 
+	def _get_labels(self, cursor: Cursor[Label], req: LabelQuery) -> List[Label]:
+		'''
+
+		'''
+		query = sql.SQL('SELECT L.* FROM projectmanagement.labels')
+		if req.label_id:
+			l_filters, data = QueryBuilder.filter_by_object_ids(
+					'L',
+					'label_id',
+					req.label_id
+					)
+
+			cursor.row_factory = class_row(Label)
+			return cursor.execute(query + sql.SQL('WHERE'), data).fetchall()
+		else: 
+			cursor.row_factory = class_row(Label)
+			return cursor.execute(query).fetchall()
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -2387,6 +2430,33 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+	@connect 
+	#TODO: Replace PredictionCropQuery with PredictionQuery
+	def _get_predictions(self, cursor: Cursor[Prediction], req: PredictionQuery) -> List[Prediction]:
+		'''
+		
+		'''
+		query = sql.SQL('SELECT p.* FROM core.predictions as p')
+
+		if req.prediction_id:
+			p_filters, data = QueryBuilder.filter_by_object_ids(
+					'p',
+					'pred_id',
+					req.prediction_id
+					)
+			cursor.row_factory = class_row(Prediction)
+			return cursor.execute(sql.SQL('{q} WHERE {p}').format(q=query, p=p_filters), data).fetchall()
+		else:
+			cursor.row_factory = class_row(Prediction)
+			return cursor.execute(query).fetchall()
+
+	def get_predictions(self, req: PredictionQuery) -> List[Prediction]:
+		'''
+
+		'''
+		return self._get_predictions(req)
+
+	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Core - Annotations
 
 	@connect
@@ -3014,17 +3084,19 @@ class Database:
 	# Functionality - Get Batch of images
 
 	@connect
-	def _get_auto_crop_batch(self, cursor: Cursor[dict], survey_id: Survey | int | UUID, herd_unit_id: HerdUnit | int | UUID, 
-					batch_size: int, labels: list[int], score: float, model_id: Model | int | UUID, user_id: User | int | UUID) -> dict[str, Union[str, int, List[int]]]:
+	def _get_auto_crop_batch(self, cursor: Cursor[Dict], params: AutoCropperBatchQuery, user: User) -> dict[str, Union[str, int, List[int]]]:
 		'''
 		
 		'''
-		herd_unit = self._get_herd_unit(cursor, herd_unit_id) if not isinstance(herd_unit_id, HerdUnit) else herd_unit_id
-		survey = self._get_survey(cursor, survey_id) if not isinstance(survey_id, Survey) else survey_id
-		user = self._get_user(cursor, user_id) if not isinstance(user_id, User) else user_id
-		model = self._get_model(cursor, model_id) if not isinstance(model_id, Model) else model_id
-		if not herd_unit or not survey or not user or not model:
-			raise Exception('Could not fetch batch')
+		# Fetching objects will perform acl checks for each object and ensures each id is in expected form
+		q_params = {
+				'survey_id': self._get_survey(cursor, params.survey_id).survey_id,
+				'herd_unit_id': self._get_herd_unit(cursor, params.herd_unit_id).herd_unit_id,
+				'model_id': self._get_model(cursor, params.model_id).model_id,
+                'labels': params.label,
+                'score': params.min_confidence,
+                'batch_size': params.batch_size
+				}
 
 		cursor.row_factory = dict_row
 		query = sql.SQL(''' 
@@ -3059,7 +3131,9 @@ class Database:
 							'pred_id', P.pred_id,
 							'image_id', P.image_id,
 							'model_id', P.model_id,
-							'dimensions', json_build_object('top_left', json_build_array(P.box_tx, P.box_ty), 'bottom_right', json_build_array(P.box_bx, P.box_by)),
+							'dimensions', json_build_object(
+								'top_left', json_build_array(P.box_tx, P.box_ty), 
+								'bottom_right', json_build_array(P.box_bx, P.box_by)),
 							'score', P.score,
 							'label', P.label,
 							'created', P.created,
@@ -3076,34 +3150,26 @@ class Database:
 				GROUP BY I.image_id 
 			) AS img_preds;
 		''')
-		params = {
-			'herd_unit_id': herd_unit.herd_unit_id,
-			'survey_id': survey.survey_id,
-			'model_id': model.model_id,
-			'labels': labels, 
-			'score': score,
-			'batch_size': batch_size
-		}
-		try:
-			cursor.execute(query, params)
-		except Exception as e:
-			print(e)
+	
+		cursor.execute(query, q_params)
+
 		results = cursor.fetchone()
+
 		if results is None:
 			raise Exception('Failed to fetch batch')
+		
 		ids = []
 		for row in cast(dict, results)['json_agg']: 
 			ids.append((user.user_id, row['image_id']))
-		cursor.executemany(sql.SQL('UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s'), ids)
+		
+		cursor.executemany(sql.SQL('UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s'), ids)	
 		return cast(dict, results)['json_agg']
 
-	def get_auto_crop_batch(self,survey_id: Survey | int | UUID, herd_unit_id: HerdUnit | int | UUID, 
-					batch_size: int, labels: list[int], score: float, model_id: Model | int | UUID, 
-					user_id: User | int | UUID) -> dict[str, Union[str, int, List[int]]]:
+	def get_auto_crop_batch(self, params: AutoCropperBatchQuery, user: User) -> dict[str, Union[str, int, List[int]]]:
 		'''
 
-		'''
-		return self._get_auto_crop_batch(survey_id = survey_id, herd_unit_id = herd_unit_id, batch_size = batch_size, user_id = user_id, labels = labels, score = score, model_id = model_id)
+		'''	
+		return self._get_auto_crop_batch(params, user)
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 	# Functionality - Delcare predictions as reviewed

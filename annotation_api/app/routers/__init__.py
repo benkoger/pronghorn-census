@@ -9,10 +9,9 @@ import io
 from typing import cast
 from uuid import UUID
 
-from cropgenerator import auto_crop, create_subcrop
+from cropgenerator import auto_crop
 from cropgenerator.generatorobjects import Annotation, Prediction, ReviewedArea, User
-import cv2
-from flask import Blueprint, Response, abort, current_app, jsonify, request, session
+from flask import Blueprint, abort, current_app, request 
 from flask_login import current_user, login_required
 
 from app.extensions import base, cache, s3
@@ -22,6 +21,7 @@ from .herd_units import herdunitBp
 from .images import imageBp
 from .models import modelBp
 from .authenticate import authBp
+from .autocropper import cropBp
 from .organizations import orgBp
 from .projects import projectBp
 from .reviewedarea import raBp
@@ -43,6 +43,7 @@ bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)
 bp.register_blueprint(userBp)
 bp.register_blueprint(authBp)
+bp.register_blueprint(cropBp)
 bp.register_blueprint(orgBp)
 
 #---------------------------------------------------------------------------------------------------------------------------#
@@ -71,75 +72,6 @@ def create_prediction():
 
 #---------------------------------------------------------------------------------------------------------------------------#
 # Auto Cropping
-
-@bp.route('/api/v1/create/auto-crop-batch', methods=['POST'])
-@login_required
-def create_auto_crop_batch():
-	'''
-	
-	'''
-	data = request.get_json()
-	if 'pred_crop_data' in session: # Delete last batch's prediction crops
-		for data in session['pred_crop_data']:
-			cache.delete(data['uuid'])
-		session.pop('pred_crop_data')
-	try:
-		img_batch = base.get_auto_crop_batch(
-			UUID(data['survey_id']),
-			UUID(data['herd_unit_id']),
-			int(data['size']),
-			data['labels'],
-			float(data['score']),
-			UUID(data['model_id']),
-			cast(User, current_user))
-	except TypeError as e:
-		abort(404, 'Database returned nothing, perhaps your confidence score is too high.')
-	except Exception:
-		abort(500)
-	return img_batch, 201
-
-@bp.route('/api/v1/create/predictionCrops', methods=['POST'])
-@login_required
-def create_prediction_crops():
-	'''
-	
-	'''
-	data = request.get_json()
-	image = base.get_image(UUID(data['image_id']))
-	img_data = cache.get(image.uuid)
-
-	if not img_data:
-		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
-		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
-		cache.set(image.uuid, img_data, 360) 
-
-	image.set_image(img_data)
-	pred_crops = create_subcrop(image, data['predictions'])
-	to_dictd_pred_crops = [] 
-
-	for crop in pred_crops: # Save crop image data into the session cache
-		cache.set(crop.uuid,  crop.get_image(), 3600)
-		to_dictd_pred_crops.append(crop.to_dict())
-	
-	json_pred_crop_data = jsonify(to_dictd_pred_crops)
-	
-	if 'pred_crop_data' not in session:
-		session['pred_crop_data'] = []
-	
-	session['pred_crop_data'] + to_dictd_pred_crops #type: ignore
-	return json_pred_crop_data, 201
-
-@bp.route('/api/v1/request/image/<string:image_id>/pred_crop/<string:pred_crop_id>', methods=['GET'])
-def get_pred_crop(image_id: str, pred_crop_id: str):
-	'''
-	
-	'''
-	crop = cache.get(pred_crop_id)
-	if crop is None:
-		abort(404, 'crop not found')
-
-	_, encoded_img = cv2.imencode('.webp', crop)
-	return Response(encoded_img.tobytes(), mimetype='image/webp'), 201
 
 @bp.route('/api/v1/create/reviewed-area-and-annotations', methods=["PUT"])
 @login_required

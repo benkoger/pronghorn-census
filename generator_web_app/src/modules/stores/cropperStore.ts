@@ -5,11 +5,12 @@
 //---------------------------------------------------------------------------------------------------------------------------//
 
 import { defineStore } from 'pinia';
-import { useProjectStore } from '@/modules/stores/projectStore.ts';
-import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects.ts';
-import type { autoCropperBatch } from '@/types/generatorobjects.ts';
-import { autoCrop, fetchAutoCropperBatch, fetchPredCrops, setPredicionsReviewed } from '../api/apiV1Methods';
-import { updateImage, closeUserImages } from '@/modules/api/images.ts';
+import { useProjectStore } from '@/modules/stores/projectStore';
+import { Image, Prediction, PredictionCrop } from '@/types/generatorobjects';
+import type { autoCropperBatch } from '@/types/generatorobjects';
+import { autoCrop, setPredicionsReviewed } from '../api/apiV1Methods';
+import { fetchAutoCropperBatch } from '../api/autoCropper';
+import { closeUserImages, createPredCrops } from '@/modules/api/images';
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
@@ -75,13 +76,28 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 		}
 	},
 	actions: {
+    get_predictions_ids(batch_idx: number, image_index: number) {
+      const pred_ids: string[] = [];
+            for (const pred of this.batches[batch_idx].predictions[image_index]) {
+              pred_ids.push(pred.uuid)
+            }
+             return pred_ids
+    },
 		async getbatch(batchIndex: number) {
-			const resp = await fetchAutoCropperBatch(pStore.CurrentSurvey?.uuid,
-				pStore.CurrentHerdUnit?.uuid,
-				this.batch_size,
-				this.minConfidence,
-				pStore.CurrentLabelValues,
-				pStore.CurrentModel?.uuid)
+      if (pStore.CurrentSurvey == undefined || pStore.CurrentHerdUnit == undefined || pStore.CurrentModel == undefined) {
+        return;
+      }
+
+			const resp = await fetchAutoCropperBatch(
+        {
+          survey_id: pStore.CurrentSurvey?.uuid,
+				  herd_unit_id: pStore.CurrentHerdUnit?.uuid,
+				  batch_size: this.batch_size,
+				  min_confidence: this.minConfidence,
+				  labels: pStore.CurrentLabelValues,
+				  model_id: pStore.CurrentModel?.uuid
+        }
+      )
 			if (resp == undefined) return;
 			if (!this.batches[batchIndex]) this.batches[batchIndex] = {
 				images: [],
@@ -102,9 +118,14 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 			this.imageIdx = 0;
 			await this.getPredCrops(this.batchIdx, this.imageIdx + 1);
 		},
-		async getPredCrops(batchIdx: number, image_index: number) {
-			const predCrops = await fetchPredCrops(this.batches[batchIdx]['images'][image_index].uuid, pStore.CurrentSurvey?.uuid, pStore.CurrentHerdUnit?.uuid, this.batches[batchIdx].predictions[image_index]);
-			if (predCrops) this.batches[batchIdx]['predictionCrops'][image_index] = predCrops;
+		async getPredCrops(batch_index: number, image_index: number) {
+			const predCrops = await createPredCrops(
+        {
+          image_id: this.batches[batch_index]['images'][image_index].uuid, 
+          prediction_id: this.get_predictions_ids(batch_index, image_index)         
+        }
+      );
+			if (predCrops) this.batches[batch_index]['predictionCrops'][image_index] = predCrops;
 		},
 		async bootstrap() {
 			this.loading = true;
@@ -178,7 +199,6 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 				if (pStore.CurrentHerdUnit == undefined || pStore.CurrentSurvey == undefined || pStore.labels.length == 0) {
 					throw new Error('HerdUnit, Survey, or labels are undefined!');
 				}
-				console.log('there')
 				await autoCrop(this.currentImage.uuid, this.approvedPredictions, pStore.CurrentHerdUnit?.uuid, pStore.CurrentSurvey?.uuid, pStore.labels)
 				await setPredicionsReviewed(this.CurrentPredictionIds);
 			}
