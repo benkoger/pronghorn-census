@@ -21,7 +21,7 @@ interface AutoCropBatchOptions {
 
 export async function fetchAutoCropperBatch(options: AutoCropBatchOptions): Promise<[Image[], Prediction[][]]> {
 	const params = new URLSearchParams()
-  options.labels.forEach(id => params.append('label', id.toString()));
+  options.label.forEach(id => params.append('label', id.toString()));
   params.append('survey_id', options.survey_id.toString());
   params.append('herd_unit_id', options.herd_unit_id.toString());
   params.append('size', options.batch_size.toString());

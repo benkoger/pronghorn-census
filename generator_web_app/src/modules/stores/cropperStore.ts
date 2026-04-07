@@ -94,7 +94,7 @@ export const useAutoCropperStore = defineStore('autoCropperStore', {
 				  herd_unit_id: pStore.CurrentHerdUnit?.uuid,
 				  batch_size: this.batch_size,
 				  min_confidence: this.minConfidence,
-				  labels: pStore.CurrentLabelValues,
+				  label: pStore.CurrentLabelValues,
 				  model_id: pStore.CurrentModel?.uuid
         }
       )
