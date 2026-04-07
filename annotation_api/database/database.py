@@ -139,7 +139,7 @@ class Database:
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-	def create_spice_update(self, object_type: str, object_id: str, subject_id: str, relation: str) -> RelationshipUpdate:
+	def create_spice_update(self, object_type: str, object_id: str, subject_type: str, subject_id: str, relation: str) -> RelationshipUpdate:
 		'''
 
 		'''
@@ -150,7 +150,7 @@ class Database:
 				relation=relation,
 				subject=SubjectReference(
 					object=ObjectReference(
-						object_type='user',
+						object_type=subject_type,
 						object_id=subject_id,
 					)
 				)
@@ -974,11 +974,11 @@ class Database:
 		'''
 		
 		'''
-		res = self.check_permission('project', str(project_id), str(user.uuid), 'view')
+		res = self.check_permission('project', str(project_id), str(user.uuid), 'access')
 		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 			return self._get_project_models(project_id)
 		else:
-			raise AuthorizationFailure(str(user.uuid), 'view', 'project', str(project_id))
+			raise AuthorizationFailure(str(user.uuid), 'access', 'project', str(project_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1003,11 +1003,11 @@ class Database:
 		'''
 		
 		'''
-		res = self.check_permission('project', str(project_id), str(user.uuid), 'view')
+		res = self.check_permission('project', str(project_id), str(user.uuid), 'access')
 		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 			return self._get_project_herd_units(project_id)
 		else:
-			raise AuthorizationFailure(str(user.uuid), 'view', 'herd_unit', str(project_id))
+			raise AuthorizationFailure(str(user.uuid), 'access', 'herd_unit', str(project_id))
 	
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1138,11 +1138,11 @@ class Database:
 		'''
 		
 		'''
-		res = self.check_permission('schema', str(schema_id), str(user.uuid), 'view')
+		res = self.check_permission('schema', str(schema_id), str(user.uuid), 'access')
 		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 			return self._get_schema_labels(schema_id)
 		else:
-			raise AuthorizationFailure(str(user.uuid), 'view', 'schema', str(schema_id))
+			raise AuthorizationFailure(str(user.uuid), 'access', 'schema', str(schema_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1456,11 +1456,11 @@ class Database:
 		'''
 		
 		'''
-		res = self.check_permission('herd_unit', str(herd_unit_id), str(user.uuid), 'view')
+		res = self.check_permission('herd_unit', str(herd_unit_id), str(user.uuid), 'access')
 		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 			return self._get_herd_unit_surveys(herd_unit_id)
 		else:
-			raise AuthorizationFailure(str(user.uuid), 'view', 'herd_unit', str(herd_unit_id))
+			raise AuthorizationFailure(str(user.uuid), 'access', 'herd_unit', str(herd_unit_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
@@ -1645,11 +1645,11 @@ class Database:
 	def get_model_schema(self, model_id: UUID, user: User) -> Schema:
 		'''
 		'''
-		res = self.check_permission('model', str(model_id), str(user.uuid), 'view')
+		res = self.check_permission('model', str(model_id), str(user.uuid), 'access')
 		if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
 			return self._get_model_schema(model_id)
 		else:
-			raise AuthorizationFailure(str(user.uuid), 'view', 'model', str(model_id))
+			raise AuthorizationFailure(str(user.uuid), 'access', 'model', str(model_id))
 
 	#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 

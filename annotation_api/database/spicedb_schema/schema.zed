@@ -16,7 +16,7 @@ definition project {
 definition herd_unit {
 	relation parent: project
 
-  permission acces = parent->access
+  permission access = parent->access
 }
 
 definition model {
@@ -55,7 +55,7 @@ definition reviewed_area {
   permission access = parent->access
 }
 
-definition annotations {
+definition annotation {
   relation parent: image
   permission access = parent->access
 }
