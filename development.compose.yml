@@ -84,11 +84,7 @@ services:
       SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
       SPICE_URL: ${SPICE_URL}
     volumes:
-      - ./annotation_api:/app:Z
-      - ./requirements.txt:/app/requirements.txt:Z
-      - ./crop_generator:/venv/crop_generator:Z
-    command: > 
-      /bin/bash -c "source /venv/api_env/bin/activate && python -u /app/app.py"
+      - ./airial_api:/app:Z
     networks: 
       - dev_pronghorn_app_network
     ports: 

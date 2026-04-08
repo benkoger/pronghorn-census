@@ -11,7 +11,7 @@ import { api_url } from '@/modules/api/apiV1Methods.ts';
 //---------------------------------------------------------------------------------------------------------------------------//
 
 export async function getAllProjects(): Promise<Project[]> {
-  const response = await fetch(`${api_url}/projects/`, {
+  const response = await fetch(`${api_url}/projects`, {
 	  method: 'GET',
 	  credentials: 'include',
 	  headers: {
@@ -27,7 +27,7 @@ export async function getAllProjects(): Promise<Project[]> {
 
 //---------------------------------------------------------------------------------------------------------------------------//
 
-export async function getProjectModels(project_id: string): Promise<Model[] | undefined> {
+export async function getProjectModels(project_id: string): Promise<Model[]> {
   const response = await fetch(`${api_url}/projects/${project_id}/models`, {
     method: 'GET',
     credentials: 'include',

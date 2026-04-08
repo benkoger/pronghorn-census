@@ -1,33 +1,24 @@
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender1 \
-    libxext6 \
-    libpq-dev \
-    bash \
-    python3-venv \
-    gcc \
-    build-essential \
-    libsqlite3-dev \
-    curl \
-    ca-certificates \
+    libgdal-dev gdal-bin proj-bin ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /venv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY requirements.txt ./
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PYTHONPATH="/app"
 
-COPY ../crop_generator /venv/crop_generator
+WORKDIR /app
 
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
+COPY ./airial_api/pyproject.toml ./airial_api/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-RUN sh /uv-installer.sh && rm /uv-installer.sh
+# 6. Final code copy
+COPY ./airial_api .
 
-ENV PATH="/root/.local/bin/:$PATH"
+EXPOSE 8000
 
-RUN /bin/bash -c "uv venv api_env && source api_env/bin/activate && uv pip install --no-cache-dir -r requirements.txt"
-
-EXPOSE 5000
+# Use the absolute path to the venv python to be safe
+CMD ["uv", "run", "python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8000", "--debug"]
