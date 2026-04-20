@@ -1,7 +1,7 @@
 // API methods for managing users 
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { User, Organization } from '@/types/generatorobjects.ts';
 import type { UserIntf, OrganizationIntf } from '@/types/generatorobjects.ts';
@@ -9,7 +9,7 @@ import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 import { getActivePinia, type Pinia, type Store } from 'pinia';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function checkAuth(): Promise<boolean> {
 	const response = await fetch(`${api_url}/users/check-auth`, {
@@ -25,7 +25,7 @@ export async function checkAuth(): Promise<boolean> {
 	return true;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getAllUsers(): Promise<User[]> {
 	const response = await fetch(`${api_url}/users`, {
@@ -45,7 +45,7 @@ export async function getAllUsers(): Promise<User[]> {
 	return users
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getUserOrganizations(user_id: string): Promise<Organization[]> {
 	const response = await fetch(`${api_url}/users/${user_id}/organizations`, {
@@ -65,7 +65,7 @@ export async function getUserOrganizations(user_id: string): Promise<Organizatio
 	return orgs
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getCurrentUser(): Promise<User> {
 	const response = await fetch(`${api_url}/users/current-user`, {
@@ -80,7 +80,7 @@ export async function getCurrentUser(): Promise<User> {
 	return new User(await response.json() as UserIntf);
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getUserHasRole(role_name: string): Promise<boolean> {
 	const params = new URLSearchParams();
@@ -100,7 +100,7 @@ export async function getUserHasRole(role_name: string): Promise<boolean> {
   return resp
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function authUser(email:string, password: string): Promise<boolean> {
 	const response = await fetch(`${api_url}/authenticate`, {
@@ -119,7 +119,7 @@ export async function authUser(email:string, password: string): Promise<boolean>
 	return true;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function deauthUser(): Promise<boolean> {
 	const response = await fetch(`${api_url}/deauthenticate`, {
@@ -146,7 +146,7 @@ export async function deauthUser(): Promise<boolean> {
 	return true;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function setActiveOrg(org_id: string): Promise<boolean> {
   const response = await fetch(`${api_url}/users/set-active-organization`, {

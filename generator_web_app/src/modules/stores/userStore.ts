@@ -1,13 +1,13 @@
 // user state store
 // Author: Michael B. Lance
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from 'pinia';
 import { authUser, checkAuth, getCurrentUser, deauthUser, getUserHasRole, getUserOrganizations,
  setActiveOrg } from '@/modules/api/users';
 import { Organization, User } from '@/types/generatorobjects.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 
 export const useUserStore = defineStore('userStore', {

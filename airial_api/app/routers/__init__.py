@@ -2,24 +2,17 @@
 # Author: Michael B. Lance
 # TODO: Finish removing endpoints into sub routers
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------#
 
-from datetime import datetime
-import io
-from typing import cast
-from uuid import UUID
 
-from flask import Blueprint, abort, current_app, request 
-from flask_login import current_user, login_required
+from flask import Blueprint
 
-from app.extensions import base, cache, s3
-
+from .authenticate import authBp
+from .autocropper import cropBp
 from .cropverifier import verifierBp
 from .herd_units import herdunitBp
 from .images import imageBp
 from .models import modelBp
-from .authenticate import authBp
-from .autocropper import cropBp
 from .organizations import orgBp
 from .projects import projectBp
 from .reviewed_area import raBp
@@ -27,20 +20,25 @@ from .schemas import schemaBp
 from .surveys import surveyBp
 from .users import userBp
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------#
 
-bp = Blueprint('app', __name__)
+bp = Blueprint("app", __name__)
 
 bp.register_blueprint(herdunitBp)
 bp.register_blueprint(imageBp)
+
 bp.register_blueprint(modelBp)
 bp.register_blueprint(projectBp)
+
 bp.register_blueprint(schemaBp)
 bp.register_blueprint(surveyBp)
+
 bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)
+
 bp.register_blueprint(userBp)
 bp.register_blueprint(authBp)
+
 bp.register_blueprint(cropBp)
 bp.register_blueprint(orgBp)
 
@@ -51,7 +49,7 @@ bp.register_blueprint(orgBp)
 # @login_required
 # def create_reviewed_area_and_annotations():
 # 	'''
-	
+
 # 	'''
 # 	data = request.get_json()
 # 	# Request image object from data in request
@@ -61,19 +59,19 @@ bp.register_blueprint(orgBp)
 # 	if not img_data:
 # 		img_key = f'images/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/image/{image.name}'
 # 		img_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'], Key=img_key)['Body'].read()
-# 		cache.set(image.uuid, img_data, 360) 
-	
+# 		cache.set(image.uuid, img_data, 360)
+
 # 	image.set_image(img_data)
 
 # 	# get label - id for schema
 # 	label_ids = { lbl['label'] : lbl['label_id'] for lbl in data['labels'] }
-	
+
 # 	# (re)Construct prediction objects from data in request
 # 	predictions = []
 
 # 	for pred in data['predictions']:
 # 		prediction = Prediction(
-# 			pred_id = pred['pred_id'], 
+# 			pred_id = pred['pred_id'],
 # 			image_id = pred['image_id'],
 # 			model_id = pred['model_id'],
 # 			label = pred['label'],
@@ -93,7 +91,7 @@ bp.register_blueprint(orgBp)
 
 # 	#Create reviewed area and predictions objects
 # 	res_1 = False # init result as false to calm pyright down
-# 	for area_set in reviewed_areas: 
+# 	for area_set in reviewed_areas:
 # 		reviewed_area: ReviewedArea = cast(ReviewedArea, area_set[0])
 # 		annotations: Annotation = cast(Annotation, area_set[1] )
 # 		ra_key = f'reviewed_areas/survey/{data['survey_id']}/herd_unit/{data['herd_unit_id']}/reviewed_area/{reviewed_area.name}'
@@ -101,7 +99,7 @@ bp.register_blueprint(orgBp)
 # 		reviewed_area_id = base.insert_reviewed_areas(reviewed_area)
 # 		annotation_ids = base.insert_annotations(annotations, cast(User, current_user))
 # 		res_1 = base.add_reviewed_area_annotations(cast(int, reviewed_area_id), annotation_ids)
-		
+
 # 		try:
 # 			img_bytes = reviewed_area.serve('.JPG')
 # 		except Exception as e:
@@ -137,5 +135,3 @@ bp.register_blueprint(orgBp)
 # 	'''
 # 	annotations = base.get_crop_annotations(UUID(reviewed_area_id))
 # 	return [annot.to_dict() for annot in annotations], 201
-
-

@@ -1,14 +1,14 @@
 // API methods for managing image objects
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { Image, Prediction } from '@/types/generatorobjects.ts';
 import type { ImageIntf, PredictionIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------------------
 
 interface AutoCropBatchOptions {
   survey_id: string;
@@ -55,4 +55,26 @@ export async function fetchAutoCropperBatch(options: AutoCropBatchOptions): Prom
 
 	return [images as Image[], predictions as Prediction[][]];
 
+}
+
+//---------------------------------------------------------------------------------------------------------------------------
+
+interface AutoCropOptions {
+  image_id: string;
+  prediction_ids: string[];
+  label_ids: string[];
+}
+
+export async function autoCrop(parameters: AutoCropOptions): Promise<boolean> {
+  const response = await fetch(`${api_url}/autocropper`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(parameters)
+  });
+  if (!response.ok) throw new ApiError(await response.json());
+  
+  return true;
 }

@@ -10,6 +10,6 @@ from database import Database as db
 login_manager = LoginManager()
 cache = Cache()
 session_manager = Session()
-s3 = LocalProxy(lambda: getattr(current_app, 's3'))
+s3 = LocalProxy(lambda: getattr(current_app, "s3"))
 
-base = db(db_config, spice_config) # pyright: ignore
+base = db(db_config, spice_config)  # pyright: ignore

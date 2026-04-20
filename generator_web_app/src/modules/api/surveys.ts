@@ -1,14 +1,14 @@
 // API methods for managing survey objects
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { HerdUnit, Survey } from '@/types/generatorobjects.ts';
 import type { HerdUnitIntf, SurveyIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getSurveyHerdUnits(survey_id: string): Promise<HerdUnit[] | undefined> {
     const response = await fetch(`${api_url}/surveys/${survey_id}/herd-units`, {
@@ -25,7 +25,7 @@ export async function getSurveyHerdUnits(survey_id: string): Promise<HerdUnit[] 
     return herd_units;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function createSurvey(project_id: number, herd_unit_id: number, name: string, survey_date: string, additional_info: string): Promise<Survey> {
     const response = await fetch(`${api_url}/surveys`, {

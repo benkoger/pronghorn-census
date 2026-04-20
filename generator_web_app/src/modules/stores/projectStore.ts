@@ -1,7 +1,7 @@
 // Project state store 
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
 import { Project, Schema, Label, HerdUnit, Model, Survey } from '@/types/generatorobjects.ts';
@@ -11,7 +11,7 @@ import { createHerdUnit, getHerdUnitSurveys } from '@/modules/api/herdunits.ts';
 import { getModelSchema } from '@/modules/api/models.ts';
 import { getSchemaLabels } from '@/modules/api/schemas.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export const useProjectStore = defineStore('pStore', {
 	state: () => ({
@@ -47,6 +47,14 @@ export const useProjectStore = defineStore('pStore', {
 			}
 			return current_labels;
 		},
+    CurrentLabelIds(): string[] {
+      const ids: string[] = []; 
+      if (this.CurrentLabels == undefined) return [];
+      for (const label of this.CurrentLabels) {
+        ids.push(label.uuid)
+      }
+      return ids;
+    },
 		SortedLabels(state): Label[] {
 			return state.labels.sort((a: Label, b: Label) => {
 				if (a.label < b.label) {

@@ -1,14 +1,14 @@
 // API methods for managing herd unit objects
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { HerdUnit, Survey } from '@/types/generatorobjects.ts';
 import type { HerdUnitIntf, SurveyIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getHerdUnitSurveys(herd_unit_id: string): Promise<Survey[]> {
     const response = await fetch(`${api_url}/herd-units/${herd_unit_id}/surveys`, {
@@ -25,7 +25,7 @@ export async function getHerdUnitSurveys(herd_unit_id: string): Promise<Survey[]
     return surveys;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function createHerdUnit(project_id: number, name: string): Promise<HerdUnit> {
     const response = await fetch(`${api_url}/herd-units`, {
@@ -44,5 +44,5 @@ export async function createHerdUnit(project_id: number, name: string): Promise<
     return new HerdUnit(await response.json() as HerdUnitIntf);
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 

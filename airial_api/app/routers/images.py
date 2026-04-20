@@ -1,7 +1,7 @@
 # Endpoints for managing images in the API
 # Author: Michael B. Lance
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import cast
 from uuid import UUID
@@ -27,7 +27,7 @@ from database.object_models.user_management import User
 
 imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # GET
 
 
@@ -52,18 +52,21 @@ def get_by_id(image_id: str):
     """
     try:
         image = base.get_image(UUID(image_id), cast(User, current_user))
+
     except ValueError as e:
-        abort(400, str(e))
+        current_app.logger.exception(e)
+        abort(400, e)
     except ObjectNotFound as e:
-        abort(404, str(e))
+        current_app.logger.exception(e)
+        abort(404, e)
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     return image.to_dict(), 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.get("/prediction_crops/<string:prediction_id>")
@@ -71,13 +74,15 @@ def get_prediction_crop(prediction_id: str):
     """ """
     crop = cache.get(prediction_id)
     if crop is None:
-        abort(404, f"Prediction crop: {prediction_id} was not found")
+        e = ObjectNotFound("prediction_crop", prediction_id)
+        current_app.logger.exception(e)
+        abort(404, e)
 
     _, encoded_image = cv2.imencode(".webp", crop)
     return Response(encoded_image.tobytes(), mimetype="image/webp"), 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.get("/<string:image_id>/crops")
@@ -96,17 +101,21 @@ def get_crops(image_id: str):
     """
     try:
         crops = base.get_image_crops(UUID(image_id))
+
     except ValueError as e:
-        abort(400, str(e))
+        current_app.logger.exception(e)
+        abort(400, e)
     except ObjectNotFound as e:
-        abort(404, str(e))
-    except (DatabaseError, Exception):
+        current_app.logger.exception(e)
+        abort(404, e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return [crop.to_dict() for crop in crops], 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.get("/<string:image_id>/predictions")
@@ -132,17 +141,21 @@ def get_predictions(image_id: str):
     """
     try:
         predictions = base.get_image_predictions(UUID(image_id))
+
     except ValueError as e:
-        abort(400, str(e))
+        current_app.logger.exception(e)
+        abort(400, e)
     except ObjectNotFound as e:
-        abort(404, str(e))
-    except (DatabaseError, Exception):
+        current_app.logger.exception(e)
+        abort(404, e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return [pred.to_dict() for pred in predictions], 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.get("/<string:image_id>/annotations")
@@ -156,6 +169,17 @@ def get_annotations(image_id: str):
               in: path
               type: string
               required: true
+    responses:
+            200:
+                    description: Annotations belonging to a given image.
+            401:
+                    description: User not authorized to perform this action.
+            400:
+                    description: Malformed request.
+            404:
+                    description: Image not found.
+            500:
+                    description: Unexpected error.
 
     """
     try:
@@ -163,16 +187,19 @@ def get_annotations(image_id: str):
             UUID(image_id), cast(User, current_user)
         )
         if not annotations:
-            abort(404, "No annotations found")
+            return [], 200
+
     except ValueError as e:
-        abort(400, str(e))
-    except (DatabaseError, Exception):
+        current_app.logger.exception(e)
+        abort(400, e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return [annot.to_dict() for annot in annotations], 200
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # POST
 
 
@@ -181,27 +208,36 @@ def get_annotations(image_id: str):
 @login_required
 def create(body: CreateImageReq):
     """
-    Create a new image record.
+    Create a new image object.
     ---
+    parameters:
+            - name: create image request
+            in: body
+            type: CreateImageReq
+            required: true
     responses:
             201:
                     description: Created successfully.
             409:
                     description: Image already exists (Unique Violation).
+            400:
             500:
                     description: Database error.
     """
     try:
         image = base.create_image(body.model_dump())
-    except UniqueViolation:
-        abort(409, "Image already exists")
-    except (DatabaseError, Exception):
+
+    except UniqueViolation as e:
+        current_app.logger.error(e)
+        abort(409, e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.error(e)
         abort(500)
 
     return image.to_dict(), 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/presigned-get-url")
@@ -233,17 +269,20 @@ def create_presigned_get():
             ExpiresIn=data["expires_in"],
         )
     except ValueError as e:
-        abort(400, str(e))
+        current_app.logger.exception(e)
+        abort(400, e)
     except ClientError as e:
+        current_app.logger.exception(e)
         status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
         abort(status, e.response.get("Error", {}).get("Message"))
-    except (DatabaseError, Exception):
+    except (DatabaseError, Exception) as e:
+        current_app.logger.error(e)
         abort(500)
 
     return response, 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/presigned-put-url")
@@ -288,18 +327,22 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
             },
             ExpiresIn=3600,
         )
-    except (ValueError, KeyError):
-        abort(400)
+
+    except ValueError as e:
+        current_app.logger.exception(e)
+        abort(400, e)
     except ClientError as e:
+        current_app.logger.exception(e)
         status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
         abort(status)
-    except (DatabaseError, Exception):
+    except (DatabaseError, ValueError) as e:
+        current_app.logger.error(e)
         abort(500)
 
     return response, 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/create-multipart-upload")
@@ -322,6 +365,7 @@ def create_multipart_upload():
             ContentType="image/jpeg",
         )
     except ClientError as e:
+        current_app.logger.exception(e)
         status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
         abort(status)
     except Exception:
@@ -330,7 +374,7 @@ def create_multipart_upload():
     return response["UploadId"], 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/complete-multipart-upload")
@@ -353,7 +397,9 @@ def complete_upload():
             MultipartUpload={"Parts": data["parts"]},
             UploadId=data["upload_id"],
         )
+
     except ClientError as e:
+        current_app.logger.exception(e)
         status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
         abort(status)
     except Exception:
@@ -362,7 +408,7 @@ def complete_upload():
     return response, 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/abort-multipart-upload")
@@ -384,6 +430,7 @@ def abort_upload():
             Key=data["image_key"],
             UploadId=data["upload_id"],
         )
+
     except ClientError as e:
         status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
         abort(status)
@@ -393,14 +440,14 @@ def abort_upload():
     return response, 201
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.post("/prediction_crops")
 @login_required
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
-    """ """
+
     try:
         image = base.get_image(body.image_id, cast(User, current_user))
         predictions = base.get_predictions(
@@ -415,7 +462,6 @@ def get_prediciton(body: CreatePredictionCropReq):
             )["Body"].read()
             cache.set(image.uuid, image_data, 500)
 
-        print("here")
         image.set_image(image_data)
         pred_crops = create_subcrop(image, predictions)
 
@@ -432,10 +478,10 @@ def get_prediciton(body: CreatePredictionCropReq):
     return [crop.to_dict() for crop in pred_crops]
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # PUT
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # PATCH
 
 
@@ -444,36 +490,40 @@ def get_prediciton(body: CreatePredictionCropReq):
 @login_required
 def update(body: UpdateImageReq, image_id: str):
     """
-    Update image record metadata.
+    Update image object in the database.
     ---
-    parameters:
+    paramete:qrsrs:
             - name: image_id
             in: path
             type: string
             required: true
     responses:
             200:
-                    description: Record updated.
+                    description: Image updated successfully.
             400:
                     description: Invalid UUID.
             404:
-                    description: Not found.
+                    description: Image not found.
             500:
                     description: Database error.
     """
     try:
-        image = base.update_image(UUID(image_id), body.model_dump())
+        image = base.update_image(UUID(image_id), body, cast(User, current_user), False)
+
     except ValueError as e:
+        current_app.logger.error(e)
         abort(400, str(e))
     except ObjectNotFound as e:
+        current_app.logger.error(e)
         abort(404, str(e))
-    except (DatabaseError, Exception):
+    except (DatabaseError, Exception) as e:
+        current_app.logger.error(e)
         abort(500)
 
     return image.to_dict(), 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @imageBp.patch("/close-user-images")
@@ -482,6 +532,7 @@ def close_user_images():
     """ """
     try:
         base.close_user_images(current_user.user_id)
+
     except ValueError as e:
         abort(400, str(e))
     except ObjectNotFound as e:
@@ -492,7 +543,7 @@ def close_user_images():
     return "", 204
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
@@ -508,6 +559,7 @@ def delete_image(image_id: str):
         s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)
 
         base.delete_image(UUID(image_id))
+
     except ValueError as e:
         abort(400, str(e))
     except ClientError as e:

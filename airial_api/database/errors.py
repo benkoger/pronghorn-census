@@ -56,3 +56,4 @@ class BulkAuthorizationFailure(Exception):
 
     def __init__(self, user_id: str, permission: str):
         self.message = f"User: {user_id} does not have permission {permission} for multiple objects"
+        super().__init__(self.message)

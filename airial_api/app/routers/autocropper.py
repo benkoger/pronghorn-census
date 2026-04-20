@@ -1,82 +1,120 @@
-# Endpoints for the autocropper utility 
+# Endpoints for the autocropper utility
 # Author: Michael B. Lance
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
-from crop_generator import auto_crop
-from flask import Blueprint, abort, current_app
-from flask_login import login_required, current_user
-from flask_pydantic import validate
-from psycopg.errors import DatabaseError
+import io
 from typing import cast
 
-from app.extensions import base, s3, cache
-from database import ObjectNotFound
+from flask import Blueprint, abort, current_app
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+from psycopg.errors import DatabaseError
 
-from database.object_models.user_management import User
-from database.object_models.project_management import LabelQuery
-from database.object_models import (
-	AutoCropperBatchQuery,
-	AutoCropReq,
+from app.extensions import base, cache, s3
+from crop_generator import auto_crop
+from database.errors import (
+    AuthorizationFailure,
+    BulkAuthorizationFailure,
+    ObjectNotFound,
 )
+from database.object_models import (
+    AutoCropperBatchQuery,
+    AutoCropReq,
+)
+from database.object_models.core import PredictionQuery, UpdateImageReq
+from database.object_models.project_management import LabelQuery
+from database.object_models.user_management import User
 
-from database.object_models.core import (
-		PredictionQuery,
-		
-		ImportReviewedAreaReq
-		)
+cropBp = Blueprint("autocropper", __name__, url_prefix="/api/v1/autocropper")
 
-cropBp = Blueprint('autocropper', __name__, url_prefix='/api/v1/autocropper')
+# ---------------------------------------------------------------------------------------------------------------------------
+# GET
 
-#---------------------------------------------------------------------------------------------------------------------------#
-# GET 
 
-@cropBp.get('/batch')
+@cropBp.get("/batch")
 @login_required
 @validate()
 def fetch_batch(query: AutoCropperBatchQuery):
-	'''
+    """ """
+    try:
+        batch = base.get_auto_crop_batch(query, cast(User, current_user))
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except (Exception, DatabaseError) as e:
+        current_app.logger.exception(e)
+        abort(500)
 
-	'''
-	try: 
-		batch = base.get_auto_crop_batch(query, cast(User, current_user))
-	except ObjectNotFound as e:
-		abort(404, str(e))
-	except (Exception, DatabaseError) as e:
-		print(f'error: {e}')
-		abort(500)
+    return batch, 200
 
-	return batch, 200
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # POST
 
-@cropBp.post('')
-@login_required 
+
+@cropBp.post("")
+@login_required
 @validate()
 def auto_crop_image(body: AutoCropReq):
-	'''
+    """ """
+    try:
+        image = base.get_image(body.image_id, cast(User, current_user))
+        predictions = base.get_predictions(
+            PredictionQuery(prediction_id=body.prediction_ids), cast(User, current_user)
+        )
+        labels = base.get_labels(
+            LabelQuery(label_id=body.label_ids), cast(User, current_user)
+        )
 
-	'''
-	try:
-		image = base.get_image(body.image_id, cast(User, current_user))
-		predictions = base.get_predictions(
-				PredictionQuery(prediction_id=body.prediction_id),
-				cast(User, current_user)
-				)
+        image_data = cache.get(image.uuid)
 
-		labels = base.get_labels(LabelQuery(label_id=body.label_id), cast(User, current_user))
+        if not image_data:
+            image_data = s3.get_object(
+                Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
+            )["Body"].read()
+            cache.set(image.uuid, image_data, 500)
 
-		image_data = cache.get(image.uuid)
+        image.set_image(image_data)
 
-		if not image_data: 
-			image_data = s3.get_object(Bucket=current_app.config['BUCKET_NAME'],Key=image.img_key)['Body'].read()
-			cache.set(image.uuid, image_data, 500)
+        crops = auto_crop(image, predictions, labels)
 
-		image.set_image(image_data)
+        for crop_group in crops:
+            crop_req, annotation_reqs = crop_group
 
-		ra_and_annotations = auto_crop(image, predictions, )
+            crop_req.ra_key = f"images/{image.uuid}/reviewed_area/{crop_req.name}"
+            crop = base.create_reviewed_area(crop_req, cast(User, current_user), True)
 
-	except (DatabaseError, Exception) as e:
-		print(e)
-		abort(500)
+            for annotation_req in annotation_reqs:
+                annotation_req.reviewed_area_id = crop.uuid
+                base.create_annotation(annotation_req, cast(User, current_user), True)
+            s3.put_object(
+                Bucket=current_app.config["BUCKET_NAME"],
+                Key=crop_req.ra_key,
+                Body=io.BytesIO(crop_req.serve(".JPG")),
+                ContentType="image/jpeg",
+            )
+
+        base.set_predictions_reviewed(
+            [pred.uuid for pred in predictions], cast(User, current_user)
+        )
+        base.update_image(
+            image.uuid,
+            UpdateImageReq(opened_by_user_id=0),
+            cast(User, current_user),
+            True,
+        )
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, e)
+    except AuthorizationFailure as e:
+        current_app.logger.exception(e)
+        abort(401, e)
+    except BulkAuthorizationFailure as e:
+        current_app.logger.exception(e)
+        abort(401, e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return "", 201

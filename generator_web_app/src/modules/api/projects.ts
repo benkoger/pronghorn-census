@@ -1,14 +1,14 @@
 // API methods for managing projects
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 import { Project, Model, HerdUnit } from '@/types/generatorobjects.ts';
 import type { ProjectIntf, ModelIntf , HerdUnitIntf} from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getAllProjects(): Promise<Project[]> {
   const response = await fetch(`${api_url}/projects`, {
@@ -25,7 +25,7 @@ export async function getAllProjects(): Promise<Project[]> {
 	return projects;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getProjectModels(project_id: string): Promise<Model[]> {
   const response = await fetch(`${api_url}/projects/${project_id}/models`, {
@@ -44,7 +44,7 @@ export async function getProjectModels(project_id: string): Promise<Model[]> {
     return models;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getProjectHerdUnits(project_id: string): Promise<HerdUnit[]> {
   const response = await fetch(`${api_url}/projects/${project_id}/herd-units`, {
