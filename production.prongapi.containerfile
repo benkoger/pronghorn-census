@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-COPY ./airial_api/pyproject.toml ./airial_api/uv.lock ./
+RUN uv init --bare
 
 COPY ./airial_api .
 RUN uv sync --frozen --no-dev
