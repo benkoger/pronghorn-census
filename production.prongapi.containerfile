@@ -15,8 +15,8 @@ RUN uv sync --locked
 
 FROM python:3.13-slim as production-stage
 
-
-COPY --from=build-stage /app/.venv /app/.venv
 COPY --from=build-stage /app /app
 
-CMD ["uv", "run", "gunicorn", "-c", "gunicorn.py", "app:create_app()"]
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["gunicorn", "-c", "gunicorn.py", "app:create_app()"]
