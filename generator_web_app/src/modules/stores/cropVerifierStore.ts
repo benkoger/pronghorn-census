@@ -142,7 +142,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
     // --------------------------------------------------------------------------------------
 
-    async getReviewedArea(increment: boolean = true) {
+    async getReviewedArea(increment: boolean = true, silent: boolean = false) {
       if (
         this.pStore.CurrentHerdUnit === undefined ||
         this.pStore.CurrentSurvey === undefined
@@ -154,7 +154,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         include_reviewed: this.alreadyReviewed,
       });
 
-      if (resp == undefined) {
+      if (resp == undefined && !silent) {
         this.loading = false;
         this.outofcrops = true;
         this.done = true;
@@ -211,10 +211,8 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       await closeUserImages();
       await this.getReviewedArea();
       await this.getAnnotations(this.activeCropId);
-      this.$patch({
-        bootStrapped: true,
-        loading: false,
-      });
+      this.bootStrapped = true;
+      this.loading = false;
     },
 
     // --------------------------------------------------------------------------------------
@@ -534,7 +532,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       this.loading = false;
       this.actionStack = [];
       this.updates = {};
-      await this.nextImage();
+      if (!this.done) await this.nextImage();
     },
 
     // --------------------------------------------------------------------------------------
@@ -543,7 +541,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       if (this.loading) return;
       this.selectedShapeName = "";
 
-      this.$patch({ loading: true });
+      this.loading = true;
 
       if (this.cropIdx > 3) {
         // Clear image data from older crop to reduce space
@@ -565,11 +563,11 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       this.actionStack = [];
       this.updates = {};
 
-      this.$patch({ loading: false });
+      this.loading = false;
 
-      // prefetch next image
+      // prefetch next image only if there are next images
       if (!this.done) {
-        this.getReviewedArea(false);
+        this.getReviewedArea(false, true);
       }
     },
 

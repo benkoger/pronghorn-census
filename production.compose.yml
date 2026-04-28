@@ -39,8 +39,7 @@ services:
       SPICE_URL: ${SPICE_URL}
     networks: 
       - pronghorn_app_network
-    command: | 
-      uv run gunicorn -c gunicorn.py "app:create_app()"
+    command: uv run gunicorn -c gunicorn.py "app:create_app()"
   valkey:
     container_name: prong_valkey
     image: docker.io/valkey/valkey:8.1.1

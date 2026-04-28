@@ -22,8 +22,6 @@ export interface getReviewedAreaOptions {
 export async function getReviewedArea(
   options: getReviewedAreaOptions,
 ): Promise<ReviewedArea | undefined> {
-  console.log("nuts");
-  console.log(options);
   const params = new URLSearchParams();
   options.herd_unit_id.forEach((id) =>
     params.append("herd_unit_id", id.toString()),

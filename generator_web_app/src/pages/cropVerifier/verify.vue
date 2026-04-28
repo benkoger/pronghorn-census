@@ -1,11 +1,11 @@
 <script lang="ts">
 // Heavily adapted from several excellent Konva demos https://konvajs.org/
 // TS ignores because Konva has bad TS support, it works though.
-import { defineComponent } from 'vue';
-import { type konvaBoxConf, type tempRect, Label } from '@/types/generatorobjects';
-import { useCropVerifierStore } from '@/modules/stores/cropVerifierStore';
-import Konva from 'konva';
-import { useProjectStore } from '@/modules/stores/projectStore';
+import { defineComponent, type Ref } from "vue";
+import { type konvaBoxConf, type tempRect, Label } from "@/types/generatorobjects";
+import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
+import Konva from "konva";
+import { useProjectStore } from "@/modules/stores/projectStore";
 
 export default defineComponent({
   name: 'crop-verifier',
@@ -34,8 +34,7 @@ export default defineComponent({
     }
   },
   async mounted() {
-    const cvsStore = useCropVerifierStore();
-    if (cvsStore.bootStrapped == false) await this.cvs.bootStrap();
+    if (!this.cvs.bootStrapped) await this.cvs.bootStrap();
 
     await this.$nextTick(() => {
       this.updateSize();
@@ -65,7 +64,9 @@ export default defineComponent({
       const y = pivotY + distance * Math.sin(angle);
       return { x, y };
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     getClientRect(element: konvaBoxConf) {
       const { x, y, width, height, rotation = 0 } = element;
       const rad = this.degToRad(rotation);
@@ -87,7 +88,9 @@ export default defineComponent({
         height: maxY - minY,
       };
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     handleTransformEnd(e: MouseEvent) {
       if (!e.target) return;
       const uuid = this.cvs.selectedShapeName;
@@ -102,7 +105,9 @@ export default defineComponent({
       this.cvs.updateBox(uuid, node.width() * scaleX, node.height() * scaleY, node.x(), node.y());
 
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+  
     handleMouseDown(e: MouseEvent) {
       // @ts-ignore
       if (e.target === e.target.getStage()) {
@@ -126,7 +131,9 @@ export default defineComponent({
       }
       this.updateTransformer();
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     updateTransformer() {
       const transformerNode = (this.$refs.transformerRef as Konva.Transformer).getNode();
       const stage = transformerNode.getStage();
@@ -148,7 +155,9 @@ export default defineComponent({
         transformerNode.nodes([]);
       }
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     handleWheel(e: WheelEvent) {
       // @ts-ignore (idk why ts is unaware of evt, so ignore)
       e.evt.preventDefault();
@@ -181,14 +190,16 @@ export default defineComponent({
       stage.position(newPos);
 
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     updateSize() {
       const stagewrapper = (this.$refs.stagewrapper as HTMLDivElement);
       if (!stagewrapper) return
       this.sceneHeight = stagewrapper.offsetHeight;
       this.sceneWidth = stagewrapper.offsetWidth;
     },
-    //--------------------------------------------------------------------------------------//
+    //--------------------------------------------------------------------------------------
     updateSizeX() {
       /* This function only exists because the resize observer was getting wild with the y scale, 
       probably because our css sucks */
@@ -196,7 +207,9 @@ export default defineComponent({
       if (!stagewrapper) return
       this.sceneWidth = stagewrapper.offsetWidth;
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     handleDragEnd(e: MouseEvent) {
       if (!e.target) return
 
@@ -208,7 +221,9 @@ export default defineComponent({
 
       this.cvs.updateBox(uuid, node.width() * scaleX, node.height() * scaleY, node.x(), node.y());
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     cancelDraw() {
       if (!this.isDrawing) return;
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
@@ -229,7 +244,9 @@ export default defineComponent({
       };
       this.isDrawing = false;
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+
     drawMouseDown(e: MouseEvent) {
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
       // @ts-ignore
@@ -242,7 +259,9 @@ export default defineComponent({
       stageContainer.addEventListener('mousemove', this.drawMouseMove);
       stageContainer.addEventListener('mouseup', this.drawMouseUp);
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     drawMouseUp(e: MouseEvent) {
 
       if (!this.drawingLabel) return;
@@ -267,7 +286,9 @@ export default defineComponent({
       };
       this.isDrawing = false;
     },
-    //--------------------------------------------------------------------------------------//
+    
+    //--------------------------------------------------------------------------------------
+    
     drawMouseMove() {
       if (!this.isDrawing) return;
       // @ts-ignore
@@ -278,7 +299,9 @@ export default defineComponent({
       this.drawingRect.width = this.drawingRect.startPointX - point.x;
       this.drawingRect.height = this.drawingRect.startPointY - point.y;
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     startDrawing(label: Label) {
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
       stageContainer.style.cursor = 'crosshair';
@@ -287,7 +310,9 @@ export default defineComponent({
       this.drawingLabel = label;
       stageContainer.addEventListener('mousedown', this.drawMouseDown);
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     handleDelete() {
       if (this.cvs.selectedShapeName === '') return;
       const transformerNode = (this.$refs.transformerRef as Konva.Transformer).getNode();
@@ -298,19 +323,26 @@ export default defineComponent({
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
       stageContainer.style.cursor = 'default';
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     async handleRightArrow() {
       await this.cvs.nextImage();
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     async handleLeftArrow() {
       await this.cvs.previousImage();
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
     async handleEnter() {
       await this.cvs.submit();
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+
     decodeDigit(event: KeyboardEvent) {
       if (this.isDrawing) return;
       const label_num = +event.key;
@@ -323,7 +355,9 @@ export default defineComponent({
         this.startDrawing(label);
       }
     },
-    //--------------------------------------------------------------------------------------//
+
+    //--------------------------------------------------------------------------------------
+    
     handleKeyPress(event: KeyboardEvent) {
       switch (true) {
         case event.code === 'Escape': {
@@ -351,8 +385,7 @@ export default defineComponent({
           break;
         };
       }
-    }
-    //--------------------------------------------------------------------------------------//
+    },  
   }
 });
 </script>
@@ -371,7 +404,7 @@ export default defineComponent({
                 </h4>
                 <span class="ms-auto text-truncate">{{ label.name }}</span>
                 <BButton @click="startDrawing(label)" variant="outline-success" size="sm"
-                  v-b-tooltip.hover="'Create new annotation'" class="ms-auto">
+                  class="ms-auto">
                   <Icon icon="gridicons:add" />
                 </BButton>
               </div>
@@ -391,15 +424,13 @@ export default defineComponent({
                     <small class="text-muted text-truncate">{{ annot.uuid }}</small>
                   </div>
                   <BButtonGroup aria-label="Annotation Options" keynav class="w-100">
-                    <BButton size="sm" variant="success" v-b-tooltip.hover="'Copy annotation -- Not yet implemented'">
+                    <BButton size="sm" variant="success">
                       <Icon icon="material-symbols:content-copy-outline" />
                     </BButton>
-                    <BButton size="sm" variant="secondary"
-                      v-b-tooltip.hover="'Zoom to annotation -- Not yet implemented'">
+                    <BButton size="sm" variant="secondary">
                       <Icon icon="material-symbols:zoom-in" />
                     </BButton>
-                    <BButton @click="cvs.deleteAnnotation(annot.uuid)" size="sm" variant="danger"
-                      v-b-tooltip.hover="'Delete Annotation'">
+                    <BButton @click="cvs.deleteAnnotation(annot.uuid)" size="sm" variant="danger">
                       <Icon icon="material-symbols:delete" />
                     </BButton>
                   </BButtonGroup>
@@ -425,7 +456,8 @@ export default defineComponent({
               <v-layer ref="imageLayer" :config="{ listening: false }">
                 <v-image v-if="cvs.currentImage && cvs.currentImage[1].value == 'loaded'" :config="{
                   image: cvs.currentImage[0].value,
-                }" />
+                }" 
+                />
               </v-layer>
               <v-layer ref="annotationLayer">
                 <v-rect v-for="(conf, uuid) in cvs.currentBoxConfs" id="" :key="uuid" :config="{

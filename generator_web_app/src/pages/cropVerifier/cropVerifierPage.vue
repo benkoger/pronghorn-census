@@ -3,7 +3,7 @@ import { defineComponent, defineAsyncComponent } from "vue";
 import { useProjectStore } from "@/modules/stores/projectStore.ts";
 import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore.ts";
 import { Project, Model, HerdUnit, Survey } from "@/types/generatorobjects.ts";
-import { mapState } from "pinia";
+import { mapState, mapWritableState } from "pinia";
 import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/templates/SelectorList.vue";
 
@@ -22,6 +22,14 @@ export default defineComponent({
     if (pStore.projects.length == 0) pStore.get_projects();
     return { pStore, cvStore };
   },
+  mounted() {
+    if (this.pStore.CurrentProject) {
+      this.$router.push({
+        name: "crop-verifier",
+        params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
+      });
+    }
+  },
   data() {
     return {
       currentStep: 0,
@@ -35,7 +43,7 @@ export default defineComponent({
       CurrentSurvey: "CurrentSurvey",
       CurrentHerdUnit: "CurrentHerdUnit",
     }),
-    ...mapState(useCropVerifierStore, {
+    ...mapWritableState(useCropVerifierStore, {
       alreadyReviewed: "alreadyReviewed",
     }),
     canProceed() {
@@ -44,10 +52,12 @@ export default defineComponent({
           return (
             this.CurrentProject != undefined && this.CurrentModel != undefined
           );
+          break;
         case 1:
           return (
             this.CurrentHerdUnit != undefined && this.CurrentSurvey != undefined
           );
+          break;
         default:
           return false;
       }

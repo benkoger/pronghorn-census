@@ -9,4 +9,4 @@ RUN uv sync --locked
 
 COPY ./airial_api .
 
-CMD ["uv", "flask", "run", "--app", "app", "--host=0.0.0.0", "--port=8000", "--debug"]
+CMD ["uv", "run", "python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8000", "--debug"]

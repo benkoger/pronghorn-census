@@ -43,10 +43,8 @@ def auto_crop(
 
     Returns list of crops based on original image
     """
-
     points = []
     centers = []
-
     output = []
 
     img = image.get_image()
