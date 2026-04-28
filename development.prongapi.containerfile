@@ -6,10 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ENV PYTHONPATH="/app"
-
 WORKDIR /app
 
 COPY ./airial_api/pyproject.toml ./airial_api/uv.lock ./
