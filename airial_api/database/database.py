@@ -7,7 +7,6 @@ import os
 import uuid
 from datetime import date, datetime, timezone
 from functools import wraps
-from itertools import batched
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, cast
 from uuid import UUID
 
@@ -25,7 +24,6 @@ from authzed.api.v1 import (
     SubjectReference,
     WriteRelationshipsRequest,
 )
-from authzed.api.v1.permission_service_pb2 import ImportBulkRelationshipsRequest
 from grpc import ChannelCredentials
 from psycopg import Cursor
 from psycopg.rows import class_row, dict_row
@@ -66,10 +64,7 @@ from .object_models.core import (
     CreatePredictionReq,
     PredictionQuery,
     UpdateImageReq,
-    UpdatePredictionReq,
     UpdateAnnotationReq,
-    BulkUpdateAnnotationsReq,
-    BulkCreateAnnotationReq,
 )
 from .object_models.project_management import (
     CreateHerdUnitReq,
@@ -79,6 +74,7 @@ from .object_models.project_management import (
 from .object_models.user_management import (
     CreateUserReq,
     RoleQuery,
+    UpdateOrganizationReq,
 )
 from .query_builder import QueryBuilder
 
@@ -392,61 +388,50 @@ class Database:
     def _update_organization(
         self,
         cursor: Cursor[Organization],
-        orgId: Organization | int | UUID,
-        name: str | None = None,
-        logo_url: str | None = None,
-    ) -> bool:
+        organization_id: Union[int, UUID],
+        req: UpdateOrganizationReq,
+    ) -> Organization:
         """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            """ UPDATE usermanagement.organizations SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; """
-        )
+        query = sql.SQL(""" 
+            UPDATE usermanagement.organizations SET {augmented_field}, 
+            modified = CURRENT_TIMESTAMP
+		    WHERE uuid = %s
+            RETURNING *; 
+        """)
         kw_augmented_field = sql.SQL(",").join(
             [
                 sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in locals().items()
+                for key, value in req.model_dump().items()
                 if key in set(["name", "logo_url"]) and value is not None
             ]
         )
-        match orgId:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("organization_id"),
-                    ),
-                    (orgId,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        kw_augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (orgId,),
-                )
-            case _:
-                raise TypeError(
-                    "organization_id must be an Organization, int, uuid, string"
-                )
-        return True if cursor.rowcount > 0 else False
+
+        org = cursor.execute(
+            query.format(augmented_field=kw_augmented_field), (organization_id,)
+        ).fetchone()
+
+        if not org:
+            raise ObjectNotFound("organization", str(organization_id))
+
+        return org
 
     def update_organization(
-        self,
-        organization_id: Organization | int | UUID,
-        name: str | None = None,
-        logo_url: str | None = None,
-    ) -> bool:
+        self, organization_id: UUID, req: UpdateOrganizationReq, user: User
+    ) -> Organization:
         """Augment an organization in the database by providing either a modified Organization object or a valid id and a new name and or a new logo_url
 
         Args:
-                organization_id: either an Organization object, a database id, or a universally unique identifier
-                name: the new name for the organization
-                logo_url: a url for the organization's logo image
         """
-        return self._update_organization(
-            organization_id=organization_id, name=name, logo_url=logo_url
-        )
+        org_id = str(organization_id)
+
+        res = self.check_permission("organization", org_id, user.id, "modify")
+
+        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+            return self._update_organization(organization_id, req)
+        else:
+            raise AuthorizationFailure(
+                user.id, "modify", "organization", str(organization_id)
+            )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -649,10 +634,7 @@ class Database:
                 cursor.execute(
                     query.format(id_field=sql.Identifier("role")), (role_ids,)
                 )
-            case _:
-                raise TypeError(
-                    "role_id must be a Role, int, uuid, string, or a list consisting of ONE of the three"
-                )
+
         return True if cursor.rowcount > 0 else False
 
     def delete_role(self, role_ids: Role | int | UUID) -> bool:
@@ -1222,10 +1204,7 @@ class Database:
                 cursor.execute(
                     query.format(id_field=sql.Identifier("uuid")), (name, project_id)
                 )
-            case _:
-                raise TypeError(
-                    "project_id MUST be an integer, UUID or Project type, and name must be a string"
-                )
+
         return True if cursor.rowcount > 0 else False
 
     def update_project(
@@ -1470,14 +1449,23 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_label(self, cursor: Cursor[Label], label_id: UUID) -> Label:
+    def _get_label(self, cursor: Cursor[Label], label_id: Union[int, UUID]) -> Label:
         """Internal helper function, do not call directly"""
         cursor.row_factory = class_row(Label)
 
         query = sql.SQL(
-            " SELECT * FROM projectmanagement.labels AS l WHERE l.uuid = %s; "
+            " SELECT * FROM projectmanagement.labels WHERE {id_field} = %s; "
         )
-        label = cursor.execute(query, (label_id,)).fetchone()
+
+        match label_id:
+            case int():
+                label = cursor.execute(
+                    query.format(id_field=sql.Identifier("label_id")), (label_id,)
+                ).fetchone()
+            case UUID():
+                label = cursor.execute(
+                    query.format(id_field=sql.Identifier("uuid")), (label_id,)
+                ).fetchone()
 
         if label is None:
             raise ObjectNotFound("label", str(label_id))
@@ -1534,7 +1522,7 @@ class Database:
             raise BulkAuthorizationFailure(usr_id, "access")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+    # todo: update to use pydantic class
     @connect
     def _update_label(
         self,
@@ -2898,11 +2886,11 @@ class Database:
         """ """
         query_1 = sql.SQL(""" 
 			INSERT INTO core.annotations (
-				label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, pred_id
+				label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, pred_id, uuid
 			)
 			VALUES (
 				%(label_id)s, %(image_id)s, %(herd_unit_id)s, %(box_tx)s, %(box_ty)s, 
-				%(box_bx)s, %(box_by)s, %(created_by_user_id)s, %(pred_id)s
+				%(box_bx)s, %(box_by)s, %(created_by_user_id)s, %(pred_id)s, %(uuid)s
 			) 
 			RETURNING *; 
 		""")
@@ -2967,12 +2955,12 @@ class Database:
         """ """
         if bypass:
             return self._create_annotation(req, user)
-        img_id = str(req.image_id)
-        lbl_id = str(req.label_id)
+        img_id = str(self._get_image(req.image_id).uuid)
+        lbl_id = str(self._get_label(req.label_id).uuid)
 
         res = self.bulk_check_permission(
             [
-                self.create_bulk_check_request("image", img_id, user.id, "accesss"),
+                self.create_bulk_check_request("image", img_id, user.id, "access"),
                 self.create_bulk_check_request("label", lbl_id, user.id, "access"),
             ]
         )
@@ -2982,7 +2970,7 @@ class Database:
             == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
             for pair in res.pairs
         ):
-            return self._create_annotation(req, res)
+            return self._create_annotation(req, user)
         else:
             raise BulkAuthorizationFailure(user.id, "access")
 
@@ -2990,49 +2978,48 @@ class Database:
 
     @connect
     def _get_annotation(
-        self, cursor: Cursor[Annotation], annotation_ids: int | UUID | list[int | UUID]
-    ) -> Annotation | list[Annotation] | None:
+        self, cursor: Cursor[Annotation], annotation_id: Union[int, UUID]
+    ) -> Annotation:
         """ """
         cursor.row_factory = class_row(Annotation)
         query = sql.SQL(
             """ SELECT * FROM core.annotations WHERE {id_field} = ANY(%s); """
         )
-        match annotation_ids:
-            case list() if isinstance(annotation_ids[0], int):
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("annotation_id")),
-                    (annotation_ids,),
-                )
-            case list() if isinstance(annotation_ids[0], UUID):
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (annotation_ids,)
-                )
+        match annotation_id:
             case int():
                 cursor.execute(
                     query.format(id_field=sql.Identifier("annotation_id")),
-                    ([annotation_ids],),
+                    ([annotation_id],),
                 )
             case UUID():
                 cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), ([annotation_ids],)
+                    query.format(id_field=sql.Identifier("uuid")), ([annotation_id],)
                 )
-            case _:
-                raise TypeError(
-                    "annotation_ids must be of type int or uuid or a list consisting of one of the two"
-                )
-        annotations = cursor.fetchall()
-        return (
-            annotations
-            if isinstance(annotations, list)
-            and all(isinstance(annot, Annotation) for annot in annotations)
-            else annotations if isinstance(annotations, Annotation) else None
-        )
+
+        annotation = cursor.fetchone()
+
+        if not annotation:
+            raise ObjectNotFound("Annotation", str(annotation_id))
+
+        return annotation
 
     def get_annotation(
-        self, annotation_ids: int | UUID | list[int | UUID]
-    ) -> Annotation | list[Annotation] | None:
+        self, annotation_id: Union[int, UUID], user: User, bypass: bool = False
+    ) -> Annotation:
         """ """
-        return self._get_annotation(annotation_ids=annotation_ids)
+        if bypass or isinstance(annotation_id, int):
+            return self._get_annotation(annotation_id)
+
+        annot_id = str(annotation_id)
+
+        res = self.check_permission("annotation", annot_id, user.id, "access")
+
+        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+            return self._get_annotation(annotation_id)
+        else:
+            raise AuthorizationFailure(
+                user.id, "access", "annotation", str(annotation_id)
+            )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3075,10 +3062,11 @@ class Database:
         req: UpdateAnnotationReq,
     ) -> Annotation:
         """ """
-        query = sql.SQL(
-            """ UPDATE core.annotations SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; """
-        )
+        query = sql.SQL(""" 
+            UPDATE core.annotations SET {augmented_field}, modified = CURRENT_TIMESTAMP
+			WHERE {id_field} = %s
+            RETURNING *; 
+        """)
 
         # Generate comma separated string containing kwargs for use in update query
         kw_augmented_field = sql.SQL(",").join(
@@ -3141,7 +3129,7 @@ class Database:
 
         annot_id = str(annotation_id)
 
-        if req.image_id:
+        if req.image_id and isinstance(req.image_id, UUID):
             image_access = self.check_permission(
                 "image", str(req.image_id), user.id, "access"
             )
@@ -3153,7 +3141,7 @@ class Database:
                     user.id, "access", "image", str(req.image_id)
                 )
 
-        if req.label_id:
+        if req.label_id and isinstance(req.label_id, UUID):
             label_access = self.check_permission(
                 "label", str(req.label_id), user.id, "access"
             )
@@ -3162,7 +3150,7 @@ class Database:
                 != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
             ):
                 raise AuthorizationFailure(
-                    user.id, "access", "image", str(req.label_id)
+                    user.id, "access", "label", str(req.label_id)
                 )
 
         res = self.check_permission("annotation", annot_id, user.id, "access")
@@ -3175,17 +3163,10 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _delete_annotation(
-        self, cursor: Cursor, annotation_id: Annotation | int | UUID
-    ):
+    def _delete_annotation(self, cursor: Cursor, annotation_id: Union[int, UUID]):
         """ """
         query = sql.SQL(" DELETE FROM core.annotations WHERE {id_field} = %s; ")
         match annotation_id:
-            case Annotation():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("annotation_id")),
-                    (annotation_id.annotation_id,),
-                )
             case int():
                 cursor.execute(
                     query.format(id_field=sql.Identifier("annotation_id")),
@@ -3195,13 +3176,19 @@ class Database:
                 cursor.execute(
                     query.format(id_field=sql.Identifier("uuid")), (annotation_id,)
                 )
-            case _:
-                raise TypeError("annotation_id must be an Annotation, int, or uuid")
-        return True
 
-    def delete_annotation(self, annotation_id: Annotation | int | UUID):
+        return True if cursor.rowcount > 0 else False
+
+    def delete_annotation(self, annotation_id: Union[int, UUID], user: User):
         """ """
-        return self._delete_annotation(annotation_id)
+        annot_id = str(annotation_id)
+
+        res = self.check_permission("annotation", annot_id, user.id, "access")
+
+        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+            return self._delete_annotation(annotation_id)
+        else:
+            raise AuthorizationFailure(user.id, "access", "annotation", annot_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Core - reviewed_area
@@ -3319,7 +3306,7 @@ class Database:
             params.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
             placeholders["survey_ids"] = [survey.survey_id]
 
-        if req.include_opened:
+        if not req.include_reviewed:
             params.append(sql.SQL("RA.reviewed_by_user_id = 0"))
 
         if not req.include_opened:
@@ -3383,9 +3370,10 @@ class Database:
         user: User,
     ) -> ReviewedArea:
         """ """
-        query = sql.SQL(""" UPDATE core.reviewed_area SET {augmented_field}, 
-            reviewed_by_user_id = %s, modified = CURRENT_TIMESTAMP
-			WHERE {id_field} = %s; """)
+        query = sql.SQL(""" UPDATE core.reviewed_area SET {augmented_field} 
+            modified = CURRENT_TIMESTAMP, reviewed_by_user_id = %s
+			WHERE {id_field} = %s
+            RETURNING *; """)
 
         kw_augmented_field = sql.SQL(",").join(
             [
@@ -3417,10 +3405,7 @@ class Database:
                         augmented_field=kw_augmented_field,
                         id_field=sql.Identifier("reviewed_area_id"),
                     ),
-                    (
-                        user.user_id,
-                        reviewed_area_id,
-                    ),
+                    (user.user_id, reviewed_area_id),
                 )
             case UUID():
                 cursor.execute(
@@ -3428,10 +3413,7 @@ class Database:
                         augmented_field=kw_augmented_field,
                         id_field=sql.Identifier("uuid"),
                     ),
-                    (
-                        user.user_id,
-                        reviewed_area_id,
-                    ),
+                    (user.user_id, reviewed_area_id),
                 )
         reviewed_area = cursor.fetchone()
 
@@ -3449,7 +3431,7 @@ class Database:
     ) -> ReviewedArea:
         """ """
         if bypass or isinstance(reviewed_area_id, int):
-            return self._update_reviewed_area(reviewed_area_id, req, user)
+            return self._update_reviewed_area(reviewed_area_id, req)
 
         ra_id = str(reviewed_area_id)
 
@@ -3818,7 +3800,7 @@ class Database:
     @connect
     def _get_crop_to_review(
         self, cursor: Cursor[ReviewedArea], req: RAQuery, user: User
-    ) -> List[ReviewedArea]:
+    ) -> Union[ReviewedArea, None]:
         """Fetch a batch of reviewed areas that have yet to be reviewed."""
         reviewed_areas = self._get_reviewed_areas(cursor, req)
 
@@ -3830,9 +3812,11 @@ class Database:
                 UpdateImageReq(opened_by_user_id=user.user_id),
             )
 
-        return reviewed_areas
+            return reviewed_areas[0]
+        else:
+            return None
 
-    def get_crop_to_review(self, req: RAQuery, user: User) -> List[ReviewedArea]:
+    def get_crop_to_review(self, req: RAQuery, user: User) -> Union[ReviewedArea, None]:
         """ """
         return self._get_crop_to_review(req, user)
 

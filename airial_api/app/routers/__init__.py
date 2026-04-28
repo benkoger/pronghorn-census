@@ -19,6 +19,7 @@ from .reviewed_area import raBp
 from .schemas import schemaBp
 from .surveys import surveyBp
 from .users import userBp
+from .annotations import annotBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -41,6 +42,8 @@ bp.register_blueprint(authBp)
 
 bp.register_blueprint(cropBp)
 bp.register_blueprint(orgBp)
+
+bp.register_blueprint(annotBp)
 
 # #---------------------------------------------------------------------------------------------------------------------------#
 # # Auto Cropping

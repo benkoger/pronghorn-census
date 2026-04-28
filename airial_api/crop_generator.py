@@ -5,6 +5,8 @@
 
 from typing import List, Tuple
 
+from uuid import uuid4
+
 import cv2
 import numpy as np
 from sklearn.cluster import KMeans
@@ -49,7 +51,7 @@ def auto_crop(
 
     img = image.get_image()
 
-    labels_ids = {label.label: label.uuid for label in labels}
+    labels_ids = {label.label: label.label_id for label in labels}
 
     if img is None:
         raise Exception("could not get image")
@@ -128,13 +130,15 @@ def auto_crop(
                 points_in_crop[p_index] += 1
 
                 annotation = CreateAnnotationReq(
-                    image_id=image.uuid,
+                    image_id=image.image_id,
                     pred_id=pred.uuid,
+                    herd_unit_id=image.herd_unit_id,
                     label_id=labels_ids[pred.label],
                     box_tx=box[0],
                     box_ty=box[1],
                     box_bx=box[2],
                     box_by=box[3],
+                    uuid=uuid4(),
                 )
 
                 annotations.append(annotation)

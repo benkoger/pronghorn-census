@@ -226,6 +226,7 @@ export async function closeUserImages(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+// DELETE
 
 export async function deleteImage(image_id: string): Promise<boolean> {
   const response = await fetch(`${api_url}/images/${image_id}`, {
@@ -235,9 +236,8 @@ export async function deleteImage(image_id: string): Promise<boolean> {
       "Content-Type": "application/json",
     },
   });
+
   if (!response.ok) throw new ApiError(await response.json());
 
   return true;
 }
-
-// ---------------------------------------------------------------------------------------------------------------------------

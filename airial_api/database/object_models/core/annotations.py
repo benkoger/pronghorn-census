@@ -55,13 +55,14 @@ class Annotation(DBbase):
 
 
 class CreateAnnotationReq(BaseModel):
-    image_id: UUID
-    label_id: UUID
-    herd_unit_id: UUID
+    label_id: int
+    image_id: int
+    herd_unit_id: int
     box_tx: int
     box_ty: int
     box_bx: int
     box_by: int
+    uuid: UUID
     pred_id: Optional[UUID] = None
     reviewed_area_id: Optional[UUID] = None
 
@@ -72,8 +73,8 @@ class BulkCreateAnnotationReq(BaseModel):
 
 
 class UpdateAnnotationReq(BaseModel):
-    image_id: Optional[UUID] = None
-    label_id: Optional[UUID] = None
+    image_id: Optional[int] = None
+    label_id: Optional[int] = None
     box_tx: Optional[int] = None
     box_ty: Optional[int] = None
     box_bx: Optional[int] = None
@@ -86,3 +87,7 @@ class BulkUpdateAnnotationsReq(BaseModel):
     reviewed_area_id: UUID
     ids: List[UUID]
     requests: List[UpdateAnnotationReq]
+
+
+class BulkDeleteAnnotationsReq(BaseModel):
+    ids: List[UUID]

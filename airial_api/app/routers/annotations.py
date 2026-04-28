@@ -3,7 +3,7 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import cast
+from typing import cast, List
 
 from flask import Blueprint, abort, current_app
 from flask_login import current_user, login_required
@@ -16,6 +16,7 @@ from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
     BulkCreateAnnotationReq,
     BulkUpdateAnnotationsReq,
+    BulkDeleteAnnotationsReq,
 )
 from database.object_models.user_management import User
 from uuid import UUID
@@ -51,7 +52,7 @@ def create(body: CreateAnnotationReq):
 
     except AuthorizationFailure as e:
         current_app.logger.exception(e)
-        abort(401, e)
+        abort(401, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
@@ -75,10 +76,10 @@ def import_annotation(body: BulkCreateAnnotationReq):
 
     except ObjectNotFound as e:
         current_app.logger.exception(e)
-        abort(404, e)
+        abort(404, str(e))
     except AuthorizationFailure as e:
         current_app.logger.exception(e)
-        abort(401, e)
+        abort(401, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
@@ -95,7 +96,7 @@ def import_annotation(body: BulkCreateAnnotationReq):
 @login_required
 def update(body: UpdateAnnotationReq, annotation_id: str):
     """
-    Update annotation object in the database.
+    Update annotation objects in the database.
     ---
     parameters:
             - name: annotation_id
@@ -154,12 +155,57 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
 
     except ObjectNotFound as e:
         current_app.logger.exception(e)
-        abort(404, e)
+        abort(404, str(e))
     except AuthorizationFailure as e:
         current_app.logger.exception(e)
-        abort(401, e)
+        abort(401, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
 
     return [annot.to_dict() for annot in annotations], 200
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# DELETE
+
+
+@annotBp.delete("/<string:annotation_id>")
+@login_required
+def delete(annotation_id: str):
+    """ """
+    try:
+        res = base.delete_annotation(UUID(annotation_id), cast(User, current_user))
+
+    except AuthorizationFailure as e:
+        current_app.logger.exception(e)
+        abort(401, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return "", 200 if res else abort(500)
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@annotBp.delete("/bulk-delete")
+@validate()
+@login_required
+def bulk_delete(body: BulkDeleteAnnotationsReq):
+    """ """
+    results: List[bool] = []
+
+    try:
+        for annot_id in body.ids:
+            results.append(base.delete_annotation(annot_id, cast(User, current_user)))
+
+    except AuthorizationFailure as e:
+        current_app.logger.exception(e)
+        abort(401, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return "", 200 if all(results) else abort(500)

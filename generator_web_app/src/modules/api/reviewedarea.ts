@@ -77,7 +77,6 @@ export async function getReviewedAreaAnnotations(
 // POST
 
 export async function getRAPresignedUrl(ra_key: string): Promise<string> {
-  console.log(ra_key);
   const response = await fetch(`${api_url}/reviewed-area/presigned-get-url`, {
     method: "POST",
     credentials: "include",
@@ -94,7 +93,7 @@ export async function getRAPresignedUrl(ra_key: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// PUT
+// PATCH
 
 interface updateReviewedAreaOptions {
   image_id?: string;
@@ -113,7 +112,7 @@ export async function updateReviewedArea(
   reviewed_area_id: string,
   options: updateReviewedAreaOptions,
 ): Promise<ReviewedArea> {
-  const response = await fetch(`${api_url}/reviewed_area/${reviewed_area_id}`, {
+  const response = await fetch(`${api_url}/reviewed-area/${reviewed_area_id}`, {
     method: "PATCH",
     credentials: "include",
     headers: {

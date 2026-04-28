@@ -9,16 +9,17 @@ import { api_url } from "@/modules/api/apiV1Methods";
 // ---------------------------------------------------------------------------------------------------------------------------
 //POST
 
-interface createAnnotationOptions {
-  image_id: string;
-  label_id: string;
-  herd_unit_id: string;
+export interface createAnnotationOptions {
+  label_id: number;
+  image_id: number;
+  herd_unit_id: number;
   box_tx: number;
   box_ty: number;
   box_bx: number;
   box_by: number;
-  pred_id: string | undefined;
-  reviewed_area_id: string | undefined;
+  uuid: string;
+  pred_id?: string;
+  reviewed_area_id?: string;
 }
 
 export async function createAnnotation(
@@ -40,7 +41,7 @@ export async function createAnnotation(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-interface bulkCreateAnnotationsOptions {
+export interface bulkCreateAnnotationsOptions {
   reviewed_area_id: string;
   requests: createAnnotationOptions[];
 }
@@ -72,13 +73,13 @@ export async function bulkCreateAnnotations(
 // ---------------------------------------------------------------------------------------------------------------------------
 // PATCH
 
-interface updateAnnotationOptions {
-  image_id?: string;
-  label_id?: string;
-  box_tx?: string;
-  box_ty?: string;
-  box_bx?: string;
-  box_by?: string;
+export interface updateAnnotationOptions {
+  image_id?: number;
+  label_id?: number;
+  box_tx?: number;
+  box_ty?: number;
+  box_bx?: number;
+  box_by?: number;
   pred_id?: string;
   reviewed_area_id?: string;
 }
@@ -102,16 +103,16 @@ export async function updateAnnotation(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-interface BulkUpdateAnnotationOptions {
+export interface bulkUpdateAnnotationOptions {
   reviewed_area_id: string;
   ids: string[];
   requests: updateAnnotationOptions[];
 }
 
 export async function bulkUpdateAnnotations(
-  options: BulkUpdateAnnotationOptions,
+  options: bulkUpdateAnnotationOptions,
 ): Promise<Annotation[]> {
-  const response = await fetch(`${api_url}/annoations/bulk-update`, {
+  const response = await fetch(`${api_url}/annotations/bulk-update`, {
     method: "PATCH",
     credentials: "include",
     headers: {
@@ -131,3 +132,45 @@ export async function bulkUpdateAnnotations(
 
   return annotations;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// DELETE
+
+export async function deleteAnnotation(
+  annotation_id: string,
+): Promise<boolean> {
+  const response = await fetch(`${api_url}/annotations/${annotation_id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
+}
+
+export interface bulkDeleteAnnotationsOptions {
+  ids: string[];
+}
+
+export async function bulkDeleteAnnotations(
+  options: bulkDeleteAnnotationsOptions,
+): Promise<boolean> {
+  const response = await fetch(`${api_url}/annotations/bulk-delete`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------

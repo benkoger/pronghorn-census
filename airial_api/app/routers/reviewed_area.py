@@ -131,7 +131,7 @@ def create_ra_presigned_get():
 # PATCH
 
 
-@raBp.put("/<string:reviewed_area_id>")
+@raBp.patch("/<string:reviewed_area_id>")
 @validate()
 @login_required
 def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):

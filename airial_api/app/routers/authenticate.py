@@ -1,9 +1,9 @@
-# Endpoints for integrating oauth2.0 
-# Special thanks to Miguel Grinberg for the excellent guide 
+# Endpoints for integrating oauth2.0
+# Special thanks to Miguel Grinberg for the excellent guide
 # https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
 # Author: Michael B. Lance
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------#
 
 import secrets
 from urllib.parse import urlencode
@@ -17,146 +17,158 @@ from werkzeug.security import check_password_hash
 
 from app.extensions import base
 from database import AuthenticationFailure, UserNotFound
-from database.object_models.user_management import (
-		LegacyAuthReq
-	)
+from database.object_models.user_management import LegacyAuthReq
 
-authBp = Blueprint('oauth2', __name__, url_prefix='/api/v1/')
+authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------#
 # Authorization
 
-@authBp.get('/authorize/<string:provider>')
+
+@authBp.get("/authorize/<string:provider>")
 def oauth2_authorize(provider: str):
-	'''
-	'''
-	provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
-	if not provider_data:
-		abort(404, 'Oauth Provider not found')
+    """ """
+    provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
+    if not provider_data:
+        abort(404, "Oauth Provider not found")
 
-	session['oauth2_state'] = secrets.token_urlsafe(16)
-	session.modified = True
+    session["oauth2_state"] = secrets.token_urlsafe(16)
+    session.modified = True
 
-	query_string = urlencode({
-		'client_id': provider_data['client_id'],
-		'redirect_uri': url_for('.oauth2_callback', provider=provider, 
-									_external=True),
-		'response_type': 'code',
-		'scope': ' '.join(provider_data['scopes']),
-		'state': session['oauth2_state'],
-	})
+    query_string = urlencode(
+        {
+            "client_id": provider_data["client_id"],
+            "redirect_uri": url_for(
+                ".oauth2_callback", provider=provider, _external=True
+            ),
+            "response_type": "code",
+            "scope": " ".join(provider_data["scopes"]),
+            "state": session["oauth2_state"],
+        }
+    )
 
-	return redirect(provider_data['authorize_url'] + '?' + query_string)
+    return redirect(provider_data["authorize_url"] + "?" + query_string)
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@authBp.get('/callback/<string:provider>')
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+@authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-	'''
+    """ """
+    provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
+    if not provider_data:
+        abort(404, "Oauth Provider not found")
 
-	'''
-	provider_data = current_app.config['OAUTH2_PROVIDERS'].get(provider)
-	if not provider_data:
-		abort(404, 'Oauth Provider not found')
+    if "error" in request.args:
+        for key, value in request.args.items():
+            if key.startswith("error"):
+                print(f"key: {key}, value: {value}")
+                abort(500)
 
-	if 'error' in request.args:
-		for key, value in request.args.items():
-			if key.startswith('error'):
-				print(f'key: {key}, value: {value}')
-				abort(500)
-	
-	if request.args['state'] != session.get('oauth2_state'):
-		abort(401)
+    if request.args["state"] != session.get("oauth2_state"):
+        abort(401)
 
-	if 'code' not in request.args:
-		abort(401)
+    if "code" not in request.args:
+        abort(401)
 
-	response = requests.post(provider_data['token_url'], data={
-		'client_id': provider_data['client_id'],
-		'client_secret': provider_data['client_secret'],
-		'code': request.args['code'],
-		'grant_type': 'authorization_code',
-		'redirect_uri': url_for('.oauth2_callback', provider=provider,
-									_external=True)
-	}, headers={'Accept': 'application/json'})
+    response = requests.post(
+        provider_data["token_url"],
+        data={
+            "client_id": provider_data["client_id"],
+            "client_secret": provider_data["client_secret"],
+            "code": request.args["code"],
+            "grant_type": "authorization_code",
+            "redirect_uri": url_for(
+                ".oauth2_callback", provider=provider, _external=True
+            ),
+        },
+        headers={"Accept": "application/json"},
+    )
 
-	if response.status_code != 200:
-		abort(401)
-	
-	oauth2_token = response.json().get('access_token')
-	if not oauth2_token:
-		abort(401)
+    if response.status_code != 200:
+        abort(401)
 
-	response = requests.get(provider_data['userinfo']['url'], headers={
-		'Authorization': 'Bearer ' + oauth2_token,
-		'Accept': 'application/json'
-	})
-	if response.status_code != 200:
-		abort(401)
-	email = provider_data['userinfo']['email'](response.json())
+    oauth2_token = response.json().get("access_token")
+    if not oauth2_token:
+        abort(401)
 
-	try:	
-		
-		user = base.get_user(email)
-	except UserNotFound:
-		abort(403, 'You must first be invited to access this resource')
-	except (DatabaseError, Exception) as e:
-		print(e)
-		abort(500)
+    response = requests.get(
+        provider_data["userinfo"]["url"],
+        headers={
+            "Authorization": "Bearer " + oauth2_token,
+            "Accept": "application/json",
+        },
+    )
+    if response.status_code != 200:
+        abort(401)
+    email = provider_data["userinfo"]["email"](response.json())
 
-	if user.status == 'invited':
-		base.activate_user(user.email, user.user_id, response.json().get('sub'), provider)
-	else:
-		base.login_user(user.user_id)
+    try:
 
-	login_user(user)
+        user = base.get_user(email)
+    except UserNotFound:
+        abort(403, "You must first be invited to access this resource")
+    except (DatabaseError, Exception) as e:
+        print(e)
+        abort(500)
 
-	default_org = base.get_organization(user.default_org_id)
-	session['active_org_uuid'] = str(default_org.uuid)
-	session[f'org_{default_org.uuid}'] = default_org.to_cache()
+    if user.status == "invited":
+        base.activate_user(
+            user.email, user.user_id, response.json().get("sub"), provider
+        )
+    else:
+        base.login_user(user.user_id)
+
+    login_user(user)
+
+    default_org = base.get_organization(user.default_org_id)
+    session["active_org_uuid"] = str(default_org.uuid)
+    session[f"org_{default_org.uuid}"] = default_org.to_cache()
+
+    frontend_url = current_app.config.get("ORIGIN_URL")
+    return redirect(f"{frontend_url}/")
 
 
-	frontend_url = current_app.config.get('ORIGIN_URL')
-	return redirect(f"{frontend_url}/")
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-@authBp.post('/authenticate')
+@authBp.post("/authenticate")
 @validate()
 def authenticate(body: LegacyAuthReq):
-	''' Basic email password authentication 
+    """Basic email password authentication"""
 
-	'''
+    try:
+        user = base.get_user(body.email)
+        if not user.password_hash:
+            abort(400)
 
-	try:
-		user = base.get_user(body.email)
-		if not user.password_hash:
-			abort(400)
+        if check_password_hash(user.password_hash, body.password):
+            base.login_user(user.user_id)
+        else:
+            raise AuthenticationFailure
 
-		if check_password_hash(user.password_hash, body.password):
-			base.login_user(user.user_id)
-		else:
-			raise AuthenticationFailure
+    except AuthenticationFailure as e:
+        print(e)
+        abort(401)
+    except (DatabaseError, Exception) as e:
+        print(e)
+        abort(500)
 
-	except AuthenticationFailure as e:
-		print(e)
-		abort(401)
-	except (DatabaseError, Exception) as e:
-		print(e)
-		abort(500)
-		
-	login_user(user)
-	
-	default_org = base.get_organization(user.default_org_id)
-	session['active_org_uuid'] = str(default_org.uuid)
-	session[f'org_{default_org.uuid}'] = default_org.to_cache()
+    login_user(user)
 
-	return '', 200
+    default_org = base.get_organization(user.default_org_id)
+    session["active_org_uuid"] = str(default_org.uuid)
+    session[f"org_{default_org.uuid}"] = default_org.to_cache()
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    return "", 200
 
-@authBp.post('/deauthenticate')
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+@authBp.post("/deauthenticate")
 @login_required
 def logout():
-	logout_user()
-	return '', 200
+    logout_user()
+    return "", 200

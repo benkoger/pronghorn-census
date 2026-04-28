@@ -283,6 +283,9 @@ class CreateReviewedAreaReq(BaseModel, ImageMixin):
         arbitrary_types_allowed = True
 
 
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateReviewedAreaReq(BaseModel):
     image_id: Optional[UUID] = None
     name: Optional[str] = None
