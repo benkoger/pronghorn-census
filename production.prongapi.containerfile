@@ -6,12 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+ENV UV_NO_DEV=1
+
 WORKDIR /app
 
-RUN uv init --bare
-
 COPY ./airial_api .
-RUN uv sync --frozen --no-dev
+RUN uv sync --locked
 
 FROM python:3.13-slim as production-stage
 
