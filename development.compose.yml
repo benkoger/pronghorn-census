@@ -62,7 +62,7 @@ services:
     container_name: prong_dev_api
     build:
       context: .
-      dockerfile: development.prongapi.containerfile
+      dockerfile: airial.containerfile
     environment:
       ORIGIN_URL: ${ORIGIN_URL}
       ROOT: ${ROOT}

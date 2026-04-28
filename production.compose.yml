@@ -16,7 +16,7 @@ services:
     container_name: prong_api
     build:
       context: .
-      dockerfile: production.prongapi.containerfile
+      dockerfile: airial.containerfile
     environment:
       SECRET_KEY: ${SECRET_KEY}
       VALKEY_HOST: ${VALKEY_HOST}
@@ -38,7 +38,9 @@ services:
       SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
       SPICE_URL: ${SPICE_URL}
     networks: 
-      - pronghorn_app_network 
+      - pronghorn_app_network
+    command: | 
+      uv run gunicorn -c gunicorn.py "app:create_app()"
   valkey:
     container_name: prong_valkey
     image: docker.io/valkey/valkey:8.1.1
