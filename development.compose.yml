@@ -3,32 +3,39 @@ services:
     container_name: prong_gres
     image: postgres:18
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pronghorn_count -d testing"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U pronghorn_count -d testing"]
       interval: 5s
       timeout: 5s 
-      retries: 5
+      retries: 20
     restart: always
     environment:
       POSTGRES_USER: pronghorn_count
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: testing
+      SPICEDB_DB: ${SPICEDB_DB}
     volumes:
       - type: bind
         source: ./local_db/restore.sh
         target: /docker-entrypoint-initdb.d/restore.sh
-      - ./local_db/dev-bootstrap:/dev-bootstrap:Z
+      - ./local_db/pct_b:/pct_b:Z
+      - ./local_db/sdbt:/sdbt:Z
     networks:
       - dev_pronghorn_app_network
     ports:
       - "5432:5432"
-    command: ["postgres", "-c", "listen_addresses=*"]
+    command: ["postgres", "-c", "listen_addresses=*"] 
 
   spicedb-migrate:
+    container_name: spicedb-migrate
+    restart: on-failure:10
     image: authzed/spicedb:latest
     environment:
       SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
-      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI} 
-    command: migrate head
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
+    volumes: 
+      - ./local_db/backup.zed:/etc/spicedb/schema.zed:Z
+    command: >
+      sh -c "spicedb schema write /etc/spicedb/schema.zed"
     depends_on:
       db:
         condition: service_healthy
@@ -45,16 +52,17 @@ services:
       SPICEDB_DATASTORE_CONN_POOL_READ_MIN_OPEN: 1
       SPICEDB_DATASTORE_CONN_POOL_WRITE_MAX_OPEN: 2
       SPICEDB_DATASTORE_CONN_POOL_WRITE_MIN_OPEN: 1
-      
     command: serve
     ports:
       - "50051:50051"
       - "50052:50052"
       - "9090:9090"
+    networks:
+      - dev_pronghorn_app_network
     depends_on:
       spicedb-migrate:
         condition: service_completed_successfully
-
+      
   pronghorn-api-dev:
     depends_on:
       db:

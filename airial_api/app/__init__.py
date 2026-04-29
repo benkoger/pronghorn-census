@@ -6,47 +6,51 @@ from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 import app.errors as errors
-from app.extensions import base, cache, login_manager, session_manager
+from app.extensions import base, cache, login_manager, session_manager, health
 from config import s3_config
-from config import FlaskConfig, cache_config, s3_config
+from config import FlaskConfig, cache_config
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-#---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------#
+
 
 def create_app():
-	app = Flask(__name__)
-	app.config.from_object(FlaskConfig)
+    app = Flask(__name__)
+    app.config.from_object(FlaskConfig)
 
-	CORS(app, resources={
-		r'/api/*': {
-			'origins': [
-				app.config['ORIGIN_URL']
-				],
-			'supports_credentials': True     
-		}
-	})
-
-	app.wsgi_app = ProxyFix(
-        app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": [app.config["ORIGIN_URL"]],
+                "supports_credentials": True,
+            }
+        },
     )
 
-	# Register s3 service app wide
-	setattr(app, 's3', client(
-        's3',
-        config=s3_config,
-        endpoint_url=os.environ.get('AWS_ENDPOINT_URL_S3')
-    ) )
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-	cache.init_app(app, cache_config)
-	login_manager.init_app(app)
-	session_manager.init_app(app)
-	base.init_app(app)
+    # Register s3 service app wide
+    setattr(
+        app,
+        "s3",
+        client(
+            "s3", config=s3_config, endpoint_url=os.environ.get("AWS_ENDPOINT_URL_S3")
+        ),
+    )
 
-	app.errorhandler(HTTPException)(errors.handle_generic_http)
-	app.errorhandler(500)(errors.internal_service_error)
+    cache.init_app(app, cache_config)
+    login_manager.init_app(app)
+    session_manager.init_app(app)
+    base.init_app(app)
 
-	from app.routers import bp
-	app.register_blueprint(bp)
+    app.errorhandler(HTTPException)(errors.handle_generic_http)
+    app.errorhandler(500)(errors.internal_service_error)
 
-	return app
+    app.add_url_rule("/healthcheck", "healthcheck", view_func=lambda: health.run())
 
+    from app.routers import bp
+
+    app.register_blueprint(bp)
+
+    return app
