@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Authenticate from '@/components/authenticate.vue';
+import Authenticate from '@/pages/authenticate.vue';
 import { useUserStore } from '@/modules/stores/userStore';
 
 
@@ -23,9 +23,9 @@ const router = createRouter({
       },
     },
     {
-      path: '/user/:uuid?',
-      name: 'user',
-      component: () => import('@/pages/user.vue'),
+      path: '/users/:uuid?',
+      name: 'users',
+      component: () => import('@/pages/users.vue'),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,

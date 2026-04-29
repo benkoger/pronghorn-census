@@ -24,9 +24,10 @@ export default defineComponent({
   },
   async mounted() {
     if (this.uStore.logged_in) {
-      await this.uStore.getCurrentUser();
+      await this.uStore.get_current_user();
+      await this.uStore.get_organizations();
     }
-  }
+  },
 })
 </script>
 

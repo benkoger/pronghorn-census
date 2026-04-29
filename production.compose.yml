@@ -1,9 +1,22 @@
 services:
+  spicedb:
+    container_name: prong_spicedb
+    image: authzed/spicedb:latest
+    environment:
+      SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL}
+      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+    command: serve 
+    ports:
+      - "50051:50051"
+      - "50052:50052"
+      - "9090:9090" 
   pronghorn-api:
-    contianer_name: prong_api
+    container_name: prong_api
     build:
       context: .
-      dockerfile: production.prongapi.containerfile
+      dockerfile: airial.containerfile
     environment:
       SECRET_KEY: ${SECRET_KEY}
       VALKEY_HOST: ${VALKEY_HOST}
@@ -20,8 +33,13 @@ services:
       NUM_API_WORKERS: ${NUM_API_WORKERS}
       SESSION_REDIS: ${SESSION_REDIS}
       ORIGIN_URL: ${APPLICATION_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+      SPICE_URL: ${SPICE_URL}
     networks: 
-      - pronghorn_app_network 
+      - pronghorn_app_network
+    command: uv run gunicorn -c gunicorn.py "app:create_app()"
   valkey:
     container_name: prong_valkey
     image: docker.io/valkey/valkey:8.1.1
@@ -46,24 +64,6 @@ services:
     volumes:
       - nginx_conf:/etc/nginx/
       - nginx_certs:/etc/ssl/
-
-  # Postgres database, uncomment if not using external database host
-  # db:
-  #   container_name: postgres_container
-  #   image: postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: root
-  #     POSTGRES_PASSWORD: $(DB_ROOT_PASS)
-  #     POSTGRES_DB: annotation_db
-  #   volumes:
-  #     - $(DB_STORAGE):/var/lib/postgresql/data
-  #   networks:
-  #     - pronghorn_app_network
-  #   ports:
-  #     - "5432:5432"
-  #   user: "999:999"
-
 volumes:
   nginx_conf:
     external: true

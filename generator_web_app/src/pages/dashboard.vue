@@ -12,7 +12,7 @@ export default defineComponent({
 </script>
 <template>
 	<div class="pageContainer">
-		<h2 class="utilityTitle"> Dashboard </h2>
+		<h2 class="utilityTitle"> {{ uStore.user?.username }}'s Dashboard </h2>
 	</div>
 </template>
 

@@ -73,7 +73,7 @@
 			@click="selectAction(item)"
 			class="d-flex flex-column"
 		>
-			<span class="mb-1 fw-bold">{{ item.name }}</span>
+			<span class="mb-1 fw-bold">{{ item.name || item.username }}</span>
 			<small>{{ item.uuid }}</small>
 			<div class="d-flex gap-4 w-50 ms-a">
 				<small class="text-muted"><strong>Created:</strong> 
