@@ -13,6 +13,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: testing
       SPICEDB_DB: ${SPICEDB_DB}
+      ZED_INSECURE: true
     volumes:
       - type: bind
         source: ./local_db/restore.sh
@@ -23,29 +24,14 @@ services:
       - dev_pronghorn_app_network
     ports:
       - "5432:5432"
-    command: ["postgres", "-c", "listen_addresses=*"] 
-
-  spicedb-migrate:
-    container_name: spicedb-migrate
-    restart: on-failure:10
-    image: authzed/spicedb:latest
-    environment:
-      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
-      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
-    volumes: 
-      - ./local_db/backup.zed:/etc/spicedb/schema.zed:Z
-    command: >
-      sh -c "spicedb schema write /etc/spicedb/schema.zed"
-    depends_on:
-      db:
-        condition: service_healthy
+    command: ["postgres", "-c", "listen_addresses=*"]
 
   spicedb:
     container_name: prong_spicedb
     image: authzed/spicedb:latest
     environment:
       SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL}
-      SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
+      SPICEDB_DATASTORE_ENGINE: memory
       SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
       SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
       SPICEDB_DATASTORE_CONN_POOL_READ_MAX_OPEN: 2
@@ -55,14 +41,20 @@ services:
     command: serve
     ports:
       - "50051:50051"
-      - "50052:50052"
-      - "9090:9090"
     networks:
       - dev_pronghorn_app_network
-    depends_on:
-      spicedb-migrate:
-        condition: service_completed_successfully
-      
+  
+  spicedb-restore:
+    container_name: spicedb-restore
+    image: authzed/zed:latest
+    environment:
+      ZED_ENDPOINT: prong_spicedb:50051
+      ZED_TOKEN: ${SPICEDB_GRPC_PRESHARED_KEY}
+      ZED_INSECURE: "true"
+    volumes: 
+      - ./local_db/backup.zed:/etc/spicedb/backup.zed:Z  
+    command: backup restore /etc/spicedb/backup.zed
+
   pronghorn-api-dev:
     depends_on:
       db:
