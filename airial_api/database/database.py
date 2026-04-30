@@ -290,8 +290,8 @@ class Database:
         return org
 
     def create_organizaztion(
-        self, name: str, logo_url: str | None = None
-    ) -> Organization | None:
+        self, name: str, logo_url: Union[str, None] = None
+    ) -> Organization:
 
         return self._create_organization(name=name, logo_url=logo_url)
 

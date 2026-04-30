@@ -70,38 +70,18 @@ export default defineComponent({
         <BForm @submit.prevent="submitAuthRequest">
           <BFormGroup id="classic-auth" class="p-4 bg-body-secondary">
             <label for="email-input">Email:</label>
-            <BFormInput
-              class="mb-2"
-              id="email-input"
-              type="email"
-              v-model="email"
-              autocomplete="off"
-              required
-            />
+            <BFormInput class="mb-2" id="email-input" type="email" v-model="email" autocomplete="off" required />
 
             <label for="password-input">Password:</label>
-            <BFormInput
-              class="mb-2"
-              id="password-input"
-              type="password"
-              v-model="password"
-              autocomplete="off"
-              required
-            />
+            <BFormInput class="mb-2" id="password-input" type="password" v-model="password" autocomplete="off"
+              required />
           </BFormGroup>
-          <BButton
-            type="submit"
-            variant="primary"
-            size="lg"
-            class="w-100 mt-auto rounded-top-0"
-          >
+          <BButton type="submit" variant="primary" size="lg" class="w-100 mt-auto rounded-top-0">
             Sign in
           </BButton>
         </BForm>
-        <a
-          :href="google_auth"
-          class="btn btn-light gap-2 btn-lg d-flex align-items-center justify-content-center shadow-sm border px-4 py-2 mt-4"
-        >
+        <a :href="google_auth"
+          class="btn btn-light gap-2 btn-lg d-flex align-items-center justify-content-center shadow-sm border px-4 py-2 mt-4">
           <Icon icon="material-icon-theme:google" />
           Sign in with Google
         </a>

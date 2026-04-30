@@ -6,7 +6,15 @@ import { useUserStore } from '@/modules/stores/userStore';
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-
+    {
+      path: '/setup',
+      name: 'setup',
+      component: () => import('@/pages/intialSetup.vue'),
+      meta: {
+        requiresAuth: false,
+        requiresNoLayout: true
+      },
+    },
     {
       path: '/authenticate',
       name: 'authenticate',

@@ -66,7 +66,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     getClientRect(element: konvaBoxConf) {
       const { x, y, width, height, rotation = 0 } = element;
       const rad = this.degToRad(rotation);
@@ -90,7 +90,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     handleTransformEnd(e: MouseEvent) {
       if (!e.target) return;
       const uuid = this.cvs.selectedShapeName;
@@ -107,7 +107,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-  
+
     handleMouseDown(e: MouseEvent) {
       // @ts-ignore
       if (e.target === e.target.getStage()) {
@@ -133,7 +133,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     updateTransformer() {
       const transformerNode = (this.$refs.transformerRef as Konva.Transformer).getNode();
       const stage = transformerNode.getStage();
@@ -157,7 +157,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     handleWheel(e: WheelEvent) {
       // @ts-ignore (idk why ts is unaware of evt, so ignore)
       e.evt.preventDefault();
@@ -192,7 +192,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     updateSize() {
       const stagewrapper = (this.$refs.stagewrapper as HTMLDivElement);
       if (!stagewrapper) return
@@ -209,7 +209,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     handleDragEnd(e: MouseEvent) {
       if (!e.target) return
 
@@ -223,7 +223,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     cancelDraw() {
       if (!this.isDrawing) return;
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
@@ -261,7 +261,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     drawMouseUp(e: MouseEvent) {
 
       if (!this.drawingLabel) return;
@@ -286,9 +286,9 @@ export default defineComponent({
       };
       this.isDrawing = false;
     },
-    
+
     //--------------------------------------------------------------------------------------
-    
+
     drawMouseMove() {
       if (!this.isDrawing) return;
       // @ts-ignore
@@ -301,7 +301,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     startDrawing(label: Label) {
       const stageContainer = (this.$refs.stageRef as Konva.Stage).getStage().container();
       stageContainer.style.cursor = 'crosshair';
@@ -312,7 +312,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     handleDelete() {
       if (this.cvs.selectedShapeName === '') return;
       const transformerNode = (this.$refs.transformerRef as Konva.Transformer).getNode();
@@ -325,13 +325,13 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     async handleRightArrow() {
       await this.cvs.nextImage();
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     async handleLeftArrow() {
       await this.cvs.previousImage();
     },
@@ -357,7 +357,7 @@ export default defineComponent({
     },
 
     //--------------------------------------------------------------------------------------
-    
+
     handleKeyPress(event: KeyboardEvent) {
       switch (true) {
         case event.code === 'Escape': {
@@ -385,7 +385,7 @@ export default defineComponent({
           break;
         };
       }
-    },  
+    },
   }
 });
 </script>
@@ -403,8 +403,7 @@ export default defineComponent({
                   {{ label.label }}
                 </h4>
                 <span class="ms-auto text-truncate">{{ label.name }}</span>
-                <BButton @click="startDrawing(label)" variant="outline-success" size="sm"
-                  class="ms-auto">
+                <BButton @click="startDrawing(label)" variant="outline-success" size="sm" class="ms-auto">
                   <Icon icon="gridicons:add" />
                 </BButton>
               </div>
@@ -451,13 +450,11 @@ export default defineComponent({
                 //@ts-ignore
                 return isDrawing ? this.getAbsolutePosition() : pos;
               }
-            }" @wheel="handleWheel" @mousedown="handleMouseDown" ref="stageRef"
-            class="rounded-3">
+            }" @wheel="handleWheel" @mousedown="handleMouseDown" ref="stageRef" class="rounded-3">
               <v-layer ref="imageLayer" :config="{ listening: false }">
                 <v-image v-if="cvs.currentImage && cvs.currentImage[1].value == 'loaded'" :config="{
                   image: cvs.currentImage[0].value,
-                }" 
-                />
+                }" />
               </v-layer>
               <v-layer ref="annotationLayer">
                 <v-rect v-for="(conf, uuid) in cvs.currentBoxConfs" id="" :key="uuid" :config="{
@@ -470,21 +467,21 @@ export default defineComponent({
                   strokeScaleEnabled: false,
                   rotation: 0
                 }" ref="rectRefs" @transformend="handleTransformEnd" @mouseover="(e: MouseEvent) => {
-                    if (!e.target) return
-                    // @ts-ignore
-                    e.target.getStage().container().style.cursor = 'move'
-                    // @ts-ignore
-                    cvs.hoveredUuid = e.target.attrs.name
-                    // @ts-ignore
-                    e.target.attrs['fill'] = e.target.attrs.stroke + '66'
-                  }" @mouseout="(e: MouseEvent) => {
-                    if (!e.target) return
-                    // @ts-ignore
-                    e.target.getStage().container().style.cursor = 'default'
-                    cvs.hoveredUuid = ''
-                    // @ts-ignore
-                    e.target.attrs['fill'] = ''
-                  }" @dragend="handleDragEnd" />
+                  if (!e.target) return
+                  // @ts-ignore
+                  e.target.getStage().container().style.cursor = 'move'
+                  // @ts-ignore
+                  cvs.hoveredUuid = e.target.attrs.name
+                  // @ts-ignore
+                  e.target.attrs['fill'] = e.target.attrs.stroke + '66'
+                }" @mouseout="(e: MouseEvent) => {
+                  if (!e.target) return
+                  // @ts-ignore
+                  e.target.getStage().container().style.cursor = 'default'
+                  cvs.hoveredUuid = ''
+                  // @ts-ignore
+                  e.target.attrs['fill'] = ''
+                }" @dragend="handleDragEnd" />
                 <v-rect v-if="isDrawing" :config="{
                   x: Math.min(drawingRect.startPointX, drawingRect.startPointX - drawingRect.width),
                   y: Math.min(drawingRect.startPointY, drawingRect.startPointY - drawingRect.height),
@@ -513,12 +510,12 @@ export default defineComponent({
                     return newBox;
                   },
                 }" @mouseover="(e: MouseEvent) => {
-                    // @ts-ignore
-                    e.target.parent._nodes[0].attrs['fill'] = e.target.parent._nodes[0].attrs.stroke + '66'
-                  }" @mouseout="(e: MouseEvent) => {
-                    // @ts-ignore
-                    e.target.parent._nodes[0].attrs['fill'] = ''
-                  }" />
+                  // @ts-ignore
+                  e.target.parent._nodes[0].attrs['fill'] = e.target.parent._nodes[0].attrs.stroke + '66'
+                }" @mouseout="(e: MouseEvent) => {
+                  // @ts-ignore
+                  e.target.parent._nodes[0].attrs['fill'] = ''
+                }" />
               </v-layer>
             </v-stage>
           </div>
@@ -561,12 +558,12 @@ export default defineComponent({
     <BContainer class="d-flex flex-row align-items-center justify-content-center">
       <BRow>
         <BCol class="d-flex align-items-center">
-          <Icon :key="cvs.outofcrops" icon="line-md:confirm-circle-filled" color="green" width="4em" class="m-1"/>
+          <Icon :key="cvs.outofcrops" icon="line-md:confirm-circle-filled" color="green" width="4em" class="m-1" />
           <h3 class="ms-3">All crops have been verified</h3>
-        </BCol> 
+        </BCol>
       </BRow>
     </BContainer>
-</BModal>
+  </BModal>
 </template>
 <style scoped>
 .label {
