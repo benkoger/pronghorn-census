@@ -9,7 +9,7 @@ import secrets
 from urllib.parse import urlencode
 
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
-from flask_login import current_user, login_required, login_user, logout_user
+from flask_login import login_required, login_user, logout_user
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 import requests
@@ -148,11 +148,14 @@ def authenticate(body: LegacyAuthReq):
         else:
             raise AuthenticationFailure
 
+    except UserNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
     except AuthenticationFailure as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(401)
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     login_user(user)

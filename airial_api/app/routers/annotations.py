@@ -9,7 +9,7 @@ from flask import Blueprint, abort, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
-
+from app.decorators import permission_required
 from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
@@ -28,8 +28,9 @@ annotBp = Blueprint("annotations", __name__, url_prefix="/api/v1/annotations")
 
 
 @annotBp.post("")
-@validate()
 @login_required
+@permission_required("access")
+@validate()
 def create(body: CreateAnnotationReq):
     """
     Create a new annotation object.
@@ -66,6 +67,7 @@ def create(body: CreateAnnotationReq):
 @annotBp.post("/bulk-import")
 @validate()
 @login_required
+@permission_required("access")
 def import_annotation(body: BulkCreateAnnotationReq):
     """ """
     try:
@@ -92,8 +94,9 @@ def import_annotation(body: BulkCreateAnnotationReq):
 
 
 @annotBp.patch("/<string:annotation_id>")
-@validate()
 @login_required
+@permission_required("access")
+@validate()
 def update(body: UpdateAnnotationReq, annotation_id: str):
     """
     Update annotation objects in the database.
@@ -129,8 +132,9 @@ def update(body: UpdateAnnotationReq, annotation_id: str):
 
 
 @annotBp.patch("/bulk-update")
-@validate()
 @login_required
+@permission_required("access")
+@validate()
 def bulk_update(body: BulkUpdateAnnotationsReq):
     """
     Update several annotation objects in the database.
@@ -172,10 +176,11 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
 
 @annotBp.delete("/<string:annotation_id>")
 @login_required
+@permission_required("access")
 def delete(annotation_id: str):
     """ """
     try:
-        res = base.delete_annotation(UUID(annotation_id), cast(User, current_user))
+        res = base.delete_annotation(UUID(annotation_id))
 
     except AuthorizationFailure as e:
         current_app.logger.exception(e)
@@ -191,15 +196,16 @@ def delete(annotation_id: str):
 
 
 @annotBp.delete("/bulk-delete")
-@validate()
 @login_required
+@permission_required("acccess")
+@validate()
 def bulk_delete(body: BulkDeleteAnnotationsReq):
     """ """
     results: List[bool] = []
 
     try:
         for annot_id in body.ids:
-            results.append(base.delete_annotation(annot_id, cast(User, current_user)))
+            results.append(base.delete_annotation(annot_id))
 
     except AuthorizationFailure as e:
         current_app.logger.exception(e)

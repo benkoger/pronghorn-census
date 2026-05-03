@@ -1,136 +1,143 @@
-// API methods for managing users 
+// API methods for managing users
 // Author: Michael B. Lance
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { User, Organization } from '@/types/generatorobjects.ts';
-import type { UserIntf, OrganizationIntf } from '@/types/generatorobjects.ts';
-import { ApiError } from '@/modules/api/errors.ts'
-import { api_url } from '@/modules/api/apiV1Methods.ts';
-import { getActivePinia, type Pinia, type Store } from 'pinia';
+import { User, Organization } from "@/types/generatorobjects.ts";
+import type { UserIntf, OrganizationIntf } from "@/types/generatorobjects.ts";
+import { ApiError } from "@/modules/api/errors.ts";
+import { api_url } from "@/modules/api/apiV1Methods.ts";
+import { getActivePinia, type Pinia, type Store } from "pinia";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function checkAuth(): Promise<boolean> {
-	const response = await fetch(`${api_url}/users/check-auth`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include',
-	});
-	if (response.status == 401) return false;
-	if (!response.ok) {throw new ApiError(await response.json());}
+  const response = await fetch(`${api_url}/users/check-auth`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (response.status == 401) return false;
+  if (!response.ok) {
+    throw new ApiError(await response.json());
+  }
 
-	return true;
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getAllUsers(): Promise<User[]> {
-	const response = await fetch(`${api_url}/users`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include',
-	});
-	if (!response.ok) throw new ApiError(await response.json());
-	
-	const resp = await response.json();
-	let users = [];
-	
-	for (const user of resp)  users.push(new User(user as UserIntf));
+  const response = await fetch(`${api_url}/users`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
-	return users
+  const resp = await response.json();
+  let users = [];
+
+  for (const user of resp) users.push(new User(user as UserIntf));
+
+  return users;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export async function getUserOrganizations(user_id: string): Promise<Organization[]> {
-	const response = await fetch(`${api_url}/users/${user_id}/organizations`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include',
-	});
-	if (!response.ok) throw new ApiError(await response.json());
-	
-	const resp = await response.json();
-	let orgs = [];
+export async function getUserOrganizations(
+  user_id: string,
+): Promise<Organization[]> {
+  const response = await fetch(`${api_url}/users/${user_id}/organizations`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
-	for (const org of resp) orgs.push(new Organization(org as OrganizationIntf));
+  const resp = await response.json();
+  let orgs = [];
 
-	return orgs
+  for (const org of resp) orgs.push(new Organization(org as OrganizationIntf));
+
+  return orgs;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getCurrentUser(): Promise<User> {
-	const response = await fetch(`${api_url}/users/current-user`, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include',
-	});
-	if (!response.ok) throw new ApiError(await response.json());
+  const response = await fetch(`${api_url}/users/current-user`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
-	return new User(await response.json() as UserIntf);
+  return new User((await response.json()) as UserIntf);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getUserHasRole(role_name: string): Promise<boolean> {
-	const params = new URLSearchParams();
-	params.append('role_name', role_name.toString());
+  const params = new URLSearchParams();
+  params.append("role_name", role_name.toString());
 
-	const response = await fetch(`${api_url}/users/role-check?${params}`, {
-		method: 'GET',
-		credentials: 'include',
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	});
-	if (!response.ok) throw new ApiError(await response.json());
-	
-	const resp = await response.json();
+  const response = await fetch(`${api_url}/users/role-check?${params}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
-  return resp
+  const resp = await response.json();
+
+  return resp;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export async function authUser(email:string, password: string): Promise<boolean> {
-	const response = await fetch(`${api_url}/authenticate`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({
-			'email': email,
-			'password': password
-		}),
-		credentials: 'include',
-	});
-	if (!response.ok) throw new ApiError(await response.json());
+export async function authUser(
+  email: string,
+  password: string,
+): Promise<boolean> {
+  const response = await fetch(`${api_url}/authenticate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: email,
+      password: password,
+    }),
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
-	return true;
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function deauthUser(): Promise<boolean> {
-	const response = await fetch(`${api_url}/deauthenticate`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		credentials: 'include'
-	});
-	if (!response.ok) throw new ApiError(await response.json());
-  
+  const response = await fetch(`${api_url}/deauthenticate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(await response.json());
+
   // Reset state of pinia stores
   interface ExtendedPina extends Pinia {
     _s: Map<string, Store>;
@@ -139,27 +146,75 @@ export async function deauthUser(): Promise<boolean> {
   const pinia = getActivePinia() as ExtendedPina;
 
   pinia._s.forEach((store: Store, name: string) => {
-    if (name != 'userStore') store.$reset();
-  })
+    if (name != "userStore") store.$reset();
+  });
 
-
-	return true;
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function setActiveOrg(org_id: string): Promise<boolean> {
   const response = await fetch(`${api_url}/users/set-active-organization`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    credentials: 'include',
+    credentials: "include",
     body: JSON.stringify({
-      'org_id': org_id
+      org_id: org_id,
     }),
   });
   if (!response.ok) throw new ApiError(await response.json());
 
   return true;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export interface createUserOptions {
+  username: string;
+  email: string;
+  password: string;
+  external_auth_id?: string;
+  external_auth_provider?: string;
+  status?: string;
+  locale?: string;
+  organization_id?: string;
+  role_ids?: string[];
+
+}
+
+export async function createUser(
+  options: createUserOptions,
+): Promise<User> {
+  const response = await fetch(`${api_url}/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return new User((await response.json()) as UserIntf);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function createSuperUser(
+  options: createUserOptions
+): Promise<User> {
+  const response = await fetch(`${api_url}/users/super-user`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return new User(await response.json() as UserIntf);
 }

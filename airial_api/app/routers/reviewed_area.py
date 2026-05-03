@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
+from app.decorators import permission_required
 from app.extensions import base, s3
 from database import ObjectNotFound
 from database.errors import AuthorizationFailure
@@ -26,6 +27,7 @@ raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 
 @raBp.get("")
 @login_required
+@permission_required("access")
 @validate()
 def get(query: RAQuery):
     """
@@ -65,14 +67,13 @@ def get(query: RAQuery):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@raBp.get("/<string:image_id>/annotations")
+@raBp.get("/<string:reviewed_area_id>/annotations")
 @login_required
-def get_annotations(image_id: str):
+@permission_required("access")
+def get_annotations(reviewed_area_id: str):
     """ """
     try:
-        annotations = base.get_reviewed_area_annotations(
-            UUID(image_id), cast(User, current_user)
-        )
+        annotations = base.get_reviewed_area_annotations(UUID(reviewed_area_id))
         if not annotations:
             return [], 200
 
@@ -92,6 +93,7 @@ def get_annotations(image_id: str):
 
 @raBp.post("/presigned-get-url")
 @login_required
+@permission_required("access")
 def create_ra_presigned_get():
     """
     Generate a presigned GET URL for a reviewed area.
@@ -132,8 +134,9 @@ def create_ra_presigned_get():
 
 
 @raBp.patch("/<string:reviewed_area_id>")
-@validate()
 @login_required
+@permission_required("access")
+@validate()
 def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):
     """
     Update reviewed areas in the database.

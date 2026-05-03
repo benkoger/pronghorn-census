@@ -42,3 +42,11 @@ class Organization(DBbase):
 class UpdateOrganizationReq(BaseModel):
     name: Optional[str] = None
     logo_url: Optional[str] = None
+
+
+# --------------------------------------------------------------------------------------------------------------------------
+
+
+class createOrganizationReq(BaseModel):
+    name: str
+    logo_url: Optional[str] = None

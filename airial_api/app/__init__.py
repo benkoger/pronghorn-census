@@ -47,7 +47,9 @@ def create_app():
     app.errorhandler(HTTPException)(errors.handle_generic_http)
     app.errorhandler(500)(errors.internal_service_error)
 
-    app.add_url_rule("/healthcheck", "healthcheck", view_func=lambda: health.run())
+    app.add_url_rule(
+        "/api/v1/healthcheck", "healthcheck", view_func=lambda: health.run()
+    )
 
     from app.routers import bp
 

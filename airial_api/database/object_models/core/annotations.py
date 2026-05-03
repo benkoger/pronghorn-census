@@ -18,6 +18,7 @@ from ..base import Box, DBbase
 class Annotation(DBbase):
     label_id: int
     image_id: int
+    pred_id: int
     herd_unit_id: int
     box_tx: int
     box_ty: int
@@ -28,7 +29,6 @@ class Annotation(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
-    pred_id: int
     dimensions: "Box" = field(init=False)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,7 +63,7 @@ class CreateAnnotationReq(BaseModel):
     box_bx: int
     box_by: int
     uuid: UUID
-    pred_id: Optional[UUID] = None
+    prediction_id: Optional[UUID] = None
     reviewed_area_id: Optional[UUID] = None
 
 
