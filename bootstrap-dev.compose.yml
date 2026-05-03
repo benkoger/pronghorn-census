@@ -1,0 +1,134 @@
+services:
+  db:
+    container_name: prong_gres
+    image: postgres:18
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U pronghorn_count -d testing"]
+      interval: 5s
+      timeout: 5s 
+      retries: 20
+    restart: always
+    environment:
+      POSTGRES_USER: pronghorn_count
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: testing
+    volumes:
+      - type: bind 
+        source: ./local_db/bootstrap.sh
+        target: /docker-entrypoint-initdb.d/bootstrap.sh
+      - ./local_db/db_definitions.sql:/db_definitions.sql:Z
+    networks:
+      - dev_pronghorn_app_network
+    ports:
+      - "5432:5432"
+    command: ["postgres", "-c", "listen_addresses=*"]
+
+  spicedb:
+    container_name: prong_spicedb
+    image: authzed/spicedb:latest
+    environment:
+      SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL}
+      SPICEDB_DATASTORE_ENGINE: memory
+      SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+      SPICEDB_DATASTORE_CONN_POOL_READ_MAX_OPEN: 2
+      SPICEDB_DATASTORE_CONN_POOL_READ_MIN_OPEN: 1
+      SPICEDB_DATASTORE_CONN_POOL_WRITE_MAX_OPEN: 2
+      SPICEDB_DATASTORE_CONN_POOL_WRITE_MIN_OPEN: 1
+    command: serve
+    ports:
+      - "50051:50051"
+    networks:
+      - dev_pronghorn_app_network
+ 
+  spicedb-init:
+    container_name: spicedb-init 
+    image: authzed/zed:latest
+    environment:
+      ZED_ENDPOINT: prong_spicedb:50051
+      ZED_TOKEN: ${SPICEDB_GRPC_PRESHARED_KEY}
+      ZED_INSECURE: "true"
+    volumes:
+      - ./airial_api/database/spicedb_schema/schema.zed:/etc/spicedb/schema.zed:Z 
+    command: schema write /etc/spicedb/schema.zed
+
+  pronghorn-api-dev:
+    depends_on:
+      db:
+        condition: service_healthy
+    container_name: prong_dev_api
+    build:
+      context: .
+      dockerfile: airial.containerfile
+    environment:
+      ORIGIN_URL: ${ORIGIN_URL}
+      ROOT: ${ROOT}
+      HERD_UNIT: ${HERD_UNIT}
+      CROP_FOLDER: ${CROP_FOLDER}
+      IMAGES: ${CROP_FOLDER}
+      SECRET_KEY: ${SECRET_KEY}
+      VALKEY_HOST: ${VALKEY_HOST}
+      SESSION_REDIS: ${SESSION_REDIS}
+      VALKEY_PASS: ${VALKEY_PASS}
+      AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS} 
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      BUCKET_NAME: ${BUCKET_NAME}
+      NUM_API_WORKERS: ${NUM_API_WORKERS}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      FLASK_APP: /app/app.py
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
+      SPICE_URL: ${SPICE_URL}
+      BOOTSTRAP: true
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./airial_api:/app:Z
+    networks: 
+      - dev_pronghorn_app_network
+    ports: 
+      - 8000:8000 
+
+  valkey:
+    container_name: prong_dev_valkey
+    image: docker.io/valkey/valkey:8.1.1
+    healthcheck:
+      test: valkey-cli ping || exit 1
+    restart: always
+    command: valkey-server --requirepass ${VALKEY_PASS}
+    ports:
+      - "6379:6379"
+    networks: 
+      - dev_pronghorn_app_network
+
+  web-app-dev:
+    container_name: prong_dev_webapp
+    build:
+      context: .
+      dockerfile: development.prongwebapp.containerfile  
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    volumes:
+    - ./generator_web_app/src:/app/src:Z
+    develop:
+      watch:
+        - path: ./generator_web_app/package.json
+          target: /app/package.json
+          action: restart
+        - path: ./generator_web_app/vite.config.ts
+          target: /app/vite.config.ts
+          action: restart
+    networks: 
+      - dev_pronghorn_app_network
+    ports: 
+      - 5173:5173
+
+networks: 
+  dev_pronghorn_app_network:
+    driver: bridge
+
