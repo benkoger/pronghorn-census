@@ -129,7 +129,7 @@ def auto_crop(
 
                 annotation = CreateAnnotationReq(
                     image_id=image.image_id,
-                    pred_id=pred.uuid,
+                    prediction_id=pred.uuid,
                     herd_unit_id=image.herd_unit_id,
                     label_id=labels_ids[pred.label],
                     box_tx=box[0],

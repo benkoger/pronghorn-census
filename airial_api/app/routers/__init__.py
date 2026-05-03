@@ -20,6 +20,8 @@ from .schemas import schemaBp
 from .surveys import surveyBp
 from .users import userBp
 from .annotations import annotBp
+from .system import systemBp
+from .roles import roleBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -44,3 +46,6 @@ bp.register_blueprint(cropBp)
 bp.register_blueprint(orgBp)
 
 bp.register_blueprint(annotBp)
+bp.register_blueprint(systemBp)
+
+bp.register_blueprint(roleBp)

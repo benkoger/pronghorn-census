@@ -11,10 +11,18 @@ import {
   getUserHasRole,
   getUserOrganizations,
   setActiveOrg,
+  createUser,
+  createSuperUser,
+  type createUserOptions
 } from "@/modules/api/users";
-import { Organization, User } from "@/types/generatorobjects.ts";
+import {
+  createOrganization,
+  type createOrganizationOptions
+} from "@/modules/api/organizations";
+import { Organization, Role, User } from "@/types/generatorobjects.ts";
 import { getActivePinia, type Pinia, type Store } from "pinia";
 import { useRouter } from "vue-router";
+import { getRoles } from "../api/roles";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -29,6 +37,7 @@ export const useUserStore = defineStore("userStore", {
     is_admin: false,
     nav_toggled: false,
     router: useRouter(),
+    roles: [] as Role[]
   }),
   persist: {
     storage: localStorage,
@@ -46,16 +55,51 @@ export const useUserStore = defineStore("userStore", {
     async authenticate(email: string, password: string) {
       this.logged_in = await authUser(email, password);
       await this.get_current_user();
+      await this.get_roles();
       if (this.user != undefined) {
-        this.organization_idx = this.user.default_org_id;
+        await this.get_organizations();
+        this.organization_idx = +Object.keys(this.organizations)[0];
       }
+    },
+    async create_user(options: createUserOptions, login: boolean = false): Promise<boolean> {
+      const user = await createUser(options);
+
+      if (user == undefined) return false;
+
+      if (login) {
+        await this.deuathenticate();
+        await this.authenticate(options.email, options.password);
+      }
+      return true;
+    },
+    async create_super_user(options: createUserOptions, login: boolean = false): Promise<boolean> {
+      const user = await createSuperUser(options);
+
+      if (user == undefined) return false;
+
+      if (login) {
+        if (this.logged_in) await this.deuathenticate();
+        await this.authenticate(options.email, options.password);
+      }
+      await this.authenticate(options.email, options.password)
+      return true;
+    },
+    async create_organization(options: createOrganizationOptions): Promise<boolean> {
+      const organization = await createOrganization(options);
+
+      if (this.organizations == undefined) return false;
+
+      this.organizations[2] = organization;
+
+      return true;
     },
     async start_up() {
       await this.check_admin();
-      await this.get_organizations();
+      if (this.logged_in) await this.get_roles();
     },
     async deuathenticate() {
       await deauthUser();
+      this.organizations = {};
       this.clear_state();
     },
     async get_current_user() {
@@ -70,6 +114,9 @@ export const useUserStore = defineStore("userStore", {
           this.organizations[org.organization_id] = org;
         });
       }
+    },
+    async get_roles() {
+      this.roles = await getRoles({});
     },
     async check_auth() {
       this.logged_in = (await checkAuth()) ? true : false;

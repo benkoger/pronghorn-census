@@ -11,6 +11,8 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
+from app.decorators import permission_required
+
 from app.extensions import base, cache, s3
 from crop_generator import auto_crop
 from database.errors import (
@@ -34,6 +36,7 @@ cropBp = Blueprint("autocropper", __name__, url_prefix="/api/v1/autocropper")
 
 @cropBp.get("/batch")
 @login_required
+@permission_required("access")
 @validate()
 def fetch_batch(query: AutoCropperBatchQuery):
     """ """
@@ -55,6 +58,7 @@ def fetch_batch(query: AutoCropperBatchQuery):
 
 @cropBp.post("")
 @login_required
+@permission_required("access")
 @validate()
 def auto_crop_image(body: AutoCropReq):
     """ """

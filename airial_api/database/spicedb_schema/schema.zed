@@ -1,68 +1,86 @@
 definition user {}
 
-definition organization {
-	relation admin: user
-	relation member: user
+  definition platform {
+  relation root: user
+}
 
-  permission access = admin + member
-  permission modify = admin
+definition organization {
+  relation platform: platform
+  relation root: user
+  relation admin: user
+  relation annotator: user
+
+permission is_root = platform->root
+  permission access = admin + annotator + is_root + root
+  permission modify = admin + is_root
 }
 
 definition project {
-    relation parent: organization
+  relation parent: organization
 
-    permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition herd_unit {
-	relation parent: project
+  relation parent: project
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition model {
-  relation parent: project 
+  relation parent: project
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
-definition survey { 
+definition survey {
   relation parent: herd_unit
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition schema {
   relation parent: model
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition label {
   relation parent: schema
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition image {
   relation parent: survey | herd_unit
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition prediction {
   relation parent: image
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition reviewed_area {
   relation parent: image
 
-  permission access = parent->access
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }
 
 definition annotation {
   relation parent: image
-  permission access = parent->access
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
 }

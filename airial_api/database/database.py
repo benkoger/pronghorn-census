@@ -3,7 +3,6 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
-import os
 import uuid
 from datetime import date, datetime, timezone
 from functools import wraps
@@ -26,6 +25,7 @@ from authzed.api.v1 import (
 )
 from grpc import ChannelCredentials
 from psycopg import Cursor
+from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row
 from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash
@@ -35,6 +35,7 @@ from database.object_models.core.images import (
     RAQuery,
     UpdateReviewedAreaReq,
 )
+from database.object_models.user_management.users import UserQuery
 
 from .errors import (
     AuthorizationFailure,
@@ -75,6 +76,7 @@ from .object_models.user_management import (
     CreateUserReq,
     RoleQuery,
     UpdateOrganizationReq,
+    createOrganizationReq,
 )
 from .query_builder import QueryBuilder
 
@@ -254,52 +256,62 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _bootstrap(self, cursor: Cursor) -> bool:
-        try:
-            with open(
-                os.path.join(os.path.dirname(__file__), "db_definitions.sql")
-            ) as script:
-                sql_script = script.read()
-                # pyright: ignore[reportArgumentType]
-                cursor.execute(sql_script)  # type: ignore
-        except Exception as e:
-            print(e)
-            return False
-        return True
+    def _check_bootstrapped(self, cursor: Cursor) -> bool:
+        """ """
+        query = sql.SQL("SELECT first_run FROM usermanagement.initialization;")
+        res = cursor.execute(query).fetchone()
 
-    def bootstrap(self) -> bool:
-        """Create tables detailed in sql file"""
-        return self._bootstrap()
+        if res is None:
+            # first_run is set up during database bootstrapping
+            raise DatabaseError()
+
+        return False if res[0] else True
+
+    def check_bootstrapped(self) -> bool:
+        return self._check_bootstrapped()
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def set_bootstrapped(self, cursor: Cursor) -> bool:
+        """ """
+        query = sql.SQL("UPDATE usermanagement.inizialization SET first_run = false")
+
+        cursor.execute(query)
+
+        return True
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     # Project Management - Organizations
     @connect
     def _create_organization(
-        self, cursor: Cursor[Organization], name: str, logo_url: str | None = None
-    ) -> Organization | None:
-        """Internal helper function, do not call directly"""
+        self, cursor: Cursor[Organization], req: createOrganizationReq
+    ) -> Organization:
+        """Internal method, do not call directly"""
         cursor.row_factory = class_row(Organization)
         cursor.execute(
             sql.SQL(
-                "INSERT INTO usermanagement.organizations (name, logo_url) VALUES (%s, %s) RETURNING *; "
+                "INSERT INTO usermanagement.organizations (name, logo_url) VALUES (%(name)s, %(logo_url)s) RETURNING *; "
             ),
-            (name, logo_url),
+            req.model_dump(),
         )
         org = cursor.fetchone()
+
+        if not org:
+            raise FailedToCreate("Organization")
+
         return org
 
-    def create_organizaztion(
-        self, name: str, logo_url: Union[str, None] = None
-    ) -> Organization:
+    def create_organizaztion(self, req: createOrganizationReq) -> Organization:
 
-        return self._create_organization(name=name, logo_url=logo_url)
+        return self._create_organization(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
     def _get_organization(
-        self, cursor: Cursor[Organization], organization_id: int | UUID
+        self, cursor: Cursor[Organization], organization_id: int | UUID | str
     ) -> Organization:
         """Internal helper function, do not call directly"""
         cursor.row_factory = class_row(Organization)
@@ -316,6 +328,10 @@ class Database:
                 cursor.execute(
                     query.format(id_field=sql.Identifier("uuid")), (organization_id,)
                 )
+            case str():
+                cursor.execute(
+                    query.format(id_field=sql.Identifier("name")), (organization_id,)
+                )
 
         organization = cursor.fetchone()
 
@@ -324,11 +340,11 @@ class Database:
 
         return organization
 
-    def get_organization(self, organization_id: int | UUID) -> Organization:
+    def get_organization(self, organization_id: int | UUID | str) -> Organization:
         """Request an organization, or organizations object(S) from the database
 
         Args:
-                organization_ids: an integer, uuid, or role name, or a list consisting entirely of one of those 3 types
+                organization_ids: an integer, uuid, or organization name
         """
         return self._get_organization(organization_id)
 
@@ -495,30 +511,6 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Project Management - Roles
-
-    @connect
-    def _create_role(self, cursor: Cursor[Role], name: str) -> Role | None:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Role)
-        cursor.execute(
-            sql.SQL(
-                " INSERT INTO usermanagement.roles (name) VALUES (%s) RETURNING *; "
-            ),
-            (name,),
-        )
-        role = cursor.fetchone()
-        return role
-
-    def create_role(self, name: str) -> Role:
-        """Insert a new role object into the database
-
-        Args:
-                role: The human readable role version
-        """
-        return self._create_role(name=name)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     @connect
     def _get_role(self, cursor: Cursor[Role], role_id: int | UUID | str) -> Role:
         """Internal helper function, do not call directly"""
@@ -552,30 +544,29 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_many_roles(self, cursor: Cursor[Role], req: RoleQuery) -> List[Role]:
+    def _get_roles(self, cursor: Cursor[Role], req: RoleQuery) -> List[Role]:
         """ """
         cursor.row_factory = class_row(Role)
 
-        query = sql.SQL("""
-			SELECT * FROM usermanagement.roles
-			WHERE  role_id = ANY(%s)
-				OR uuid = ANY(%s::uuid[])
-		""")
+        query = sql.SQL(
+            "SELECT * FROM usermanagement.roles as r WHERE r.role_id != 1 AND r.role_id != 0"
+        )
+        if req.role_id:
+            r_filters, data = QueryBuilder.filter_by_object_ids(
+                "r", "role_id", req.role_id
+            )
 
-        model = req.model_dump()
+            cursor.row_factory = class_row(Role)
+            return cursor.execute(
+                sql.SQL("{q} AND {p}").format(q=query, p=r_filters), data
+            ).fetchall()
+        else:
+            cursor.row_factory = class_row(Role)
+            return cursor.execute(query).fetchall()
 
-        query += sql.SQL("""
-			
-		""")
-
-        ints = [i for i in model["role_id"] if isinstance(i, int)]
-        uuids = [str(i) for i in model["role_id"] if not isinstance(i, int)]
-
-        return cursor.execute(query, (ints, uuids)).fetchall()
-
-    def get_many_roles(self, req: RoleQuery) -> List[Role]:
+    def get_roles(self, req: RoleQuery) -> List[Role]:
         """ """
-        return self._get_many_roles(req)
+        return self._get_roles(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -650,25 +641,23 @@ class Database:
     # User Management - Users
 
     @connect
-    def _create_user(
-        self, cursor: Cursor[User], req: CreateUserReq, organization: Organization
-    ) -> User:
+    def _create_user(self, cursor: Cursor[User], req: CreateUserReq) -> User:
         """Internal helper function, do not call directly"""
         query_1 = sql.SQL("""
 			INSERT INTO usermanagement.users (
 				username, email, external_auth_id, external_auth_provider,
-				status, locale, passowrd_hash
+                status, locale, password_hash, default_org_id
 			)
 			VALUES (
 				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
-				%(status)s, %(locale)s, %(password_hash)s
-			)No
+				%(status)s, %(locale)s, %(password_hash)s, %(default_org_id)s
+			)
 			RETURNING *;
 		""")
 
         query_2 = sql.SQL("""
 			INSERT INTO usermanagement.organizations_users (
-				user_id, organziation_id, role_id
+				user_id, organization_id, role_id
 			)
 			VALUES (
 				%s, %s, %s
@@ -678,17 +667,20 @@ class Database:
         placeholders = req.model_dump()
 
         placeholders["password_hash"] = generate_password_hash(placeholders["password"])
+        organization = self._get_organization(cursor, req.organization_id)
+        placeholders["default_org_id"] = organization.organization_id
 
         cursor.row_factory = class_row(User)
-        cursor.execute(query_1, req.model_dump())
-
-        user = cursor.fetchone()
+        user = cursor.execute(query_1, placeholders).fetchone()
 
         if not user:
             raise FailedToCreate("user")
 
         # Organizations and Ids should be equal length and appear in the same order
-        roles = self._get_many_roles(cursor, RoleQuery(role_id=req.role_ids))
+        if not req.role_ids:
+            raise FailedToCreate("user")
+
+        roles = self._get_roles(cursor, RoleQuery(role_id=req.role_ids))
 
         cursor.executemany(
             query_2,
@@ -698,20 +690,20 @@ class Database:
             ],
         )
 
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "organization", str(organization.uuid), "user", user.id, role.name
+                )
+                for role in roles
+            ]
+        )
+
         return user
 
     def create_user(self, req: CreateUserReq) -> User:
         """ """
-        org = self._get_organization(req.organization_id)
-        res = self.check_permission(
-            "organization", str(org.uuid), str(req.current_user), "manage"
-        )
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._create_user(req, org)
-        else:
-            raise AuthorizationFailure(
-                str(req.current_user), "manage", "organization", str(org.uuid)
-            )
+        return self._create_user(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -757,18 +749,21 @@ class Database:
 
     # TODO: Users should be queried by organization
     @connect
-    def _get_users(self, cursor: Cursor[User]) -> List[User]:
-        """
+    def _get_users(self, cursor: Cursor[User], req: UserQuery) -> List[User]:
+        """ """
+        org = self._get_organization(req.organization_id)
 
-        self.crddeate_bulk_check_request('')
-        """
         cursor.row_factory = class_row(User)
-        query = sql.SQL("SELECT * FROM usermanagement.users WHERE user_id != 0;")
+        query = sql.SQL("""
+            SELECT U.* FROM usermanagement.users AS U
+            JOIN usermanagement.organizations_users AS OU ON OU.user_id = U.user_id 
+            WHERE U.user_id != 0 AND OU.organization_id = %s;
+        """)
 
-        return cursor.execute(query).fetchall()
+        return cursor.execute(query, (org.organization_id,)).fetchall()
 
-    def get_users(self):
-        return self._get_users()
+    def get_users(self, req: UserQuery):
+        return self._get_users(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1133,17 +1128,9 @@ class Database:
 
         return cursor.fetchall()
 
-    def get_project_models(self, project_id: UUID, user: User) -> List[Model]:
+    def get_project_models(self, project_id: UUID) -> List[Model]:
         """ """
-        res = self.check_permission(
-            "project", str(project_id), str(user.uuid), "access"
-        )
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_project_models(project_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "access", "project", str(project_id)
-            )
+        return self._get_project_models(project_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1164,17 +1151,9 @@ class Database:
 
         return cursor.fetchall()
 
-    def get_project_herd_units(self, project_id: UUID, user: User) -> list[HerdUnit]:
+    def get_project_herd_units(self, project_id: UUID) -> list[HerdUnit]:
         """ """
-        res = self.check_permission(
-            "project", str(project_id), str(user.uuid), "access"
-        )
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_project_herd_units(project_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "access", "project", str(project_id)
-            )
+        return self._get_project_herd_units(project_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1329,15 +1308,9 @@ class Database:
             raise ObjectNotFound("labels for schema", str(schema_id))
         return labels
 
-    def get_schema_labels(self, schema_id: UUID, user: User) -> list[Label]:
+    def get_schema_labels(self, schema_id: UUID) -> list[Label]:
         """ """
-        res = self.check_permission("schema", str(schema_id), str(user.uuid), "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_schema_labels(schema_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "access", "schema", str(schema_id)
-            )
+        return self._get_schema_labels(schema_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1691,20 +1664,13 @@ class Database:
 
         return herd_unit
 
-    def create_herd_unit(self, req: CreateHerdUnitReq, user: User) -> HerdUnit:
+    def create_herd_unit(self, req: CreateHerdUnitReq) -> HerdUnit:
         """Insert a new herd unit object into the database
 
         Args:
                 name: the herd unit name
         """
-        usr_id = str(user.uuid)
-        project_id = str(req.project_id)
-
-        res = self.check_permission("project", project_id, usr_id, "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._create_herd_unit(req)
-        else:
-            raise AuthorizationFailure(usr_id, "access", "project", project_id)
+        return self._create_herd_unit(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1759,17 +1725,10 @@ class Database:
 
         return surveys
 
-    def get_herd_unit_surveys(self, herd_unit_id: UUID, user: User) -> list[Survey]:
+    def get_herd_unit_surveys(self, herd_unit_id: UUID) -> list[Survey]:
         """ """
-        res = self.check_permission(
-            "herd_unit", str(herd_unit_id), str(user.uuid), "access"
-        )
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_herd_unit_surveys(herd_unit_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "access", "herd_unit", str(herd_unit_id)
-            )
+
+        return self._get_herd_unit_surveys(herd_unit_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2578,17 +2537,9 @@ class Database:
 
         return image
 
-    def get_image(self, image_id: UUID, user: User) -> Image:
+    def get_image(self, image_id: UUID) -> Image:
         """ """
-        usr_id = str(user.uuid)
-        img_id = str(image_id)
-
-        res = self.check_permission("image", img_id, usr_id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_image(image_id)
-        else:
-            raise AuthorizationFailure(usr_id, "access", "image", img_id)
+        return self._get_image(image_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2650,17 +2601,9 @@ class Database:
 
         return cursor.fetchall()
 
-    def get_image_annotations(self, image_id: UUID, user: User) -> List[Annotation]:
+    def get_image_annotations(self, image_id: UUID) -> List[Annotation]:
         """ """
-        usr_id = str(user.uuid)
-        img_id = str(image_id)
-
-        res = self.check_permission("image", img_id, usr_id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_image_annotations(image_id=image_id)
-        else:
-            raise AuthorizationFailure(usr_id, "access", "image", img_id)
+        return self._get_image_annotations(image_id=image_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2726,21 +2669,9 @@ class Database:
         self,
         image_id: Union[int, UUID],
         req: UpdateImageReq,
-        user: User,
-        bypass: bool = False,
     ) -> Image:
         """ """
-        # Allow the api layer to bypass bypass acl checks to prevent redundant checks
-        if bypass or isinstance(image_id, int):
-            return self._update_image(image_id, req)
-
-        img_id = str(image_id)
-        res = self.check_permission("image", img_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._update_image(image_id, req)
-        else:
-            raise AuthorizationFailure(user.id, "access", "image", img_id)
+        return self._update_image(image_id, req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2795,16 +2726,9 @@ class Database:
 
         return prediction
 
-    def create_prediction(self, req: CreatePredictionReq, user: User) -> Prediction:
+    def create_prediction(self, req: CreatePredictionReq) -> Prediction:
         """ """
-        usr_id = str(user.uuid)
-        image_id = str(req.image_id)
-
-        res = self.check_permission("image", image_id, usr_id, "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._create_prediction(req)
-        else:
-            raise AuthorizationFailure(usr_id, "access", "image", image_id)
+        return self._create_prediction(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2823,17 +2747,9 @@ class Database:
 
         return prediction
 
-    def get_prediction(self, prediction_id: UUID, user: User) -> Prediction:
+    def get_prediction(self, prediction_id: UUID) -> Prediction:
         """ """
-        usr_id = str(user.uuid)
-        pred_id = str(prediction_id)
-
-        res = self.check_permission("prediction", pred_id, usr_id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_prediction(prediction_id)
-        else:
-            raise AuthorizationFailure(usr_id, "access", "prediction", pred_id)
+        return self._get_prediction(prediction_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2853,25 +2769,9 @@ class Database:
             sql.SQL("{q} WHERE {p}").format(q=query, p=p_filters), data
         ).fetchall()
 
-    def get_predictions(self, req: PredictionQuery, user: User) -> List[Prediction]:
+    def get_predictions(self, req: PredictionQuery) -> List[Prediction]:
         """ """
-        res = self.bulk_check_permission(
-            [
-                self.create_bulk_check_request(
-                    "prediction", str(pred_uuid), user.id, "access"
-                )
-                for pred_uuid in req.prediction_id
-            ]
-        )
-
-        if all(
-            pair.item.permissionship
-            == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            for pair in res.pairs
-        ):
-            return self._get_predictions(req)
-        else:
-            raise BulkAuthorizationFailure(user.id, "access")
+        return self._get_predictions(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Core - Annotations
@@ -2912,8 +2812,8 @@ class Database:
         label = self._get_label(cursor, req.label_id)
         params["label_id"] = label.label_id
 
-        if req.pred_id:
-            prediction = self._get_prediction(cursor, req.pred_id)
+        if req.prediction_id:
+            prediction = self._get_prediction(cursor, req.prediction_id)
             params["pred_id"] = prediction.pred_id
         else:
             params["pred_id"] = 0
@@ -2946,33 +2846,9 @@ class Database:
 
         return annotation
 
-    def create_annotation(
-        self,
-        req: CreateAnnotationReq,
-        user: User,
-        bypass: bool = False,
-    ) -> Annotation:
+    def create_annotation(self, req: CreateAnnotationReq, user: User) -> Annotation:
         """ """
-        if bypass:
-            return self._create_annotation(req, user)
-        img_id = str(self._get_image(req.image_id).uuid)
-        lbl_id = str(self._get_label(req.label_id).uuid)
-
-        res = self.bulk_check_permission(
-            [
-                self.create_bulk_check_request("image", img_id, user.id, "access"),
-                self.create_bulk_check_request("label", lbl_id, user.id, "access"),
-            ]
-        )
-
-        if all(
-            pair.item.permissionship
-            == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            for pair in res.pairs
-        ):
-            return self._create_annotation(req, user)
-        else:
-            raise BulkAuthorizationFailure(user.id, "access")
+        return self._create_annotation(req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3179,16 +3055,9 @@ class Database:
 
         return True if cursor.rowcount > 0 else False
 
-    def delete_annotation(self, annotation_id: Union[int, UUID], user: User):
+    def delete_annotation(self, annotation_id: Union[int, UUID]):
         """ """
-        annot_id = str(annotation_id)
-
-        res = self.check_permission("annotation", annot_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._delete_annotation(annotation_id)
-        else:
-            raise AuthorizationFailure(user.id, "access", "annotation", annot_id)
+        return self._delete_annotation(annotation_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Core - reviewed_area
@@ -3347,17 +3216,9 @@ class Database:
             raise Exception("Crop has no annotations")
         return annotations
 
-    def get_reviewed_area_annotations(
-        self, reviewed_area_id: UUID, user: User
-    ) -> list[Annotation]:
+    def get_reviewed_area_annotations(self, reviewed_area_id: UUID) -> list[Annotation]:
         """ """
-        ra_id = str(reviewed_area_id)
-        res = self.check_permission("reviewed_area", ra_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_reviewed_area_annotations(reviewed_area_id)
-        else:
-            raise AuthorizationFailure(user.id, "access", "reviewed_area", ra_id)
+        return self._get_reviewed_area_annotations(reviewed_area_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3430,29 +3291,7 @@ class Database:
         bypass: bool = False,
     ) -> ReviewedArea:
         """ """
-        if bypass or isinstance(reviewed_area_id, int):
-            return self._update_reviewed_area(reviewed_area_id, req)
-
-        ra_id = str(reviewed_area_id)
-
-        if req.image_id:
-            image_access = self.check_permission(
-                "image", str(req.image_id), user.id, "access"
-            )
-            if (
-                image_access.permissionship
-                != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            ):
-                raise AuthorizationFailure(
-                    user.id, "access", "image", str(req.image_id)
-                )
-
-        res = self.check_permission("reviewed_area", ra_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._update_reviewed_area(reviewed_area_id, req, user)
-        else:
-            raise AuthorizationFailure(user.id, "access", "reviewed_area", "access")
+        return self._update_reviewed_area(reviewed_area_id, req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3696,31 +3535,7 @@ class Database:
         self, req: AutoCropperBatchQuery, user: User
     ) -> dict[str, Union[str, int, List[int]]]:
         """ """
-        usr_id = str(user.uuid)
-        perm = "access"
-
-        res = self.bulk_check_permission(
-            [
-                self.create_bulk_check_request(
-                    "survey", str(req.survey_id), usr_id, perm
-                ),
-                self.create_bulk_check_request(
-                    "herd_unit", str(req.herd_unit_id), usr_id, perm
-                ),
-                self.create_bulk_check_request(
-                    "model", str(req.model_id), usr_id, perm
-                ),
-            ]
-        )
-
-        if all(
-            pair.item.permissionship
-            == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            for pair in res.pairs
-        ):
-            return self._get_auto_crop_batch(req, user)
-        else:
-            raise BulkAuthorizationFailure(usr_id, "access")
+        return self._get_auto_crop_batch(req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Functionality - Set predictions as reviewed

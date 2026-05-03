@@ -3,7 +3,6 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import cast
 from uuid import UUID
 
 import cv2
@@ -12,6 +11,7 @@ from flask import Blueprint, Response, abort, current_app, request
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError, UniqueViolation
+from app.decorators import permission_required
 
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
@@ -23,7 +23,6 @@ from database.object_models.core import (
     PredictionQuery,
     UpdateImageReq,
 )
-from database.object_models.user_management import User
 
 imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 
@@ -33,6 +32,7 @@ imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 
 @imageBp.get("/<string:image_id>")
 @login_required
+@permission_required("access")
 def get_by_id(image_id: str):
     """
     Request an image object from the database using its UUID.
@@ -51,7 +51,7 @@ def get_by_id(image_id: str):
             description: No image record found for the provided ID.
     """
     try:
-        image = base.get_image(UUID(image_id), cast(User, current_user))
+        image = base.get_image(UUID(image_id))
 
     except ValueError as e:
         current_app.logger.exception(e)
@@ -69,6 +69,7 @@ def get_by_id(image_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+@permission_required("access")
 @imageBp.get("/prediction_crops/<string:prediction_id>")
 def get_prediction_crop(prediction_id: str):
     """ """
@@ -120,6 +121,7 @@ def get_crops(image_id: str):
 
 @imageBp.get("/<string:image_id>/predictions")
 @login_required
+@permission_required("access")
 def get_predictions(image_id: str):
     """
     Retrieve all predictions associated with an image.
@@ -160,6 +162,7 @@ def get_predictions(image_id: str):
 
 @imageBp.get("/<string:image_id>/annotations")
 @login_required
+@permission_required("access")
 def get_annotations(image_id: str):
     """
     Retrieve all annotations associated with an image.
@@ -183,9 +186,7 @@ def get_annotations(image_id: str):
 
     """
     try:
-        annotations = base.get_image_annotations(
-            UUID(image_id), cast(User, current_user)
-        )
+        annotations = base.get_image_annotations(UUID(image_id))
         if not annotations:
             return [], 200
 
@@ -206,6 +207,7 @@ def get_annotations(image_id: str):
 @imageBp.post("")
 @validate()
 @login_required
+@permission_required("access")
 def create(body: CreateImageReq):
     """
     Create a new image object.
@@ -242,6 +244,7 @@ def create(body: CreateImageReq):
 
 @imageBp.post("/presigned-get-url")
 @login_required
+@permission_required("access")
 def create_presigned_get():
     """
     Generate a presigned GET URL for an image.
@@ -258,7 +261,7 @@ def create_presigned_get():
     """
     data = request.get_json()
     try:
-        image = base.get_image(UUID(data["image_id"]), cast(User, current_user))
+        image = base.get_image(UUID(data["image_id"]))
 
         if not image:
             abort(404, "Image not found")
@@ -289,6 +292,7 @@ def create_presigned_get():
 # @roles_required('admin')
 @validate()
 @login_required
+@permission_required("access")
 def create_chunk_presigned_put(body: CreatePresignedPutReq):
     """
     Generates a pre-signed URL for a single file chunk (UploadPart).
@@ -347,6 +351,7 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
 
 @imageBp.post("/create-multipart-upload")
 @login_required
+@permission_required("access")
 def create_multipart_upload():
     """
     Initiates a new multipart upload.
@@ -379,6 +384,7 @@ def create_multipart_upload():
 
 @imageBp.post("/complete-multipart-upload")
 @login_required
+@permission_required("access")
 def complete_upload():
     """
     Completes a new multipart upload.
@@ -413,6 +419,7 @@ def complete_upload():
 
 @imageBp.post("/abort-multipart-upload")
 @login_required
+@permission_required("access")
 def abort_upload():
     """
     Aborts a multipart upload.
@@ -445,13 +452,14 @@ def abort_upload():
 
 @imageBp.post("/prediction_crops")
 @login_required
+@permission_required("acecss")
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
 
     try:
-        image = base.get_image(body.image_id, cast(User, current_user))
+        image = base.get_image(body.image_id)
         predictions = base.get_predictions(
-            PredictionQuery(prediction_id=body.prediction_id), cast(User, current_user)
+            PredictionQuery(prediction_id=body.prediction_id)
         )
 
         image_data = cache.get(image.uuid)
@@ -486,8 +494,9 @@ def get_prediciton(body: CreatePredictionCropReq):
 
 
 @imageBp.patch("/<string:image_id>")
-@validate()
 @login_required
+@permission_required("acecss")
+@validate()
 def update(body: UpdateImageReq, image_id: str):
     """
     Update image object in the database.
@@ -508,7 +517,7 @@ def update(body: UpdateImageReq, image_id: str):
                     description: Database error.
     """
     try:
-        image = base.update_image(UUID(image_id), body, cast(User, current_user), False)
+        image = base.update_image(UUID(image_id), body)
 
     except ValueError as e:
         current_app.logger.error(e)
@@ -528,6 +537,7 @@ def update(body: UpdateImageReq, image_id: str):
 
 @imageBp.patch("/close-user-images")
 @login_required
+@permission_required("acess")
 def close_user_images():
     """ """
     try:
@@ -549,10 +559,11 @@ def close_user_images():
 
 @imageBp.delete("/<string:image_id>")
 @login_required
+@permission_required("access")
 def delete_image(image_id: str):
     """ """
     try:
-        image = base.get_image(UUID(image_id), cast(User, current_user))
+        image = base.get_image(UUID(image_id))
         if not image:
             abort(404, "Image not found")
 

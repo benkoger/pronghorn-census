@@ -12,7 +12,6 @@ services:
       POSTGRES_USER: pronghorn_count
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: testing
-      SPICEDB_DB: ${SPICEDB_DB}
     volumes:
       - type: bind
         source: ./local_db/restore.sh
@@ -51,7 +50,7 @@ services:
       ZED_TOKEN: ${SPICEDB_GRPC_PRESHARED_KEY}
       ZED_INSECURE: "true"
     volumes: 
-      - ./local_db/bap.zed:/etc/spicedb/backup.zed:Z  
+      - ./local_db/backup.zed:/etc/spicedb/backup.zed:Z  
     command: backup restore /etc/spicedb/backup.zed
 
   pronghorn-api-dev:

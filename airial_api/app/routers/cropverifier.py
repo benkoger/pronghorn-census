@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
+from app.decorators import permission_required
 from app.extensions import base
 from database import ObjectNotFound
 from database.object_models.core import RAQuery
@@ -23,6 +24,7 @@ verifierBp = Blueprint("verifier", __name__, url_prefix="/api/v1/verifier")
 
 @verifierBp.get("/area-needing-reviewed")
 @login_required
+@permission_required("access")
 @validate()
 def get(query: RAQuery):
     """
@@ -60,6 +62,7 @@ def get(query: RAQuery):
 
 @verifierBp.get("/needing-reviewed")
 @login_required
+@permission_required("access")
 @validate()
 def get_selection_count(query: RAQuery):
     """ """

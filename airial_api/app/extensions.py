@@ -13,6 +13,13 @@ cache = Cache()
 session_manager = Session()
 s3 = LocalProxy(lambda: getattr(current_app, "s3"))
 
+base = db(db_config, spice_config)  # pyright: ignore
+
 health = HealthCheck()
 
-base = db(db_config, spice_config)  # pyright: ignore
+
+def first_run():
+    return base.check_bootstrapped(), "first_run"
+
+
+health.add_check(first_run)
