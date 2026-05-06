@@ -107,6 +107,9 @@ services:
       - dev_pronghorn_app_network
 
   web-app-dev:
+    depends_on:
+      db:
+        condition: service_healthy
     container_name: prong_dev_webapp
     build:
       context: .

@@ -25,15 +25,16 @@ const submitReq = async () => {
   await props.submitAction(options.value).catch((e: apiError) => {
     create({
       title: `${e.error}`,
-      message: `${e.code}: ${e.message}`,
+      body: `${e.code}: ${e.message}`,
       variant: "danger",
       position: "bottom-start",
     });
+    return;
   });
 
   create({
     title: `Organization ${options.value.name} created successfully`,
-    message: "Organization created successfully",
+    body: "Organization created successfully",
     variant: "success",
     position: "bottom-start",
   });

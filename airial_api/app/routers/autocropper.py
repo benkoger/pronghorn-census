@@ -63,9 +63,9 @@ def fetch_batch(query: AutoCropperBatchQuery):
 def auto_crop_image(body: AutoCropReq):
     """ """
     try:
-        image = base.get_image(body.image_id, cast(User, current_user))
+        image = base.get_image(body.image_id)
         predictions = base.get_predictions(
-            PredictionQuery(prediction_id=body.prediction_ids), cast(User, current_user)
+            PredictionQuery(prediction_id=body.prediction_ids)
         )
         labels = base.get_labels(
             LabelQuery(label_id=body.label_ids), cast(User, current_user)
@@ -87,11 +87,11 @@ def auto_crop_image(body: AutoCropReq):
             crop_req, annotation_reqs = crop_group
 
             crop_req.ra_key = f"images/{image.uuid}/reviewed_area/{crop_req.name}"
-            crop = base.create_reviewed_area(crop_req, cast(User, current_user), True)
+            crop = base.create_reviewed_area(crop_req)
 
             for annotation_req in annotation_reqs:
                 annotation_req.reviewed_area_id = crop.uuid
-                base.create_annotation(annotation_req, cast(User, current_user), True)
+                base.create_annotation(annotation_req, cast(User, current_user))
             s3.put_object(
                 Bucket=current_app.config["BUCKET_NAME"],
                 Key=crop_req.ra_key,
@@ -105,8 +105,6 @@ def auto_crop_image(body: AutoCropReq):
         base.update_image(
             image.uuid,
             UpdateImageReq(opened_by_user_id=0),
-            cast(User, current_user),
-            True,
         )
     except ObjectNotFound as e:
         current_app.logger.exception(e)

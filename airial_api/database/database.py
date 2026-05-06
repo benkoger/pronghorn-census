@@ -3140,19 +3140,9 @@ class Database:
 
         return crop
 
-    def create_reviewed_area(
-        self, req: CreateReviewedAreaReq, user: User, bypass: bool
-    ) -> ReviewedArea:
+    def create_reviewed_area(self, req: CreateReviewedAreaReq) -> ReviewedArea:
         """ """
-        if bypass:
-            return self._create_reviewed_area(req)
-        img_id = str(req.image_id)
-
-        res = self.check_permission("image", img_id, user.id, "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._create_reviewed_area(req)
-        else:
-            raise AuthorizationFailure(user.id, "acesss", "image", img_id)
+        return self._create_reviewed_area(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

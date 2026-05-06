@@ -35,7 +35,7 @@ const submitReq = async () => {
   await props.submitAction(options.value).catch((e: apiError) => {
     create({
       title: `${e.error}`,
-      message: `${e.code}: ${e.message}`,
+      body: `${e.code}: ${e.message}`,
       variant: "danger",
       position: "bottom-start",
     });
@@ -44,7 +44,7 @@ const submitReq = async () => {
 
   create({
     title: `Project ${options.value.name} created successfully`,
-    message: `The project was created successfully.`,
+    body: `The project was created successfully.`,
     variant: "success",
     position: "bottom-start",
   });
@@ -61,8 +61,12 @@ const submitReq = async () => {
       <span>Administrator: {{ props.user.username }}</span>
     </div>
   </div>
-  <BForm class="d-flex gap-4 flex-column flex-grow-1" autocomplete="off" data-bwignore="true"
-    @submit.prevent="submitReq">
+  <BForm
+    class="d-flex gap-4 flex-column flex-grow-1"
+    autocomplete="off"
+    data-bwignore="true"
+    @submit.prevent="submitReq"
+  >
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
@@ -70,7 +74,15 @@ const submitReq = async () => {
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Name" label-for="name">
-        <BFormInput type="text" id="name" required trim data-bwignore="true" v-model="options.name" placeholder=" " />
+        <BFormInput
+          type="text"
+          id="name"
+          required
+          trim
+          data-bwignore="true"
+          v-model="options.name"
+          placeholder=" "
+        />
       </BFormFloatingLabel>
     </BInputGroup>
     <BButton type="submit" variant="primary" class="mt-auto">Submit</BButton>

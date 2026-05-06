@@ -3,7 +3,6 @@ import { defineComponent } from "vue";
 import type { Organization } from "@/types/generatorobjects";
 import { useSystemStore } from "@/modules/stores/systemStore";
 import { BButton, BTooltip } from "bootstrap-vue-next";
-import { mapState } from "pinia";
 import type { apiError } from "@/modules/api/errors";
 import { useToast } from "bootstrap-vue-next";
 
@@ -55,11 +54,13 @@ export default defineComponent({
     <BButtonGroup style="border-radius: 8px">
       <BButton class="btn-secondary" @click="sStore.toggleTheme">
         <Icon
-          v-if="sStore.theme == 'light'"
-          icon="material-symbols:light-mode"
+          :icon="
+            sStore.theme == 'light'
+              ? 'material-symbols:light-mode'
+              : 'material-symbols:dark-mode'
+          "
           class="text-warning"
         />
-        <Icon v-else icon="material-symbols:dark-mode" class="text-info" />
       </BButton>
       <BDropdown
         v-if="sStore.logged_in"

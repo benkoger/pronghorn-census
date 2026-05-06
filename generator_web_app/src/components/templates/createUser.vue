@@ -35,16 +35,18 @@ const props = defineProps({
 });
 
 const invalidPassword = ref(false);
-const passwordReason = ref('');
+const passwordReason = ref("");
 const matchWord = ref("");
-const showPassword = ref(false)
+const showPassword = ref(false);
 
 const emit = defineEmits(["creationSuccessful"]);
 
 const usernameState = computed(() => {
   if (options.value.username.length == 0) return null;
   if (!(options.value.username.length > 2)) return false;
-  return /^(?!.*[._]{2})[a-zA-Z0-9][a-zA-Z0-9._]{1,18}[a-zA-Z0-9]$/.test(options.value.username);
+  return /^(?!.*[._]{2})[a-zA-Z0-9][a-zA-Z0-9._]{1,18}[a-zA-Z0-9]$/.test(
+    options.value.username,
+  );
 });
 
 const emailState = computed(() => {
@@ -60,7 +62,7 @@ const passwordState = computed(() => {
     return true;
   } else {
     invalidPassword.value = true;
-    passwordReason.value = 'Passwords do not match!';
+    passwordReason.value = "Passwords do not match!";
     return false;
   }
 });
@@ -72,9 +74,6 @@ const options = ref<createUserOptions>({
   organization_id: props.organization?.uuid,
   role_ids: props.role == undefined ? undefined : [props.role.uuid],
 });
-
-
-
 
 const submitReq = async () => {
   if (passwordState.value === false) {
@@ -92,7 +91,7 @@ const submitReq = async () => {
 
   create({
     title: `User ${options.value.username} created successfully`,
-    body: `The root user was created successfully`,
+    body: `The user was created successfully`,
     variant: "success",
     position: "bottom-start",
   });
@@ -108,8 +107,12 @@ const submitReq = async () => {
       <span>Email: {{ options.email }}</span>
     </div>
   </div>
-  <BForm autocomplete="off" data-bwignore="true" class="d-flex flex-column flex-grow-1 gap-4"
-    @submit.prevent="submitReq">
+  <BForm
+    autocomplete="off"
+    data-bwignore="true"
+    class="d-flex flex-column flex-grow-1 gap-4"
+    @submit.prevent="submitReq"
+  >
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
@@ -117,8 +120,16 @@ const submitReq = async () => {
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Username" label-for="username">
-        <BFormInput id="username" type="text" trim required data-bwignore="true" v-model="options.username"
-          placeholder=" " :state="usernameState" />
+        <BFormInput
+          id="username"
+          type="text"
+          trim
+          required
+          data-bwignore="true"
+          v-model="options.username"
+          placeholder=" "
+          :state="usernameState"
+        />
       </BFormFloatingLabel>
     </BInputGroup>
     <BInputGroup>
@@ -128,11 +139,24 @@ const submitReq = async () => {
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Email" label-for="email">
-        <BFormInput id="email" type="email" trim required data-bwignore="true" v-model="options.email" placeholder=" "
-          :state="emailState" />
+        <BFormInput
+          id="email"
+          type="email"
+          trim
+          required
+          data-bwignore="true"
+          v-model="options.email"
+          placeholder=" "
+          :state="emailState"
+        />
       </BFormFloatingLabel>
     </BInputGroup>
-    <BPopover title="Invalid Password" manual v-model="invalidPassword" placement="bottom-center">
+    <BPopover
+      title="Invalid Password"
+      manual
+      v-model="invalidPassword"
+      placement="bottom-center"
+    >
       <template #target>
         <BInputGroup>
           <template #prepend>
@@ -141,14 +165,37 @@ const submitReq = async () => {
             </BInputGroupText>
           </template>
           <BFormFloatingLabel label="Password" label-for="password">
-            <BFormInput id="password" :type="showPassword ? 'text' : 'password'" trim required data-bwignore="true"
-              v-model="options.password" placeholder=" " :state="passwordState" />
+            <BFormInput
+              id="password"
+              :type="showPassword ? 'text' : 'password'"
+              trim
+              required
+              data-bwignore="true"
+              v-model="options.password"
+              placeholder=" "
+              :state="passwordState"
+            />
           </BFormFloatingLabel>
-          <BFormFloatingLabel label="Verify Password" label-for="verify-password">
-            <BFormInput id="verify-password" :type="showPassword ? 'text' : 'password'" trim required
-              data-bwignore="true" v-model="matchWord" placeholder=" " :state="passwordState" />
+          <BFormFloatingLabel
+            label="Verify Password"
+            label-for="verify-password"
+          >
+            <BFormInput
+              id="verify-password"
+              :type="showPassword ? 'text' : 'password'"
+              trim
+              required
+              data-bwignore="true"
+              v-model="matchWord"
+              placeholder=" "
+              :state="passwordState"
+            />
           </BFormFloatingLabel>
-          <BInputGroupText role="button" @click="showPassword = !showPassword" style="cursor: pointer;">
+          <BInputGroupText
+            role="button"
+            @click="showPassword = !showPassword"
+            style="cursor: pointer"
+          >
             <Icon :icon="showPassword ? 'mdi:eye-off' : 'mdi:eye'" width="20" />
           </BInputGroupText>
         </BInputGroup>
@@ -162,7 +209,11 @@ const submitReq = async () => {
         </BInputGroupText>
       </template>
       <BFormSelect v-model="options.organization_id" id="organizations">
-        <BFormSelectOption v-for="org in Object.values(sStore.organizations)" :key="org.uuid" :value="org.uuid">
+        <BFormSelectOption
+          v-for="org in Object.values(sStore.organizations)"
+          :key="org.uuid"
+          :value="org.uuid"
+        >
           {{ org.name }}
         </BFormSelectOption>
       </BFormSelect>
