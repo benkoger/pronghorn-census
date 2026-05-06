@@ -24,3 +24,16 @@ export async function checkApiBootstrapped(): Promise<boolean> {
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function finishBootstrap(): Promise<boolean> {
+  const response = await fetch(`${api_url}/bootstrapped`, {
+    method: "POST",
+    credentials: "include"
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
+}

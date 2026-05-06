@@ -35,6 +35,7 @@ from database.object_models.core.images import (
     RAQuery,
     UpdateReviewedAreaReq,
 )
+from database.object_models.project_management.projects import createProjectReq
 from database.object_models.user_management.users import UserQuery
 
 from .errors import (
@@ -273,13 +274,17 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def set_bootstrapped(self, cursor: Cursor) -> bool:
+    def _set_bootstrapped(self, cursor: Cursor) -> bool:
         """ """
-        query = sql.SQL("UPDATE usermanagement.inizialization SET first_run = false")
+        query = sql.SQL("UPDATE usermanagement.initialization SET first_run = false")
 
         cursor.execute(query)
 
         return True
+
+    def set_bootstrapped(self) -> bool:
+        """ """
+        return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -999,30 +1004,60 @@ class Database:
     # Project Management - Projects
     @connect
     def _create_project(
-        self,
-        cursor: Cursor[Project],
-        name: str,
+        self, cursor: Cursor[Project], req: createProjectReq, user: User
     ) -> Project:
         """Internal helper function, do not call directly"""
+
+        query_1 = sql.SQL(
+            " INSERT INTO projectmanagement.projects (name) VALUES (%s) RETURNING *; "
+        )
+
+        query_2 = sql.SQL(""" 
+            INSERT INTO usermanagement.organizations_projects (project_id, organization_id) 
+            VALUES (%s, %s);
+        """)
+
+        query_3 = sql.SQL("""
+
+            INSERT INTO projectmanagement.projects_users (project_id, user_id, role_id)
+            VALUES (%s, %s, %s)
+                          """)
+
+        org = self._get_organization(cursor, req.organization_id)
+        role = self._get_role("admin")
+
         cursor.row_factory = class_row(Project)
         cursor.execute(
-            sql.SQL(
-                " INSERT INTO projectmanagement.projects (name) VALUES (%s) RETURNING *; "
-            ),
-            (name,),
+            query_1,
+            (req.name,),
         )
         project = cursor.fetchone()
         if project is None:
             raise Exception("Failed to create project")
+
+        cursor.execute(query_2, (project.project_id, org.organization_id))
+        cursor.execute(query_3, (project.project_id, user.user_id, role.role_id))
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "project",
+                    str(project.uuid),
+                    "organization",
+                    str(org.uuid),
+                    "parent",
+                ),
+                self.create_spice_update(
+                    "project", str(project.uuid), "user", user.id, "member"
+                ),
+            ]
+        )
+
         return project
 
-    def create_project(self, name: str) -> Project:
-        """Insert a new project object into the database
-
-        Args:
-                name: The name of the project you want to create
-        """
-        return self._create_project(name=name)
+    def create_project(self, req: createProjectReq, user: User) -> Project:
+        """ """
+        return self._create_project(req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

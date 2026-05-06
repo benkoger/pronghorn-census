@@ -6,6 +6,7 @@
 from uuid import UUID
 
 from database.errors import AuthorizationFailure
+from database.object_models.project_management.projects import createProjectReq
 from database.object_models.user_management import User, Organization
 from flask import Blueprint, abort, current_app, session
 from flask_login import login_required, current_user
@@ -153,3 +154,22 @@ def get_herd_units(project_id: str):
         abort(500)
 
     return [herd_unit.to_dict() for herd_unit in herd_units], 200
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# POST
+
+
+@projectBp.post("")
+@login_required
+@permission_required("access")
+@validate()
+def create(body: createProjectReq):
+    """ """
+    try:
+        project = base.create_project(body, cast(User, current_user))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return project.to_dict(), 201

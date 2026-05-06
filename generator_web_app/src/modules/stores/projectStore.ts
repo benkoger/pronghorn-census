@@ -17,6 +17,8 @@ import {
   getProjectModels,
   getAllProjects,
   getProjectHerdUnits,
+  type createProjectOptions,
+  createProject,
 } from "@/modules/api/projects.ts";
 import { createHerdUnit, getHerdUnitSurveys } from "@/modules/api/herdunits.ts";
 import { getModelSchema } from "@/modules/api/models.ts";
@@ -110,6 +112,14 @@ export const useProjectStore = defineStore("pStore", {
     get_label_by_id(id: string) {
       if (this.labels)
         return this.labels.find((label) => label.uuid === id) as Label;
+    },
+    async create_project(options: createProjectOptions): Promise<boolean> {
+      const project = await createProject(options);
+
+      if (project == undefined) return false;
+
+      this.projects.push(project);
+      return true;
     },
     async get_project_models() {
       if (this.CurrentProject)

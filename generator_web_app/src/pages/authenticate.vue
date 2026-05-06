@@ -1,6 +1,6 @@
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useUserStore } from "@/modules/stores/userStore.ts";
+import { useSystemStore } from "@/modules/stores/systemStore.ts";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "bootstrap-vue-next";
 import { api_url } from "@/modules/api/apiV1Methods.ts";
@@ -9,14 +9,14 @@ import type { apiError } from "@/modules/api/errors";
 export default defineComponent({
   name: "Authenticate",
   setup() {
-    const uStore = useUserStore();
+    const sStore = useSystemStore();
     const router = useRouter();
     const route = useRoute();
     const redirection_path = route.query.redirect as string;
 
     const { create } = useToast();
 
-    return { uStore, router, route, redirection_path, create };
+    return { sStore, router, route, redirection_path, create };
   },
   data() {
     return {
@@ -26,7 +26,7 @@ export default defineComponent({
     };
   },
   async mounted() {
-    if (this.uStore.logged_in == true) {
+    if (this.sStore.logged_in == true) {
       this.router.push("/");
     }
     this.create({
@@ -38,18 +38,18 @@ export default defineComponent({
   },
   methods: {
     async submitAuthRequest() {
-      await this.uStore
+      await this.sStore
         .authenticate(this.email, this.password)
         .catch((e: apiError) => {
           this.create({
             title: `${e.error}`,
-            message: `${e.code}: ${e.message}`,
+            body: `${e.code}: ${e.message}`,
             variant: "danger",
             position: "bottom-start",
           });
           return;
         });
-      if (this.uStore.logged_in) {
+      if (this.sStore.logged_in) {
         if (this.redirection_path) {
           this.router.push(this.redirection_path);
         } else {

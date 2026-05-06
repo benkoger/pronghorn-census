@@ -17,9 +17,10 @@ permission is_root = platform->root
 
 definition project {
   relation parent: organization
+  relation member: user
 
   permission is_root = parent->is_root
-  permission access = parent->access + is_root
+  permission access = member + parent->access + is_root
 }
 
 definition herd_unit {

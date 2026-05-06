@@ -205,9 +205,9 @@ def get_annotations(image_id: str):
 
 
 @imageBp.post("")
-@validate()
 @login_required
 @permission_required("access")
+@validate()
 def create(body: CreateImageReq):
     """
     Create a new image object.
