@@ -17,7 +17,6 @@ services:
         source: ./local_db/restore.sh
         target: /docker-entrypoint-initdb.d/restore.sh
       - ./local_db/pct_b:/pct_b:Z
-      - ./local_db/sdbt:/sdbt:Z
     networks:
       - dev_pronghorn_app_network
     ports:

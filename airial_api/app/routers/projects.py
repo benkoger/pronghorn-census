@@ -71,9 +71,6 @@ def get_by_id(project_id: str):
     """
     try:
         project = base.get_project(UUID(project_id))
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, str(e))
     except ObjectNotFound as e:
         current_app.logger.exception(e)
         abort(404, str(e))
@@ -109,9 +106,6 @@ def get_models(project_id: str):
     """
     try:
         models = base.get_project_models(UUID(project_id))
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, str(e))
     except ObjectNotFound as e:
         current_app.logger.exception(e)
         abort(404, str(e))
@@ -145,15 +139,34 @@ def get_herd_units(project_id: str):
     """
     try:
         herd_units = base.get_project_herd_units(UUID(project_id))
-    except ValueError as e:
-        abort(400, str(e))
     except ObjectNotFound as e:
+        current_app.logger.exception(e)
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     return [herd_unit.to_dict() for herd_unit in herd_units], 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+
+@projectBp.get("/<string:project_id>/schemas")
+@login_required
+@permission_required("access")
+def get_surveys(project_id: str):
+    """ """
+    try:
+        schemas = base.get_project_schemas(UUID(project_id))
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return [schema.to_dict() for schema in schemas], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -168,8 +181,30 @@ def create(body: createProjectReq):
     """ """
     try:
         project = base.create_project(body, cast(User, current_user))
+
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
 
     return project.to_dict(), 201
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# DELETE
+
+
+@projectBp.delete("/<string:project_id>")
+@login_required
+@permission_required("access")
+def delete(project_id: str):
+    """ """
+    try:
+        base.delete_project(UUID(project_id))
+
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+
+    return "", 204

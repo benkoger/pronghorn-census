@@ -140,18 +140,6 @@ def get_schema(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.get("/<string:model_id>/predictions")
-@login_required
-@permission_required("access")
-def get_predictions():
-    """ """
-    score_range = request.args.get("score_range", None)
-    return ""
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 @modelBp.get("/training")
 @login_required
 @permission_required("access")

@@ -63,10 +63,9 @@ const UserCreationFinished = async () => {
 };
 
 const projectCreationFinished = async () => {
-
   sStore.bootstrapped = await finishBootstrap();
 
-  router.push({ name: 'dashboard' });
+  router.push({ name: "dashboard" });
 };
 </script>
 <template>
@@ -74,8 +73,17 @@ const projectCreationFinished = async () => {
     <BRow align-v="center" align-h="center" class="h-100">
       <BCol lg="10">
         <BCard no-body class="mx-auto shadow" style="height: 80vh">
-          <BTabs pills card vertical v-model:index="tabIndex" v-model="tabId" nav-wrapper-class="col-3 h-100"
-            nav-class="w-100" tab-class="w-100" class="flex-grow-1 overflow-hidden h-100">
+          <BTabs
+            pills
+            card
+            vertical
+            v-model:index="tabIndex"
+            v-model="tabId"
+            nav-wrapper-class="col-3 h-100"
+            nav-class="w-100"
+            tab-class="w-100"
+            class="flex-grow-1 overflow-hidden h-100"
+          >
             <BTab title="Welcome to Airial">
               <BCardTitle>Welcome to Airial Survey Tools</BCardTitle>
               <BCardText>
@@ -103,8 +111,12 @@ const projectCreationFinished = async () => {
                   to all organizations, projects, and data inside the instance.
                   This account should not be used for regular activities.
                 </BCardText>
-                <CreateUser :submit-action="sStore.create_super_user" @creation-successful="superUserCreationFinished"
-                  :super-user="true" :login="true" />
+                <CreateUser
+                  :submit-action="sStore.create_super_user"
+                  @creation-successful="superUserCreationFinished"
+                  :super-user="true"
+                  :login="true"
+                />
               </div>
             </BTab>
             <BTab title="Organization" :disabled="!superUserCreated" lazy>
@@ -115,11 +127,17 @@ const projectCreationFinished = async () => {
                   eachother by default. Airial is designed to allow multiple
                   organizations to exist in the same space.
                 </BCardText>
-                <CreateOrganization :submit-action="sStore.create_organization"
-                  @creationSuccessful="OrganizationCreationFinished" />
+                <CreateOrganization
+                  :submit-action="sStore.create_organization"
+                  @creationSuccessful="OrganizationCreationFinished"
+                />
               </div>
             </BTab>
-            <BTab title="User" :disabled="!superUserCreated && !organizationCreated" lazy>
+            <BTab
+              title="User"
+              :disabled="!superUserCreated && !organizationCreated"
+              lazy
+            >
               <div class="d-flex flex-column h-100">
                 <BCardTitle>User</BCardTitle>
                 <BCardText>
@@ -128,12 +146,20 @@ const projectCreationFinished = async () => {
                   "regular" user. This user will be an adminstrator in the
                   organization you just created.
                 </BCardText>
-                <CreateUser :submit-action="sStore.create_user" :login="true" :organization="sStore.organizations[2]"
+                <CreateUser
+                  :submit-action="sStore.create_user"
+                  :login="true"
+                  :organization="sStore.organizations[2]"
                   :role="sStore.roles.find((role) => role.name == 'admin')"
-                  @creation-successful="UserCreationFinished" />
+                  @creation-successful="UserCreationFinished"
+                />
               </div>
             </BTab>
-            <BTab title="Project" lazy :disabled="!superUserCreated && !organizationCreated">
+            <BTab
+              title="Project"
+              lazy
+              :disabled="!superUserCreated && !organizationCreated"
+            >
               <div class="d-flex flex-column h-100">
                 <BCardTitle>Creating your first project</BCardTitle>
                 <BCardText>
@@ -143,21 +169,32 @@ const projectCreationFinished = async () => {
                   datasets and models between themselves, and projects can be
                   shared between organizations too.
                 </BCardText>
-                <CreateProject :submit-action="pStore.create_project" :user="sStore.user as User"
+                <CreateProject
+                  :submit-action="pStore.create_project"
+                  :user="sStore.user as User"
                   :organization="sStore.CurrentOrganization as Organization"
-                  @creation-successful="projectCreationFinished" />
+                  @creation-successful="projectCreationFinished"
+                />
               </div>
             </BTab>
           </BTabs>
           <template #footer>
             <div class="d-flex justify-content-between">
-              <BButton variant="secondary" @click="previousStep" :disabled="tabIndex == 0">
+              <BButton
+                variant="secondary"
+                @click="previousStep"
+                :disabled="tabIndex == 0"
+              >
                 Previous Step
               </BButton>
               <span class="d-flex align-items-center">
                 {{ tabIndex + 1 }} of {{ numTabs }} steps
               </span>
-              <BButton variant="primary" @click="nextStep" :disabled="tabIndex == 3">
+              <BButton
+                variant="primary"
+                @click="nextStep"
+                :disabled="tabIndex == 3"
+              >
                 Next Step
               </BButton>
             </div>

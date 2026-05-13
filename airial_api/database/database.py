@@ -26,7 +26,7 @@ from authzed.api.v1 import (
 from grpc import ChannelCredentials
 from psycopg import Cursor
 from psycopg.errors import DatabaseError
-from psycopg.rows import class_row, dict_row
+from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash
 
@@ -681,7 +681,6 @@ class Database:
         if not user:
             raise FailedToCreate("user")
 
-        # Organizations and Ids should be equal length and appear in the same order
         if not req.role_ids:
             raise FailedToCreate("user")
 
@@ -1048,7 +1047,7 @@ class Database:
                     "parent",
                 ),
                 self.create_spice_update(
-                    "project", str(project.uuid), "user", user.id, "member"
+                    "project", str(project.uuid), "user", user.id, "annotator"
                 ),
             ]
         )
@@ -1236,18 +1235,13 @@ class Database:
 
     @connect
     def _delete_project(
-        self, cursor: Cursor[Project], project_id: Project | int | UUID
-    ) -> bool:
+        self, cursor: Cursor[Project], project_id: Union[int, UUID]
+    ) -> None:
         """Internal helper function, do not call directly"""
         query = sql.SQL(
             " DELETE FROM projectmanagement.projects WHERE {id_field} = %s; "
         )
         match project_id:
-            case Project():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")),
-                    (project_id.project_id,),
-                )
             case int():
                 cursor.execute(
                     query.format(id_field=sql.Identifier("project_id")), (project_id,)
@@ -1257,9 +1251,10 @@ class Database:
                     query.format(id_field=sql.Identifier("uuid")), (project_id,)
                 )
 
-        return True if cursor.rowcount > 0 else False
+        if cursor.rowcount == 0:
+            raise ObjectNotFound("Project", str(project_id))
 
-    def delete_project(self, project_id: Project | int | UUID) -> bool:
+    def delete_project(self, project_id: Union[int, UUID]) -> None:
         """Delete a project object from the database
 
         Args:
@@ -1327,9 +1322,7 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_schema_labels(
-        self, cursor: Cursor[Label], schema_id: int | UUID
-    ) -> list[Label]:
+    def _get_schema_labels(self, cursor: Cursor[Label], schema_id: UUID) -> List[Label]:
         """ """
         schema = self._get_schema(cursor, schema_id)
         query = sql.SQL(
@@ -1337,15 +1330,28 @@ class Database:
         )
 
         cursor.row_factory = class_row(Label)
-        cursor.execute(query, (schema.schema_id,))
-        labels = cursor.fetchall()
-        if len(labels) == 0:
-            raise ObjectNotFound("labels for schema", str(schema_id))
-        return labels
+        return cursor.execute(query, (schema.schema_id,)).fetchall()
 
-    def get_schema_labels(self, schema_id: UUID) -> list[Label]:
+    def get_schema_labels(self, schema_id: UUID) -> List[Label]:
         """ """
         return self._get_schema_labels(schema_id)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_schema_models(self, cursor: Cursor[Model], schema_id: UUID) -> List[Model]:
+        """ """
+        schema = self._get_schema(cursor, schema_id)
+        query = sql.SQL(
+            " SELECT * FROM projectmanagement.models WHERE schema_id = %s; "
+        )
+
+        cursor.row_factory = class_row(Model)
+        return cursor.execute(query, (schema.schema_id,)).fetchall()
+
+    def get_schema_models(self, schema_id: UUID) -> List[Model]:
+        """ """
+        return self._get_schema_models(schema_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1753,10 +1759,9 @@ class Database:
 			SELECT S.* FROM projectmanagement.surveys as S JOIN
 			projectmanagement.surveys_herd_units AS SHU ON SHU.survey_id = S.survey_id
 			WHERE SHU.herd_unit_id = %s; """)
+
         cursor.execute(query, (herd_unit.herd_unit_id,))
         surveys = cursor.fetchall()
-        if len(surveys) == 0:
-            raise ObjectNotFound("Surveys for herd unit", str(herd_unit_id))
 
         return surveys
 
@@ -1811,38 +1816,19 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _delete_herd_unit(
-        self, cursor: Cursor[HerdUnit], herd_unit_ids: HerdUnit | int | UUID
-    ) -> bool:
+    def _delete_herd_unit(self, cursor: Cursor[HerdUnit], herd_unit_id: UUID) -> bool:
         """Internal helper function, do not call directly"""
         query = sql.SQL(
             " DELETE FROM projectmanagement.herd_units WHERE {id_field} = %s; "
         )
-        match herd_unit_ids:
-            case HerdUnit():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_ids.herd_unit_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_ids,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (herd_unit_ids,)
-                )
+
+        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (herd_unit_id,))
 
         return True if cursor.rowcount > 0 else False
 
-    def delete_herd_unit(self, herd_unit_ids: HerdUnit | int | UUID) -> bool:
-        """Delete a herd unit object from the database
-
-        Args:
-                herd_unit_id: either a herd unit object, a database id, or a universally unique identifier
-        """
-        return self._delete_herd_unit(herd_unit_ids=herd_unit_ids)
+    def delete_herd_unit(self, herd_unit_id: UUID) -> bool:
+        """Delete a herd unit object from the database"""
+        return self._delete_herd_unit(herd_unit_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Project Management - Models
@@ -3400,15 +3386,9 @@ class Database:
         schemas = cursor.fetchall()
         return schemas
 
-    def get_project_schemas(self, project_id: UUID, user: User) -> list[Schema]:
+    def get_project_schemas(self, project_id: UUID) -> list[Schema]:
         """ """
-        res = self.check_permission("project", str(project_id), str(user.uuid), "view")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_project_schemas(project_id=project_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "view", "project", str(project_id)
-            )
+        return self._get_project_schemas(project_id=project_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Relationship Management - projectmanagement <-> projectmanagement: surveys <-> herdunits
@@ -3614,25 +3594,39 @@ class Database:
 
     @connect
     def _get_survey_images(
-        self, cursor: Cursor[Image], survey_id: Survey | int | UUID
-    ) -> list[Image] | Image:
+        self, cursor: Cursor[Any], survey_id: UUID, limit: int, offset: int
+    ) -> Tuple[List[Image], int]:
         """ """
+
+        query_1 = sql.SQL("SELECT COUNT(*) FROM core.images WHERE survey_id = %s")
+        query_2 = sql.SQL(""" 
+            SELECT * FROM core.images 
+            WHERE survey_id = %s
+            ORDER BY image_id ASC 
+            LIMIT %s OFFSET %s; 
+        """)
+
+        survey = self._get_survey(cursor, survey_id)
+
+        cursor.row_factory = tuple_row
+        res = cursor.execute(query_1, (survey.survey_id,)).fetchone()
+
+        if not res:
+            return [], 0
+
+        total_images = int(res[0])
+
         cursor.row_factory = class_row(Image)
-        query = sql.SQL(" SELECT * FROM core.images WHERE survey_id = %s; ")
-        match survey_id:
-            case Survey():
-                cursor.execute(query, (survey_id.survey_id,))
-            case int():
-                cursor.execute(query, (survey_id,))
-            case UUID():
-                survey = self._get_survey(survey_id)
-                cursor.execute(query, (survey.survey_id,))
 
-        return cursor.fetchall()
+        images = cursor.execute(query_2, (survey.survey_id, limit, offset)).fetchall()
 
-    def get_survey_images(self, survey_id: Survey | int | UUID) -> list[Image]:
+        return images, total_images
+
+    def get_survey_images(
+        self, survey_id: UUID, limit: int, offset: int
+    ) -> Tuple[list[Image], int]:
         """ """
-        return self._get_survey_images(survey_id=survey_id)
+        return self._get_survey_images(survey_id, limit, offset)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Functionality - Get crops to review

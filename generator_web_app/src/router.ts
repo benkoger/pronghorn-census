@@ -84,6 +84,15 @@ const router = createRouter({
         requiresNoLayout: false,
       },
     },
+    {
+      path: "/data",
+      name: "data-manager",
+      component: () => import("@/pages/dataManager.vue"),
+      meta: {
+        requiresAuth: true,
+        requiresNoLayout: false,
+      },
+    },
   ],
 });
 

@@ -32,20 +32,22 @@ export async function getHerdUnitSurveys(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
+export interface createHerdUnitOptions {
+  project_id: string;
+  name: string
+};
+
 export async function createHerdUnit(
-  project_id: string,
-  name: string,
+  options: createHerdUnitOptions,
 ): Promise<HerdUnit> {
+  console.log(options);
   const response = await fetch(`${api_url}/herd-units`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      project_id: project_id,
-      name: name,
-    }),
+    body: JSON.stringify(options),
   });
   if (!response.ok) throw new ApiError(await response.json());
 

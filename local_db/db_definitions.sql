@@ -280,6 +280,84 @@ CREATE INDEX ON "projectmanagement"."surveys" ("uuid");
 
 CREATE INDEX ON "projectmanagement"."surveys" ("created");
 
+ALTER TABLE "core"."images" ADD FOREIGN KEY ("herd_unit_id") REFERENCES "projectmanagement"."herd_units" ("herd_unit_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."images" ADD FOREIGN KEY ("opened_by_user_id") REFERENCES "usermanagement"."users" ("user_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."images" ADD FOREIGN KEY ("survey_id") REFERENCES "projectmanagement"."surveys" ("survey_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."predictions" ADD FOREIGN KEY ("image_id") REFERENCES "core"."images" ("image_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."predictions" ADD FOREIGN KEY ("model_id") REFERENCES "projectmanagement"."models" ("model_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."predictions" ADD FOREIGN KEY ("reviewed_by_user_id") REFERENCES "usermanagement"."users" ("user_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."reviewed_area" ADD FOREIGN KEY ("image_id") REFERENCES "core"."images" ("image_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."reviewed_area" ADD FOREIGN KEY ("reviewed_by_user_id") REFERENCES "usermanagement"."users" ("user_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."annotations" ADD FOREIGN KEY ("image_id") REFERENCES "core"."images" ("image_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."annotations" ADD FOREIGN KEY ("label_id") REFERENCES "projectmanagement"."labels" ("label_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."annotations" ADD FOREIGN KEY ("pred_id") REFERENCES "core"."predictions" ("pred_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."labels" ADD FOREIGN KEY ("schema_id") REFERENCES "projectmanagement"."schemas" ("schema_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."models" ADD FOREIGN KEY ("schema_id") REFERENCES "projectmanagement"."schemas" ("schema_id") ON DELETE SET DEFAULT ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."training" ADD FOREIGN KEY ("model_id") REFERENCES "projectmanagement"."models" ("model_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."training" ADD FOREIGN KEY ("reviewed_area_id") REFERENCES "core"."reviewed_area" ("reviewed_area_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."annotations_reviewed_area" ADD FOREIGN KEY ("annotation_id") REFERENCES "core"."annotations" ("annotation_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "core"."annotations_reviewed_area" ADD FOREIGN KEY ("reviewed_area_id") REFERENCES "core"."reviewed_area" ("reviewed_area_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "usermanagement"."organizations_projects" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "usermanagement"."organizations_projects" ADD FOREIGN KEY ("organization_id") REFERENCES "usermanagement"."organizations" ("organization_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "usermanagement"."organizations_users" ADD FOREIGN KEY ("user_id") REFERENCES "usermanagement"."users" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "usermanagement"."organizations_users" ADD FOREIGN KEY ("organization_id") REFERENCES "usermanagement"."organizations" ("organization_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "usermanagement"."organizations_users" ADD FOREIGN KEY ("role_id") REFERENCES "usermanagement"."roles" ("role_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_users" ADD FOREIGN KEY ("user_id") REFERENCES "usermanagement"."users" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_users" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_users" ADD FOREIGN KEY ("role_id") REFERENCES "usermanagement"."roles" ("role_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_schemas" ADD FOREIGN KEY ("schema_id") REFERENCES "projectmanagement"."schemas" ("schema_id") ON DELETE SET NULL ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_schemas" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_herd_units" ADD FOREIGN KEY ("herd_unit_id") REFERENCES "projectmanagement"."herd_units" ("herd_unit_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_herd_units" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_models" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_models" ADD FOREIGN KEY ("model_id") REFERENCES "projectmanagement"."models" ("model_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."surveys_models" ADD FOREIGN KEY ("survey_id") REFERENCES "projectmanagement"."surveys" ("survey_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."surveys_models" ADD FOREIGN KEY ("model_id") REFERENCES "projectmanagement"."models" ("model_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."herd_units_models" ADD FOREIGN KEY ("herd_unit_id") REFERENCES "projectmanagement"."herd_units" ("herd_unit_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."herd_units_models" ADD FOREIGN KEY ("model_id") REFERENCES "projectmanagement"."models" ("model_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_surveys" ADD FOREIGN KEY ("survey_id") REFERENCES "projectmanagement"."surveys" ("survey_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."projects_surveys" ADD FOREIGN KEY ("project_id") REFERENCES "projectmanagement"."projects" ("project_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."surveys_herd_units" ADD FOREIGN KEY ("survey_id") REFERENCES "projectmanagement"."surveys" ("survey_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "projectmanagement"."surveys_herd_units" ADD FOREIGN KEY ("herd_unit_id") REFERENCES "projectmanagement"."herd_units" ("herd_unit_id") ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY IMMEDIATE;
+
 -- 1. BASE ENTITIES
 INSERT INTO usermanagement.users (user_id, username, email, status, created, modified) 
 VALUES (0, 'NO_USER', 'none@system.local', 'DISABLED', now(), now());

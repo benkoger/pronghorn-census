@@ -3,11 +3,12 @@
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Project, Model, HerdUnit } from "@/types/generatorobjects.ts";
+import { Project, Model, HerdUnit, Schema } from "@/types/generatorobjects.ts";
 import type {
   ProjectIntf,
   ModelIntf,
   HerdUnitIntf,
+  SchemaIntf,
 } from "@/types/generatorobjects.ts";
 import { ApiError } from "@/modules/api/errors.ts";
 import { api_url } from "@/modules/api/apiV1Methods.ts";
@@ -22,8 +23,11 @@ export async function getAllProjects(): Promise<Project[]> {
       "Content-Type": "application/json",
     },
   });
+
   if (!response.ok) throw new ApiError(await response.json());
+
   const resp = await response.json();
+
   let projects = [];
   for (const project of resp)
     projects.push(new Project(project as ProjectIntf));
@@ -61,6 +65,7 @@ export async function getProjectHerdUnits(
       "Content-Type": "application/json",
     },
   });
+
   if (!response.ok) throw new ApiError(await response.json());
 
   const resp = await response.json();
@@ -70,6 +75,31 @@ export async function getProjectHerdUnits(
 
   return herd_units;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function getProjectSchemas(
+  project_id: string,
+): Promise<Schema[]> {
+  const response = await fetch(`${api_url}/projects/${project_id}/schemas`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+  let schemas = [];
+  for (const schema of resp)
+    schemas.push(new Schema(schema as SchemaIntf))
+
+  return schemas;
+}
+
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // POST
@@ -93,4 +123,20 @@ export async function createProject(
   if (!response.ok) throw new ApiError(await response.json());
 
   return new Project((await response.json()) as ProjectIntf);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function deleteProject(project_id: string): Promise<boolean> {
+  const response = await fetch(`${api_url}/projects/${project_id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
 }

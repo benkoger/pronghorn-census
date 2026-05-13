@@ -3,24 +3,49 @@
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Schema, Label } from '@/types/generatorobjects.ts';
-import type { SchemaIntf, LabelIntf } from '@/types/generatorobjects.ts';
+import { Label, Model } from '@/types/generatorobjects.ts';
+import type { LabelIntf, ModelIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function getSchemaLabels(schema_id: string): Promise<Label[]> {
-    const response = await fetch(`${api_url}/schemas/${schema_id}/labels`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-    });
-    if (!response.ok) throw new ApiError(await response.json());
-    const resp = await response.json();
-    let labels = [];
-    for (const label of resp) labels.push(new Label(label as Label));
-    return labels;
+  const response = await fetch(`${api_url}/schemas/${schema_id}/labels`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+  let labels = [];
+
+  for (const label of resp) labels.push(new Label(label as LabelIntf));
+
+  return labels;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function getSchemaModels(schema_id: string): Promise<Model[]> {
+  const response = await fetch(`${api_url}/schemas/${schema_id}/models`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "content-Type": "application/json"
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+  let models = [];
+
+  for (const model of resp) models.push(new Model(model as ModelIntf));
+
+  return models;
 }

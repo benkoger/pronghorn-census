@@ -5,7 +5,6 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "bootstrap-vue-next";
 import { api_url } from "@/modules/api/apiV1Methods.ts";
 import type { apiError } from "@/modules/api/errors";
-import { template } from "lodash";
 
 const sStore = useSystemStore();
 const router = useRouter();
@@ -55,7 +54,7 @@ onMounted(() => {
 <template>
   <BContainer class="h-100">
     <BRow align-v="center" align-h="center" class="h-100">
-      <BCol lg="4">
+      <BCol cols="6">
         <div class="shadow-sm rounded-3">
           <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 m-0">
             Authenticate

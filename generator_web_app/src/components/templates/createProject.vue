@@ -22,6 +22,10 @@ const props = defineProps({
     type: Organization,
     required: true,
   },
+  showSummary: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits(["creationSuccessful"]);
@@ -50,10 +54,11 @@ const submitReq = async () => {
   });
 
   emit("creationSuccessful");
+  options.value.name = "";
 };
 </script>
 <template>
-  <div class="d-flex mb-3">
+  <div class="d-flex mb-3" v-if="props.showSummary">
     <Icon icon="ix:projects" width="15%" height="100%" />
     <div class="d-flex flex-column">
       <span>Name: {{ options.name }}</span>
@@ -61,12 +66,8 @@ const submitReq = async () => {
       <span>Administrator: {{ props.user.username }}</span>
     </div>
   </div>
-  <BForm
-    class="d-flex gap-4 flex-column flex-grow-1"
-    autocomplete="off"
-    data-bwignore="true"
-    @submit.prevent="submitReq"
-  >
+  <BForm class="d-flex gap-4 flex-column flex-grow-1" autocomplete="off" data-bwignore="true"
+    @submit.prevent="submitReq">
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
@@ -74,15 +75,7 @@ const submitReq = async () => {
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Name" label-for="name">
-        <BFormInput
-          type="text"
-          id="name"
-          required
-          trim
-          data-bwignore="true"
-          v-model="options.name"
-          placeholder=" "
-        />
+        <BFormInput type="text" id="name" required trim data-bwignore="true" v-model="options.name" placeholder=" " />
       </BFormFloatingLabel>
     </BInputGroup>
     <BButton type="submit" variant="primary" class="mt-auto">Submit</BButton>

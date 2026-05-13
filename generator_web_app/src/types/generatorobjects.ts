@@ -566,6 +566,12 @@ export interface cropVerifierBatch {
   };
 }
 
+
+export interface imageRecords {
+  images: { [image_uuid: string]: Image };
+  total_images: number;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export default {};

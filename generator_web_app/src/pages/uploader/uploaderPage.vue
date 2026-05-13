@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, defineAsyncComponent, ref } from "vue";
+import { defineComponent, defineAsyncComponent } from "vue";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { Project, HerdUnit } from "@/types/generatorobjects";
 import { mapState } from "pinia";
@@ -47,13 +47,10 @@ export default defineComponent({
       switch (this.currentStep) {
         case 0:
           return this.CurrentProject !== undefined;
-          break;
         case 1:
           return this.CurrentHerdUnit !== undefined;
-          break;
         case 2:
           return this.CurrentSurvey !== undefined;
-          break;
         default:
           return false;
       }
@@ -227,4 +224,3 @@ export default defineComponent({
     <Upload v-if="currentStep === 3" />
   </BreadCrumb>
 </template>
-

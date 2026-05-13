@@ -5,9 +5,8 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort
-from flask_login import login_required, current_user
-from typing import cast
+from flask import Blueprint, abort, current_app
+from flask_login import login_required
 from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
@@ -24,7 +23,7 @@ schemaBp = Blueprint("schemas", __name__, url_prefix="/api/v1/schemas")
 @schemaBp.get("/<string:schema_id>/labels")
 @login_required
 @permission_required("access")
-def get_crops(schema_id: str):
+def get_labels(schema_id: str):
     """
     Retrieve labels for a schema
     ---
@@ -38,17 +37,37 @@ def get_crops(schema_id: str):
     """
     try:
         labels = base.get_schema_labels(UUID(schema_id))
-    except ValueError as e:
-        abort(400, str(e))
     except ObjectNotFound as e:
+        current_app.logger.exception(e)
         abort(404, str(e))
     except AuthorizationFailure as e:
+        current_app.logger.exception(e)
         abort(401, str(e))
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     return [label.to_dict() for label in labels], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@schemaBp.get("<string:schema_id>/models")
+@login_required
+@permission_required("access")
+def get_models(schema_id: str):
+    """ """
+    try:
+        models = base.get_schema_models(UUID(schema_id))
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except AuthorizationFailure as e:
+        current_app.logger.exception(e)
+        abort(401, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return [model.to_dict() for model in models], 200

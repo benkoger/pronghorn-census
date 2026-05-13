@@ -16,6 +16,8 @@ from flask_login import (
 )
 from uuid import UUID
 
+from database.object_models.project_management.surveys import SurveyImageQuery
+
 surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -93,14 +95,25 @@ def get_herd_units(survey_id: str):
 
 @surveyBp.get("/<string:survey_id>/images")
 @login_required
-def get_images(survey_id: str):
+@permission_required("access")
+@validate()
+def get_images(query: SurveyImageQuery, survey_id: str):
     """ """
+    offset = (query.page - 1) * query.per_page
     try:
-        images = base.get_survey_images(UUID(survey_id))
-    except (DatabaseError, Exception):
+        images, total_images = base.get_survey_images(
+            UUID(survey_id), query.per_page, offset
+        )
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
-    return [image.to_dict() for image in images], 200
+    return {
+        "images": [image.to_dict() for image in images],
+        "total": total_images,
+        "page": query.page,
+        "per_page": query.per_page,
+    }, 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
