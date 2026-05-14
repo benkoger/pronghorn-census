@@ -67,11 +67,15 @@ const submitReq = async () => {
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
+<<<<<<< HEAD
           <Icon
             icon="fluent:rename-16-regular"
             fluent:rename-16-regular
             width="24"
           />
+=======
+          <Icon icon="fluent:rename-16-regular" width="24" />
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Name" label-for="name">

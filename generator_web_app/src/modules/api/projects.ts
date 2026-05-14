@@ -86,6 +86,7 @@ export async function getProjectSchemas(project_id: string): Promise<Schema[]> {
       "Content-Type": "application/json",
     },
   });
+<<<<<<< HEAD
 
   if (!response.ok) throw new ApiError(await response.json());
 
@@ -136,6 +137,18 @@ export async function getProjectPredictionCount(
   return (await response.json()).count;
 }
 
+=======
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+  let schemas = [];
+  for (const schema of resp) schemas.push(new Schema(schema as SchemaIntf));
+
+  return schemas;
+}
+
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 // ---------------------------------------------------------------------------------------------------------------------------
 // POST
 

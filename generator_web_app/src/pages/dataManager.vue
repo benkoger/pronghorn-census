@@ -8,7 +8,10 @@ import type {
   HerdUnit,
   Survey,
   Image,
+<<<<<<< HEAD
   Schema,
+=======
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
   Project,
   Model,
 } from "@/types/generatorobjects";
@@ -17,12 +20,15 @@ import CreateProject from "@/components/templates/createProject.vue";
 import CreateHerdUnit from "@/components/templates/createHerdUnit.vue";
 import CreateSchema from "@/components/templates/createSchema.vue";
 import CreateSurvey from "@/components/templates/createSurvey.vue";
+<<<<<<< HEAD
 import CreateModel from "@/components/templates/createModel.vue";
 import CreateLabel from "@/components/templates/createLabel.vue";
 import {
   getProjectImageCount,
   getProjectPredictionCount,
 } from "@/modules/api/projects";
+=======
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 
 const pStore = useProjectStore();
 const sStore = useSystemStore();
@@ -30,9 +36,12 @@ const sStore = useSystemStore();
 const tabIndex = ref(0);
 const perPage = ref(8);
 
+<<<<<<< HEAD
 const imageCount = ref(0);
 const predictionCount = ref(0);
 
+=======
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 pStore.$reset();
 
 watch(
@@ -41,10 +50,13 @@ watch(
     if (newValue != oldValue && newValue != undefined) {
       await pStore.get_project_herd_units();
       await pStore.get_project_models();
+<<<<<<< HEAD
       await pStore.get_project_schemas();
 
       imageCount.value = await getProjectImageCount(newValue.uuid);
       predictionCount.value = await getProjectPredictionCount(newValue.uuid);
+=======
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
     }
   },
 );
@@ -68,6 +80,18 @@ watch(
     }
   },
 );
+<<<<<<< HEAD
+=======
+
+watch(
+  () => pStore.CurrentModel,
+  async (newValue, oldValue) => {
+    if (newValue != oldValue && newValue != undefined) {
+      await pStore.get_model_schema();
+    }
+  },
+);
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 
 watch(
   () => pStore.CurrentSchema,
@@ -126,12 +150,17 @@ const moveToImage = (image: Image) => {
                 :delete-action="pStore.delete_project"
               >
                 <template #create="{ Finished }">
+<<<<<<< HEAD
                   <CreateProject
                     :submit-action="pStore.create_project"
                     :user="sStore.CurrentUser as User"
                     :organization="sStore.CurrentOrganization as Organization"
                     @creation-successful="Finished"
                   />
+=======
+                  <CreateProject :submit-action="pStore.create_project" :user="sStore.CurrentUser as User"
+                    :organization="sStore.CurrentOrganization as Organization" @creation-successful="Finished" />
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                 </template>
               </SelectorList>
             </BCol>
@@ -154,6 +183,7 @@ const moveToImage = (image: Image) => {
               <BTabs pills fill>
                 <BTab title="Herd Units" lazy>
                   <div class="mt-2">
+<<<<<<< HEAD
                     <SelectorList
                       :items="pStore.herd_units"
                       :active-item="pStore.CurrentHerdUnit"
@@ -162,6 +192,11 @@ const moveToImage = (image: Image) => {
                       allow-delete
                       :delete-action="pStore.delete_herd_unit"
                     >
+=======
+                    <SelectorList :items="pStore.herd_units" :active-item="pStore.CurrentHerdUnit"
+                      :select-action="moveToHerdUnit" allow-create allow-delete
+                      :delete-action="pStore.delete_herd_unit">
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                       <template #create="{ Finished }">
                         <CreateHerdUnit
                           :project="pStore.CurrentProject as Project"
@@ -174,6 +209,7 @@ const moveToImage = (image: Image) => {
                 </BTab>
                 <BTab title="Models" lazy>
                   <div class="mt-2">
+<<<<<<< HEAD
                     <SelectorList
                       :items="pStore.models"
                       :active-item="pStore.CurrentModel"
@@ -191,6 +227,10 @@ const moveToImage = (image: Image) => {
                         />
                       </template>
                     </SelectorList>
+=======
+                    <SelectorList :items="pStore.models" :active-item="pStore.CurrentModel" :select-action="moveToModel"
+                      allow-delete />
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                   </div>
                 </BTab>
               </BTabs>
@@ -203,6 +243,7 @@ const moveToImage = (image: Image) => {
             </BRow>
           </BRow>
         </BTab>
+<<<<<<< HEAD
         <BTab
           title="Herd Units"
           :disabled="pStore.CurrentProject == undefined"
@@ -218,6 +259,14 @@ const moveToImage = (image: Image) => {
                 allow-delete
                 allow-create
               >
+=======
+        <BTab title="Herd Units" :disabled="pStore.CurrentProject == undefined" lazy>
+          <BRow class="mt-3 h-100">
+            <BCol cols="6">
+              <SelectorList :items="pStore.herd_units" :active-item="pStore.CurrentHerdUnit"
+                :select-action="pStore.set_current_herd_unit" :delete-action="pStore.delete_herd_unit" allow-delete
+                allow-create allow-update>
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                 <template #create="{ Finished }">
                   <CreateHerdUnit
                     :project="pStore.CurrentProject as Project"
@@ -230,6 +279,7 @@ const moveToImage = (image: Image) => {
             <BCol cols="6">
               <h3>Surveys</h3>
               <div v-if="pStore.CurrentHerdUnit">
+<<<<<<< HEAD
                 <SelectorList
                   :items="pStore.surveys"
                   :active-item="pStore.CurrentSurvey"
@@ -245,6 +295,14 @@ const moveToImage = (image: Image) => {
                       :submitAction="pStore.create_survey"
                       @creation-successful="Finished"
                     />
+=======
+                <SelectorList :items="pStore.surveys" :active-item="pStore.CurrentSurvey" :select-action="moveToSurvey"
+                  allow-create allow-delete :delete-action="pStore.delete_survey">
+                  <template #create="{ Finished }">
+                    <CreateSurvey :project="pStore.CurrentProject as Project"
+                      :herd_unit="pStore.CurrentHerdUnit as HerdUnit" :submitAction="pStore.create_survey"
+                      @creation-successful="Finished" />
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                   </template>
                 </SelectorList>
               </div>
@@ -254,6 +312,7 @@ const moveToImage = (image: Image) => {
             </BCol>
           </BRow>
         </BTab>
+<<<<<<< HEAD
         <BTab
           title="Models"
           :disabled="pStore.CurrentProject == undefined"
@@ -300,6 +359,24 @@ const moveToImage = (image: Image) => {
                           :submit-action="pStore.create_schema"
                           @creation-successful="Finished"
                         />
+=======
+        <BTab title="Models" :disabled="pStore.CurrentProject == undefined" lazy>
+          <BRow class="mt-3 h-100">
+            <BCol cols="6">
+              <SelectorList :items="pStore.models" :active-item="pStore.CurrentModel" :select-action="moveToModel"
+                allow-create />
+            </BCol>
+            <BCol cols="6" v-if="pStore.CurrentModel">
+              <h3>Model Children</h3>
+              <BTabs pills fill>
+                <BTab title="Schema" lazy>
+                  <div class="mt-2">
+                    <SelectorList :items="pStore.schemas" :active-item="pStore.CurrentSchema"
+                      :select-action="pStore.set_current_schema" allow-create>
+                      <template #create="{ Finished }">
+                        <CreateSchema :project="pStore.CurrentProject as Project" :model="pStore.CurrentModel as Model"
+                          :submit-action="pStore.create_schema" @creation-successful="Finished" />
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                       </template>
                     </SelectorList>
                   </div>
@@ -330,6 +407,7 @@ const moveToImage = (image: Image) => {
                 </BTab>
               </BTabs>
             </BCol>
+<<<<<<< HEAD
           </BRow>
         </BTab>
         <BTab
@@ -387,6 +465,43 @@ const moveToImage = (image: Image) => {
               </SelectorList>
             </BCol>
             <BCol cols="6" class="overflow-y-auto" style="max-height: 90%">
+=======
+            <BCol v-else>
+              <span>Select a Model to continue</span>
+            </BCol>
+          </BRow>
+        </BTab>
+        <BTab title="Surveys" :disabled="pStore.CurrentHerdUnit == undefined" lazy>
+          <BRow class="mt-3" style="height: calc(100vh - 100px)">
+            <BCol cols="6">
+              <SelectorList :items="pStore.surveys" :active-item="pStore.CurrentSurvey"
+                :select-action="pStore.set_current_survey" allow-delete allow-create allow-update
+                :delete-action="pStore.delete_survey">
+                <template #create="{ Finished }">
+                  <CreateSurvey :project="pStore.CurrentProject as Project"
+                    :herd_unit="pStore.CurrentHerdUnit as HerdUnit" :submitAction="pStore.create_survey"
+                    @creation-successful="Finished" />
+                </template>
+              </SelectorList>
+            </BCol>
+            <BCol cols="6" class="overflow-y-auto" style="max-height: 90%">
+              <h3>Images</h3>
+              <SelectorList :items="pStore.CurrentImages" :active-item="pStore.CurrentImage"
+                :select-action="moveToImage" :perPage="perPage" :itemNum="pStore.imageRecords.total_images"
+                :fetch-action="pStore.get_survey_images" />
+            </BCol>
+          </BRow>
+        </BTab>
+        <BTab title="Images" :disabled="pStore.CurrentSurvey == undefined" lazy>
+          <BRow class="mt-3" style="height: calc(100vh - 100px)">
+            <BCol cols="6" class="overflow-y-auto" style="max-height: 90%">
+              <SelectorList :items="pStore.CurrentImages" :active-item="pStore.CurrentImage"
+                :select-action="pStore.set_current_image" :perPage="perPage" :itemNum="pStore.imageRecords.total_images"
+                :fetch-action="pStore.get_survey_images" allow-delete :delete-action="pStore.delete_image">
+              </SelectorList>
+            </BCol>
+            <BCol cols="6" class="overflow-y-auto" style="max-height: 90%">
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
               <h3>Image Children</h3>
               <p>
                 Images make up the core of surveys and herd units. They are the
@@ -400,11 +515,16 @@ const moveToImage = (image: Image) => {
                         <span>Label</span>
                         <span>Score</span>
                       </BListGroupItem>
+<<<<<<< HEAD
                       <BListGroupItem
                         class="d-flex justify-content-between"
                         v-for="pred in pStore.CurrentPredictions"
                         v-if="pStore.CurrentPredictions.length != 0"
                       >
+=======
+                      <BListGroupItem class="d-flex justify-content-between" v-for="pred in pStore.CurrentPredictions"
+                        v-if="pStore.CurrentPredictions.length != 0">
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                         <span>{{ pred.label }}</span>
                         <span>{{ pred.score }}</span>
                       </BListGroupItem>
@@ -421,11 +541,16 @@ const moveToImage = (image: Image) => {
                         <span>Label</span>
                         <span></span>
                       </BListGroupItem>
+<<<<<<< HEAD
                       <BListGroupItem
                         class="d-flex justify-content-between"
                         v-for="annot in pStore.CurrentAnnotations"
                         v-if="pStore.CurrentAnnotations.length != 0"
                       >
+=======
+                      <BListGroupItem class="d-flex justify-content-between" v-for="annot in pStore.CurrentAnnotations"
+                        v-if="pStore.CurrentAnnotations.length != 0">
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
                         <span>{{ annot.created }}</span>
                         <span>{{ annot.modified }}</span>
                       </BListGroupItem>
@@ -435,6 +560,10 @@ const moveToImage = (image: Image) => {
                     </BListGroup>
                   </div>
                 </BTab>
+<<<<<<< HEAD
+=======
+                <BTab title="crops" lazy> </BTab>
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
               </BTabs>
             </BCol>
           </BRow>

@@ -15,12 +15,16 @@ import {
   type imageRecords,
   Prediction,
 } from "@/types/generatorobjects.ts";
+<<<<<<< HEAD
 import {
   createSurvey,
   deleteSurvey,
   getSurveyImages,
   type createSurveyOptions,
 } from "@/modules/api/surveys.ts";
+=======
+import { createSurvey, deleteSurvey, getSurveyImages, type createSurveyOptions } from "@/modules/api/surveys.ts";
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 import {
   getProjectModels,
   getAllProjects,
@@ -36,6 +40,7 @@ import {
   getHerdUnitSurveys,
   type createHerdUnitOptions,
 } from "@/modules/api/herdunits.ts";
+<<<<<<< HEAD
 import {
   createModel,
   deleteModel,
@@ -45,10 +50,16 @@ import {
 import {
   createSchema,
   deleteSchema,
+=======
+import { getModelSchema } from "@/modules/api/models.ts";
+import {
+  createSchema,
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
   getSchemaLabels,
   getSchemaModels,
   type createSchemaOptions,
 } from "@/modules/api/schemas.ts";
+<<<<<<< HEAD
 import {
   deleteImage,
   getImageAnnotations,
@@ -59,6 +70,9 @@ import {
   deleteLabel,
   type createLabelOptions,
 } from "../api/labels";
+=======
+import { deleteImage, getImageAnnotations, getImagePredictions } from "../api/images";
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -155,7 +169,11 @@ export const useProjectStore = defineStore("pStore", {
       return state.imageRecords?.annotations
         ? Object.values(state.imageRecords.annotations)
         : [];
+<<<<<<< HEAD
     },
+=======
+    }
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
   },
   actions: {
     get_schema_by_id(id: string) {
@@ -222,8 +240,16 @@ export const useProjectStore = defineStore("pStore", {
       this.herd_units.push(herd_unit);
       this.herd_unit_idx = this.herd_units.indexOf(herd_unit);
     },
+<<<<<<< HEAD
     async create_survey(options: createSurveyOptions) {
       const survey = await createSurvey(options);
+=======
+    async create_survey(
+      options: createSurveyOptions
+    ) {
+      const survey = await createSurvey(
+        options);
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
       this.surveys.push(survey);
       this.survey_idx = this.surveys.indexOf(survey);
     },
@@ -268,6 +294,7 @@ export const useProjectStore = defineStore("pStore", {
       const index = this.surveys.indexOf(survey as Survey);
 
       await deleteSurvey(this.surveys[index].uuid);
+<<<<<<< HEAD
 
       this.surveys.splice(index, 1);
     },
@@ -294,6 +321,9 @@ export const useProjectStore = defineStore("pStore", {
       await deleteSchema(this.schemas[index].uuid);
 
       this.schemas.splice(index, 1);
+=======
+      this.surveys.splice(index, 1);
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
     },
     async get_survey_images(page: number, per_page: number) {
       if (this.CurrentSurvey != undefined) {
