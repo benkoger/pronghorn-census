@@ -162,7 +162,7 @@ def get_annotated_images(survey_id: str):
 def create(body: CreateSurveyReq):
     """ """
     try:
-        survey = base.create_survey(body.model_dump())
+        survey = base.create_survey(body)
     except AuthorizationFailure as e:
         current_app.logger.exception(e)
         abort(401, str(e))

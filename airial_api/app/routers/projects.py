@@ -1,7 +1,7 @@
 # Endpoints for managing projects in the API
 # Author: Michael B. Lance
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
 
@@ -25,7 +25,7 @@ from database.object_models.project_management import (
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # GET
 
 
@@ -149,7 +149,7 @@ def get_herd_units(project_id: str):
     return [herd_unit.to_dict() for herd_unit in herd_units], 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @projectBp.get("/<string:project_id>/schemas")
@@ -167,6 +167,40 @@ def get_surveys(project_id: str):
         abort(500)
 
     return [schema.to_dict() for schema in schemas], 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@projectBp.get("/<string:project_id>/image-count")
+@login_required
+@permission_required("access")
+def image_count(project_id: str):
+    """ """
+    try:
+        count = base.get_project_image_count(UUID(project_id))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return {"count": count}, 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@projectBp.get("/<string:project_id>/prediction-count")
+@login_required
+@permission_required("access")
+def prediction_count(project_id: str):
+    """ """
+    try:
+        count = base.get_project_prediction_count(UUID(project_id))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return {"count": count}, 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -206,5 +240,6 @@ def delete(project_id: str):
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
+        abort(500)
 
     return "", 204

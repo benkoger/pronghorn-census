@@ -40,8 +40,9 @@ class Prediction(DBbase):
         return {
             "pred_id": self.pred_id,
             "score": self.score,
+            "label": self.label,
             "dimensions": self.dimensions.to_dict(),
-            # ... etc
+            "uuid": self.uuid,
         }
 
 

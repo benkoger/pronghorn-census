@@ -78,28 +78,63 @@ export async function getProjectHerdUnits(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export async function getProjectSchemas(
+export async function getProjectSchemas(project_id: string): Promise<Schema[]> {
+  const response = await fetch(`${api_url}/projects/${project_id}/schemas`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+  let schemas = [];
+  for (const schema of resp) schemas.push(new Schema(schema as SchemaIntf));
+
+  return schemas;
+}
+
+export async function getProjectImageCount(
   project_id: string,
-): Promise<Schema[]> {
-  const response = await fetch(`${api_url}/projects/${project_id}/schemas`,
+): Promise<number> {
+  const response = await fetch(
+    `${api_url}/projects/${project_id}/image-count`,
     {
       method: "GET",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
-    });
+    },
+  );
 
   if (!response.ok) throw new ApiError(await response.json());
 
-  const resp = await response.json();
-  let schemas = [];
-  for (const schema of resp)
-    schemas.push(new Schema(schema as SchemaIntf))
-
-  return schemas;
+  return (await response.json()).count;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function getProjectPredictionCount(
+  project_id: string,
+): Promise<number> {
+  const response = await fetch(
+    `${api_url}/projects/${project_id}/prediction-count`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return (await response.json()).count;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // POST
@@ -108,6 +143,7 @@ export interface createProjectOptions {
   name: string;
   organization_id: string;
 }
+
 export async function createProject(
   options: createProjectOptions,
 ): Promise<Project> {

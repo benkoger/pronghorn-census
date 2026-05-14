@@ -7,11 +7,13 @@ from uuid import UUID
 
 from flask import Blueprint, abort, current_app
 from flask_login import login_required
+from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base
 from database.errors import ObjectNotFound, AuthorizationFailure
+from database.object_models.project_management.schemas import createSchemaReq
 
 schemaBp = Blueprint("schemas", __name__, url_prefix="/api/v1/schemas")
 
@@ -71,3 +73,45 @@ def get_models(schema_id: str):
         abort(500)
 
     return [model.to_dict() for model in models], 200
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# POST
+
+
+@schemaBp.post("")
+@login_required
+@permission_required("access")
+@validate()
+def create(body: createSchemaReq):
+    """ """
+    try:
+        schema = base.create_schema(body)
+
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return schema.to_dict(), 201
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# DELETE
+
+
+@schemaBp.delete("/<string:schema_id>")
+@login_required
+@permission_required("access")
+def delete_schema(schema_id: str):
+    """ """
+    try:
+        base.delete_schema(UUID(schema_id))
+
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return "", 204

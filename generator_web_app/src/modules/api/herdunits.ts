@@ -34,8 +34,8 @@ export async function getHerdUnitSurveys(
 
 export interface createHerdUnitOptions {
   project_id: string;
-  name: string
-};
+  name: string;
+}
 
 export async function createHerdUnit(
   options: createHerdUnitOptions,
@@ -55,3 +55,17 @@ export async function createHerdUnit(
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+
+export async function deleteHerdUnit(herd_unit_id: string): Promise<boolean> {
+  const response = await fetch(`${api_url}/herd-units/${herd_unit_id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
+}
