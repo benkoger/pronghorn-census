@@ -13,8 +13,9 @@ import {
   Survey,
   Image,
   type imageRecords,
+  Prediction,
 } from "@/types/generatorobjects.ts";
-import { createSurvey, getSurveyImages } from "@/modules/api/surveys.ts";
+import { createSurvey, deleteSurvey, getSurveyImages, type createSurveyOptions } from "@/modules/api/surveys.ts";
 import {
   getProjectModels,
   getAllProjects,
@@ -24,10 +25,20 @@ import {
   deleteProject,
   getProjectSchemas,
 } from "@/modules/api/projects.ts";
-import { createHerdUnit, getHerdUnitSurveys, type createHerdUnitOptions } from "@/modules/api/herdunits.ts";
+import {
+  createHerdUnit,
+  deleteHerdUnit,
+  getHerdUnitSurveys,
+  type createHerdUnitOptions,
+} from "@/modules/api/herdunits.ts";
 import { getModelSchema } from "@/modules/api/models.ts";
-import { getSchemaLabels, getSchemaModels } from "@/modules/api/schemas.ts";
-import { deleteImage } from "../api/images";
+import {
+  createSchema,
+  getSchemaLabels,
+  getSchemaModels,
+  type createSchemaOptions,
+} from "@/modules/api/schemas.ts";
+import { deleteImage, getImageAnnotations, getImagePredictions } from "../api/images";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -47,6 +58,7 @@ export const useProjectStore = defineStore("pStore", {
     survey_idx: undefined as number | undefined,
     imageRecords: {} as imageRecords,
     active_image: undefined as string | undefined,
+    active_prediction: undefined as string | undefined,
   }),
   getters: {
     CurrentProject: (state) =>
@@ -109,6 +121,20 @@ export const useProjectStore = defineStore("pStore", {
       return state.imageRecords?.images
         ? Object.values(state.imageRecords.images)
         : [];
+    },
+    CurrentPrediction: (state) =>
+      state.active_prediction != undefined
+        ? state.imageRecords.predictions[state.active_prediction]
+        : undefined,
+    CurrentPredictions: (state) => {
+      return state.imageRecords?.predictions
+        ? Object.values(state.imageRecords.predictions)
+        : [];
+    },
+    CurrentAnnotations: (state) => {
+      return state.imageRecords?.annotations
+        ? Object.values(state.imageRecords.annotations)
+        : [];
     }
   },
   actions: {
@@ -143,6 +169,11 @@ export const useProjectStore = defineStore("pStore", {
       this.projects.push(project);
       return true;
     },
+    async create_schema(options: createSchemaOptions) {
+      const schema = await createSchema(options);
+
+      this.schemas.push(schema);
+    },
     async get_project_models() {
       if (this.CurrentProject)
         this.models = (await getProjectModels(
@@ -156,7 +187,7 @@ export const useProjectStore = defineStore("pStore", {
     async get_model_schema() {
       if (this.CurrentModel) {
         const schema = await getModelSchema(this.CurrentModel.uuid);
-        this.schemas.push(schema);
+        this.schemas = [schema];
         this.set_current_schema(schema);
       }
     },
@@ -172,19 +203,10 @@ export const useProjectStore = defineStore("pStore", {
       this.herd_unit_idx = this.herd_units.indexOf(herd_unit);
     },
     async create_survey(
-      project_id: number,
-      herd_unit_id: number,
-      name: string,
-      survey_date: string,
-      additional_info: string,
+      options: createSurveyOptions
     ) {
       const survey = await createSurvey(
-        project_id,
-        herd_unit_id,
-        name,
-        survey_date,
-        additional_info,
-      );
+        options);
       this.surveys.push(survey);
       this.survey_idx = this.surveys.indexOf(survey);
     },
@@ -201,16 +223,45 @@ export const useProjectStore = defineStore("pStore", {
       await deleteProject(this.projects[index].uuid);
       this.projects.splice(index, 1);
     },
-    async delete_image(id: string) {
+    async delete_herd_unit(id: string) {
+      const herdUnit = this.herd_units.find((hu) => hu.uuid == id);
+      const index = this.herd_units.indexOf(herdUnit as HerdUnit);
 
+      await deleteHerdUnit(this.herd_units[index].uuid);
+      this.herd_units.splice(index, 1);
+    },
+    async delete_image(id: string) {
       await deleteImage(id);
       delete this.imageRecords.images[id];
+    },
+    async delete_survey(id: string) {
+      const survey = this.surveys.find((survey) => survey.uuid == id);
+      const index = this.surveys.indexOf(survey as Survey);
 
+      await deleteSurvey(this.surveys[index].uuid);
+      this.surveys.splice(index, 1);
     },
     async get_survey_images(page: number, per_page: number) {
       if (this.CurrentSurvey != undefined) {
-        this.imageRecords = await getSurveyImages(this.CurrentSurvey.uuid, page, per_page);
-
+        this.imageRecords = await getSurveyImages(
+          this.CurrentSurvey.uuid,
+          page,
+          per_page,
+        );
+      }
+    },
+    async get_image_predictions() {
+      if (this.CurrentImage != undefined) {
+        this.imageRecords.predictions = await getImagePredictions(
+          this.CurrentImage.uuid,
+        );
+      }
+    },
+    async get_image_annotations() {
+      if (this.CurrentImage != undefined) {
+        this.imageRecords.annotations = await getImageAnnotations(
+          this.CurrentImage.uuid,
+        );
       }
     },
     get_project_by_id(id: string) {
@@ -232,7 +283,7 @@ export const useProjectStore = defineStore("pStore", {
         const idx = this.projects.indexOf(project);
         if (this.project_idx == idx) {
           this.project_idx = undefined;
-          this.clear_project_children()
+          this.clear_project_children();
           return;
         }
         this.project_idx = idx;
@@ -273,10 +324,21 @@ export const useProjectStore = defineStore("pStore", {
       }
     },
     set_current_image(image: Image) {
-      if ((this.imageRecords.images[image.uuid] != undefined) && this.active_image != image.uuid) {
+      if (
+        this.imageRecords.images[image.uuid] != undefined &&
+        this.active_image != image.uuid
+      ) {
         this.active_image = image.uuid;
       } else {
         this.active_image = undefined;
+      }
+    },
+    set_current_prediction(prediction: Prediction) {
+      if (
+        this.imageRecords.predictions[prediction.uuid] != undefined &&
+        this.active_prediction != prediction.uuid
+      ) {
+        this.active_prediction = prediction.uuid;
       }
     },
     set_current_herd_unit(herdunit: HerdUnit | undefined) {
@@ -315,6 +377,6 @@ export const useProjectStore = defineStore("pStore", {
       this.clear_surveys();
       this.clear_schemas();
       this.clear_models();
-    }
+    },
   },
 });

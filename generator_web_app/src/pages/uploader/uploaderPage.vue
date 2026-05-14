@@ -5,6 +5,7 @@ import { Project, HerdUnit } from "@/types/generatorobjects";
 import { mapState } from "pinia";
 import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/templates/SelectorList.vue";
+import CreateHerdUnit from "@/components/templates/createHerdUnit.vue";
 
 export default defineComponent({
   name: "Uploader-Utility",
@@ -59,7 +60,7 @@ export default defineComponent({
   watch: {
     CurrentProject(newValue: Project, oldValue: Project) {
       const currentQuery = { ...this.$route.query };
-      this.pStore.clear_state();
+      this.pStore.$reset();
       if (newValue != oldValue && newValue != undefined) {
         this.pStore.get_project_herd_units();
         const newQuery = {
@@ -110,16 +111,6 @@ export default defineComponent({
         this.pStore.set_current_survey(this.CurrentSurvey);
       this.newSurvey = !this.newSurvey;
     },
-    async submitNewHerdUnit() {
-      if (this.CurrentProject) {
-        await this.pStore.create_herd_unit(
-          this.CurrentProject?.uuid,
-          this.newHerdUnitName,
-        );
-        this.newHerdUnitName = "";
-        this.currentStep++;
-      }
-    },
     async submitNewSurvey() {
       if (this.CurrentProject && this.CurrentHerdUnit) {
         await this.pStore.create_survey(
@@ -165,21 +156,15 @@ export default defineComponent({
           :items="pStore.herd_units"
           :active-item="CurrentHerdUnit"
           allow-create
-          :createAction="submitNewHerdUnit"
         >
-          <label class="visually-hidden" for="herd-unit-name">Name</label>
-          <BFormInput
-            id="herd-unit-name"
-            placeholder="Name"
-            class="w-auto me-2"
-            required
-            v-model="newHerdUnitName"
-          ></BFormInput>
-          <span class="text-info"
-            >A new herd unit will be created and associated with the project:
-            <strong>{{ CurrentProject?.name }}</strong
-            >.
-          </span>
+          <template #create="{ Finished }">
+            <CreateHerdUnit
+              :project="pStore.CurrentProject as Project"
+              :submit-action="pStore.create_herd_unit"
+              @creation-successful="Finished"
+            >
+            </CreateHerdUnit>
+          </template>
         </SelectList>
       </div>
     </div>

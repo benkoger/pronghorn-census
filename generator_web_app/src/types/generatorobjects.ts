@@ -566,10 +566,11 @@ export interface cropVerifierBatch {
   };
 }
 
-
 export interface imageRecords {
   images: { [image_uuid: string]: Image };
   total_images: number;
+  predictions: { [prediction_uuid: string]: Prediction };
+  annotations: { [annotation_uuid: string]: Annotation };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

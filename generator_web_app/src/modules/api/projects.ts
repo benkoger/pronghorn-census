@@ -78,28 +78,23 @@ export async function getProjectHerdUnits(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export async function getProjectSchemas(
-  project_id: string,
-): Promise<Schema[]> {
-  const response = await fetch(`${api_url}/projects/${project_id}/schemas`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+export async function getProjectSchemas(project_id: string): Promise<Schema[]> {
+  const response = await fetch(`${api_url}/projects/${project_id}/schemas`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) throw new ApiError(await response.json());
 
   const resp = await response.json();
   let schemas = [];
-  for (const schema of resp)
-    schemas.push(new Schema(schema as SchemaIntf))
+  for (const schema of resp) schemas.push(new Schema(schema as SchemaIntf));
 
   return schemas;
 }
-
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // POST
@@ -108,6 +103,7 @@ export interface createProjectOptions {
   name: string;
   organization_id: string;
 }
+
 export async function createProject(
   options: createProjectOptions,
 ): Promise<Project> {

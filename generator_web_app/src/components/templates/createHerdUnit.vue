@@ -49,7 +49,7 @@ const submitReq = async () => {
     <Icon icon="token:area" width="15%" height="100%" />
     <div class="d-flex flex-column">
       <span>Name: {{ options.name }}</span>
-      <span>Project: {{ props.project.name }}</span>
+      <span>Project: {{ props.project?.name }}</span>
     </div>
   </div>
   <BForm class="d-flex gap-4 flex-column flex-grow-1" autocomplete="off" data-bwignore="true"

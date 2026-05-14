@@ -52,23 +52,41 @@ export async function getSurveyImages(survey_id: string, page: number, per_page:
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export async function createSurvey(project_id: number, herd_unit_id: number, name: string, survey_date: string, additional_info: string): Promise<Survey> {
+export interface createSurveyOptions {
+  "name": string;
+  "project_id": string;
+  "herd_unit_id": string;
+  "survey_date": string;
+  "additional_info": string;
+}
+
+export async function createSurvey(options: createSurveyOptions): Promise<Survey> {
   const response = await fetch(`${api_url}/surveys`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      'project_id': project_id,
-      'herd_unit_ids': [herd_unit_id],
-      'survey_date': survey_date,
-      'name': name,
-      'additional_info': additional_info
-    }),
+    body: JSON.stringify(options),
   });
   if (!response.ok) throw new ApiError(await response.json());
   const resp = await response.json();
   let survey = new Survey(resp as SurveyIntf);
   return survey;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function deleteSurvey(survey_id: string): Promise<boolean> {
+  const response = await fetch(`${api_url}/surveys/${survey_id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json"
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
 }

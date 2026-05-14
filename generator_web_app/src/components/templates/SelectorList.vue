@@ -58,7 +58,6 @@ const toggleCreate = () => {
 
 const getDeleteConsent = (id: string) => {
   objectToDestroy.value = id;
-  console.log(objectToDestroy.value);
   showDeleteConfirmation.value = true;
 };
 

@@ -45,8 +45,8 @@ class Survey(DBbase):
 
 
 class CreateSurveyReq(BaseModel):
-    project_id: Union[int, UUID]
-    herd_unit_ids: List[Union[int, UUID]]
+    project_id: UUID
+    herd_unit_id: UUID
     survey_date: datetime
     name: str
     additional_info: Optional[str]
@@ -64,4 +64,3 @@ class UpdateSurveyReq(BaseModel):
 class SurveyImageQuery(BaseModel):
     page: int = 1
     per_page: int = 50
-

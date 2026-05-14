@@ -5,16 +5,70 @@
 
 import {
   Image,
+  Prediction,
   type ImageIntf,
   PredictionCrop,
   type PredictionCropIntf,
-  type Prediction,
+  type PredictionIntf,
+  type imageRecords,
+  Project,
+  Annotation,
+  type AnnotationIntf,
 } from "@/types/generatorobjects";
 import { ApiError } from "@/modules/api/errors";
 import { api_url } from "@/modules/api/apiV1Methods";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 //GET
+
+export async function getImagePredictions(
+  image_id: string,
+): Promise<imageRecords["predictions"]> {
+  const response = await fetch(`${api_url}/images/${image_id}/predictions`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+
+  let predictions: imageRecords["predictions"] = {};
+  for (const pred of resp)
+    predictions[pred.uuid] = new Prediction(pred as PredictionIntf);
+
+  return predictions;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function getImageAnnotations(
+  image_id: string,
+): Promise<imageRecords["annotations"]> {
+  const response = await fetch(`${api_url}/images/${image_id}/annotations`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  const resp = await response.json();
+
+  let annotations: imageRecords["annotations"] = {};
+  for (const annot of resp)
+    annotations[annot.uuid] = new Annotation(annot as AnnotationIntf);
+
+  return annotations;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+//POST
 
 interface createImageOptions {
   survey_id: string | number;
@@ -34,13 +88,13 @@ export async function createImage(options: createImageOptions): Promise<Image> {
     },
     body: JSON.stringify(options),
   });
+
   if (!response.ok) throw new ApiError(await response.json());
 
   return new Image((await response.json()) as ImageIntf);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-//POST
 
 interface presignedPutOptions {
   upload_id: string;
@@ -198,6 +252,7 @@ export async function updateImage(
 ): Promise<Image> {
   const response = await fetch(`${api_url}/images/${image_id}`, {
     method: "PATCH",
+
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
