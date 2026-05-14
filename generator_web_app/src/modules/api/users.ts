@@ -146,7 +146,7 @@ export async function deauthUser(): Promise<boolean> {
   const pinia = getActivePinia() as ExtendedPina;
 
   pinia._s.forEach((store: Store, name: string) => {
-    if (name != "userStore") store.$reset();
+    if (name != "systemStore") store.$reset();
   });
 
   return true;

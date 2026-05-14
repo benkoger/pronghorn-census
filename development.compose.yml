@@ -17,7 +17,6 @@ services:
         source: ./local_db/restore.sh
         target: /docker-entrypoint-initdb.d/restore.sh
       - ./local_db/pct_b:/pct_b:Z
-      - ./local_db/sdbt:/sdbt:Z
     networks:
       - dev_pronghorn_app_network
     ports:
@@ -107,6 +106,9 @@ services:
       - dev_pronghorn_app_network
 
   web-app-dev:
+    depends_on:
+      db:
+        condition: service_healthy
     container_name: prong_dev_webapp
     build:
       context: .

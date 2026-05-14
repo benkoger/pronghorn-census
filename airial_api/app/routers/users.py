@@ -178,6 +178,10 @@ def create_super(body: CreateUserReq):
 
         user = base.create_user(body)
 
+        base.write_spice_relationships(
+            [base.create_spice_update("platform", "airial", "user", user.id, "root")]
+        )
+
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)

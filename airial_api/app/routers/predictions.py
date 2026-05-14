@@ -6,14 +6,12 @@
 from uuid import UUID
 
 from flask import Blueprint, abort
-from flask_login import current_user, login_required
+from flask_login import login_required
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
 
-from typing import cast
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.user_management import User
 from database.errors import AuthorizationFailure, FailedToCreate, ObjectNotFound
 from database.object_models.core import (
     PredictionQuery,

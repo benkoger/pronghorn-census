@@ -1,4 +1,4 @@
-# Generate high quality crops of training data with model assisted labeling and Kmeans clustering
+# Genera high quality crops of training data with model assisted labeling and Kmeans clustering
 # Authors: Ben Koger, Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------

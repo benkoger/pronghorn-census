@@ -26,7 +26,7 @@ from authzed.api.v1 import (
 from grpc import ChannelCredentials
 from psycopg import Cursor
 from psycopg.errors import DatabaseError
-from psycopg.rows import class_row, dict_row
+from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash
 
@@ -35,6 +35,10 @@ from database.object_models.core.images import (
     RAQuery,
     UpdateReviewedAreaReq,
 )
+from database.object_models.project_management.models import CreateModelReq
+from database.object_models.project_management.projects import createProjectReq
+from database.object_models.project_management.schemas import createSchemaReq
+from database.object_models.project_management.surveys import CreateSurveyReq
 from database.object_models.user_management.users import UserQuery
 
 from .errors import (
@@ -71,6 +75,7 @@ from .object_models.project_management import (
     CreateHerdUnitReq,
     LabelQuery,
     ProjectQuery,
+    CreateLabelReq,
 )
 from .object_models.user_management import (
     CreateUserReq,
@@ -273,13 +278,17 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def set_bootstrapped(self, cursor: Cursor) -> bool:
+    def _set_bootstrapped(self, cursor: Cursor) -> bool:
         """ """
-        query = sql.SQL("UPDATE usermanagement.inizialization SET first_run = false")
+        query = sql.SQL("UPDATE usermanagement.initialization SET first_run = false")
 
         cursor.execute(query)
 
         return True
+
+    def set_bootstrapped(self) -> bool:
+        """ """
+        return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -676,7 +685,6 @@ class Database:
         if not user:
             raise FailedToCreate("user")
 
-        # Organizations and Ids should be equal length and appear in the same order
         if not req.role_ids:
             raise FailedToCreate("user")
 
@@ -999,30 +1007,60 @@ class Database:
     # Project Management - Projects
     @connect
     def _create_project(
-        self,
-        cursor: Cursor[Project],
-        name: str,
+        self, cursor: Cursor[Project], req: createProjectReq, user: User
     ) -> Project:
         """Internal helper function, do not call directly"""
+
+        query_1 = sql.SQL(
+            " INSERT INTO projectmanagement.projects (name) VALUES (%s) RETURNING *; "
+        )
+
+        query_2 = sql.SQL(""" 
+            INSERT INTO usermanagement.organizations_projects (project_id, organization_id) 
+            VALUES (%s, %s);
+        """)
+
+        query_3 = sql.SQL("""
+
+            INSERT INTO projectmanagement.projects_users (project_id, user_id, role_id)
+            VALUES (%s, %s, %s)
+                          """)
+
+        org = self._get_organization(cursor, req.organization_id)
+        role = self._get_role("admin")
+
         cursor.row_factory = class_row(Project)
         cursor.execute(
-            sql.SQL(
-                " INSERT INTO projectmanagement.projects (name) VALUES (%s) RETURNING *; "
-            ),
-            (name,),
+            query_1,
+            (req.name,),
         )
         project = cursor.fetchone()
         if project is None:
-            raise Exception("Failed to create project")
+            raise FailedToCreate("Schema")
+
+        cursor.execute(query_2, (project.project_id, org.organization_id))
+        cursor.execute(query_3, (project.project_id, user.user_id, role.role_id))
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "project",
+                    str(project.uuid),
+                    "organization",
+                    str(org.uuid),
+                    "parent",
+                ),
+                self.create_spice_update(
+                    "project", str(project.uuid), "user", user.id, "annotator"
+                ),
+            ]
+        )
+
         return project
 
-    def create_project(self, name: str) -> Project:
-        """Insert a new project object into the database
-
-        Args:
-                name: The name of the project you want to create
-        """
-        return self._create_project(name=name)
+    def create_project(self, req: createProjectReq, user: User) -> Project:
+        """ """
+        return self._create_project(req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1158,6 +1196,61 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
+    def _get_project_image_count(self, cursor: Cursor, project_id: UUID):
+        """ """
+        query = sql.SQL("""
+            SELECT COUNT(image_id) FROM core.images as I 
+            JOIN projectmanagement.projects_herd_units PH ON I.herd_unit_id = PH.herd_unit_id
+            WHERE PH.project_id = %s
+        """)
+
+        project = self._get_project(cursor, project_id)
+
+        cursor.row_factory = tuple_row
+        count = cursor.execute(query, (project.project_id,)).fetchone()
+
+        if not count:
+            return 0
+
+        else:
+            return count[0]
+
+    def get_project_image_count(self, project_id: UUID):
+        """ """
+        return self._get_project_image_count(project_id)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_project_prediction_count(self, cursor: Cursor, project_id: UUID):
+        """ """
+        query = sql.SQL("""
+            SELECT COUNT(pred_id) FROM core.predictions AS P 
+            WHERE P.image_id IN (
+                SELECT image_id FROM core.images as I 
+            JOIN projectmanagement.projects_herd_units PH ON I.herd_unit_id = PH.herd_unit_id
+            WHERE PH.project_id = %s 
+            )
+        """)
+
+        project = self._get_project(cursor, project_id)
+
+        cursor.row_factory = tuple_row
+        count = cursor.execute(query, (project.project_id,)).fetchone()
+
+        if not count:
+            return 0
+
+        else:
+            return count[0]
+
+    def get_project_prediction_count(self, project_id: UUID):
+        """ """
+        return self._get_project_prediction_count(project_id)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
     def _update_project(
         self,
         cursor: Cursor[Project],
@@ -1201,18 +1294,13 @@ class Database:
 
     @connect
     def _delete_project(
-        self, cursor: Cursor[Project], project_id: Project | int | UUID
-    ) -> bool:
+        self, cursor: Cursor[Project], project_id: Union[int, UUID]
+    ) -> None:
         """Internal helper function, do not call directly"""
         query = sql.SQL(
             " DELETE FROM projectmanagement.projects WHERE {id_field} = %s; "
         )
         match project_id:
-            case Project():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")),
-                    (project_id.project_id,),
-                )
             case int():
                 cursor.execute(
                     query.format(id_field=sql.Identifier("project_id")), (project_id,)
@@ -1222,9 +1310,10 @@ class Database:
                     query.format(id_field=sql.Identifier("uuid")), (project_id,)
                 )
 
-        return True if cursor.rowcount > 0 else False
+        if cursor.rowcount == 0:
+            raise ObjectNotFound("Project", str(project_id))
 
-    def delete_project(self, project_id: Project | int | UUID) -> bool:
+    def delete_project(self, project_id: Union[int, UUID]) -> None:
         """Delete a project object from the database
 
         Args:
@@ -1236,25 +1325,45 @@ class Database:
     # Project Management - Schemas
 
     @connect
-    def _create_schema(self, cursor: Cursor[Schema], name: str) -> Schema | None:
+    def _create_schema(self, cursor: Cursor[Schema], req: createSchemaReq) -> Schema:
         """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Schema)
-        cursor.execute(
-            sql.SQL(
-                " INSERT INTO projectmanagement.schemas (name) VALUES (%s) RETURNING *; "
-            ),
-            (name,),
+        query_1 = sql.SQL(
+            " INSERT INTO projectmanagement.schemas (name) VALUES (%s) RETURNING *; "
         )
-        schema = cursor.fetchone()
-        return schema if isinstance(schema, Schema) else None
 
-    def create_schema(self, name: str) -> Schema | None:
+        query_2 = sql.SQL(
+            " INSERT INTO projectmanagement.projects_schemas (project_id, schema_id) VALUES (%s, %s); "
+        )
+
+        project = self._get_project(cursor, req.project_id)
+
+        cursor.row_factory = class_row(Schema)
+        cursor.execute(query_1, (req.name,))
+
+        schema = cursor.fetchone()
+
+        if schema is None:
+            raise FailedToCreate("Schema")
+
+        cursor.execute(query_2, (project.project_id, schema.schema_id))
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "schema", str(schema.uuid), "model", str(req.model_id), "parent"
+                )
+            ]
+        )
+
+        return schema
+
+    def create_schema(self, req: createSchemaReq) -> Schema:
         """Insert a new schema object into the database
 
         Args:
                 name: the schema name
         """
-        return self._create_schema(name=name)
+        return self._create_schema(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1292,9 +1401,7 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_schema_labels(
-        self, cursor: Cursor[Label], schema_id: int | UUID
-    ) -> list[Label]:
+    def _get_schema_labels(self, cursor: Cursor[Label], schema_id: UUID) -> List[Label]:
         """ """
         schema = self._get_schema(cursor, schema_id)
         query = sql.SQL(
@@ -1302,15 +1409,28 @@ class Database:
         )
 
         cursor.row_factory = class_row(Label)
-        cursor.execute(query, (schema.schema_id,))
-        labels = cursor.fetchall()
-        if len(labels) == 0:
-            raise ObjectNotFound("labels for schema", str(schema_id))
-        return labels
+        return cursor.execute(query, (schema.schema_id,)).fetchall()
 
-    def get_schema_labels(self, schema_id: UUID) -> list[Label]:
+    def get_schema_labels(self, schema_id: UUID) -> List[Label]:
         """ """
         return self._get_schema_labels(schema_id)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_schema_models(self, cursor: Cursor[Model], schema_id: UUID) -> List[Model]:
+        """ """
+        schema = self._get_schema(cursor, schema_id)
+        query = sql.SQL(
+            " SELECT * FROM projectmanagement.models WHERE schema_id = %s; "
+        )
+
+        cursor.row_factory = class_row(Model)
+        return cursor.execute(query, (schema.schema_id,)).fetchall()
+
+    def get_schema_models(self, schema_id: UUID) -> List[Model]:
+        """ """
+        return self._get_schema_models(schema_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1390,26 +1510,39 @@ class Database:
 
     # Project Management - labels
     @connect
-    def _create_label(
-        self,
-        cursor: Cursor[Label],
-        name: str,
-        label: int,
-        color: str | None = None,
-        image_link: str | None = None,
-    ) -> Label | None:
+    def _create_label(self, cursor: Cursor[Label], req: CreateLabelReq) -> Label:
         """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Label)
-        cursor.execute(
-            sql.SQL(
-                " INSERT INTO projectmanagement.labels (name, label, color, image_link) VALUES (%s, %s, %s) RETURNING *; "
-            ),
-            (name, label, color, image_link),
-        )
-        lbl = cursor.fetchone()
-        return lbl if isinstance(lbl, Label) else None
 
-    def create_label(self, name: str, label: int, image_link: str) -> Label | None:
+        query = sql.SQL(
+            """ INSERT INTO projectmanagement.labels (name, schema_id, label, image_link, color)
+        VALUES (%(name)s, %(schema_id)s, %(label)s, %(image_link)s, %(color)s)
+        RETURNING *;
+                          """
+        )
+
+        params = req.model_dump()
+
+        schema = self._get_schema(cursor, req.schema_id)
+
+        params["schema_id"] = schema.schema_id
+
+        cursor.row_factory = class_row(Label)
+        label = cursor.execute(query, params).fetchone()
+
+        if not label:
+            raise FailedToCreate("label")
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "label", str(label.uuid), "schema", str(schema.uuid), "parent"
+                )
+            ]
+        )
+
+        return label
+
+    def create_label(self, req: CreateLabelReq) -> Label:
         """Insert a new label object into the database
 
         Args:
@@ -1417,7 +1550,7 @@ class Database:
                 label: the integer value associated to the class being labeled
                 image_link: optional parameter for the generator to grab an image representing the class
         """
-        return self._create_label(name=name, label=label, image_link=image_link)
+        return self._create_label(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1718,10 +1851,9 @@ class Database:
 			SELECT S.* FROM projectmanagement.surveys as S JOIN
 			projectmanagement.surveys_herd_units AS SHU ON SHU.survey_id = S.survey_id
 			WHERE SHU.herd_unit_id = %s; """)
+
         cursor.execute(query, (herd_unit.herd_unit_id,))
         surveys = cursor.fetchall()
-        if len(surveys) == 0:
-            raise ObjectNotFound("Surveys for herd unit", str(herd_unit_id))
 
         return surveys
 
@@ -1776,59 +1908,26 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _delete_herd_unit(
-        self, cursor: Cursor[HerdUnit], herd_unit_ids: HerdUnit | int | UUID
-    ) -> bool:
+    def _delete_herd_unit(self, cursor: Cursor[HerdUnit], herd_unit_id: UUID) -> bool:
         """Internal helper function, do not call directly"""
         query = sql.SQL(
             " DELETE FROM projectmanagement.herd_units WHERE {id_field} = %s; "
         )
-        match herd_unit_ids:
-            case HerdUnit():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_ids.herd_unit_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_ids,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (herd_unit_ids,)
-                )
+
+        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (herd_unit_id,))
 
         return True if cursor.rowcount > 0 else False
 
-    def delete_herd_unit(self, herd_unit_ids: HerdUnit | int | UUID) -> bool:
-        """Delete a herd unit object from the database
-
-        Args:
-                herd_unit_id: either a herd unit object, a database id, or a universally unique identifier
-        """
-        return self._delete_herd_unit(herd_unit_ids=herd_unit_ids)
+    def delete_herd_unit(self, herd_unit_id: UUID) -> bool:
+        """Delete a herd unit object from the database"""
+        return self._delete_herd_unit(herd_unit_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Project Management - Models
 
     @connect
-    def _create_model(self, cursor: Cursor[Model], parameters: dict) -> Model:
+    def _create_model(self, cursor: Cursor[Model], req: CreateModelReq) -> Model:
         """Internal helper function, do not call directly"""
-        project = self._get_project(cursor, parameters["project_id"])
-        schema = self._get_schema(cursor, parameters["schema_id"])
-
-        # TODO: create method to get list of surveys
-        survey_ids = [
-            survey_id if isinstance(survey_id, int) else UUID(survey_id)
-            for survey_id in parameters["survey_ids"]
-        ]
-
-        if not schema:
-            raise Exception("Schema not found")
-        if len(survey_ids) == 0:
-            raise Exception("no surveys were found")
-
         query_1 = sql.SQL(""" 
 			INSERT into projectmanagement.models (
 				name, schema_id
@@ -1839,12 +1938,6 @@ class Database:
 			RETURNING *; 
 		""")
 
-        cursor.execute(query_1, parameters)
-        cursor.row_factory = class_row(Model)
-        model = cursor.fetchone()
-        if not model:
-            raise Exception("Failed to create model")
-
         query_2 = sql.SQL(""" 
 			INSERT INTO projectmanagement.projects_models (
 				project_id, model_id
@@ -1854,30 +1947,40 @@ class Database:
 			); 
 		""")
 
+        project = self._get_project(cursor, req.project_id)
+        schema = self._get_schema(cursor, req.schema_id)
+
+        params = req.model_dump()
+
+        params["schema_id"] = schema.schema_id
+
+        cursor.execute(query_1, params)
+
+        cursor.row_factory = class_row(Model)
+        model = cursor.fetchone()
+
+        if not model:
+            raise FailedToCreate("Model")
+
         cursor.execute(query_2, (project.project_id, model.model_id))
 
-        query_3 = sql.SQL("""
-			INSERT INTO projectmanagement.surveys_models (
-				survey_id, model_id
-			)
-			VALUES (
-				%s, %s	
-			);
-		""")
-
-        cursor.executemany(
-            query_3, [(survey_id, model.model_id) for survey_id in survey_ids]
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "model", str(model.uuid), "project", str(project.uuid), "parent"
+                )
+            ]
         )
 
         return model
 
-    def create_model(self, parameters: dict) -> Model:
+    def create_model(self, req: CreateModelReq) -> Model:
         """Insert a new model object into the database
 
         Args:
                 name: the model name
         """
-        return self._create_model(parameters)
+        return self._create_model(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1998,35 +2101,21 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _delete_model(
-        self, cursor: Cursor[Model], model_ids: Model | int | UUID
-    ) -> bool:
+    def _delete_model(self, cursor: Cursor[Model], model_id: UUID) -> bool:
         """Internal helper function, do not call directly"""
         query = sql.SQL(" DELETE FROM projectmanagement.models WHERE {id_field} = %s; ")
-        match model_ids:
-            case Model():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("model_id")),
-                    (model_ids.model_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("model_id")), (model_ids,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (model_ids,)
-                )
+
+        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (model_id,))
 
         return True if cursor.rowcount > 0 else False
 
-    def delete_model(self, model_ids: Model | int | UUID) -> bool:
+    def delete_model(self, model_id: UUID) -> bool:
         """Delete a model object from the database
 
         Args:
                 model_id: either a model object, a database id, or a universally unique identifier
         """
-        return self._delete_model(model_ids=model_ids)
+        return self._delete_model(model_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2137,22 +2226,12 @@ class Database:
     # Project Management - Surveys
 
     @connect
-    def _create_survey(self, cursor: Cursor[Survey], parameters: dict) -> Survey:
+    def _create_survey(self, cursor: Cursor[Survey], req: CreateSurveyReq) -> Survey:
         """Internal helper function, do not call directly"""
 
-        project = self._get_project(cursor, parameters["project_id"])
+        project = self._get_project(cursor, req.project_id)
 
-        # TODO: create method to get list of herd units
-        herd_unit_ids = [
-            herd_unit_id if isinstance(herd_unit_id, int) else UUID(herd_unit_id)
-            for herd_unit_id in parameters["herd_unit_ids"]
-        ]
-
-        # TODO: Remove this after methods get updated for these objects
-        if not project:
-            raise Exception("Project not found")
-        if len(herd_unit_ids) == 0:
-            raise Exception("no herd units were found")
+        herd_unit = self._get_herd_unit(cursor, req.herd_unit_id)
 
         query_1 = sql.SQL(""" 
 			INSERT into projectmanagement.surveys (
@@ -2163,12 +2242,6 @@ class Database:
 			) 
 			RETURNING *; """)
 
-        cursor.row_factory = class_row(Survey)
-        cursor.execute(query_1, parameters)
-        survey = cursor.fetchone()
-        if not survey:
-            raise Exception("Failed to create survey")
-
         query_2 = sql.SQL("""
 			INSERT INTO projectmanagement.projects_surveys (
 				project_id, survey_id
@@ -2177,8 +2250,6 @@ class Database:
 				%s, %s
 			);
 		""")
-
-        cursor.execute(query_2, (project.project_id, survey.survey_id))
 
         query_3 = sql.SQL("""
 			INSERT INTO projectmanagement.surveys_herd_units (
@@ -2189,13 +2260,30 @@ class Database:
 			);
 		""")
 
-        cursor.executemany(
-            query_3, [(survey.survey_id, herd_id) for herd_id in herd_unit_ids]
-        )
+        cursor.row_factory = class_row(Survey)
+        cursor.execute(query_1, req.model_dump())
 
+        survey = cursor.fetchone()
+        if not survey:
+            raise Exception("Failed to create survey")
+
+        cursor.execute(query_2, (project.project_id, survey.survey_id))
+        cursor.execute(query_3, (survey.survey_id, herd_unit.herd_unit_id))
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "survey",
+                    str(survey.uuid),
+                    "herd_unit",
+                    str(herd_unit.uuid),
+                    "parent",
+                )
+            ]
+        )
         return survey
 
-    def create_survey(self, parameters: dict) -> Survey:
+    def create_survey(self, req: CreateSurveyReq) -> Survey:
         """Insert a new survey object into the database
 
         Args:
@@ -2203,7 +2291,7 @@ class Database:
                 name: the survey name
                 additional_info: any information that may be important regarding the survey (can be null)
         """
-        return self._create_survey(parameters)
+        return self._create_survey(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2458,8 +2546,6 @@ class Database:
                 cursor.execute(
                     query.format(id_field=sql.Identifier("uuid")), (survey_id,)
                 )
-            case _:
-                raise TypeError("survey_id must be a Survey, int, uuid")
 
         return True if cursor.rowcount > 0 else False
 
@@ -2469,7 +2555,7 @@ class Database:
         Args:
                 survey_id: either a survey object, a database id, or a universally unique identifier
         """
-        return self._delete_survey(survey_ids=survey_id)
+        return self._delete_survey(survey_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Core - Images
@@ -2568,7 +2654,7 @@ class Database:
 
     @connect
     def _get_image_predictions(
-        self, cursor: Cursor[Prediction], image_id: int | UUID
+        self, cursor: Cursor[Prediction], image_id: UUID
     ) -> List[Prediction]:
         """ """
         image = self._get_image(cursor, image_id)
@@ -2578,12 +2664,10 @@ class Database:
         cursor.execute(query, (image.image_id,))
 
         predictions = cursor.fetchall()
-        if len(predictions) == 0:
-            raise ObjectNotFound("Predctions for image", str(image_id))
 
         return predictions
 
-    def get_image_predictions(self, image_id: int | UUID) -> List[Prediction]:
+    def get_image_predictions(self, image_id: UUID) -> List[Prediction]:
         """ """
         return self._get_image_predictions(image_id=image_id)
 
@@ -2705,8 +2789,6 @@ class Database:
         self, cursor: Cursor[Prediction], req: CreatePredictionReq
     ) -> Prediction:
         """ """
-        image = self._get_image(cursor, req.image_id)
-        model = self._get_model(cursor, req.model_id)
 
         query = sql.SQL("""
 			INSERT INTO core.predicitons (
@@ -3105,19 +3187,9 @@ class Database:
 
         return crop
 
-    def create_reviewed_area(
-        self, req: CreateReviewedAreaReq, user: User, bypass: bool
-    ) -> ReviewedArea:
+    def create_reviewed_area(self, req: CreateReviewedAreaReq) -> ReviewedArea:
         """ """
-        if bypass:
-            return self._create_reviewed_area(req)
-        img_id = str(req.image_id)
-
-        res = self.check_permission("image", img_id, user.id, "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._create_reviewed_area(req)
-        else:
-            raise AuthorizationFailure(user.id, "acesss", "image", img_id)
+        return self._create_reviewed_area(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3375,15 +3447,9 @@ class Database:
         schemas = cursor.fetchall()
         return schemas
 
-    def get_project_schemas(self, project_id: UUID, user: User) -> list[Schema]:
+    def get_project_schemas(self, project_id: UUID) -> list[Schema]:
         """ """
-        res = self.check_permission("project", str(project_id), str(user.uuid), "view")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_project_schemas(project_id=project_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "view", "project", str(project_id)
-            )
+        return self._get_project_schemas(project_id=project_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Relationship Management - projectmanagement <-> projectmanagement: surveys <-> herdunits
@@ -3589,25 +3655,39 @@ class Database:
 
     @connect
     def _get_survey_images(
-        self, cursor: Cursor[Image], survey_id: Survey | int | UUID
-    ) -> list[Image] | Image:
+        self, cursor: Cursor[Any], survey_id: UUID, limit: int, offset: int
+    ) -> Tuple[List[Image], int]:
         """ """
+
+        query_1 = sql.SQL("SELECT COUNT(*) FROM core.images WHERE survey_id = %s")
+        query_2 = sql.SQL(""" 
+            SELECT * FROM core.images 
+            WHERE survey_id = %s
+            ORDER BY image_id ASC 
+            LIMIT %s OFFSET %s; 
+        """)
+
+        survey = self._get_survey(cursor, survey_id)
+
+        cursor.row_factory = tuple_row
+        res = cursor.execute(query_1, (survey.survey_id,)).fetchone()
+
+        if not res:
+            return [], 0
+
+        total_images = int(res[0])
+
         cursor.row_factory = class_row(Image)
-        query = sql.SQL(" SELECT * FROM core.images WHERE survey_id = %s; ")
-        match survey_id:
-            case Survey():
-                cursor.execute(query, (survey_id.survey_id,))
-            case int():
-                cursor.execute(query, (survey_id,))
-            case UUID():
-                survey = self._get_survey(survey_id)
-                cursor.execute(query, (survey.survey_id,))
 
-        return cursor.fetchall()
+        images = cursor.execute(query_2, (survey.survey_id, limit, offset)).fetchall()
 
-    def get_survey_images(self, survey_id: Survey | int | UUID) -> list[Image]:
+        return images, total_images
+
+    def get_survey_images(
+        self, survey_id: UUID, limit: int, offset: int
+    ) -> Tuple[list[Image], int]:
         """ """
-        return self._get_survey_images(survey_id=survey_id)
+        return self._get_survey_images(survey_id, limit, offset)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Functionality - Get crops to review

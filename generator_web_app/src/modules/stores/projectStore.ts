@@ -11,16 +11,68 @@ import {
   HerdUnit,
   Model,
   Survey,
+  Image,
+  type imageRecords,
+  Prediction,
 } from "@/types/generatorobjects.ts";
-import { createSurvey } from "@/modules/api/surveys.ts";
+<<<<<<< HEAD
+import {
+  createSurvey,
+  deleteSurvey,
+  getSurveyImages,
+  type createSurveyOptions,
+} from "@/modules/api/surveys.ts";
+=======
+import { createSurvey, deleteSurvey, getSurveyImages, type createSurveyOptions } from "@/modules/api/surveys.ts";
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 import {
   getProjectModels,
   getAllProjects,
   getProjectHerdUnits,
+  type createProjectOptions,
+  createProject,
+  deleteProject,
+  getProjectSchemas,
 } from "@/modules/api/projects.ts";
-import { createHerdUnit, getHerdUnitSurveys } from "@/modules/api/herdunits.ts";
+import {
+  createHerdUnit,
+  deleteHerdUnit,
+  getHerdUnitSurveys,
+  type createHerdUnitOptions,
+} from "@/modules/api/herdunits.ts";
+<<<<<<< HEAD
+import {
+  createModel,
+  deleteModel,
+  getModelSchema,
+  type createModelOptions,
+} from "@/modules/api/models.ts";
+import {
+  createSchema,
+  deleteSchema,
+=======
 import { getModelSchema } from "@/modules/api/models.ts";
-import { getSchemaLabels } from "@/modules/api/schemas.ts";
+import {
+  createSchema,
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
+  getSchemaLabels,
+  getSchemaModels,
+  type createSchemaOptions,
+} from "@/modules/api/schemas.ts";
+<<<<<<< HEAD
+import {
+  deleteImage,
+  getImageAnnotations,
+  getImagePredictions,
+} from "../api/images";
+import {
+  createLabel,
+  deleteLabel,
+  type createLabelOptions,
+} from "../api/labels";
+=======
+import { deleteImage, getImageAnnotations, getImagePredictions } from "../api/images";
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -38,6 +90,9 @@ export const useProjectStore = defineStore("pStore", {
     herd_unit_idx: undefined as number | undefined,
     surveys: [] as Survey[],
     survey_idx: undefined as number | undefined,
+    imageRecords: {} as imageRecords,
+    active_image: undefined as string | undefined,
+    active_prediction: undefined as string | undefined,
   }),
   getters: {
     CurrentProject: (state) =>
@@ -92,6 +147,33 @@ export const useProjectStore = defineStore("pStore", {
       state.survey_idx != undefined
         ? state.surveys[state.survey_idx]
         : undefined,
+    CurrentImage: (state) =>
+      state.active_image != undefined
+        ? state.imageRecords.images[state.active_image]
+        : undefined,
+    CurrentImages: (state) => {
+      return state.imageRecords?.images
+        ? Object.values(state.imageRecords.images)
+        : [];
+    },
+    CurrentPrediction: (state) =>
+      state.active_prediction != undefined
+        ? state.imageRecords.predictions[state.active_prediction]
+        : undefined,
+    CurrentPredictions: (state) => {
+      return state.imageRecords?.predictions
+        ? Object.values(state.imageRecords.predictions)
+        : [];
+    },
+    CurrentAnnotations: (state) => {
+      return state.imageRecords?.annotations
+        ? Object.values(state.imageRecords.annotations)
+        : [];
+<<<<<<< HEAD
+    },
+=======
+    }
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
   },
   actions: {
     get_schema_by_id(id: string) {
@@ -107,9 +189,28 @@ export const useProjectStore = defineStore("pStore", {
           this.CurrentSchema.uuid,
         )) as Label[];
     },
+    async get_schema_models() {
+      if (this.CurrentSchema)
+        this.models = (await getSchemaModels(
+          this.CurrentSchema.uuid,
+        )) as Model[];
+    },
     get_label_by_id(id: string) {
       if (this.labels)
         return this.labels.find((label) => label.uuid === id) as Label;
+    },
+    async create_project(options: createProjectOptions): Promise<boolean> {
+      const project = await createProject(options);
+
+      if (project == undefined) return false;
+
+      this.projects.push(project);
+      return true;
+    },
+    async create_schema(options: createSchemaOptions) {
+      const schema = await createSchema(options);
+
+      this.schemas.push(schema);
     },
     async get_project_models() {
       if (this.CurrentProject)
@@ -117,10 +218,14 @@ export const useProjectStore = defineStore("pStore", {
           this.CurrentProject.uuid,
         )) as Model[];
     },
+    async get_project_schemas() {
+      if (this.CurrentProject)
+        this.schemas = await getProjectSchemas(this.CurrentProject.uuid);
+    },
     async get_model_schema() {
       if (this.CurrentModel) {
         const schema = await getModelSchema(this.CurrentModel.uuid);
-        this.schemas.push(schema);
+        this.schemas = [schema];
         this.set_current_schema(schema);
       }
     },
@@ -130,33 +235,118 @@ export const useProjectStore = defineStore("pStore", {
           this.CurrentProject.uuid,
         )) as HerdUnit[];
     },
-    async create_herd_unit(project_id: string, name: string) {
-      const herd_unit = await createHerdUnit(project_id, name);
+    async create_herd_unit(options: createHerdUnitOptions) {
+      const herd_unit = await createHerdUnit(options);
       this.herd_units.push(herd_unit);
       this.herd_unit_idx = this.herd_units.indexOf(herd_unit);
     },
+<<<<<<< HEAD
+    async create_survey(options: createSurveyOptions) {
+      const survey = await createSurvey(options);
+=======
     async create_survey(
-      project_id: number,
-      herd_unit_id: number,
-      name: string,
-      survey_date: string,
-      additional_info: string,
+      options: createSurveyOptions
     ) {
       const survey = await createSurvey(
-        project_id,
-        herd_unit_id,
-        name,
-        survey_date,
-        additional_info,
-      );
+        options);
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
       this.surveys.push(survey);
       this.survey_idx = this.surveys.indexOf(survey);
+    },
+    async create_model(options: createModelOptions) {
+      const model = await createModel(options);
+
+      this.models.push(model);
+      this.model_idx = this.models.indexOf(model);
+    },
+    async create_label(options: createLabelOptions) {
+      const label = await createLabel(options);
+
+      this.labels.push(label);
+      this.label_idxs.push(this.labels.indexOf(label));
     },
     async get_herd_unit_surveys() {
       if (this.CurrentHerdUnit)
         this.surveys = (await getHerdUnitSurveys(
           this.CurrentHerdUnit.uuid,
         )) as Survey[];
+    },
+    async delete_project(id: string) {
+      const proj = this.projects.find((project) => project.uuid == id);
+      const index = this.projects.indexOf(proj as Project);
+
+      await deleteProject(this.projects[index].uuid);
+      this.projects.splice(index, 1);
+    },
+    async delete_herd_unit(id: string) {
+      const herdUnit = this.herd_units.find((hu) => hu.uuid == id);
+      const index = this.herd_units.indexOf(herdUnit as HerdUnit);
+
+      await deleteHerdUnit(this.herd_units[index].uuid);
+      this.herd_units.splice(index, 1);
+    },
+    async delete_image(id: string) {
+      await deleteImage(id);
+      delete this.imageRecords.images[id];
+    },
+    async delete_survey(id: string) {
+      const survey = this.surveys.find((survey) => survey.uuid == id);
+      const index = this.surveys.indexOf(survey as Survey);
+
+      await deleteSurvey(this.surveys[index].uuid);
+<<<<<<< HEAD
+
+      this.surveys.splice(index, 1);
+    },
+    async delete_label(id: string) {
+      const label = this.labels.find((label) => label.uuid == id);
+      const index = this.labels.indexOf(label as Label);
+
+      await deleteLabel(this.labels[index].uuid);
+
+      this.labels.splice(index, 1);
+    },
+    async delete_model(id: string) {
+      const model = this.models.find((model) => model.uuid == id);
+      const index = this.models.indexOf(model as Model);
+
+      await deleteModel(this.models[index].uuid);
+
+      this.models.splice(index, 1);
+    },
+    async delete_schema(id: string) {
+      const schema = this.schemas.find((schema) => schema.uuid == id);
+      const index = this.schemas.indexOf(schema as Schema);
+
+      await deleteSchema(this.schemas[index].uuid);
+
+      this.schemas.splice(index, 1);
+=======
+      this.surveys.splice(index, 1);
+>>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
+    },
+    async get_survey_images(page: number, per_page: number) {
+      if (this.CurrentSurvey != undefined) {
+        this.imageRecords = await getSurveyImages(
+          this.CurrentSurvey.uuid,
+          page,
+          per_page,
+        );
+      }
+    },
+    async get_image_predictions() {
+      if (this.CurrentImage != undefined) {
+        this.imageRecords.predictions = await getImagePredictions(
+          this.CurrentImage.uuid,
+        );
+      }
+    },
+    async get_image_annotations() {
+      if (this.CurrentImage != undefined) {
+        this.imageRecords.annotations = await getImageAnnotations(
+          this.CurrentImage.uuid,
+        );
+      }
     },
     get_project_by_id(id: string) {
       if (this.projects)
@@ -177,6 +367,7 @@ export const useProjectStore = defineStore("pStore", {
         const idx = this.projects.indexOf(project);
         if (this.project_idx == idx) {
           this.project_idx = undefined;
+          this.clear_project_children();
           return;
         }
         this.project_idx = idx;
@@ -216,6 +407,24 @@ export const useProjectStore = defineStore("pStore", {
         this.survey_idx = idx;
       }
     },
+    set_current_image(image: Image) {
+      if (
+        this.imageRecords.images[image.uuid] != undefined &&
+        this.active_image != image.uuid
+      ) {
+        this.active_image = image.uuid;
+      } else {
+        this.active_image = undefined;
+      }
+    },
+    set_current_prediction(prediction: Prediction) {
+      if (
+        this.imageRecords.predictions[prediction.uuid] != undefined &&
+        this.active_prediction != prediction.uuid
+      ) {
+        this.active_prediction = prediction.uuid;
+      }
+    },
     set_current_herd_unit(herdunit: HerdUnit | undefined) {
       if (herdunit != undefined) {
         const idx = this.herd_units.indexOf(herdunit);
@@ -226,18 +435,6 @@ export const useProjectStore = defineStore("pStore", {
         this.herd_unit_idx = idx;
       }
     },
-    clear_state() {
-      this.schemas = [];
-      this.schema_idx = undefined;
-      this.labels = [];
-      this.label_idxs = [];
-      this.models = [];
-      this.model_idx = undefined;
-      this.herd_units = [];
-      this.herd_unit_idx = undefined;
-      this.surveys = [];
-      this.survey_idx = undefined;
-    },
     clear_herd_units() {
       this.herd_units = [];
       this.herd_unit_idx = undefined;
@@ -245,10 +442,6 @@ export const useProjectStore = defineStore("pStore", {
     clear_models() {
       this.models = [];
       this.model_idx = undefined;
-    },
-    clear_projects() {
-      this.projects = [];
-      this.project_idx = undefined;
     },
     clear_surveys() {
       this.surveys = [];
@@ -261,6 +454,13 @@ export const useProjectStore = defineStore("pStore", {
     clear_labels() {
       this.labels = [];
       this.label_idxs = [];
+    },
+    clear_project_children() {
+      this.clear_herd_units();
+      this.clear_models();
+      this.clear_surveys();
+      this.clear_schemas();
+      this.clear_models();
     },
   },
 });

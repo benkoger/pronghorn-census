@@ -6,7 +6,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from flask import Blueprint, abort, request
+from flask import Blueprint, abort, current_app, request
 from flask_login import login_required, current_user
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
@@ -140,18 +140,6 @@ def get_schema(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.get("/<string:model_id>/predictions")
-@login_required
-@permission_required("access")
-def get_predictions():
-    """ """
-    score_range = request.args.get("score_range", None)
-    return ""
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 @modelBp.get("/training")
 @login_required
 @permission_required("access")
@@ -187,7 +175,7 @@ def get_training_set():
 def create(body: CreateModelReq):
     """ """
     try:
-        model = base.create_model(body.model_dump())
+        model = base.create_model(body)
     except Exception as e:
         print(e)
         abort(500)
@@ -345,4 +333,14 @@ def update(model_id: str):
 @permission_required("access")
 def delete_model(model_id: str):
     """ """
-    return ""
+    try:
+        base.delete_model(UUID(model_id))
+
+    except ObjectNotFound as e:
+        current_app.logger.exception(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
+
+    return "", 204

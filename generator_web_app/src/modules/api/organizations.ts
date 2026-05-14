@@ -23,9 +23,10 @@ export async function createOrganization(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(options)
+    body: JSON.stringify(options),
   });
+
   if (!response.ok) throw new ApiError(await response.json());
 
-  return new Organization(await response.json() as OrganizationIntf);
+  return new Organization((await response.json()) as OrganizationIntf);
 }

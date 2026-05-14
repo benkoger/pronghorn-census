@@ -171,6 +171,9 @@ class PredictionCrop(DBbase, ImageMixin):
     def to_dict(self) -> dict:
         return {
             "image_id": self.image_id,
+            "score": self.score,
+            "pred_id": self.pred_id,
+            "name": self.name,
             "approved": self.approved,
             "label": self.label,
             "dimensions": self.dimensions.to_dict(),

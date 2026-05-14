@@ -26,11 +26,12 @@ import { getRoles } from "../api/roles";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-export const useUserStore = defineStore("userStore", {
+export const useSystemStore = defineStore("systemStore", {
   state: () => ({
     first_login: true,
     theme: "dark",
     logged_in: false,
+    bootstrapped: undefined as undefined | boolean,
     organizations: {} as Record<number, Organization>,
     organization_idx: 1, // set to id when user is logged in
     user: undefined as User | undefined,
@@ -140,7 +141,7 @@ export const useUserStore = defineStore("userStore", {
           const pinia = getActivePinia() as ExtendedPina;
 
           pinia._s.forEach((store: Store, name: string) => {
-            if (name != "userStore") store.$reset();
+            if (name != "systemStore") store.$reset();
           });
 
           this.router.go(0);

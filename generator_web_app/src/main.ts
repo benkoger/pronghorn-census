@@ -8,7 +8,6 @@ import App from './app.vue';
 import router from './router';
 import { Icon } from '@iconify/vue';
 import VueKonva from 'vue-konva';
-import { useUserStore } from './modules/stores/userStore';
 
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
@@ -17,10 +16,6 @@ const app = createApp(App);
 app.use(pinia);
 app.use(router);
 app.use(VueKonva);
-
-const userStore = useUserStore();
-
-await userStore.check_auth();
 
 app.component('Icon', Icon);
 

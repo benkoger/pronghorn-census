@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { defineComponent } from "vue";
-	import { useUserStore } from "@/modules/stores/userStore.ts";
+	import { useSystemStore } from "@/modules/stores/systemStore.ts";
 	import { useOrgStore } from "@/modules/stores/organizationStore.ts";
 	import { mapState } from 'pinia';
 	import type { User } from "@/types/generatorobjects.ts";
@@ -13,11 +13,11 @@
 			SelectList: SelectorList
 		},
 		setup() {
-			const uStore = useUserStore();
+			const sStore = useSystemStore();
 			const oStore = useOrgStore();
 			if (!oStore.bootstrapped) oStore.bootstrap();
 
-			return { uStore, oStore };
+			return { sStore, oStore };
 		},
 		computed: {
 			...mapState(useOrgStore, {

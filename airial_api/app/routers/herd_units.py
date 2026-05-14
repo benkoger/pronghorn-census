@@ -5,7 +5,7 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort
+from flask import Blueprint, abort, current_app
 from flask_login import current_user, login_required
 from app.decorators import permission_required
 from database.object_models.user_management import User
@@ -27,13 +27,16 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @login_required
 def get_by_id(herd_unit_id: str):
     """ """
-    herd_unit = base.get_herd_unit(UUID(herd_unit_id), cast(User, current_user))
+    try:
+        herd_unit = base.get_herd_unit(UUID(herd_unit_id), cast(User, current_user))
+    except ObjectNotFound as e:
+        current_app.logger.error(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+        abort(500)
 
-    if herd_unit is None:
-        abort(404, f"Herd Unit with ID {herd_unit_id} was not found!")
-
-    else:
-        return herd_unit.to_dict()
+    return herd_unit.to_dict(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,11 +70,13 @@ def get_surveys(herd_unit_id: str):
         )
 
     except ValueError as e:
+        current_app.logger.exception(e)
         abort(400, str(e))
     except ObjectNotFound as e:
+        current_app.logger.exception(e)
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     return [survey.to_dict() for survey in surveys], 200
@@ -89,8 +94,25 @@ def create(body: CreateHerdUnitReq):
     """ """
     try:
         herd_unit = base.create_herd_unit(body)
-    except Exception as e:
-        print(e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return herd_unit.to_dict(), 201
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# DELETE
+
+
+@herdunitBp.delete("/<string:herd_unit_id>")
+@login_required
+@permission_required("access")
+def delete(herd_unit_id: str):
+    """ """
+    try:
+        base.delete_herd_unit(UUID(herd_unit_id))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
+
+    return "", 204

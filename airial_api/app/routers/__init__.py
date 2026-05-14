@@ -22,6 +22,7 @@ from .users import userBp
 from .annotations import annotBp
 from .system import systemBp
 from .roles import roleBp
+from .labels import labelBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -49,3 +50,4 @@ bp.register_blueprint(annotBp)
 bp.register_blueprint(systemBp)
 
 bp.register_blueprint(roleBp)
+bp.register_blueprint(labelBp)
