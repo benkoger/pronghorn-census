@@ -288,14 +288,10 @@ const moveToImage = (image: Image) => {
                 </template>
               </SelectorList>
             </BCol>
-            <BCol cols="6" v-if="pStore.CurrentModel">
+            <BCol cols="6">
               <h3>Model Details</h3>
               <BTabs pills fill>
-                <BTab
-                  title="Schema"
-                  :disabled="pStore.CurrentSchema == undefined"
-                  lazy
-                >
+                <BTab title="Schema" lazy>
                   <div class="mt-2">
                     <SelectorList
                       :items="pStore.schemas"
@@ -307,7 +303,7 @@ const moveToImage = (image: Image) => {
                     >
                       <template #create="{ Finished }">
                         <CreateSchema
-                          v-if="pStore.CurrentModel == undefined"
+                          v-if="pStore.CurrentModel != undefined"
                           :project="pStore.CurrentProject as Project"
                           :model="pStore.CurrentModel as Model"
                           :submit-action="pStore.create_schema"
@@ -342,9 +338,6 @@ const moveToImage = (image: Image) => {
                   </div>
                 </BTab>
               </BTabs>
-            </BCol>
-            <BCol v-else>
-              <span>Select a Model to continue</span>
             </BCol>
           </BRow>
         </BTab>
