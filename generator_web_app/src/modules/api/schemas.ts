@@ -40,7 +40,7 @@ export async function getSchemaModels(schema_id: string): Promise<Model[]> {
     method: "GET",
     credentials: "include",
     headers: {
-      "content-Type": "application/json",
+      "Content-Type": "application/json",
     },
   });
 
@@ -79,7 +79,6 @@ export async function createSchema(
 
   return new Schema((await response.json()) as SchemaIntf);
 }
-<<<<<<< HEAD
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // DELETE
@@ -97,5 +96,3 @@ export async function deleteSchema(schema_id: string): Promise<boolean> {
 
   return true;
 }
-=======
->>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9

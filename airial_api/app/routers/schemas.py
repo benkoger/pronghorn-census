@@ -93,7 +93,6 @@ def create(body: createSchemaReq):
         abort(500)
 
     return schema.to_dict(), 201
-<<<<<<< HEAD
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -116,5 +115,3 @@ def delete_schema(schema_id: str):
         abort(500)
 
     return "", 204
-=======
->>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
