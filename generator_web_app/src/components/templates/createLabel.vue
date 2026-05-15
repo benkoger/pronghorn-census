@@ -40,8 +40,8 @@ const submitReq = async () => {
   });
 
   create({
-    title: `Herd Unit ${options.value.name} created successfully`,
-    body: `The Herd Unit was created successfully.`,
+    title: `Label ${options.value.name} created successfully`,
+    body: `The Label was created successfully.`,
     variant: "success",
     position: "bottom-start",
   });
