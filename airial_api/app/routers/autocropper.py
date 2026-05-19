@@ -24,7 +24,7 @@ from database.object_models import (
     AutoCropperBatchQuery,
     AutoCropReq,
 )
-from database.object_models.core import PredictionQuery, UpdateImageReq
+from database.object_models.core import UpdateImageReq
 from database.object_models.project_management import LabelQuery
 from database.object_models.user_management import User
 
@@ -64,9 +64,8 @@ def auto_crop_image(body: AutoCropReq):
     """ """
     try:
         image = base.get_image(body.image_id)
-        predictions = base.get_predictions(
-            PredictionQuery(prediction_id=body.prediction_ids)
-        )
+        predictions = body.predictions
+
         labels = base.get_labels(
             LabelQuery(label_id=body.label_ids), cast(User, current_user)
         )
