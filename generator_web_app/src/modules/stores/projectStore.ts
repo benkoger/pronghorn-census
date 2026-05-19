@@ -282,6 +282,8 @@ export const useProjectStore = defineStore("pStore", {
       const label = this.labels.find((label) => label.uuid == id);
       const index = this.labels.indexOf(label as Label);
 
+      if (this.CurrentLabelIds.includes(id)) this.set_current_labels(label);
+
       await deleteLabel(this.labels[index].uuid);
 
       this.labels.splice(index, 1);
@@ -361,7 +363,7 @@ export const useProjectStore = defineStore("pStore", {
       }
     },
     set_current_labels(label: Label | undefined) {
-      if (label != undefined) {
+      if (label != undefined && !Array.isArray(label)) {
         const idx = this.labels.indexOf(label);
         if (this.label_idxs.includes(idx)) {
           if (this.label_idxs.length > 1) {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useToast } from "bootstrap-vue-next";
 import { type apiError } from "@/modules/api/errors";
 import { Schema } from "@/types/generatorobjects";
 import type { createLabelOptions } from "@/modules/api/labels";
+import { useProjectStore } from "@/modules/stores/projectStore";
 
 const { create } = useToast();
+const pStore = useProjectStore();
 
 const props = withDefaults(
   defineProps<{
@@ -18,13 +20,25 @@ const props = withDefaults(
   },
 );
 
+const minLabelValue = computed(() => {
+  const labels = pStore.SortedLabels;
+  console.log(labels[labels.length - 1].label + 1);
+
+  if (!labels || labels.length === 0) {
+    console.log("here");
+    return 1;
+  }
+
+  return labels[labels.length - 1].label + 1;
+});
+
 const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createLabelOptions>({
   name: "",
   schema_id: props.schema.uuid,
-  label: 0,
-  image_link: "",
+  label: minLabelValue.value,
+  image_link: " ",
   color: "#ffffff",
 });
 
@@ -94,10 +108,9 @@ const submitReq = async () => {
           id="label"
           required
           trim
-          min="0"
+          :min="minLabelValue"
           data-bwignore="true"
           v-model="options.label"
-          placeholder=" "
         />
       </BFormFloatingLabel>
     </BInputGroup>
@@ -111,7 +124,6 @@ const submitReq = async () => {
         <BFormInput
           type="text"
           id="label_link"
-          required
           trim
           data-bwignore="true"
           v-model="options.image_link"

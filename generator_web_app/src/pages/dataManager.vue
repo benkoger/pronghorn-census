@@ -268,7 +268,10 @@ const moveToImage = (image: Image) => {
           :disabled="pStore.CurrentProject == undefined"
           lazy
         >
-          <BRow class="mt-3 h-100">
+          <BRow
+            class="mt-3 overflow-y-auto"
+            style="height: calc(100vh - 100px)"
+          >
             <BCol cols="6">
               <SelectorList
                 :items="pStore.models"
