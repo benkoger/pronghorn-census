@@ -227,7 +227,7 @@ def create(body: CreateImageReq):
                     description: Database error.
     """
     try:
-        image = base.create_image(body.model_dump())
+        image = base.create_image(body)
 
     except UniqueViolation as e:
         current_app.logger.error(e)

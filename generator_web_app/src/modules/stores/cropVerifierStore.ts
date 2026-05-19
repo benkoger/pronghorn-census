@@ -142,7 +142,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
     // --------------------------------------------------------------------------------------
 
-    async getReviewedArea(increment: boolean = true, silent: boolean = false) {
+    async getReviewedArea(increment: boolean = true) {
       if (
         this.pStore.CurrentHerdUnit === undefined ||
         this.pStore.CurrentSurvey === undefined
@@ -154,7 +154,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         include_reviewed: this.alreadyReviewed,
       });
 
-      if (resp == undefined && !silent) {
+      if (resp == undefined) {
         this.loading = false;
         this.outofcrops = true;
         this.done = true;
@@ -373,7 +373,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         kind: "update",
         id: uuid,
         req: {
-          label_id: label.label,
+          label_id: label.label_id,
         },
         original: { ...this.currentAnnotations[uuid] },
         boxConf: { ...this.currentBoxConfs[uuid] },
@@ -496,9 +496,12 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         }
       }
 
-      for (const annot_updates of Object.values(this.updates)) {
+      for (const [key, annot_updates] of Object.entries(this.updates)) {
         // send only the latest update
-        updateAnnotReq.requests.concat(annot_updates[annot_updates.length - 1]);
+        const update_req = annot_updates[annot_updates.length - 1];
+        updateAnnotReq.requests.push(update_req);
+        updateAnnotReq.ids.push(key);
+        console.log(updateAnnotReq.requests);
       }
 
       let created_annots: Annotation[] = [];
@@ -532,7 +535,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       this.loading = false;
       this.actionStack = [];
       this.updates = {};
-      if (!this.done) await this.nextImage();
+      await this.nextImage();
     },
 
     // --------------------------------------------------------------------------------------
@@ -567,7 +570,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
       // prefetch next image only if there are next images
       if (!this.done) {
-        this.getReviewedArea(false, true);
+        this.getReviewedArea(false);
       }
     },
 

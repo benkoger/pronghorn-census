@@ -330,4 +330,3 @@ export default defineComponent({
     <Crop v-if="currentStep === 4" />
   </BreadCrumb>
 </template>
-

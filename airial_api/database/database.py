@@ -31,6 +31,7 @@ from psycopg_pool import ConnectionPool
 from werkzeug.security import generate_password_hash
 
 from database.object_models.core.images import (
+    CreateImageReq,
     CreateReviewedAreaReq,
     RAQuery,
     UpdateReviewedAreaReq,
@@ -2561,17 +2562,17 @@ class Database:
     # Core - Images
 
     @connect
-    def _create_image(self, cursor: Cursor[Image], parameters: dict) -> Image:
+    def _create_image(self, cursor: Cursor[Image], req: CreateImageReq) -> Image:
         """ """
-        if isinstance(parameters["survey_id"], str):
-            parameters["survey_id"] = self._get_survey(
-                cursor, UUID(parameters["survey_id"])
-            ).survey_id
+        parameters = req.model_dump()
 
-        if isinstance(parameters["herd_unit_id"], str):
-            parameters["herd_unit_id"] = self._get_herd_unit(
-                cursor, UUID(parameters["herd_unit_id"])
-            ).herd_unit_id
+        survey = self._get_survey(parameters["survey_id"])
+
+        parameters["survey_id"] = survey.survey_id
+
+        herd_unit = self._get_herd_unit(parameters["herd_unit_id"])
+
+        parameters["herd_unit_id"] = herd_unit.herd_unit_id
 
         query = sql.SQL(""" 
 			INSERT INTO core.images (
@@ -2592,6 +2593,17 @@ class Database:
 
         if not image:
             raise FailedToCreate("Image")
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "image", str(image.uuid), "survey", str(survey.uuid), "parent"
+                ),
+                self.create_spice_update(
+                    "image", str(image.uuid), "herd_unit", str(herd_unit.uuid), "parent"
+                ),
+            ]
+        )
 
         return image
 
@@ -2760,20 +2772,11 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _delete_image(self, cursor: Cursor, image_id: int | UUID) -> bool:
+    def _delete_image(self, cursor: Cursor, image_id: UUID) -> bool:
         """ """
         query = sql.SQL(""" DELETE FROM core.images WHERE {id_field} = %s; """)
-        match image_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("image_id")), (image_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (image_id,)
-                )
-            case _:
-                raise TypeError("image_id must be an integer, or UUID")
+
+        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (image_id,))
 
         return True if cursor.rowcount > 0 else False
 
@@ -2789,9 +2792,16 @@ class Database:
         self, cursor: Cursor[Prediction], req: CreatePredictionReq
     ) -> Prediction:
         """ """
+        image = self._get_image(cursor, req.image_id)
+        model = self._get_model(cursor, req.model_id)
+
+        parameters = req.model_dump()
+
+        parameters["image_id"] = image.image_id
+        parameters["model_id"] = model.model_id
 
         query = sql.SQL("""
-			INSERT INTO core.predicitons (
+			INSERT INTO core.predictions (
 				image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
 			)
 			VALUES (
@@ -2801,10 +2811,23 @@ class Database:
 
 			""")
 
+        cursor.row_factory = class_row(Prediction)
         prediction = cursor.execute(query, req.model_dump()).fetchone()
 
         if not prediction:
             raise FailedToCreate("prediction")
+
+        self.write_spice_relationships(
+            [
+                self.create_spice_update(
+                    "prediction",
+                    str(prediction.uuid),
+                    "image",
+                    str(image.uuid),
+                    "parent",
+                )
+            ]
+        )
 
         return prediction
 
@@ -3527,10 +3550,14 @@ class Database:
 
         cursor.row_factory = dict_row
         query = sql.SQL(""" 
-			WITH SelectedImageIds AS (
+		    WITH SelectedImageIds AS (
 				SELECT DISTINCT I.image_id, I.herd_unit_id, I.survey_id, P.score
 				FROM core.images I
-				INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
+				INNER JOIN (
+					-- Subquery replacing the predictions_by_confidence view
+					SELECT image_id, model_id, reviewed_by_user_id, label, score 
+					FROM core.predictions
+				) P ON I.image_id = P.image_id
 				WHERE I.herd_unit_id = %(herd_unit_id)s
 					AND I.survey_id = %(survey_id)s
 					AND I.opened_by_user_id = 0
@@ -3569,14 +3596,14 @@ class Database:
 						ORDER BY P.score DESC
 					) AS predictions
 				FROM core.images I
-				INNER JOIN core."predictions_by_confidence" P ON I.image_id = P.image_id
+				INNER JOIN core.predictions P ON I.image_id = P.image_id
 				WHERE I.image_id IN (SELECT image_id FROM SelectedImageIds)
 					AND P.label = ANY(%(labels)s)
 					AND P.score > %(score)s
 					AND P.model_id = %(model_id)s
 				GROUP BY I.image_id 
 			) AS img_preds;
-		""")
+                        """)
 
         cursor.execute(query, q_params)
 
