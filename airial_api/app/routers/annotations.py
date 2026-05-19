@@ -151,11 +151,15 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
     """
     try:
         annotations = []
+        print(body.requests)
+        print(f"ids: {body.ids}")
 
         for req, annot_id in zip(body.requests, body.ids):
+            print("hi")
             annotations.append(
                 base.update_annotation(annot_id, req, cast(User, current_user))
             )
+            print(annot_id)
 
     except ObjectNotFound as e:
         current_app.logger.exception(e)
