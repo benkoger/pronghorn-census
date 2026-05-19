@@ -22,7 +22,6 @@ const props = withDefaults(
 
 const minLabelValue = computed(() => {
   const labels = pStore.SortedLabels;
-  console.log(labels[labels.length - 1].label + 1);
 
   if (!labels || labels.length === 0) {
     console.log("here");
