@@ -3550,59 +3550,57 @@ class Database:
 
         cursor.row_factory = dict_row
         query = sql.SQL(""" 
-		    WITH SelectedImageIds AS (
-				SELECT DISTINCT I.image_id, I.herd_unit_id, I.survey_id, P.score
-				FROM core.images I
-				INNER JOIN (
-					-- Subquery replacing the predictions_by_confidence view
-					SELECT image_id, model_id, reviewed_by_user_id, label, score 
-					FROM core.predictions
-				) P ON I.image_id = P.image_id
-				WHERE I.herd_unit_id = %(herd_unit_id)s
-					AND I.survey_id = %(survey_id)s
-					AND I.opened_by_user_id = 0
-					AND P.model_id = %(model_id)s
-					AND P.reviewed_by_user_id = 0  
-					AND P.label = ANY(%(labels)s)
-					AND P.score > %(score)s
-				ORDER BY P.score DESC
-				LIMIT %(batch_size)s
-			)
-			SELECT json_agg(row_to_json(img_preds))
-			FROM (
-				SELECT
-					I.image_id,
-					I.name,
-					I.in_training,
-					I.crops_generated,
-					I.created,
-					I.modified,
-					I.image_length_px,
-					I.image_width_px,
-					I.uuid,
-					json_agg(
-						json_build_object(
-							'pred_id', P.pred_id,
-							'image_id', P.image_id,
-							'model_id', P.model_id,
-							'dimensions', json_build_object(
-								'top_left', json_build_array(P.box_tx, P.box_ty), 
-								'bottom_right', json_build_array(P.box_bx, P.box_by)),
-							'score', P.score,
-							'label', P.label,
-							'created', P.created,
-							'uuid', P.uuid
-						)
-						ORDER BY P.score DESC
-					) AS predictions
-				FROM core.images I
-				INNER JOIN core.predictions P ON I.image_id = P.image_id
-				WHERE I.image_id IN (SELECT image_id FROM SelectedImageIds)
-					AND P.label = ANY(%(labels)s)
-					AND P.score > %(score)s
-					AND P.model_id = %(model_id)s
-				GROUP BY I.image_id 
-			) AS img_preds;
+		    WITH SelectedImages AS (
+    SELECT I.image_id
+    FROM core.images I
+    INNER JOIN core.predictions P ON I.image_id = P.image_id
+    WHERE I.herd_unit_id = %(herd_unit_id)s
+      AND I.survey_id = %(survey_id)s
+      AND I.opened_by_user_id = 0
+      AND P.model_id = %(model_id)s
+      AND P.reviewed_by_user_id = 0  
+      AND P.label = ANY(%(labels)s)
+      AND P.score > %(score)s
+    GROUP BY I.image_id
+    ORDER BY MAX(P.score) DESC  
+    LIMIT %(batch_size)s
+)
+SELECT json_agg(row_to_json(img_preds))
+FROM (
+        SELECT
+        I.image_id,
+        I.name,
+        I.in_training,
+        I.crops_generated,
+        I.created,
+        I.modified,
+        I.image_length_px,
+        I.image_width_px,
+        I.uuid,
+        json_agg(
+            json_build_object(
+                'pred_id', P.pred_id,
+                'image_id', P.image_id,
+                'model_id', P.model_id,
+                'dimensions', json_build_object(
+                    'top_left', json_build_array(P.box_tx, P.box_ty), 
+                    'bottom_right', json_build_array(P.box_bx, P.box_by)),
+                'score', P.score,
+                'label', P.label,
+                'created', P.created,
+                'uuid', P.uuid
+            )
+            ORDER BY P.score DESC -- Internal array stays perfectly ordered
+        ) AS predictions,
+        MAX(P.score) AS max_score -- Kept for outer sorting parity
+    FROM core.images I
+    INNER JOIN core.predictions P ON I.image_id = P.image_id
+    WHERE I.image_id IN (SELECT image_id FROM SelectedImages)
+      AND P.label = ANY(%(labels)s)
+      AND P.score > %(score)s
+      AND P.model_id = %(model_id)s
+    GROUP BY I.image_id
+    ORDER BY max_score DESC) AS img_preds;
                         """)
 
         cursor.execute(query, q_params)
