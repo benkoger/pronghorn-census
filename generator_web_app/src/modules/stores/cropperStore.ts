@@ -228,7 +228,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
         await autoCrop({
           image_id: this.currentImage.uuid,
           predictions: this.approvedPredictions,
-          label_ids: pStore.CurrentLabelIds,
+          label_ids: pStore.LabelIds,
         });
       }
 
