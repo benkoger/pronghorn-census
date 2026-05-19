@@ -114,6 +114,12 @@ export const useProjectStore = defineStore("pStore", {
       }
       return ids;
     },
+    LabelIds(): string[] {
+      const ids: string[] = [];
+      for (const label of this.labels) ids.push(label.uuid);
+
+      return ids;
+    },
     SortedLabels(state): Label[] {
       return state.labels.sort((a: Label, b: Label) => {
         if (a.label < b.label) {
