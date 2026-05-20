@@ -1,6 +1,7 @@
 import multiprocessing
 import os
-import gevent.monkey
+
+# import gevent.monkey
 
 bind = "0.0.0.0:8000"
 forwarded_allow_ips = "*"
@@ -8,9 +9,10 @@ workers = os.environ.get("NUM_API_WORKERS") or multiprocessing.cpu_count() * 2 +
 worker_class = "gthread"
 worker_connections = 2000
 
-
-def when_ready(server):
-    gevent.monkey.patch_all()
+#
+# def when_ready(server):
+#     gevent.monkey.patch_all()
+#
 
 
 def post_fork(server, worker):
