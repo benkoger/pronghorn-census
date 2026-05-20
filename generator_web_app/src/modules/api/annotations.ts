@@ -74,6 +74,7 @@ export async function bulkCreateAnnotations(
 // PATCH
 
 export interface updateAnnotationOptions {
+  annotation_id: string;
   image_id?: number;
   label_id?: number;
   box_tx?: number;
@@ -105,7 +106,6 @@ export async function updateAnnotation(
 
 export interface bulkUpdateAnnotationOptions {
   reviewed_area_id: string;
-  ids: string[];
   requests: updateAnnotationOptions[];
 }
 
@@ -136,16 +136,23 @@ export async function bulkUpdateAnnotations(
 // ---------------------------------------------------------------------------------------------------------------------------
 // DELETE
 
+export interface deleteAnnotationOptions {
+  annotation_id: string;
+}
+
 export async function deleteAnnotation(
-  annotation_id: string,
+  options: deleteAnnotationOptions,
 ): Promise<boolean> {
-  const response = await fetch(`${api_url}/annotations/${annotation_id}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${api_url}/annotations/${options.annotation_id}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
 
   if (!response.ok) throw new ApiError(await response.json());
 
@@ -153,12 +160,13 @@ export async function deleteAnnotation(
 }
 
 export interface bulkDeleteAnnotationsOptions {
-  ids: string[];
+  requests: deleteAnnotationOptions[];
 }
 
 export async function bulkDeleteAnnotations(
   options: bulkDeleteAnnotationsOptions,
 ): Promise<boolean> {
+  console.log(options);
   const response = await fetch(`${api_url}/annotations/bulk-delete`, {
     method: "DELETE",
     credentials: "include",

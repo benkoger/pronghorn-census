@@ -122,6 +122,7 @@ router.beforeEach(async (to) => {
         query: { redirect: to.fullPath },
       };
     }
+    await sStore.check_admin();
   }
 
   return true;

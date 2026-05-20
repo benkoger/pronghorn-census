@@ -53,10 +53,11 @@ db_config = {
 }
 
 if (os.environ.get("DB_SSL") or "false").lower() in true_set:
+    db_config["sslmode"] = "require"
+
+if os.environ.get("DB_SSL_MODE") == "verify-full":
     db_config["sslmode"] = "verify-full"
     db_config["sslrootcert"] = os.environ.get("DB_SSL_ROOT_CERT_PATH")
-    db_config["sslcert"] = os.environ.get("DB_SSL_CERT_PATH")
-    db_config["sslkey"] = os.environ.get("DB_SSL_KEY_PATH")
 
 spice_config = {
     "spice_url": os.environ.get("SPICE_URL"),

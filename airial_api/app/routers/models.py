@@ -4,6 +4,7 @@
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 from datetime import datetime
+from logging import exception
 from uuid import UUID
 
 from flask import Blueprint, abort, current_app, request
@@ -126,12 +127,15 @@ def get_schema(model_id: str):
     """
     try:
         project = base.get_model_schema(UUID(model_id), cast(User, current_user))
+
     except ValueError as e:
+        current_app.logger.error(e)
         abort(400, str(e))
     except ObjectNotFound as e:
+        current_app.logger.error(e)
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
-        print(e)
+        current_app.logger.exception(e)
         abort(500)
 
     return project.to_dict(), 200
@@ -176,8 +180,8 @@ def create(body: CreateModelReq):
     """ """
     try:
         model = base.create_model(body)
-    except Exception as e:
-        print(e)
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return model.to_dict(), 201
@@ -317,8 +321,12 @@ def update(model_id: str):
 
     try:
         model = base.update_model(UUID(model_id), data)
-    except Exception as e:
-        print(f"error: {e}")
+
+    except ObjectNotFound as e:
+        current_app.logger.error(e)
+        abort(404, str(e))
+    except (DatabaseError, Exception) as e:
+        current_app.logger.exception(e)
         abort(500)
 
     return model.to_dict(), 200
