@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, cast
 from uuid import UUID
 
+from grpcutil import bearer_token_credentials
 import psycopg.sql as sql
 from authzed.api.v1 import (
     BulkCheckPermissionRequest,
@@ -16,6 +17,7 @@ from authzed.api.v1 import (
     CheckPermissionRequest,
     CheckPermissionResponse,
     InsecureClient,
+    Client,
     LookupResourcesRequest,
     ObjectReference,
     Relationship,
@@ -36,6 +38,9 @@ from database.object_models.core.images import (
     RAQuery,
     UpdateReviewedAreaReq,
 )
+
+import atexit
+
 from database.object_models.project_management.models import CreateModelReq
 from database.object_models.project_management.projects import createProjectReq
 from database.object_models.project_management.schemas import createSchemaReq
@@ -101,10 +106,17 @@ class Database:
     ):
         self._config = db_config
         self._pool = None
-        self._spice_client = InsecureClient(
-            cast(str, spice_config["spice_url"]),
-            cast(str, spice_config["bearer_token"]),
-        )
+
+        if spice_config["use_tls"]:
+            self._spice_client = Client(
+                cast(str, spice_config["spice_url"]),
+                bearer_token_credentials(cast(str, spice_config["bearer_token"])),
+            )
+        else:
+            self._spice_client = InsecureClient(
+                cast(str, spice_config["spice_url"]),
+                cast(str, spice_config["bearer_token"]),
+            )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -131,6 +143,8 @@ class Database:
             max_lifetime=290,
             check=ConnectionPool.check_connection,
         )
+
+        atexit.register(self.close_pool)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
