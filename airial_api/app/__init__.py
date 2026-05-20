@@ -20,7 +20,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(FlaskConfig)
 
-    app.config["SESSION_REDIS"] = redis.from_url(app.config["SESSION_REDIS_URL"])
+    pool = redis.ConnectionPool.from_url(app.config["SESSION_REDIS_URL"])
+    app.config["SESSION_REDIS"] = redis.Redis(connection_pool=pool)
 
     CORS(
         app,
