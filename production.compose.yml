@@ -7,7 +7,6 @@ services:
       SPICEDB_DATASTORE_ENGINE: ${SPICEDB_DATASTORE_ENGINE}
       SPICEDB_DATASTORE_CONN_URI: ${SPICEDB_DATASTORE_CONN_URI}
       SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY}
-      SPICEDB_TLS: ${SPICEDB_TLS}
       SPICEDB_GRPC_TLS_CERT_PATH: ${SPICEDB_GRPC_TLS_CERT_PATH}
       SPICEDB_GRPC_TLS_KEY_PATH: ${SPICEDB_GRPC_TLS_KEY_PATH}
     command: serve 
@@ -46,6 +45,7 @@ services:
       DB_SSL: ${DB_SSL}
       DB_SSL_MODE: ${DB_SSL_MODE}
       DB_SSL_ROOT_CERT_PATH: ${DB_SSL_ROOT_CERT_PATH}
+      SPICEDB_TLS: ${SPICEDB_TLS}
     networks: 
       - pronghorn_app_network
     command: uv run gunicorn -c gunicorn.py "app:create_app()"

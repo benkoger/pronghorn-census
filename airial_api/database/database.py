@@ -111,10 +111,12 @@ class Database:
 
         if spice_config["use_tls"]:
 
-            with open(cast(str, spice_config["SPICEDB_CERT_PATH"])) as f:
+            with open(cast(str, spice_config["SPICEDB_CERT_PATH"]), "rb") as f:
                 tls_creds = ssl_channel_credentials(f.read())
 
-            token_creds = access_token_call_credentials(spice_config["bearer_token"])
+            token_creds = access_token_call_credentials(
+                cast(str, spice_config["bearer_token"])
+            )
 
             combined_creds = composite_channel_credentials(tls_creds, token_creds)
 
