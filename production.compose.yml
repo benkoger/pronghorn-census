@@ -24,7 +24,6 @@ services:
       dockerfile: airial.containerfile
     environment:
       SECRET_KEY: ${SECRET_KEY}
-      VALKEY_HOST: ${VALKEY_HOST}
       VALKEY_PASS: ${VALKEY_PASS}
       AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -46,12 +45,14 @@ services:
       DB_SSL_MODE: ${DB_SSL_MODE}
       DB_SSL_ROOT_CERT_PATH: ${DB_SSL_ROOT_CERT_PATH}
       SPICEDB_TLS: ${SPICEDB_TLS}
+      VALKEY_TLS: ${VALKE_TLS}
     networks: 
       - pronghorn_app_network
     command: uv run gunicorn -c gunicorn.py "app:create_app()"
     volumes:
       - airial_certs:/etc/airial/certs:z,U 
       - spicedb_certs:/etc/spicedb/certs:z,U
+      - valkey_certs:/etc/valkey/certs:z,U
 
   valkey:
     container_name: prong_valkey
@@ -59,7 +60,16 @@ services:
     healthcheck:
       test: valkey-cli ping || exit 1
     restart: always
-    command: valkey-server --requirepass ${VALKEY_PASS}
+    volumes:
+      - valkey_certs:/etc/valkey/certs:z,U
+    command: >
+      sh -c "valkey-server 
+      --tls-port 6379
+      --port 0
+      --tls-cert-file /etc/valkey/certs/valkey.crt 
+      --tls-key-file /etc/valkey/certs/valkey.key 
+      --tls-auth-clients no
+      --requirepass ${VALKEY_PASS}"
     networks: 
       - pronghorn_app_network 
 
@@ -87,6 +97,8 @@ volumes:
   spicedb_certs:
     external: true
   airial_certs:
+    external: true
+  valkey_certs:
     external: true
 
 networks: 

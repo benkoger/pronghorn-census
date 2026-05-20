@@ -74,9 +74,7 @@ if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
 cache_config = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
-    "CACHE_REDIS_HOST": os.environ.get("VALKEY_HOST"),
-    "CACHE_REDIS_PORT": 6379,
-    "CACHE_REDIS_PASSWORD": os.environ.get("VALKEY_PASS"),
+    "CACHE_REDIS_URL": os.environ.get("SESSION_REDIS"),
 }
 
 s3_config = Config(
