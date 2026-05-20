@@ -83,6 +83,10 @@ volumes:
     external: true
   nginx_certs:
     external: true
+  spicedb_certs:
+    external: true
+  airial_certsL:
+    external: true
 
 networks: 
   pronghorn_app_network:
