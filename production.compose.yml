@@ -16,7 +16,7 @@ services:
       - "50052:50052"
       - "9090:9090" 
     volumes:
-      - spicedb_certs:/etc/spicedb/certs:ro,Z
+      - spicedb_certs:/etc/spicedb/certs:z,U
 
   pronghorn-api:
     container_name: prong_api
@@ -50,7 +50,8 @@ services:
       - pronghorn_app_network
     command: uv run gunicorn -c gunicorn.py "app:create_app()"
     volumes:
-      - airial_certs:etc/airial/certs:ro,Z
+      - airial_certs:/etc/airial/certs:z,U 
+      - spicedb_certs:/etc/spicedb/certs:z,U
 
   valkey:
     container_name: prong_valkey
@@ -85,7 +86,7 @@ volumes:
     external: true
   spicedb_certs:
     external: true
-  airial_certsL:
+  airial_certs:
     external: true
 
 networks: 
