@@ -18,6 +18,18 @@ const password = ref("");
 const showPassword = ref(false);
 const google_auth = `${api_url}/authorize/google`;
 
+onMounted(() => {
+  if (sStore.logged_in == true) {
+    router.push("/");
+  }
+  create({
+    title: "Authentication is required",
+    body: "You must be authenticated to access this resource",
+    variant: "warning",
+    position: "bottom-start",
+  });
+});
+
 const submitAuthRequest = async () => {
   await sStore
     .authenticate(email.value, password.value)
@@ -38,18 +50,6 @@ const submitAuthRequest = async () => {
     }
   }
 };
-
-onMounted(() => {
-  if (sStore.logged_in == true) {
-    router.push("/");
-  }
-  create({
-    title: "Authentication is required",
-    body: "You must be authenticated to access this resource",
-    variant: "warning",
-    position: "bottom-start",
-  });
-});
 </script>
 <template>
   <BContainer class="h-100">

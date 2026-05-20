@@ -8,9 +8,6 @@ export default defineComponent({
     const sStore = useSystemStore();
     return { sStore };
   },
-  async mounted() {
-    await this.sStore.start_up();
-  },
 });
 </script>
 <template>
