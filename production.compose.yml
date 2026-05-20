@@ -24,7 +24,6 @@ services:
       dockerfile: airial.containerfile
     environment:
       SECRET_KEY: ${SECRET_KEY}
-      VALKEY_PASS: ${VALKEY_PASS}
       AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -36,6 +35,7 @@ services:
       BUCKET_NAME: ${BUCKET_NAME}
       NUM_API_WORKERS: ${NUM_API_WORKERS}
       SESSION_REDIS: ${SESSION_REDIS}
+      CACHE_RDIS: ${CACE_REDIS}
       ORIGIN_URL: ${APPLICATION_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -45,7 +45,6 @@ services:
       DB_SSL_MODE: ${DB_SSL_MODE}
       DB_SSL_ROOT_CERT_PATH: ${DB_SSL_ROOT_CERT_PATH}
       SPICEDB_TLS: ${SPICEDB_TLS}
-      VALKEY_TLS: ${VALKE_TLS}
     networks: 
       - pronghorn_app_network
     command: uv run gunicorn -c gunicorn.py "app:create_app()"
