@@ -29,6 +29,9 @@ def create(body: CreateLabelReq):
     try:
         label = base.create_label(body)
 
+    except ObjectNotFound as e:
+        current_app.logger.error(e)
+        abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)

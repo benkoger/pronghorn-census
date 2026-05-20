@@ -51,27 +51,42 @@ def permission_required(permission: str):
             resources = req_body.model_dump() if req_body else {}
             resources.update(kwargs)
 
-            for field_name, value in resources.items():
-                if field_name.endswith("_id") and value is not None:
-                    obj_type = field_name.rsplit("_id", 1)[0]
+            def extract_and_queue_checks(data_dict: dict):
+                for field_name, value in data_dict.items():
+                    if field_name.endswith("_id") and value is not None:
+                        obj_type = field_name.rsplit("_id", 1)[0]
 
-                    if isinstance(value, int):
-                        try:
-                            obj_id = str(getters[obj_type](value))
-                        except (ObjectNotFound, KeyError) as e:
-                            current_app.logger.exception(e)
-                            abort(404, str(e))
-                    else:
-                        obj_id = str(value)
+                        if isinstance(value, int):
+                            try:
+                                db_obj = getters[obj_type](value)
+                                obj_id = str(getattr(db_obj, "uuid", db_obj))
+                            except (ObjectNotFound, KeyError) as e:
+                                current_app.logger.exception(e)
+                                abort(404, str(e))
+                        else:
+                            obj_id = str(value)
 
-                    item = base.create_bulk_check_request(
-                        object_type=obj_type,
-                        object_id=obj_id,
-                        subject_id=user.id,
-                        permission=permission,
-                    )
-                    check_items.append(item)
-                    targets.append((obj_type, obj_id))
+                        item = base.create_bulk_check_request(
+                            object_type=obj_type,
+                            object_id=obj_id,
+                            subject_id=user.id,
+                            permission=permission,
+                        )
+                        check_items.append(item)
+                        targets.append((obj_type, obj_id))
+
+            nested_requests = resources.get("requests")
+
+            if nested_requests and isinstance(nested_requests, list):
+                root_ids = {k: v for k, v in resources.items() if k != "requests"}
+                extract_and_queue_checks(root_ids)
+
+                for req in nested_requests:
+                    req_data = req.model_dump() if isinstance(req, BaseModel) else req
+                    if isinstance(req_data, dict):
+                        extract_and_queue_checks(req_data)
+            else:
+                extract_and_queue_checks(resources)
 
             if check_items:
                 bulk_res = base.bulk_check_permission(check_items)
@@ -82,9 +97,8 @@ def permission_required(permission: str):
                         != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
                     ):
                         obj_type, obj_id = targets[i]
-                        raise AuthorizationFailure(
-                            user.id, permission, obj_type, obj_id
-                        )
+                        e = AuthorizationFailure(user.id, permission, obj_type, obj_id)
+                        abort(401, str(e))
 
             return f(*args, **kwargs)
 

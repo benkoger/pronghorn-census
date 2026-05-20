@@ -13,11 +13,11 @@ import {
   setActiveOrg,
   createUser,
   createSuperUser,
-  type createUserOptions
+  type createUserOptions,
 } from "@/modules/api/users";
 import {
   createOrganization,
-  type createOrganizationOptions
+  type createOrganizationOptions,
 } from "@/modules/api/organizations";
 import { Organization, Role, User } from "@/types/generatorobjects.ts";
 import { getActivePinia, type Pinia, type Store } from "pinia";
@@ -38,7 +38,7 @@ export const useSystemStore = defineStore("systemStore", {
     is_admin: false,
     nav_toggled: false,
     router: useRouter(),
-    roles: [] as Role[]
+    roles: [] as Role[],
   }),
   persist: {
     storage: localStorage,
@@ -62,7 +62,10 @@ export const useSystemStore = defineStore("systemStore", {
         this.organization_idx = +Object.keys(this.organizations)[0];
       }
     },
-    async create_user(options: createUserOptions, login: boolean = false): Promise<boolean> {
+    async create_user(
+      options: createUserOptions,
+      login: boolean = false,
+    ): Promise<boolean> {
       const user = await createUser(options);
 
       if (user == undefined) return false;
@@ -73,7 +76,10 @@ export const useSystemStore = defineStore("systemStore", {
       }
       return true;
     },
-    async create_super_user(options: createUserOptions, login: boolean = false): Promise<boolean> {
+    async create_super_user(
+      options: createUserOptions,
+      login: boolean = false,
+    ): Promise<boolean> {
       const user = await createSuperUser(options);
 
       if (user == undefined) return false;
@@ -82,10 +88,12 @@ export const useSystemStore = defineStore("systemStore", {
         if (this.logged_in) await this.deuathenticate();
         await this.authenticate(options.email, options.password);
       }
-      await this.authenticate(options.email, options.password)
+      await this.authenticate(options.email, options.password);
       return true;
     },
-    async create_organization(options: createOrganizationOptions): Promise<boolean> {
+    async create_organization(
+      options: createOrganizationOptions,
+    ): Promise<boolean> {
       const organization = await createOrganization(options);
 
       if (this.organizations == undefined) return false;
@@ -93,10 +101,6 @@ export const useSystemStore = defineStore("systemStore", {
       this.organizations[2] = organization;
 
       return true;
-    },
-    async start_up() {
-      await this.check_admin();
-      if (this.logged_in) await this.get_roles();
     },
     async deuathenticate() {
       await deauthUser();

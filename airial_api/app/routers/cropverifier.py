@@ -51,13 +51,18 @@ def get(query: RAQuery):
         query.num = 1
         reviewed_area = base.get_crop_to_review(query, cast(User, current_user))
 
+        # Dont return 404, it is not an error for there to not be any crops needing reviewed
         if reviewed_area is None:
             return "", 204
+
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
 
     return reviewed_area.to_dict(), 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @verifierBp.get("/needing-reviewed")
@@ -68,8 +73,9 @@ def get_selection_count(query: RAQuery):
     """ """
     try:
         count = base.get_crop_to_review_selection_count(query)
+
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)

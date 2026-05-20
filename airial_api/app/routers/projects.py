@@ -40,7 +40,7 @@ def get_all(query: ProjectQuery):
         active_org = session.get(f"org_{org_id}")
         org = Organization(**unpackb(active_org))
 
-        projects = base.get_projects(query, org, cast(User, current_user))
+        projects = base.get_projects(query, org)
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
@@ -81,7 +81,7 @@ def get_by_id(project_id: str):
     return project.to_dict(), 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @projectBp.get("/<string:project_id>/models")
@@ -119,7 +119,7 @@ def get_models(project_id: str):
     return [model.to_dict() for model in models], 200
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @projectBp.get("/<string:project_id>/herd-units")

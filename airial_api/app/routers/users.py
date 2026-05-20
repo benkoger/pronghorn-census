@@ -20,7 +20,6 @@ from msgpack import unpackb
 from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, cache, login_manager
-from database import UserNotFound
 
 from authzed.api.v1 import CheckPermissionResponse
 
@@ -37,25 +36,19 @@ def load(session_user_id: str):
     if cached_user:
         user = User(**unpackb(cached_user))
         return user
-    try:
-        user_obj = base.get_user(UUID(session_user_id))
 
-        if "active_org_uuid" in session:
-            org_id = UUID(session.get("active_org_uuid"))
-        else:
-            org_id = user_obj.default_org_id
+    user_obj = base.get_user(UUID(session_user_id))
 
-        user_obj.roles = [
-            role.name for role in base.get_user_roles(user_obj.user_id, org_id)
-        ]
+    if "active_org_uuid" in session:
+        org_id = UUID(session.get("active_org_uuid"))
+    else:
+        org_id = user_obj.default_org_id
 
-        cache.set(user_key, user_obj.to_cache(), timeout=3600)
-    except UserNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    user_obj.roles = [
+        role.name for role in base.get_user_roles(user_obj.user_id, org_id)
+    ]
+
+    cache.set(user_key, user_obj.to_cache(), timeout=3600)
 
     return user_obj
 
@@ -74,13 +67,10 @@ def unathorizated_callback():
 @permission_required("access")
 def get_all():
     """ """
-    try:
-        query = UserQuery(organization_id=session["active_org_uuid"])
 
-        users = base.get_users(query)
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
+    query = UserQuery(organization_id=session["active_org_uuid"])
+
+    users = base.get_users(query)
 
     return [user.to_dict() for user in users], 200
 
@@ -89,9 +79,11 @@ def get_all():
 
 
 @userBp.get("/check-auth")
-@login_required
 def check_auth():
-    return "true", 200
+    if current_user.is_authenticated:
+        return "true", 200
+    else:
+        return "false", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

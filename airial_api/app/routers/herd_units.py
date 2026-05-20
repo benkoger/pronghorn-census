@@ -6,12 +6,10 @@
 from uuid import UUID
 
 from flask import Blueprint, abort, current_app
-from flask_login import current_user, login_required
+from flask_login import login_required
 from app.decorators import permission_required
-from database.object_models.user_management import User
 from flask_pydantic import validate
 from psycopg.errors import DatabaseError
-from typing import cast
 
 from app.extensions import base
 from database import ObjectNotFound
@@ -25,10 +23,11 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 
 @herdunitBp.get("/<string:herd_unit_id>")
 @login_required
+@permission_required("access")
 def get_by_id(herd_unit_id: str):
     """ """
     try:
-        herd_unit = base.get_herd_unit(UUID(herd_unit_id), cast(User, current_user))
+        herd_unit = base.get_herd_unit(UUID(herd_unit_id))
     except ObjectNotFound as e:
         current_app.logger.error(e)
         abort(404, str(e))
@@ -70,10 +69,10 @@ def get_surveys(herd_unit_id: str):
         )
 
     except ValueError as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(400, str(e))
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
@@ -94,6 +93,10 @@ def create(body: CreateHerdUnitReq):
     """ """
     try:
         herd_unit = base.create_herd_unit(body)
+
+    except ObjectNotFound as e:
+        current_app.logger.error(e)
+        abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)

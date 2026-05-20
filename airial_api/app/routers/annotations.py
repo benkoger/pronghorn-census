@@ -5,13 +5,11 @@
 
 from typing import cast, List
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint, abort
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 from app.decorators import permission_required
 from app.extensions import base
-from database.errors import AuthorizationFailure, ObjectNotFound
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
     BulkCreateAnnotationReq,
@@ -48,15 +46,7 @@ def create(body: CreateAnnotationReq):
             500:
                     description: Unexpected error.
     """
-    try:
-        annotation = base.create_annotation(body, cast(User, current_user))
-
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    annotation = base.create_annotation(body, cast(User, current_user))
 
     return annotation.to_dict(), 201
 
@@ -70,21 +60,11 @@ def create(body: CreateAnnotationReq):
 @permission_required("access")
 def import_annotation(body: BulkCreateAnnotationReq):
     """ """
-    try:
-        annotations = []
 
-        for req in body.requests:
-            annotations.append(base.create_annotation(req, cast(User, current_user)))
+    annotations = []
 
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    for req in body.requests:
+        annotations.append(base.create_annotation(req, cast(User, current_user)))
 
     return [annot.to_dict() for annot in annotations], 201
 
@@ -116,14 +96,10 @@ def update(body: UpdateAnnotationReq, annotation_id: str):
             500:
                     description: Unexpected error.
     """
-    try:
-        annotation = base.update_annotation(
-            UUID(annotation_id), body, cast(User, current_user)
-        )
 
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    annotation = base.update_annotation(
+        UUID(annotation_id), body, cast(User, current_user)
+    )
 
     return annotation.to_dict(), 200
 
@@ -149,27 +125,13 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
             500:
                 description: Unexpected error.
     """
-    try:
-        annotations = []
-        print(body.requests)
-        print(f"ids: {body.ids}")
 
-        for req, annot_id in zip(body.requests, body.ids):
-            print("hi")
-            annotations.append(
-                base.update_annotation(annot_id, req, cast(User, current_user))
-            )
-            print(annot_id)
+    annotations = []
 
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    for req in body.requests:
+        annotations.append(
+            base.update_annotation(req.annotation_id, req, cast(User, current_user))
+        )
 
     return [annot.to_dict() for annot in annotations], 200
 
@@ -183,15 +145,8 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
 @permission_required("access")
 def delete(annotation_id: str):
     """ """
-    try:
-        res = base.delete_annotation(UUID(annotation_id))
 
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    res = base.delete_annotation(UUID(annotation_id))
 
     return "", 200 if res else abort(500)
 
@@ -207,15 +162,7 @@ def bulk_delete(body: BulkDeleteAnnotationsReq):
     """ """
     results: List[bool] = []
 
-    try:
-        for annot_id in body.ids:
-            results.append(base.delete_annotation(annot_id))
-
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    for req in body.requests:
+        results.append(base.delete_annotation(req.annotation_id))
 
     return "", 200 if all(results) else abort(500)

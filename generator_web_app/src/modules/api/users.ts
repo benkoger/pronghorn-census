@@ -24,7 +24,7 @@ export async function checkAuth(): Promise<boolean> {
     throw new ApiError(await response.json());
   }
 
-  return true;
+  return await response.json();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -182,12 +182,9 @@ export interface createUserOptions {
   locale?: string;
   organization_id?: string;
   role_ids?: string[];
-
 }
 
-export async function createUser(
-  options: createUserOptions,
-): Promise<User> {
+export async function createUser(options: createUserOptions): Promise<User> {
   const response = await fetch(`${api_url}/users`, {
     method: "POST",
     credentials: "include",
@@ -204,7 +201,7 @@ export async function createUser(
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export async function createSuperUser(
-  options: createUserOptions
+  options: createUserOptions,
 ): Promise<User> {
   const response = await fetch(`${api_url}/users/super-user`, {
     method: "POST",
@@ -216,5 +213,5 @@ export async function createSuperUser(
   });
   if (!response.ok) throw new ApiError(await response.json());
 
-  return new User(await response.json() as UserIntf);
+  return new User((await response.json()) as UserIntf);
 }
