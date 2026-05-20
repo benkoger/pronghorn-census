@@ -2,6 +2,7 @@ import os
 from botocore.config import Config
 from dotenv import load_dotenv
 from boto3.s3.transfer import TransferConfig
+import ssl
 
 load_dotenv()
 
@@ -70,11 +71,20 @@ if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
         os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
     )
 
+cache_redis_url = os.environ.get("CACHE_REDIS", "")
+
 cache_config = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
-    "CACHE_REDIS_URL": os.environ.get("CACHE_REDIS"),
+    "CACHE_REDIS_URL": cache_redis_url,
 }
+
+
+if cache_redis_url.startswith("rediss://"):
+    cache_config["CACHE_OPTIONS"] = {
+        "ssl_cert_reqs": ssl.CERT_NONE,
+        "ssl_check_hostname": False,
+    }
 
 s3_config = Config(
     signature_version="s3",  # s3v4 is the standard, s3 is an older version
