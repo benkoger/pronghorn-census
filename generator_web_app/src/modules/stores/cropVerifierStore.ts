@@ -373,6 +373,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         kind: "update",
         id: uuid,
         req: {
+          annotation_id: uuid,
           label_id: label.label_id,
         },
         original: { ...this.currentAnnotations[uuid] },
@@ -412,6 +413,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         kind: "update",
         id: uuid,
         req: {
+          annotation_id: uuid,
           box_tx: Math.round(box.x + this.currentCrop.dimensions.top_left.x),
           box_ty: Math.round(box.y + this.currentCrop.dimensions.top_left.y),
           box_bx: Math.round(
@@ -475,11 +477,10 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       let updateAnnotReq: bulkUpdateAnnotationOptions = {
         reviewed_area_id: this.currentCrop.uuid,
         requests: [],
-        ids: [],
       };
 
       let deleteAnnotationReq: bulkDeleteAnnotationsOptions = {
-        ids: [],
+        requests: [],
       };
 
       for (const act of this.actionStack) {
@@ -491,16 +492,17 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
             delete this.currentAnnotations[act.id];
             break;
           case "delete":
-            deleteAnnotationReq.ids.push(({ ...act } as deleteAction).id);
+            deleteAnnotationReq.requests.push({
+              annotation_id: ({ ...act } as deleteAction).id,
+            });
             break;
         }
       }
 
-      for (const [key, annot_updates] of Object.entries(this.updates)) {
+      for (const annot_updates of Object.values(this.updates)) {
         // send only the latest update
         const update_req = annot_updates[annot_updates.length - 1];
         updateAnnotReq.requests.push(update_req);
-        updateAnnotReq.ids.push(key);
         console.log(updateAnnotReq.requests);
       }
 
@@ -518,7 +520,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         console.log(`updated: ${updated_annots}`);
       }
 
-      if (deleteAnnotationReq.ids.length > 0) {
+      if (deleteAnnotationReq.requests.length > 0) {
         await bulkDeleteAnnotations(deleteAnnotationReq);
       }
 

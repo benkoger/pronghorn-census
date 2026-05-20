@@ -49,7 +49,6 @@ from database.object_models.user_management.users import UserQuery
 
 from .errors import (
     AuthorizationFailure,
-    BulkAuthorizationFailure,
     FailedToCreate,
     ObjectNotFound,
     UserNotFound,
@@ -1137,30 +1136,9 @@ class Database:
             cursor.row_factory = class_row(Project)
             return cursor.execute(query, {"org_id": org.organization_id}).fetchall()
 
-    def get_projects(
-        self, req: ProjectQuery, org: Organization, user: User
-    ) -> List[Project]:
+    def get_projects(self, req: ProjectQuery, org: Organization) -> List[Project]:
         """ """
-        if req.project_id:
-            res = self.bulk_check_permission(
-                [
-                    self.create_bulk_check_request(
-                        "project", str(project_id), user.id, "access"
-                    )
-                    for project_id in req.project_id
-                ]
-            )
-
-            if all(
-                pair.item.permissionship
-                == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-                for pair in res.pairs
-            ):
-                return self._get_projects(req, org)
-            else:
-                raise BulkAuthorizationFailure(user.id, "access")
-        else:
-            return self._get_projects(req, org)
+        return self._get_projects(req, org)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1593,19 +1571,14 @@ class Database:
 
         return label
 
-    def get_label(self, label_id: UUID, user: User):
+    def get_label(self, label_id: UUID):
         """Query the database for a label
 
         Args:
                 label_id: either the label's internal database id or its universally unique identifier
         """
-        lbl_id = str(label_id)
 
-        res = self.check_permission("label", lbl_id, user.id, "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_label(label_id=label_id)
-        else:
-            raise AuthorizationFailure(user.id, "access", "label", lbl_id)
+        return self._get_label(label_id=label_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1622,25 +1595,9 @@ class Database:
             sql.SQL("{q} WHERE {p}").format(q=query, p=l_filters), data
         ).fetchall()
 
-    def get_labels(self, req: LabelQuery, user: User) -> List[Label]:
+    def get_labels(self, req: LabelQuery) -> List[Label]:
         """ """
-        usr_id = str(user.uuid)
-
-        res = self.bulk_check_permission(
-            [
-                self.create_bulk_check_request("label", str(lbl_uuid), usr_id, "access")
-                for lbl_uuid in req.label_id
-            ]
-        )
-
-        if all(
-            pair.item.permissionship
-            == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            for pair in res.pairs
-        ):
-            return self._get_labels(req)
-        else:
-            raise BulkAuthorizationFailure(usr_id, "access")
+        return self._get_labels(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # todo: update to use pydantic class
@@ -1823,34 +1780,38 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_herd_unit(self, cursor: Cursor[HerdUnit], herd_unit_id: UUID) -> HerdUnit:
+    def _get_herd_unit(
+        self, cursor: Cursor[HerdUnit], herd_unit_id: Union[UUID, int]
+    ) -> HerdUnit:
         """Internal helper function, do not call directly"""
         cursor.row_factory = class_row(HerdUnit)
-        query = sql.SQL(" SELECT * FROM projectmanagement.herd_units WHERE uuid = %s; ")
+        query = sql.SQL(
+            " SELECT * FROM projectmanagement.herd_units WHERE {id_field} = %s; "
+        )
 
-        herd_unit = cursor.execute(query, (herd_unit_id,)).fetchone()
+        match herd_unit_id:
+            case int():
+                herd_unit = cursor.execute(
+                    query.format(id_field=sql.Identifier("herd_unit_id")),
+                    (herd_unit_id,),
+                ).fetchone()
+            case UUID():
+                herd_unit = cursor.execute(
+                    query.format(id_field=sql.Identifier("uuid")), (herd_unit_id,)
+                ).fetchone()
 
         if not herd_unit:
             raise Exception("Herd Unit was not found")
 
         return herd_unit
 
-    def get_herd_unit(self, herd_unit_id: UUID, user: User) -> HerdUnit:
+    def get_herd_unit(self, herd_unit_id: UUID) -> HerdUnit:
         """Query the database for a herd unit
 
         Args:
         herd_unit_id: A universally unique identifier
         """
-        res = self.check_permission(
-            "herd_unit", str(herd_unit_id), str(user.uuid), "access"
-        )
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_herd_unit(herd_unit_id=herd_unit_id)
-        else:
-            raise AuthorizationFailure(
-                str(user.uuid), "access", "herd_unit", str(herd_unit_id)
-            )
+        return self._get_herd_unit(herd_unit_id=herd_unit_id)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2621,9 +2582,9 @@ class Database:
 
         return image
 
-    def create_image(self, parameters: dict) -> Image:
+    def create_image(self, req: CreateImageReq) -> Image:
         """ """
-        return self._create_image(parameters)
+        return self._create_image(req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3653,7 +3614,6 @@ FROM (
         user: User,
     ) -> bool:
         """ """
-        print([(user.user_id, uuid) for uuid in prediction_ids])
         query = sql.SQL(
             " UPDATE core.predictions AS p SET reviewed_by_user_id = %s WHERE p.uuid = %s "
         )

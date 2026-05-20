@@ -16,7 +16,7 @@ services:
       - "50052:50052"
       - "9090:9090" 
     volumes:
-      - spicedb_certs:/etc=spicedb/certs:ro,Z
+      - spicedb_certs:/etc/spicedb/certs:ro,Z
 
   pronghorn-api:
     container_name: prong_api
@@ -45,8 +45,6 @@ services:
       SPICE_URL: ${SPICE_URL}
       DB_SSL: ${DB_SSL}
       DB_SSL_ROOT_CERT_PATH: ${DB_SSL_ROOT_CERT_PATH}
-      DB_SSL_CERT_PATH: ${DB_SSL_CERT_PATH}
-      DB_SSL_KEY_PATH: ${DB_SSL_KEY_PATH}
     networks: 
       - pronghorn_app_network
     command: uv run gunicorn -c gunicorn.py "app:create_app()"

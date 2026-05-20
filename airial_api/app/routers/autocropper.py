@@ -16,8 +16,6 @@ from app.decorators import permission_required
 from app.extensions import base, cache, s3
 from crop_generator import auto_crop
 from database.errors import (
-    AuthorizationFailure,
-    BulkAuthorizationFailure,
     ObjectNotFound,
 )
 from database.object_models import (
@@ -40,14 +38,7 @@ cropBp = Blueprint("autocropper", __name__, url_prefix="/api/v1/autocropper")
 @validate()
 def fetch_batch(query: AutoCropperBatchQuery):
     """ """
-    try:
-        batch = base.get_auto_crop_batch(query, cast(User, current_user))
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except (Exception, DatabaseError) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    batch = base.get_auto_crop_batch(query, cast(User, current_user))
 
     return batch, 200
 
@@ -106,14 +97,8 @@ def auto_crop_image(body: AutoCropReq):
             UpdateImageReq(opened_by_user_id=0),
         )
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, e)
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, e)
-    except BulkAuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, e)
+        current_app.logger.error(e)
+        abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)

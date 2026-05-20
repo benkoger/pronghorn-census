@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from ..base import Box, DBbase
+from ..base import Box, BulkRequestModel, DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -67,12 +67,19 @@ class CreateAnnotationReq(BaseModel):
     reviewed_area_id: Optional[UUID] = None
 
 
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class BulkCreateAnnotationReq(BaseModel):
     reviewed_area_id: UUID
     requests: List[CreateAnnotationReq]
 
 
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateAnnotationReq(BaseModel):
+    annotation_id: UUID
     image_id: Optional[int] = None
     label_id: Optional[int] = None
     box_tx: Optional[int] = None
@@ -83,11 +90,23 @@ class UpdateAnnotationReq(BaseModel):
     reviewed_area_id: Optional[UUID] = None
 
 
-class BulkUpdateAnnotationsReq(BaseModel):
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class DeleteAnnotationReq(BaseModel):
+    annotation_id: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class BulkUpdateAnnotationsReq(BulkRequestModel):
     reviewed_area_id: UUID
-    ids: List[UUID]
     requests: List[UpdateAnnotationReq]
 
 
-class BulkDeleteAnnotationsReq(BaseModel):
-    ids: List[UUID]
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class BulkDeleteAnnotationsReq(BulkRequestModel):
+    requests: List[DeleteAnnotationReq]

@@ -11,12 +11,11 @@ from urllib.parse import urlencode
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
 from flask_login import login_required, login_user, logout_user
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 import requests
 from werkzeug.security import check_password_hash
 
 from app.extensions import base
-from database import AuthenticationFailure, UserNotFound
+from database import AuthenticationFailure
 from database.object_models.user_management import LegacyAuthReq
 
 authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
@@ -63,7 +62,7 @@ def oauth2_callback(provider: str):
     if "error" in request.args:
         for key, value in request.args.items():
             if key.startswith("error"):
-                print(f"key: {key}, value: {value}")
+                current_app.logger.info(f"key: {key}, value: {value}")
                 abort(500)
 
     if request.args["state"] != session.get("oauth2_state"):
@@ -104,14 +103,7 @@ def oauth2_callback(provider: str):
         abort(401)
     email = provider_data["userinfo"]["email"](response.json())
 
-    try:
-
-        user = base.get_user(email)
-    except UserNotFound:
-        abort(403, "You must first be invited to access this resource")
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
+    user = base.get_user(email)
 
     if user.status == "invited":
         base.activate_user(
@@ -138,25 +130,14 @@ def oauth2_callback(provider: str):
 def authenticate(body: LegacyAuthReq):
     """Basic email password authentication"""
 
-    try:
-        user = base.get_user(body.email)
-        if not user.password_hash:
-            abort(400)
+    user = base.get_user(body.email)
+    if not user.password_hash:
+        abort(400)
 
-        if check_password_hash(user.password_hash, body.password):
-            base.login_user(user.user_id)
-        else:
-            raise AuthenticationFailure
-
-    except UserNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except AuthenticationFailure as e:
-        current_app.logger.exception(e)
-        abort(401)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    if check_password_hash(user.password_hash, body.password):
+        base.login_user(user.user_id)
+    else:
+        abort(401, AuthenticationFailure())
 
     login_user(user)
 

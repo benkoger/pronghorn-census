@@ -54,10 +54,10 @@ def get_by_id(image_id: str):
         image = base.get_image(UUID(image_id))
 
     except ValueError as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(400, e)
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(404, e)
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
@@ -104,10 +104,10 @@ def get_crops(image_id: str):
         crops = base.get_image_crops(UUID(image_id))
 
     except ValueError as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(400, e)
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(404, e)
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
@@ -145,10 +145,10 @@ def get_predictions(image_id: str):
         predictions = base.get_image_predictions(UUID(image_id))
 
     except ValueError as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(400, e)
     except ObjectNotFound as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(404, e)
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
@@ -191,8 +191,11 @@ def get_annotations(image_id: str):
             return [], 200
 
     except ValueError as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(e)
         abort(400, e)
+    except ObjectNotFound as e:
+        current_app.logger.error(e)
+        abort(404, str(e))
     except (DatabaseError, Exception) as e:
         current_app.logger.exception(e)
         abort(500)
@@ -476,11 +479,13 @@ def get_prediciton(body: CreatePredictionCropReq):
         [cache.set(crop.uuid, crop.get_image(), 3600) for crop in pred_crops]
 
     except ObjectNotFound as e:
+        current_app.logger.exception(e)
         abort(404, str(e))
     except AuthorizationFailure as e:
+        current_app.logger.exception(e)
         abort(401, str(e))
     except (DatabaseError, Exception) as e:
-        print(f"error: {e}")
+        current_app.logger.exception(e)
         abort(500)
 
     return [crop.to_dict() for crop in pred_crops]
