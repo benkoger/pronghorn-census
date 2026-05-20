@@ -5,7 +5,7 @@ import gevent.monkey
 bind = "0.0.0.0:8000"
 forwarded_allow_ips = "*"
 workers = os.environ.get("NUM_API_WORKERS") or multiprocessing.cpu_count() * 2 + 1
-worker_class = "gevent"
+worker_class = "gthread"
 worker_connections = 2000
 
 
@@ -19,4 +19,3 @@ def post_fork(server, worker):
     worker.log.info(f"Creating pool for worker: {worker.pid}")
     base.create_pool(min_size=3, max_size=5)
     worker.log.info(f"worker: {worker.pid}'s pool uuid: {base.pool_uuid}")
-
