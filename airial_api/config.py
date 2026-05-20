@@ -53,6 +53,9 @@ db_config = {
 }
 
 if (os.environ.get("DB_SSL") or "false").lower() in true_set:
+    db_config["sslmode"] = "require"
+
+if os.environ.get("DB_SSL_MODE") == "verify-full":
     db_config["sslmode"] = "verify-full"
     db_config["sslrootcert"] = os.environ.get("DB_SSL_ROOT_CERT_PATH")
 
