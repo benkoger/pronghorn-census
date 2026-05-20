@@ -68,7 +68,7 @@ spice_config = {
 if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
     spice_config["use_tls"] = True
     spice_config["SPICEDB_CERT_PATH"] = (
-        os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.cert"
+        os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
     )
 
 cache_config = {
