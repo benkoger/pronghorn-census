@@ -1,7 +1,6 @@
 import os
 from botocore.config import Config
 from dotenv import load_dotenv
-import redis
 from boto3.s3.transfer import TransferConfig
 
 load_dotenv()
@@ -23,7 +22,7 @@ class FlaskConfig:
     SESSION_USE_SIGNER = (
         os.environ.get("SESSION_USE_SIGNER") or "true"
     ).lower() in true_set
-    SESSION_REDIS = redis.from_url(os.environ.get("SESSION_REDIS"))
+    SESSION_REDIS_URL = os.environ.get("SESSION_REDIS")
     ORIGIN_URL = os.environ.get("ORIGIN_URL")  # pyright: ignore
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
     SESSION_COOKIE_DOMAIN = None
