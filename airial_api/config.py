@@ -81,7 +81,7 @@ cache_config = {
 
 
 if cache_redis_url.startswith("rediss://"):
-    cache_config["CACHE_OPTIONS"] = {
+    cache_config["CACHE_REDIS_OPTIONS"] = {
         "ssl_cert_reqs": ssl.CERT_NONE,
         "ssl_check_hostname": False,
     }
