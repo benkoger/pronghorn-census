@@ -52,12 +52,10 @@ export default defineComponent({
           return (
             this.CurrentProject != undefined && this.CurrentModel != undefined
           );
-          break;
         case 1:
           return (
             this.CurrentHerdUnit != undefined && this.CurrentSurvey != undefined
           );
-          break;
         default:
           return false;
       }

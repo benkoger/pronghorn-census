@@ -66,16 +66,28 @@ const submitReq = async () => {
       <span>Administrator: {{ props.user.username }}</span>
     </div>
   </div>
-  <BForm class="d-flex gap-4 flex-column flex-grow-1" autocomplete="off" data-bwignore="true"
-    @submit.prevent="submitReq">
+  <BForm
+    class="d-flex gap-4 flex-column flex-grow-1"
+    autocomplete="off"
+    data-bwignore="true"
+    @submit.prevent="submitReq"
+  >
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
-          <Icon icon="ix:projects" width="24" />
+          <Icon icon="fluent:rename-16-regular" width="24" />
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Name" label-for="name">
-        <BFormInput type="text" id="name" required trim data-bwignore="true" v-model="options.name" placeholder=" " />
+        <BFormInput
+          type="text"
+          id="name"
+          required
+          trim
+          data-bwignore="true"
+          v-model="options.name"
+          placeholder=" "
+        />
       </BFormFloatingLabel>
     </BInputGroup>
     <BButton type="submit" variant="primary" class="mt-auto">Submit</BButton>
