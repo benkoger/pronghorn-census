@@ -6,18 +6,15 @@
 import io
 from typing import cast
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 
 from app.extensions import base, cache, s3
 from crop_generator import auto_crop
-from database.errors import (
-    ObjectNotFound,
-)
+
 from database.object_models import (
     AutoCropperBatchQuery,
     AutoCropReq,
@@ -53,54 +50,45 @@ def fetch_batch(query: AutoCropperBatchQuery):
 @validate()
 def auto_crop_image(body: AutoCropReq):
     """ """
-    try:
-        image = base.get_image(body.image_id)
-        predictions = body.predictions
 
-        labels = base.get_labels(
-            LabelQuery(label_id=body.label_ids), cast(User, current_user)
+    image = base.get_image(body.image_id)
+    predictions = body.predictions
+
+    labels = base.get_labels(LabelQuery(label_id=body.label_ids))
+
+    image_data = cache.get(image.uuid)
+
+    if not image_data:
+        image_data = s3.get_object(
+            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
+        )["Body"].read()
+        cache.set(image.uuid, image_data, 500)
+
+    image.set_image(image_data)
+
+    crops = auto_crop(image, predictions, labels)
+
+    for crop_group in crops:
+        crop_req, annotation_reqs = crop_group
+
+        crop_req.ra_key = f"images/{image.uuid}/reviewed_area/{crop_req.name}"
+        crop = base.create_reviewed_area(crop_req)
+
+        for annotation_req in annotation_reqs:
+            annotation_req.reviewed_area_id = crop.uuid
+            base.create_annotation(annotation_req, cast(User, current_user))
+        s3.put_object(
+            Bucket=current_app.config["BUCKET_NAME"],
+            Key=crop_req.ra_key,
+            Body=io.BytesIO(crop_req.serve(".JPG")),
+            ContentType="image/jpeg",
         )
 
-        image_data = cache.get(image.uuid)
-
-        if not image_data:
-            image_data = s3.get_object(
-                Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
-            )["Body"].read()
-            cache.set(image.uuid, image_data, 500)
-
-        image.set_image(image_data)
-
-        crops = auto_crop(image, predictions, labels)
-
-        for crop_group in crops:
-            crop_req, annotation_reqs = crop_group
-
-            crop_req.ra_key = f"images/{image.uuid}/reviewed_area/{crop_req.name}"
-            crop = base.create_reviewed_area(crop_req)
-
-            for annotation_req in annotation_reqs:
-                annotation_req.reviewed_area_id = crop.uuid
-                base.create_annotation(annotation_req, cast(User, current_user))
-            s3.put_object(
-                Bucket=current_app.config["BUCKET_NAME"],
-                Key=crop_req.ra_key,
-                Body=io.BytesIO(crop_req.serve(".JPG")),
-                ContentType="image/jpeg",
-            )
-
-        base.set_predictions_reviewed(
-            [pred.uuid for pred in predictions], cast(User, current_user)
-        )
-        base.update_image(
-            image.uuid,
-            UpdateImageReq(opened_by_user_id=0),
-        )
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
+    base.set_predictions_reviewed(
+        [pred.uuid for pred in predictions], cast(User, current_user)
+    )
+    base.update_image(
+        image.uuid,
+        UpdateImageReq(opened_by_user_id=0),
+    )
     return "", 201

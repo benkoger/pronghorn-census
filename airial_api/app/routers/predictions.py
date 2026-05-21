@@ -5,14 +5,12 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort
+from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.errors import AuthorizationFailure, FailedToCreate, ObjectNotFound
 from database.object_models.core import (
     PredictionQuery,
     CreatePredictionReq,
@@ -30,13 +28,8 @@ predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 @validate()
 def get_predictions(query: PredictionQuery):
     """ """
-    try:
-        predictions = base.get_predictions(query)
-    except AuthorizationFailure as e:
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
+
+    predictions = base.get_predictions(query)
 
     return [pred.to_dict() for pred in predictions], 200
 
@@ -49,17 +42,8 @@ def get_predictions(query: PredictionQuery):
 @login_required
 def get_prediction_by_id(prediction_id: str):
     """ """
-    try:
-        prediciton = base.get_prediction(UUID(prediction_id))
-    except AuthorizationFailure as e:
-        abort(401, str(e))
-    except ObjectNotFound as e:
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
 
-    return prediciton.to_dict(), 200
+    return base.get_prediction(UUID(prediction_id)).to_dict(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------#
@@ -72,14 +56,5 @@ def get_prediction_by_id(prediction_id: str):
 @validate()
 def create_prediction(body: CreatePredictionReq):
     """ """
-    try:
-        prediction = base.create_prediction(body)
-    except AuthorizationFailure as e:
-        abort(401, str(e))
-    except FailedToCreate as e:
-        abort(422, str(e))
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
 
-    return prediction.to_dict(), 201
+    return base.create_prediction(body).to_dict(), 200

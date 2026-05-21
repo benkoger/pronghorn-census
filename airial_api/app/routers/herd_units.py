@@ -5,14 +5,12 @@
 
 from uuid import UUID
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint
 from flask_login import login_required
 from app.decorators import permission_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.extensions import base
-from database import ObjectNotFound
 from database.object_models.project_management import CreateHerdUnitReq
 
 herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
@@ -26,16 +24,7 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @permission_required("access")
 def get_by_id(herd_unit_id: str):
     """ """
-    try:
-        herd_unit = base.get_herd_unit(UUID(herd_unit_id))
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return herd_unit.to_dict(), 200
+    return base.get_herd_unit(UUID(herd_unit_id)).to_dict(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -49,7 +38,7 @@ def get_surveys(herd_unit_id: str):
     Retrieve all surveys associated with a herd unit.
     ---
     parameters:
-            - name: survye_id
+            - name: survey_id
             in: path
             type: string
             required: true
@@ -63,20 +52,10 @@ def get_surveys(herd_unit_id: str):
             500:
                     description: Database error.
     """
-    try:
-        surveys = base.get_herd_unit_surveys(
-            UUID(herd_unit_id),
-        )
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, str(e))
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    surveys = base.get_herd_unit_surveys(
+        UUID(herd_unit_id),
+    )
 
     return [survey.to_dict() for survey in surveys], 200
 
@@ -91,17 +70,7 @@ def get_surveys(herd_unit_id: str):
 @validate()
 def create(body: CreateHerdUnitReq):
     """ """
-    try:
-        herd_unit = base.create_herd_unit(body)
-
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return herd_unit.to_dict(), 201
+    return base.create_herd_unit(body).to_dict(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -113,9 +82,6 @@ def create(body: CreateHerdUnitReq):
 @permission_required("access")
 def delete(herd_unit_id: str):
     """ """
-    try:
-        base.delete_herd_unit(UUID(herd_unit_id))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
+    base.delete_herd_unit(UUID(herd_unit_id))
 
     return "", 204

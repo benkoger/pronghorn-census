@@ -19,4 +19,10 @@ app.use(VueKonva);
 
 app.component("Icon", Icon);
 
+app.config.errorHandler = (err, instance, info) => {
+  console.error("Global error:", err);
+  console.log("Vue Instance:", instance);
+  console.log("Error Info:", info);
+};
+
 app.mount("#app");

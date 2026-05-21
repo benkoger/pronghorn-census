@@ -4,10 +4,9 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
-from psycopg import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base
@@ -24,10 +23,7 @@ roleBp = Blueprint("roles", __name__, url_prefix="/api/v1/roles")
 @validate()
 def get(query: RoleQuery):
     """ """
-    try:
-        roles = base.get_roles(query)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+
+    roles = base.get_roles(query)
 
     return [role.to_dict() for role in roles], 200
