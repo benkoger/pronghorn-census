@@ -3,10 +3,30 @@ from botocore.config import Config
 from dotenv import load_dotenv
 from boto3.s3.transfer import TransferConfig
 import ssl
+import redis
 
 load_dotenv()
 
 true_set = ("true", "1", "t")
+
+
+# Create redis connections
+session_redis_url = os.environ.get("SESSION_REDIS", "redis://@prong_valkey:6379/0")
+cache_redis_url = os.environ.get("CACHE_REDIS", "redis://@prong_valkey:6379/1")
+
+session_redis_kwargs = {}
+cache_redis_kwargs = {}
+
+if session_redis_url.startswith("rediss://"):
+    session_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    session_redis_kwargs["ssl_check_hostname"] = False
+
+if cache_redis_url.startswith("rediss://"):
+    cache_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    cache_redis_kwargs["ssl_check_hostname"] = False
+
+session_redis = redis.from_url(session_redis_url, **session_redis_kwargs)
+cache_redis = redis.from_url(cache_redis_url, **cache_redis_kwargs)
 
 
 class FlaskConfig:
@@ -23,7 +43,7 @@ class FlaskConfig:
     SESSION_USE_SIGNER = (
         os.environ.get("SESSION_USE_SIGNER") or "true"
     ).lower() in true_set
-    SESSION_REDIS_URL = os.environ.get("SESSION_REDIS")
+    SESSION_REDIS = session_redis
     ORIGIN_URL = os.environ.get("ORIGIN_URL")  # pyright: ignore
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
     SESSION_COOKIE_DOMAIN = None
@@ -71,24 +91,13 @@ if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
         os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
     )
 
-cache_redis_url = os.environ.get("CACHE_REDIS", "")
-
-from flask import current_app
-
-current_app.logger.info(cache_redis_url)
 
 cache_config = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
-    "CACHE_REDIS_URL": cache_redis_url,
+    "CACHE_REDIS_HOST": cache_redis,
 }
 
-
-if cache_redis_url.startswith("rediss://"):
-    cache_config["CACHE_REDIS_OPTIONS"] = {
-        "ssl_cert_reqs": ssl.CERT_NONE,
-        "ssl_check_hostname": False,
-    }
 
 s3_config = Config(
     signature_version="s3",  # s3v4 is the standard, s3 is an older version

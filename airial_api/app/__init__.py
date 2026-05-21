@@ -3,8 +3,6 @@ import os
 from boto3 import client
 from flask import Flask
 from flask_cors import CORS
-import redis
-import ssl
 
 import app.errors as errors
 from app.extensions import base, cache, login_manager, session_manager, health
@@ -20,15 +18,6 @@ from werkzeug.exceptions import HTTPException
 def create_app():
     app = Flask(__name__)
     app.config.from_object(FlaskConfig)
-
-    redis_kwargs = {}
-    if app.config["SESSION_REDIS_URL"].startswith("rediss://"):
-        redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
-        redis_kwargs["ssl_check_hostname"] = False
-
-    app.config["SESSION_REDIS"] = redis.from_url(
-        app.config["SESSION_REDIS_URL"], **redis_kwargs
-    )
 
     CORS(
         app,
