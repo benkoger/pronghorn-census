@@ -20,6 +20,14 @@ export default defineComponent({
     const cStore = useAutoCropperStore();
     return { pStore, cStore };
   },
+  mounted() {
+    if (this.pStore.CurrentProject) {
+      this.$router.push({
+        name: "auto-cropper",
+        params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
+      });
+    }
+  },
   data() {
     return {
       currentStep: 0,
@@ -47,10 +55,12 @@ export default defineComponent({
           return (
             this.CurrentProject != undefined && this.CurrentModel != undefined
           );
+          break;
         case 1:
           return (
             this.CurrentHerdUnit != undefined && this.CurrentSurvey != undefined
           );
+          break;
         case 2:
           return (
             this.CurrentLabels.length > 0 &&
@@ -157,176 +167,176 @@ export default defineComponent({
     :steps="steps"
     :showButtons="true"
     :canContinue="canProceed"
-  >
-    <BContainer fluid v-if="currentStep === 0" class="h-100">
-      <BRow>
-        <BCol cols="6">
-          <div class="flex-grow-1 overflow-y-auto">
-            <SelectList
-              :items="pStore.projects"
-              :active-item="CurrentProject"
-              :select-action="pStore.set_current_project"
-              list-name="Project"
-            />
-          </div>
-        </BCol>
-        <BCol cols="6">
-          <div class="flex-grow-1 overflow-y-auto">
-            <SelectList
-              :items="pStore.models"
-              :active-item="CurrentModel"
-              :select-action="pStore.set_current_model"
-              listName="Model"
-            />
-          </div>
-        </BCol>
-      </BRow>
-    </BContainer>
-    <BContainer fluid v-if="currentStep === 1" class="h-100">
-      <BRow>
-        <BCol cols="6">
-          <div class="flex-grow-1 overflow-y-auto">
-            <SelectList
-              :items="pStore.herd_units"
-              :active-item="CurrentHerdUnit"
-              :select-action="pStore.set_current_herd_unit"
-              listName="Herd Unit"
-            />
-          </div>
-        </BCol>
-        <BCol cols="6">
-          <div class="flex-grow-1 overflow-y-auto">
-            <SelectList
-              :items="pStore.surveys"
-              :active-item="CurrentSurvey"
-              :select-action="pStore.set_current_survey"
-              listName="Survey"
-            />
-          </div>
-        </BCol>
-      </BRow>
-    </BContainer>
-    <BContainer fluid v-if="currentStep === 2" class="h-100">
-      <SelectList
-        :items="pStore.labels"
-        :active-item="CurrentLabels"
-        :select-action="pStore.set_current_labels"
-        listName="Label"
-      />
-    </BContainer>
-    <BContainer fluid v-if="currentStep === 3" class="h-100">
-      <BRow>
-        <BCol cols="4" class="d-flex flex-column m-0">
-          <BCard class="h-100 bg-body-tertiary rounded-top-3">
-            <template #img class="rounded-top-3">
-              <BCarousel controls indicators ride="carousel" fade fluid>
-                <BCarouselSlide
-                  v-for="label in CurrentLabels"
-                  :img-src="label.image_link"
-                  :caption="label.name"
-                  class="rounded-top-3"
+  />
+  <BRow v-if="currentStep === 0">
+    <BCol cols="6">
+      <div class="flex-grow-1 overflow-y-auto">
+        <SelectList
+          :items="pStore.projects"
+          icon="ix:projects"
+          :active-item="CurrentProject"
+          :select-action="pStore.set_current_project"
+          list-name="Project"
+        />
+      </div>
+    </BCol>
+    <BCol cols="6">
+      <div class="flex-grow-1 overflow-y-auto">
+        <SelectList
+          :items="pStore.models"
+          icon="octicon:ai-model-16"
+          :active-item="CurrentModel"
+          :select-action="pStore.set_current_model"
+          listName="Model"
+        />
+      </div>
+    </BCol>
+  </BRow>
+  <BRow fluid v-if="currentStep === 1">
+    <BCol cols="6">
+      <div class="flex-grow-1 overflow-y-auto">
+        <SelectList
+          :items="pStore.herd_units"
+          icon="token:area"
+          :active-item="CurrentHerdUnit"
+          :select-action="pStore.set_current_herd_unit"
+          listName="Herd Unit"
+        />
+      </div>
+    </BCol>
+    <BCol cols="6">
+      <div class="flex-grow-1 overflow-y-auto">
+        <SelectList
+          :items="pStore.surveys"
+          icon="roentgen:survey-point"
+          :active-item="CurrentSurvey"
+          :select-action="pStore.set_current_survey"
+          listName="Survey"
+        />
+      </div>
+    </BCol>
+  </BRow>
+  <BRow v-if="currentStep === 2">
+    <SelectList
+      :items="pStore.labels"
+      icon="bx:label"
+      :active-item="CurrentLabels"
+      :select-action="pStore.set_current_labels"
+      listName="Label"
+    />
+  </BRow>
+  <BContainer fluid v-if="currentStep === 3" class="h-100">
+    <BRow>
+      <BCol cols="4" class="d-flex flex-column m-0">
+        <BCard class="h-100 bg-body-tertiary rounded-top-3">
+          <template #img class="rounded-top-3">
+            <BCarousel controls indicators ride="carousel" fade fluid>
+              <BCarouselSlide
+                v-for="label in CurrentLabels"
+                :img-src="label.image_link"
+                :caption="label.name"
+                class="rounded-top-3"
+              />
+            </BCarousel>
+          </template>
+          <BCardBody>
+            <h3>Selection Summary</h3>
+            <BListGroup>
+              <BListGroupItem>
+                <span>
+                  <strong>Project</strong>:
+                  {{ CurrentProject?.name }}
+                </span>
+              </BListGroupItem>
+              <BListGroupItem>
+                <span>
+                  <strong>Herd Unit</strong>:
+                  {{ CurrentHerdUnit?.name }}
+                </span>
+              </BListGroupItem>
+              <BListGroupItem>
+                <span>
+                  <strong>Survey</strong>:
+                  {{ CurrentSurvey?.name }}
+                </span>
+              </BListGroupItem>
+              <BListGroupItem>
+                <span>
+                  <strong>Schema</strong>:
+                  {{ CurrentSchema?.name }}
+                </span>
+                <BListGroup>
+                  <BListGroupItem
+                    v-for="label in CurrentLabels"
+                    variant="secondary"
+                  >
+                    <span>
+                      <strong>Label</strong>:
+                      {{ label.name }}
+                    </span>
+                  </BListGroupItem>
+                </BListGroup>
+              </BListGroupItem>
+            </BListGroup>
+          </BCardBody>
+        </BCard>
+      </BCol>
+      <BCol cols="8">
+        <div
+          class="d-flex flex-column flex-grow-1 w-100 h-100 bg-body-tertiary rounded-top-3 shadow"
+        >
+          <div class="p-3">
+            <h3>Session Settings</h3>
+            <BTabs content-class="mt-3">
+              <BTab title="general settings">
+                <label for="min-score"
+                  >Minium Score: {{ cStore.minConfidence }}</label
+                >
+                <BFormInput
+                  id="min-score"
+                  v-model="cStore.minConfidence"
+                  type="range"
+                  min="0.001"
+                  :max="cStore.maxConfidence + 0.001"
+                  step="0.01"
                 />
-              </BCarousel>
-            </template>
-            <BCardBody>
-              <h3>Selection Summary</h3>
-              <BListGroup>
-                <BListGroupItem>
-                  <span>
-                    <strong>Project</strong>:
-                    {{ CurrentProject?.name }}
-                  </span>
-                </BListGroupItem>
-                <BListGroupItem>
-                  <span>
-                    <strong>Herd Unit</strong>:
-                    {{ CurrentHerdUnit?.name }}
-                  </span>
-                </BListGroupItem>
-                <BListGroupItem>
-                  <span>
-                    <strong>Survey</strong>:
-                    {{ CurrentSurvey?.name }}
-                  </span>
-                </BListGroupItem>
-                <BListGroupItem>
-                  <span>
-                    <strong>Schema</strong>:
-                    {{ CurrentSchema?.name }}
-                  </span>
-                  <BListGroup>
-                    <BListGroupItem
-                      v-for="label in CurrentLabels"
-                      variant="secondary"
-                    >
-                      <span>
-                        <strong>Label</strong>:
-                        {{ label.name }}
-                      </span>
-                    </BListGroupItem>
-                  </BListGroup>
-                </BListGroupItem>
-              </BListGroup>
-            </BCardBody>
-          </BCard>
-        </BCol>
-        <BCol cols="8">
-          <div
-            class="d-flex flex-column flex-grow-1 w-100 h-100 bg-body-tertiary rounded-top-3 shadow"
-          >
-            <div class="p-3">
-              <h3>Session Settings</h3>
-              <BTabs content-class="mt-3">
-                <BTab title="general settings">
-                  <label for="min-score"
-                    >Minium Score: {{ cStore.minConfidence }}</label
-                  >
-                  <BFormInput
-                    id="min-score"
-                    v-model="cStore.minConfidence"
-                    type="range"
-                    min="0.001"
-                    :max="cStore.maxConfidence + 0.001"
-                    step="0.01"
-                  />
-                  <label for="max-score"
-                    >Maximum Score: {{ cStore.maxConfidence }}</label
-                  >
-                  <BFormInput
-                    id="max-score"
-                    v-model="cStore.maxConfidence"
-                    type="range"
-                    :min="cStore.minConfidence + 0.02"
-                    max="0.999"
-                    step="0.01"
-                  />
-                </BTab>
-                <BTab title="advanced settings">
-                  <label for="batch-size"
-                    >Batch Size: {{ cStore.batch_size }}</label
-                  >
-                  <BFormInput
-                    id="batch-size"
-                    v-model="cStore.batch_size"
-                    placeholder="batch size"
-                    size="sm"
-                    type="number"
-                  />
-                </BTab>
-              </BTabs>
-            </div>
-            <BButton
-              variant="primary"
-              class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
-              size="lg"
-              @click="currentStep += 1"
-            >
-              Start Cropping
-            </BButton>
+                <label for="max-score"
+                  >Maximum Score: {{ cStore.maxConfidence }}</label
+                >
+                <BFormInput
+                  id="max-score"
+                  v-model="cStore.maxConfidence"
+                  type="range"
+                  :min="cStore.minConfidence + 0.02"
+                  max="0.999"
+                  step="0.01"
+                />
+              </BTab>
+              <BTab title="advanced settings">
+                <label for="batch-size"
+                  >Batch Size: {{ cStore.batch_size }}</label
+                >
+                <BFormInput
+                  id="batch-size"
+                  v-model="cStore.batch_size"
+                  placeholder="batch size"
+                  size="sm"
+                  type="number"
+                />
+              </BTab>
+            </BTabs>
           </div>
-        </BCol>
-      </BRow>
-    </BContainer>
-    <Crop v-if="currentStep === 4" />
-  </BreadCrumb>
+          <BButton
+            variant="primary"
+            class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
+            size="lg"
+            @click="currentStep += 1"
+          >
+            Start Cropping
+          </BButton>
+        </div>
+      </BCol>
+    </BRow>
+  </BContainer>
+  <Crop v-if="currentStep === 4" />
 </template>

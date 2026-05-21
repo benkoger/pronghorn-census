@@ -129,6 +129,7 @@ const moveToImage = (image: Image) => {
             <BCol cols="6">
               <SelectorList
                 :items="pStore.projects"
+                icon="ix:projects"
                 :active-item="pStore.CurrentProject"
                 :select-action="pStore.set_current_project"
                 allow-delete
@@ -166,6 +167,7 @@ const moveToImage = (image: Image) => {
                   <div class="mt-2">
                     <SelectorList
                       :items="pStore.herd_units"
+                      icon="token:area"
                       :active-item="pStore.CurrentHerdUnit"
                       :select-action="moveToHerdUnit"
                       allow-create

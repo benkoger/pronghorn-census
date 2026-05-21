@@ -1,54 +1,52 @@
-<script lang="ts">
-import { defineComponent } from "vue";
+<script setup lang="ts">
+import { useRouter } from "vue-router";
 import type { Organization } from "@/types/generatorobjects";
 import { useSystemStore } from "@/modules/stores/systemStore";
-import { BButton, BTooltip } from "bootstrap-vue-next";
+import { useProjectStore } from "@/modules/stores/projectStore";
+import { BButton } from "bootstrap-vue-next";
 import type { apiError } from "@/modules/api/errors";
 import { useToast } from "bootstrap-vue-next";
 
-export default defineComponent({
+defineOptions({
   name: "header_component",
-  components: { BButton, BTooltip },
-  setup() {
-    const isDev = import.meta.env.DEV;
-    const sStore = useSystemStore();
-    const { create } = useToast();
-
-    return { sStore, isDev, create };
-  },
-  methods: {
-    async logout() {
-      await this.sStore.deuathenticate();
-      this.$router.push("/authenticate");
-    },
-    async set_org(org: Organization) {
-      await this.sStore.set_organization(org).catch((e: apiError) => {
-        this.create({
-          title: `${e.error}`,
-          body: `${e.code}: ${e.message}`,
-          variant: "danger",
-          position: "bottom-start",
-        });
-        return;
-      });
-      this.create({
-        title: "Changing Organization",
-        body: `Active organization changed to: ${this.sStore.CurrentOrganization?.name}`,
-        variant: "success",
-        position: "bottom-start",
-      });
-    },
-  },
 });
-</script>
 
+const isDev = import.meta.env.DEV;
+const sStore = useSystemStore();
+const pStore = useProjectStore();
+const { create } = useToast();
+const router = useRouter();
+
+const logout = async () => {
+  await sStore.deuathenticate();
+  router.push("/authenticate");
+};
+
+const set_org = async (org: Organization) => {
+  await sStore.set_organization(org).catch((e: apiError) => {
+    create({
+      title: `${e.error}`,
+      body: `${e.code}: ${e.message}`,
+      variant: "danger",
+      position: "bottom-start",
+    });
+    return;
+  });
+  create({
+    title: "Changing Organization",
+    body: `Active organization changed to: ${sStore.CurrentOrganization?.name}`,
+    variant: "success",
+    position: "bottom-start",
+  });
+};
+</script>
 <template>
   <header
     class="sticky-top d-flex justify-content-between align-items-center bg-body-secondary px-3"
-    :style="{ height: '6vh' }"
+    style="height: 6vh"
   >
     <div>
-      <h3 class="m-0">AIrial Survey Tools</h3>
+      <h2 class="m-0">AIrial Survey Tools</h2>
       <p v-if="isDev" class="text-warning m-0 small">Development Mode</p>
     </div>
     <BButtonGroup style="border-radius: 8px">
