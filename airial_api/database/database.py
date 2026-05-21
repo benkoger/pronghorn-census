@@ -1,4 +1,4 @@
-# Psycopg3 database abstraction layer for airial_api
+# Psycopg3 database abstraction layer for airial_apidatabase.py
 # Author: Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------#
@@ -9,7 +9,6 @@ from functools import wraps
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, cast
 from uuid import UUID
 
-from grpcutil import bearer_token_credentials
 import psycopg.sql as sql
 from authzed.api.v1 import (
     BulkCheckPermissionRequest,
@@ -25,7 +24,11 @@ from authzed.api.v1 import (
     SubjectReference,
     WriteRelationshipsRequest,
 )
-from grpc import ChannelCredentials
+from grpc import (
+    access_token_call_credentials,
+    composite_channel_credentials,
+    ssl_channel_credentials,
+)
 from psycopg import Cursor
 from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row, tuple_row
@@ -101,17 +104,28 @@ class Database:
     def __init__(
         self,
         db_config: Dict[str, str],
-        spice_config: Dict[str, Union[str, ChannelCredentials]],
+        spice_config: Dict[str, Union[str, bool]],
     ):
         self._config = db_config
         self._pool = None
 
         if spice_config["use_tls"]:
+
+            with open(cast(str, spice_config["SPICEDB_CERT_PATH"]), "rb") as f:
+                tls_creds = ssl_channel_credentials(f.read())
+
+            token_creds = access_token_call_credentials(
+                cast(str, spice_config["bearer_token"])
+            )
+
+            combined_creds = composite_channel_credentials(tls_creds, token_creds)
+
             self._spice_client = Client(
                 cast(str, spice_config["spice_url"]),
-                bearer_token_credentials(cast(str, spice_config["bearer_token"])),
+                combined_creds,
             )
         else:
+
             self._spice_client = InsecureClient(
                 cast(str, spice_config["spice_url"]),
                 cast(str, spice_config["bearer_token"]),

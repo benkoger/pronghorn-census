@@ -19,4 +19,3 @@ def post_fork(server, worker):
     worker.log.info(f"Creating pool for worker: {worker.pid}")
     base.create_pool(min_size=3, max_size=5)
     worker.log.info(f"worker: {worker.pid}'s pool uuid: {base.pool_uuid}")
-
