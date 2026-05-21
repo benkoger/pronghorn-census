@@ -5,7 +5,7 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 from uuid import UUID
 
 import cv2
@@ -213,6 +213,38 @@ class CreatePresignedPutReq(BaseModel):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+class PresignedImageGetReq(BaseModel):
+    image_id: UUID
+    expires_in: int
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateImageMultiPartUploadReq(BaseModel):
+    image_key: str
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class AbortMulitPartUploadReq(BaseModel):
+    image_key: str
+    upload_id: str
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CompleteMultiPartUploadReq(BaseModel):
+    image_key: str
+    upload_id: str
+    parts: List[Any]
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateImageReq(BaseModel):
     name: Optional[str] = None
     herd_unit_id: Optional[int] = None
@@ -299,3 +331,13 @@ class UpdateReviewedAreaReq(BaseModel):
     reviewed_area_length_px: Optional[int] = None
     reviewed_area_width_px: Optional[int] = None
     ra_key: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CrateReviewedAreaPresignedGetReq(BaseModel):
+    reviewed_area_id: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------

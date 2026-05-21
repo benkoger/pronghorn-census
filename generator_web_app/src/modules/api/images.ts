@@ -11,7 +11,6 @@ import {
   type PredictionCropIntf,
   type PredictionIntf,
   type imageRecords,
-  Project,
   Annotation,
   type AnnotationIntf,
 } from "@/types/generatorobjects";

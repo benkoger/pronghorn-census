@@ -76,7 +76,9 @@ export async function getReviewedAreaAnnotations(
 // ---------------------------------------------------------------------------------------------------------------------------
 // POST
 
-export async function getRAPresignedUrl(ra_key: string): Promise<string> {
+export async function getRAPresignedUrl(
+  reviewed_area_id: string,
+): Promise<string> {
   const response = await fetch(`${api_url}/reviewed-area/presigned-get-url`, {
     method: "POST",
     credentials: "include",
@@ -84,7 +86,7 @@ export async function getRAPresignedUrl(ra_key: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ra_key: ra_key,
+      reviewed_area_id,
     }),
   });
   if (!response.ok) throw new ApiError(await response.json());

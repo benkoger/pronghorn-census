@@ -5,14 +5,12 @@
 
 from typing import cast
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base
-from database import ObjectNotFound
 from database.object_models.core import RAQuery
 from database.object_models.user_management import User
 
@@ -47,17 +45,13 @@ def get(query: RAQuery):
             500:
                     description: Database error.
     """
-    try:
-        query.num = 1
-        reviewed_area = base.get_crop_to_review(query, cast(User, current_user))
 
-        # Dont return 404, it is not an error for there to not be any crops needing reviewed
-        if reviewed_area is None:
-            return "", 204
+    query.num = 1
+    reviewed_area = base.get_crop_to_review(query, cast(User, current_user))
 
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    # Dont return 404, it is not an error for there to not be any crops needing reviewed
+    if reviewed_area is None:
+        return "", 204
 
     return reviewed_area.to_dict(), 200
 
@@ -71,14 +65,6 @@ def get(query: RAQuery):
 @validate()
 def get_selection_count(query: RAQuery):
     """ """
-    try:
-        count = base.get_crop_to_review_selection_count(query)
-
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    count = base.get_crop_to_review_selection_count(query)
 
     return {"count": count}, 200
