@@ -73,6 +73,8 @@ if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
 
 cache_redis_url = os.environ.get("CACHE_REDIS", "")
 
+print(cache_redis_url)
+
 cache_config = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
