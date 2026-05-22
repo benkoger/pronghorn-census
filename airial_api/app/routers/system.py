@@ -3,9 +3,8 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint
 from flask_login import login_required
-from psycopg import DatabaseError
 
 from app.extensions import base
 
@@ -16,11 +15,8 @@ systemBp = Blueprint("system", __name__, url_prefix="/api/v1")
 
 @systemBp.get("/bootstrapped")
 def check_bootstrapped():
-    try:
-        res = base.check_bootstrapped()
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    """ """
+    res = base.check_bootstrapped()
 
     return {"result": res}, 200
 
@@ -31,10 +27,7 @@ def check_bootstrapped():
 @systemBp.post("/bootstrapped")
 @login_required
 def finish_bootstrapp():
-    try:
-        base.set_bootstrapped()
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    """ """
+    base.set_bootstrapped()
 
     return "", 204

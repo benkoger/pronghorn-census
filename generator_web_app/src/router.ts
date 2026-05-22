@@ -19,7 +19,7 @@ const router = createRouter({
       path: "/authenticate",
       name: "authenticate",
       component: Authenticate,
-      meta: { requiresNoLayout: true },
+      meta: { requiresNoLayout: true, requiresNoTitle: true },
     },
     {
       path: "/",

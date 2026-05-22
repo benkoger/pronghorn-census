@@ -137,7 +137,7 @@ def authenticate(body: LegacyAuthReq):
     if check_password_hash(user.password_hash, body.password):
         base.login_user(user.user_id)
     else:
-        abort(401, AuthenticationFailure())
+        raise AuthenticationFailure()
 
     login_user(user)
 

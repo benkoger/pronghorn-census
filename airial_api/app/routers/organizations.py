@@ -3,9 +3,8 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint
 from flask_login import login_required
-from psycopg import DatabaseError
 from app.decorators import permission_required
 from database.object_models.user_management import createOrganizationReq
 
@@ -25,10 +24,4 @@ orgBp = Blueprint("organizations", __name__, url_prefix="/api/v1/organizations")
 @validate()
 def create(body: createOrganizationReq):
     """ """
-    try:
-        org = base.create_organizaztion(body)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return org.to_dict(), 201
+    return base.create_organizaztion(body).to_dict(), 201

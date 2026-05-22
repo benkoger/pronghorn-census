@@ -6,17 +6,14 @@
 from typing import cast
 from uuid import UUID
 
-from botocore.exceptions import ClientError
-from flask import Blueprint, abort, current_app, request
+from flask import Blueprint, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base, s3
-from database import ObjectNotFound
-from database.errors import AuthorizationFailure
 from database.object_models.core import RAQuery, UpdateReviewedAreaReq
+from database.object_models.core.images import CrateReviewedAreaPresignedGetReq
 from database.object_models.user_management import User
 
 raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
@@ -50,16 +47,8 @@ def get(query: RAQuery):
             500:
                     description: Database error.
     """
-    try:
-        reviewed_areas = base.get_reviewed_areas(query)
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
 
-    print(reviewed_areas)
+    reviewed_areas = base.get_reviewed_areas(query)
 
     return [ra.to_dict() for ra in reviewed_areas]
 
@@ -72,17 +61,8 @@ def get(query: RAQuery):
 @permission_required("access")
 def get_annotations(reviewed_area_id: str):
     """ """
-    try:
-        annotations = base.get_reviewed_area_annotations(UUID(reviewed_area_id))
-        if not annotations:
-            return [], 200
 
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    annotations = base.get_reviewed_area_annotations(UUID(reviewed_area_id))
 
     return [annot.to_dict() for annot in annotations], 200
 
@@ -94,7 +74,8 @@ def get_annotations(reviewed_area_id: str):
 @raBp.post("/presigned-get-url")
 @login_required
 @permission_required("access")
-def create_ra_presigned_get():
+@validate()
+def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
     """
     Generate a presigned GET URL for a reviewed area.
     ---
@@ -108,23 +89,13 @@ def create_ra_presigned_get():
             500:
                     description: Storage or database error.
     """
-    data = request.get_json()
-    try:
-        response = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": current_app.config["BUCKET_NAME"], "Key": data["ra_key"]},
-            ExpiresIn=3600,
-        )
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, str(e))
-    except ClientError as e:
-        current_app.logger.exception(e)
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status, e.response.get("Error", {}).get("Message"))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    ra = base.get_reviewed_area(body.reviewed_area_id)
+
+    response = s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": current_app.config["BUCKET_NAME"], "Key": ra.ra_key},
+        ExpiresIn=3600,
+    )
 
     return response, 201
 
@@ -158,19 +129,10 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):
         500:
                 description: An unexpected error has occured.
     """
-    try:
-        reviewed_area = base.update_reviewed_area(
+
+    return (
+        base.update_reviewed_area(
             UUID(reviewed_area_id), body, cast(User, current_user)
-        )
-
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, e)
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, e)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return reviewed_area.to_dict(), 200
+        ).to_dict(),
+        200,
+    )

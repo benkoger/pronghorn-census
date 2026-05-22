@@ -4,20 +4,19 @@
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 from datetime import datetime
-from logging import exception
+
 from uuid import UUID
 
-from flask import Blueprint, abort, current_app, request
+from flask import Blueprint, request
 from flask_login import login_required, current_user
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError
 
 from app.decorators import permission_required
 from app.extensions import base
-from database import ObjectNotFound
 from typing import cast
 
 from database.object_models.project_management import CreateModelReq
+from database.object_models.project_management.models import UpdateModelReq
 from database.object_models.user_management import User
 
 modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
@@ -33,12 +32,7 @@ modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 @permission_required("access")
 def get_by_id(model_id: str):
     """ """
-    model = base.get_model(UUID(model_id))
-
-    if model is None:
-        abort(404, f"Model with ID {model_id} was not found!")
-    else:
-        return model.to_dict()
+    return base.get_model(UUID(model_id)).to_dict(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,20 +119,11 @@ def get_schema(model_id: str):
       500:
             description: Database error.
     """
-    try:
-        project = base.get_model_schema(UUID(model_id), cast(User, current_user))
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, str(e))
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return project.to_dict(), 200
+    return (
+        base.get_model_schema(UUID(model_id), cast(User, current_user)).to_dict(),
+        200,
+    )
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,11 +146,7 @@ def get_training_set():
             datetime.strptime(date_range[1], format_pattern),
         )
 
-    try:
-        data = base.get_model_training_data(labels, date_range, surveys, herd_units)
-    except Exception as e:
-        abort(404, str(e))
-    return data, 200
+    return base.get_model_training_data(labels, date_range, surveys, herd_units), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -178,13 +159,7 @@ def get_training_set():
 @validate()
 def create(body: CreateModelReq):
     """ """
-    try:
-        model = base.create_model(body)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return model.to_dict(), 201
+    return base.create_model(body).to_dict(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -315,21 +290,11 @@ def replace_readme(model_id: str):
 @modelBp.patch("/<string:model_id>")
 @login_required
 @permission_required("access")
-def update(model_id: str):
+@validate()
+def update(body: UpdateModelReq, model_id: str):
     """ """
-    data = request.get_json()
 
-    try:
-        model = base.update_model(UUID(model_id), data)
-
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return model.to_dict(), 200
+    return base.update_model(UUID(model_id), body).to_dict(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -341,14 +306,7 @@ def update(model_id: str):
 @permission_required("access")
 def delete_model(model_id: str):
     """ """
-    try:
-        base.delete_model(UUID(model_id))
 
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    base.delete_model(UUID(model_id))
 
     return "", 204

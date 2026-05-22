@@ -44,7 +44,10 @@ from database.object_models.core.images import (
 
 import atexit
 
-from database.object_models.project_management.models import CreateModelReq
+from database.object_models.project_management.models import (
+    CreateModelReq,
+    UpdateModelReq,
+)
 from database.object_models.project_management.projects import createProjectReq
 from database.object_models.project_management.schemas import createSchemaReq
 from database.object_models.project_management.surveys import CreateSurveyReq
@@ -2036,57 +2039,45 @@ class Database:
 
     @connect
     def _update_model(
-        self, cursor: Cursor[Model], model_id: int | UUID, parameters: dict
+        self, cursor: Cursor[Model], model_id: int | UUID, body: UpdateModelReq
     ) -> Model:
         """Internal helper function, do not call directly"""
         cursor.row_factory = class_row(Model)
         query = sql.SQL(
             """ UPDATE projectmanagement.models SET {augmented_field}, modified = CURRENT_TIMESTAMP 
-							WHERE {id_field} = %s RETURNING *; """
+							WHERE uuid = %s RETURNING *; """
         )
         kw_augmented_field = sql.SQL(",").join(
             [
                 sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in parameters.items()
+                for key, value in body.model_dump().items()
                 if key in set(["survey_id", "survey_date", "name", "additional_info"])
                 and value is not None
             ]
         )
-        match model_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("model_id"),
-                    ),
-                    (model_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (model_id,),
-                )
-            case _:
-                raise TypeError("model_id MUST be an integer, or UUID")
+
+        cursor.execute(
+            query.format(
+                augmented_field=kw_augmented_field,
+            ),
+            (model_id,),
+        )
 
         model = cursor.fetchone()
 
-        if model:
-            return model
-        else:
-            raise Exception("failed to update the model")
+        if not model:
+            raise ObjectNotFound("Model", str(model_id))
 
-    def update_model(self, model_id: int | UUID, parameters: dict) -> Model:
+        return model
+
+    def update_model(self, model_id: int | UUID, body: UpdateModelReq) -> Model:
         """Augment a model in the database by providing a modified Model object or a valid id and a new name
 
         Args:
                 model: either a Model object, a database id, or a universally unique identifier
                 name: the new name for the model
         """
-        return self._update_model(model_id, parameters)
+        return self._update_model(model_id, body)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

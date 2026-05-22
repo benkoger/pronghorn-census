@@ -13,11 +13,10 @@ from database.object_models.user_management import (
     SetActiveOrgReq,
     UserQuery,
 )
-from flask import Blueprint, abort, current_app, session
+from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user
 from flask_pydantic import validate
 from msgpack import unpackb
-from psycopg.errors import DatabaseError, UniqueViolation
 
 from app.extensions import base, cache, login_manager
 
@@ -103,11 +102,8 @@ def get_current_user():
 @login_required
 def get_orgs(user_id: str):
     """ """
-    try:
-        orgs = base.get_user_organizations(UUID(user_id))
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
+
+    orgs = base.get_user_organizations(UUID(user_id))
 
     return [org.to_dict() for org in orgs]
 
@@ -137,15 +133,7 @@ def check_role(query: RoleNameQuery):
 @validate()
 def create(body: CreateUserReq):
     """ """
-    try:
-        user = base.create_user(body)
-    except UniqueViolation:
-        abort(409, "User already exists")
-    except (DatabaseError, Exception) as e:
-        print(e)
-        abort(500)
-
-    return user.to_dict(), 201
+    return base.create_user(body).to_dict(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -156,27 +144,22 @@ def create(body: CreateUserReq):
 @validate()
 def create_super(body: CreateUserReq):
     """ """
-    try:
-        # Disable this endpoint if databae is initialized
-        bootstrapped = base.check_bootstrapped()
-        if bootstrapped:
-            abort(401)
+    # Disable this endpoint if databae is initialized
+    bootstrapped = base.check_bootstrapped()
+    if bootstrapped:
+        abort(401)
 
-        role = base.get_role("root")
-        body.role_ids = [role.uuid]
+    role = base.get_role("root")
+    body.role_ids = [role.uuid]
 
-        org = base.get_organization("Root")
-        body.organization_id = org.uuid
+    org = base.get_organization("Root")
+    body.organization_id = org.uuid
 
-        user = base.create_user(body)
+    user = base.create_user(body)
 
-        base.write_spice_relationships(
-            [base.create_spice_update("platform", "airial", "user", user.id, "root")]
-        )
-
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    base.write_spice_relationships(
+        [base.create_spice_update("platform", "airial", "user", user.id, "root")]
+    )
 
     login_user(user)
     return user.to_dict(), 200
