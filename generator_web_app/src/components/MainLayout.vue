@@ -34,20 +34,22 @@ onErrorCaptured((err) => {
   <Header />
   <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
   <main
-    class="d-flex flex-column"
     :style="{
       marginLeft: sStore.nav_toggled ? '12rem' : '4.5rem',
       transition: 'margin-left 0.2s',
     }"
   >
-    <h2 class="bg-body-tertiary text-center mb-2 p-1 shadow">
-      {{ routeName }}
-    </h2>
     <BContainer
       fluid
       id="Router View Content"
-      class="flex-grow-1 d-flex flex-column"
+      class="flex-grow-1 d-flex flex-column mb-1"
     >
+      <h2
+        v-if="!$route.meta.requiresNoTitle"
+        class="bg-body-tertiary text-center mb-2 p-1 shadow mx-n3 me-n3"
+      >
+        {{ routeName }}
+      </h2>
       <RouterView />
     </BContainer>
   </main>

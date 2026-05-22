@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  type ComponentPublicInstance,
+} from "vue";
 import { useAutoCropperStore } from "@/modules/stores/cropperStore";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import type { PredictionCrop } from "@/types/generatorobjects";
@@ -12,9 +19,22 @@ const cStore = useAutoCropperStore();
 const pStore = useProjectStore();
 
 const predCropRefs = ref<Record<string, HTMLCanvasElement>>({});
-const predictionRefs = ref<Record<string, HTMLDivElement>>({});
+const predictionRefs = ref<Record<string, ComponentPublicInstance>>({});
 
 const CurrentPredictionCrops = computed(() => cStore.CurrentPredictionCrops);
+const showInfo = ref(false);
+
+const scrollToPredCrop = () => {
+  if (cStore.CurrentPredictionCrop) {
+    const target = predictionRefs.value[cStore.CurrentPredictionCrop.uuid];
+
+    const el = target?.$el;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+    });
+  }
+};
 
 const drawBoundingBox = (
   canvas: HTMLCanvasElement,
@@ -27,7 +47,7 @@ const drawBoundingBox = (
   const ctx = canvas.getContext("2d");
   if (ctx == null) return;
   ctx.beginPath();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1;
   const label_color_hex = pStore.labels?.find(
     (label) => label.label == predCrop.label,
   )?.color;
@@ -60,28 +80,22 @@ const toggleAllBoxes = () => {
 
 const handleRightArrow = async () => {
   await cStore.nextImage();
+  scrollToPredCrop();
 };
 
 const handleLeftArrow = async () => {
   await cStore.previousImage();
+  scrollToPredCrop();
 };
 
 const handleLeftBracket = async () => {
   await cStore.previousPrediction();
-  if (cStore.CurrentPredictionCrop) {
-    predictionRefs.value[cStore.CurrentPredictionCrop.uuid].scrollIntoView({
-      behavior: "smooth",
-    });
-  }
+  scrollToPredCrop();
 };
 
 const handle_right_bracket = async () => {
   await cStore.nextPrediction();
-  if (cStore.CurrentPredictionCrop) {
-    predictionRefs.value[cStore.CurrentPredictionCrop.uuid].scrollIntoView({
-      behavior: "smooth",
-    });
-  }
+  scrollToPredCrop();
 };
 
 const handleS = () => {
@@ -97,6 +111,21 @@ const handleS = () => {
   }
 };
 
+const selectPredCrop = (index: number) => {
+  cStore.moveToPrediction(index);
+  handleS();
+
+  if (cStore.CurrentPredictionCrop) {
+    const target = predictionRefs.value[cStore.CurrentPredictionCrop.uuid];
+
+    const el = target?.$el;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+    });
+  }
+};
+
 const handleEnter = async () => {
   await cStore.submit();
 };
@@ -107,6 +136,10 @@ const handleSpace = async () => {
       predCrop.approved = predCrop.approved ? false : true;
     });
   }, 0);
+};
+
+const handleI = () => {
+  showInfo.value = !showInfo.value;
 };
 
 const decodeDigit = (event: KeyboardEvent) => {
@@ -163,6 +196,10 @@ const handleKeyPress = (event: KeyboardEvent) => {
       handleSpace();
       break;
     }
+    case event.code === "KeyI": {
+      handleI();
+      break;
+    }
     default: {
       console.log("none matched");
       break;
@@ -194,17 +231,28 @@ onBeforeUnmount(async () => {
 </script>
 <template>
   <BRow align-v="center" class="flex-grow-1" v-if="!cStore.loading">
-    <BCol>
-      <BCardGroup class="gap-2 p-2 overflow-x-auto">
+    <BCol class="overflow-x-auto w-100">
+      <div
+        class="d-flex gap-2 p-2 ps-3 overflow-x-auto"
+        style="min-height: 100%; max-width: 200%"
+      >
         <BCard
           no-body
           v-for="(predCrop, index) in cStore.CurrentPredictionCrops"
           :key="predCrop.uuid"
-          class="bg-body-secondary rounded-3 shadow"
+          class="bg-body-secondary rounded-3 shadow predictionObject"
           :class="{
             Approved: predCrop.approved === true,
             Selected: cStore.activePredIdx === index,
           }"
+          style="min-width: 30vw"
+          :ref="
+            (el) => {
+              if (el) {
+                predictionRefs[predCrop.uuid] = el as ComponentPublicInstance;
+              }
+            }
+          "
         >
           <template #img>
             <div
@@ -217,6 +265,7 @@ onBeforeUnmount(async () => {
                 tabindex="-1"
                 fluid
                 class="w-100 d-block"
+                @click="selectPredCrop(index)"
               />
               <canvas
                 :ref="
@@ -279,51 +328,113 @@ onBeforeUnmount(async () => {
             </BFormGroup>
           </template>
         </BCard>
-      </BCardGroup>
+      </div>
     </BCol>
+    <BButtonToolbar justify aria-label="Auto Cropper Controls">
+      <BButtonGroup class="mx-1">
+        <BButton class="w-100" @click="handleLeftArrow()" variant="primary">
+          <Icon icon="ooui:next-rtl" width="16" height="16" />
+          Previous Image
+        </BButton>
+      </BButtonGroup>
+      <BButtonGroup class="mx-1">
+        <BButton @click="handleSpace()">
+          <Icon icon="uis:space-key" width="16" height="16" />
+          Select All
+        </BButton>
+        <BButton @click="toggleAllBoxes">
+          <Icon icon="mdi:letter-b-box-outline" width="16" height="16" />
+          Show All Boxes
+        </BButton>
+        <BButton v-b-toggle.Crop-Info>
+          <Icon icon="material-symbols:info-outline" width="16" height="16" />
+          Show Info
+        </BButton>
+        <BButton @click="handleEnter()">
+          <Icon icon="vaadin:enter-arrow" width="16" height="16" />
+          Submit
+        </BButton>
+      </BButtonGroup>
+      <BButtonGroup class="mx-1">
+        <BButton class="w-100" @click="handleRightArrow" variant="primary">
+          Next Image
+          <Icon icon="ooui:next-ltr" width="16" height="16" />
+        </BButton>
+      </BButtonGroup>
+    </BButtonToolbar>
   </BRow>
-  <div v-else class="d-flex justify-content-center align-items-center h-100">
+  <BRow v-else class="flex-grow-1" align-v="center">
     <Icon icon="eos-icons:three-dots-loading" width="96" height="96" />
-  </div>
-  <BButtonToolbar key-nav justify aria-label="Auto Cropper Controls" class="">
-    <BButtonGroup class="mx-1">
-      <BButton class="w-100" @click="handleLeftArrow()" variant="primary">
-        <Icon icon="ooui:next-rtl" width="16" height="16" />
-        Previous Image
-      </BButton>
-    </BButtonGroup>
-    <BButtonGroup class="mx-1">
-      <BButton @click="handleSpace()">
-        <Icon icon="uis:space-key" width="16" height="16" />
-        Toggle All
-      </BButton>
-      <BButton @click="handleEnter()">
-        <Icon icon="vaadin:enter-arrow" width="16" height="16" />
-        Submit
-      </BButton>
-    </BButtonGroup>
-    <BButtonGroup class="mx-1">
-      <BButton class="w-100" @click="handleRightArrow" variant="primary">
-        Next Image
-        <Icon icon="ooui:next-ltr" width="16" height="16" />
-      </BButton>
-    </BButtonGroup>
-  </BButtonToolbar>
+  </BRow>
+  <BOffcanvas
+    id="Crop-Info"
+    title="Information"
+    shadow
+    v-model="showInfo"
+    width="32%"
+    lazy
+  >
+    <BRow>
+      <BCol class="d-flex flex-column gap-2">
+        <h4><Icon icon="material-symbols:image-outline" /> Image:</h4>
+        <BListGroup class="ms-2 me-2">
+          <BListGroupItem class="d-flex p-0">
+            <BCol
+              cols="2"
+              class="ps-1 bg-body-secondary rounded-top-1 d-flex align-items-center gap-1 pe-2"
+            >
+              <span>Name</span>
+            </BCol>
+            <BCol cols="10" class="text-truncate">
+              <span>{{ cStore.currentImage.name }}</span>
+            </BCol>
+          </BListGroupItem>
+          <BListGroupItem class="d-flex p-0">
+            <BCol
+              cols="2"
+              class="ps-1 bg-body-secondary d-flex align-items-center gap-1 pe-2"
+            >
+              <span>Created</span>
+            </BCol>
+            <BCol cols="10" class="text-truncate">
+              <span>{{ cStore.currentImage.created }}</span>
+            </BCol>
+          </BListGroupItem>
+          <BListGroupItem class="d-flex p-0">
+            <BCol
+              cols="2"
+              class="ps-1 bg-body-secondary rounded-bottom-1 justify-content-evenly align-items-center gap-1 pe-2"
+            >
+              <span>Modified</span>
+            </BCol>
+            <BCol cols="10" class="text-truncate">
+              <span>{{ cStore.currentImage.modified }}</span>
+            </BCol>
+          </BListGroupItem>
+        </BListGroup>
+        <BListGroup class="ms-2 me-2">
+          <BListGroupItem
+            v-for="label in pStore.SortedLabels"
+            class="p-1 m-0 d-flex flex-column justify-content-center"
+          >
+            <div
+              class="d-flex justify-content-between w-100 align-items-center"
+            >
+              <h4
+                :style="{ color: label.color, borderColor: label.color }"
+                class="label"
+              >
+                {{ label.label }}
+              </h4>
+              <span class="ms-auto text-truncate">{{ label.name }}</span>
+            </div>
+          </BListGroupItem>
+        </BListGroup>
+      </BCol>
+    </BRow>
+  </BOffcanvas>
 </template>
 <style scoped>
-#predictionsCarosuel {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-}
-
-.Overflow {
-  overflow-x: auto;
-  justify-content: flex-start !important;
-  scrollbar-color: var(--color-text) transparent;
-  scroll-padding-inline: 10%;
-}
-
 canvas {
   object-fit: cover;
   display: none;
@@ -336,31 +447,22 @@ canvas {
   display: block;
 }
 
-.predictionObject canvas.Visible {
-  width: 100%;
-  height: 100%;
-  display: block;
-  z-index: 999;
-}
-
-.predictionObject button {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  width: 22vw;
-  height: auto;
-  align-items: center;
-  border: none;
-  background: none;
-  position: relative;
-  color: var(--color-heading);
-}
-
 .predictionObject.Selected {
   box-shadow: 0 0 3px 1px white !important;
 }
 
 .predictionObject.Approved {
   background-color: var(--bs-success) !important;
+}
+
+.label {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: solid 1px;
+  border-radius: 4px;
+  margin: 0;
 }
 </style>

@@ -67,7 +67,6 @@ interface AutoCropOptions {
 }
 
 export async function autoCrop(options: AutoCropOptions): Promise<boolean> {
-  console.log(JSON.stringify(options));
   const response = await fetch(`${api_url}/autocropper`, {
     method: "POST",
     credentials: "include",

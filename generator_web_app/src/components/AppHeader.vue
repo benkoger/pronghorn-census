@@ -2,7 +2,6 @@
 import { useRouter } from "vue-router";
 import type { Organization } from "@/types/generatorobjects";
 import { useSystemStore } from "@/modules/stores/systemStore";
-import { useProjectStore } from "@/modules/stores/projectStore";
 import { BButton } from "bootstrap-vue-next";
 import type { apiError } from "@/modules/api/errors";
 import { useToast } from "bootstrap-vue-next";
@@ -13,7 +12,6 @@ defineOptions({
 
 const isDev = import.meta.env.DEV;
 const sStore = useSystemStore();
-const pStore = useProjectStore();
 const { create } = useToast();
 const router = useRouter();
 
