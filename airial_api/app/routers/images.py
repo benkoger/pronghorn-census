@@ -6,22 +6,26 @@
 from uuid import UUID
 
 import cv2
-from botocore.exceptions import ClientError
-from flask import Blueprint, Response, abort, current_app, request
+from flask import Blueprint, Response, abort, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from psycopg.errors import DatabaseError, UniqueViolation
-from app.decorators import permission_required
+from app.decorators import permission_required, roles_required
 
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
-from database.errors import AuthorizationFailure, ObjectNotFound
+from database.errors import ObjectNotFound
 from database.object_models.core import (
     CreateImageReq,
     CreatePredictionCropReq,
     CreatePresignedPutReq,
     PredictionQuery,
     UpdateImageReq,
+)
+from database.object_models.core.images import (
+    AbortMulitPartUploadReq,
+    CompleteMultiPartUploadReq,
+    CreateImageMultiPartUploadReq,
+    PresignedImageGetReq,
 )
 
 imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
@@ -50,20 +54,7 @@ def get_by_id(image_id: str):
       404:
             description: No image record found for the provided ID.
     """
-    try:
-        image = base.get_image(UUID(image_id))
-
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, e)
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, e)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
-
-    return image.to_dict(), 200
+    return base.get_image(UUID(image_id)).to_dict(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,9 +66,7 @@ def get_prediction_crop(prediction_id: str):
     """ """
     crop = cache.get(prediction_id)
     if crop is None:
-        e = ObjectNotFound("prediction_crop", prediction_id)
-        current_app.logger.exception(e)
-        abort(404, e)
+        raise ObjectNotFound("prediction_crop", prediction_id)
 
     _, encoded_image = cv2.imencode(".webp", crop)
     return Response(encoded_image.tobytes(), mimetype="image/webp"), 200
@@ -100,18 +89,8 @@ def get_crops(image_id: str):
       500:
             description: Database error.
     """
-    try:
-        crops = base.get_image_crops(UUID(image_id))
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, e)
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, e)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    crops = base.get_image_crops(UUID(image_id))
 
     return [crop.to_dict() for crop in crops], 200
 
@@ -141,18 +120,8 @@ def get_predictions(image_id: str):
             500:
                     description: Database error.
     """
-    try:
-        predictions = base.get_image_predictions(UUID(image_id))
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, e)
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, e)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    predictions = base.get_image_predictions(UUID(image_id))
 
     return [pred.to_dict() for pred in predictions], 200
 
@@ -185,20 +154,8 @@ def get_annotations(image_id: str):
                     description: Unexpected error.
 
     """
-    try:
-        annotations = base.get_image_annotations(UUID(image_id))
-        if not annotations:
-            return [], 200
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, e)
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    annotations = base.get_image_annotations(UUID(image_id))
 
     return [annot.to_dict() for annot in annotations], 200
 
@@ -229,17 +186,7 @@ def create(body: CreateImageReq):
             500:
                     description: Database error.
     """
-    try:
-        image = base.create_image(body)
-
-    except UniqueViolation as e:
-        current_app.logger.error(e)
-        abort(409, e)
-    except (DatabaseError, Exception) as e:
-        current_app.logger.error(e)
-        abort(500)
-
-    return image.to_dict(), 201
+    return base.create_image(body).to_dict(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -248,7 +195,8 @@ def create(body: CreateImageReq):
 @imageBp.post("/presigned-get-url")
 @login_required
 @permission_required("access")
-def create_presigned_get():
+@validate()
+def create_presigned_get(body: PresignedImageGetReq):
     """
     Generate a presigned GET URL for an image.
     ---
@@ -262,28 +210,17 @@ def create_presigned_get():
             500:
                     description: Storage or database error.
     """
-    data = request.get_json()
-    try:
-        image = base.get_image(UUID(data["image_id"]))
 
-        if not image:
-            abort(404, "Image not found")
+    image = base.get_image(body.image_id)
 
-        response = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": current_app.config["BUCKET_NAME"], "Key": image.img_key},
-            ExpiresIn=data["expires_in"],
-        )
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, e)
-    except ClientError as e:
-        current_app.logger.exception(e)
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status, e.response.get("Error", {}).get("Message"))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.error(e)
-        abort(500)
+    if not image:
+        raise ObjectNotFound("image", str(body.image_id))
+
+    response = s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": current_app.config["BUCKET_NAME"], "Key": image.img_key},
+        ExpiresIn=body.image_id,
+    )
 
     return response, 201
 
@@ -292,7 +229,7 @@ def create_presigned_get():
 
 
 @imageBp.post("/presigned-put-url")
-# @roles_required('admin')
+@roles_required("admin")
 @validate()
 @login_required
 @permission_required("access")
@@ -311,40 +248,29 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
                     description: Storage/Database error.
     """
     data = body.model_dump()
-    try:
-        image_id = (
-            UUID(data["image_id"])
-            if isinstance(data["image_id"], str)
-            else data["image_id"]
-        )
-        image = base._get_image(image_id)
 
-        if image is None:
-            abort(404, "Image not found")
+    image_id = (
+        UUID(data["image_id"])
+        if isinstance(data["image_id"], str)
+        else data["image_id"]
+    )
+    image = base._get_image(image_id)
 
-        response = s3.generate_presigned_url(
-            ClientMethod="upload_part",
-            Params={
-                "Bucket": current_app.config["BUCKET_NAME"],
-                "Key": image.img_key,
-                "UploadId": data["upload_id"],
-                "PartNumber": data["part_number"],
-                "ContentLength": data["chunk_size"],
-                "ContentMD5": data["chunk_md5"],
-            },
-            ExpiresIn=3600,
-        )
+    if image is None:
+        abort(404, "Image not found")
 
-    except ValueError as e:
-        current_app.logger.exception(e)
-        abort(400, e)
-    except ClientError as e:
-        current_app.logger.exception(e)
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status)
-    except (DatabaseError, ValueError) as e:
-        current_app.logger.error(e)
-        abort(500)
+    response = s3.generate_presigned_url(
+        ClientMethod="upload_part",
+        Params={
+            "Bucket": current_app.config["BUCKET_NAME"],
+            "Key": image.img_key,
+            "UploadId": data["upload_id"],
+            "PartNumber": data["part_number"],
+            "ContentLength": data["chunk_size"],
+            "ContentMD5": data["chunk_md5"],
+        },
+        ExpiresIn=3600,
+    )
 
     return response, 201
 
@@ -355,7 +281,8 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
 @imageBp.post("/create-multipart-upload")
 @login_required
 @permission_required("access")
-def create_multipart_upload():
+@validate()
+def create_multipart_upload(body: CreateImageMultiPartUploadReq):
     """
     Initiates a new multipart upload.
     ---
@@ -365,19 +292,11 @@ def create_multipart_upload():
             500:
                     description: system error.
     """
-    data = request.get_json()
-    try:
-        response = s3.create_multipart_upload(
-            Bucket=current_app.config["BUCKET_NAME"],
-            Key=data["image_key"],
-            ContentType="image/jpeg",
-        )
-    except ClientError as e:
-        current_app.logger.exception(e)
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status)
-    except Exception:
-        abort(500)
+    response = s3.create_multipart_upload(
+        Bucket=current_app.config["BUCKET_NAME"],
+        Key=body.image_key,
+        ContentType="image/jpeg",
+    )
 
     return response["UploadId"], 201
 
@@ -388,7 +307,8 @@ def create_multipart_upload():
 @imageBp.post("/complete-multipart-upload")
 @login_required
 @permission_required("access")
-def complete_upload():
+@validate()
+def complete_upload(body: CompleteMultiPartUploadReq):
     """
     Completes a new multipart upload.
     ---
@@ -398,21 +318,13 @@ def complete_upload():
             500:
                     description: S3 or system error.
     """
-    data = request.get_json()
-    try:
-        response = s3.complete_multipart_upload(
-            Bucket=current_app.config["BUCKET_NAME"],
-            Key=data["image_key"],
-            MultipartUpload={"Parts": data["parts"]},
-            UploadId=data["upload_id"],
-        )
 
-    except ClientError as e:
-        current_app.logger.exception(e)
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status)
-    except Exception:
-        abort(500)
+    response = s3.complete_multipart_upload(
+        Bucket=current_app.config["BUCKET_NAME"],
+        Key=body.image_key,
+        MultipartUpload={"Parts": body.parts},
+        UploadId=body.upload_id,
+    )
 
     return response, 201
 
@@ -423,31 +335,25 @@ def complete_upload():
 @imageBp.post("/abort-multipart-upload")
 @login_required
 @permission_required("access")
-def abort_upload():
+@validate()
+def abort_upload(body: AbortMulitPartUploadReq):
     """
     Aborts a multipart upload.
     ---
     responses:
-            201:
-                    description: Multipart upload started.
+            200:
+                    description: Multipart upload aborted.
             500:
                     description: S3 or system error.
     """
-    data = request.get_json()
-    try:
-        response = s3.abort_multipart_upload(
-            Bucket=current_app.config["BUCKET_NAME"],
-            Key=data["image_key"],
-            UploadId=data["upload_id"],
-        )
 
-    except ClientError as e:
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status)
-    except Exception:
-        abort(500)
+    response = s3.abort_multipart_upload(
+        Bucket=current_app.config["BUCKET_NAME"],
+        Key=body.image_key,
+        UploadId=body.upload_id,
+    )
 
-    return response, 201
+    return response, 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -458,41 +364,28 @@ def abort_upload():
 @permission_required("acecss")
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
+    """"""
+    image = base.get_image(body.image_id)
+    predictions = base.get_predictions(
+        PredictionQuery(prediction_id=body.prediction_id)
+    )
 
-    try:
-        image = base.get_image(body.image_id)
-        predictions = base.get_predictions(
-            PredictionQuery(prediction_id=body.prediction_id)
-        )
+    image_data = cache.get(image.uuid)
 
-        image_data = cache.get(image.uuid)
+    if not image_data:
+        image_data = s3.get_object(
+            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
+        )["Body"].read()
 
-        if not image_data:
-            image_data = s3.get_object(
-                Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
-            )["Body"].read()
-            cache.set(image.uuid, image_data, 500)
+        cache.set(image.uuid, image_data, 500)
 
-        image.set_image(image_data)
-        pred_crops = create_subcrop(image, predictions)
+    image.set_image(image_data)
+    pred_crops = create_subcrop(image, predictions)
 
-        [cache.set(crop.uuid, crop.get_image(), 3600) for crop in pred_crops]
-
-    except ObjectNotFound as e:
-        current_app.logger.exception(e)
-        abort(404, str(e))
-    except AuthorizationFailure as e:
-        current_app.logger.exception(e)
-        abort(401, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.exception(e)
-        abort(500)
+    [cache.set(crop.uuid, crop.get_image(), 3600) for crop in pred_crops]
 
     return [crop.to_dict() for crop in pred_crops]
 
-
-# ---------------------------------------------------------------------------------------------------------------------------
-# PUT
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # PATCH
@@ -521,20 +414,8 @@ def update(body: UpdateImageReq, image_id: str):
             500:
                     description: Database error.
     """
-    try:
-        image = base.update_image(UUID(image_id), body)
 
-    except ValueError as e:
-        current_app.logger.error(e)
-        abort(400, str(e))
-    except ObjectNotFound as e:
-        current_app.logger.error(e)
-        abort(404, str(e))
-    except (DatabaseError, Exception) as e:
-        current_app.logger.error(e)
-        abort(500)
-
-    return image.to_dict(), 200
+    return base.update_image(UUID(image_id), body).to_dict(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -545,15 +426,8 @@ def update(body: UpdateImageReq, image_id: str):
 @permission_required("acess")
 def close_user_images():
     """ """
-    try:
-        base.close_user_images(current_user.user_id)
 
-    except ValueError as e:
-        abort(400, str(e))
-    except ObjectNotFound as e:
-        abort(404, str(e))
-    except (DatabaseError, Exception):
-        abort(500)
+    base.close_user_images(current_user.user_id)
 
     return "", 204
 
@@ -567,21 +441,11 @@ def close_user_images():
 @permission_required("access")
 def delete_image(image_id: str):
     """ """
-    try:
-        image = base.get_image(UUID(image_id))
-        if not image:
-            abort(404, "Image not found")
 
-        s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)
+    image = base.get_image(UUID(image_id))
 
-        base.delete_image(UUID(image_id))
+    s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)
 
-    except ValueError as e:
-        abort(400, str(e))
-    except ClientError as e:
-        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
-        abort(status, e.response.get("Error", {}).get("Message"))
-    except (DatabaseError, Exception):
-        abort(500)
+    base.delete_image(UUID(image_id))
 
     return "", 204

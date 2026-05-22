@@ -198,7 +198,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
     async getReviewedAreaImage(crop: ReviewedArea | undefined) {
       if (crop == undefined) return;
-      const resp = await getRAPresignedUrl(crop.ra_key);
+      const resp = await getRAPresignedUrl(crop.uuid);
       if (resp == undefined) return;
       crop.url = resp;
       return useImage(resp);

@@ -208,6 +208,10 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
       }
       this.loading = false;
     },
+    moveToPrediction(index: number) {
+      if (this.loading) return;
+      this.activePredIdx = index;
+    },
     async nextPrediction() {
       if (this.loading) return;
       if (this.activePredIdx != this.CurrentPredictionCrops.length - 1)

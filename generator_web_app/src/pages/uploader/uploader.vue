@@ -338,148 +338,140 @@ export default defineComponent({
 });
 </script>
 <template>
-  <BContainer class="h-100" fluid>
-    <BRow class="h-100">
-      <BCol cols="9" class="d-flex flex-column m-0 h-100">
-        <h3>File Dropzone</h3>
+  <BRow class="flex-grow-1 mb-3 overflow-hidden">
+    <BCol cols="9" class="flex-grow-1 d-flex flex-column">
+      <h3>File Dropzone</h3>
+      <div class="rounded-3 shadow flex-grow-1 bg-body-tertiary">
         <div
-          class="h-100 rounded-3 shadow d-flex justify-content-center align-items-center bg-body-tertiary"
+          id="Upload-DropZone"
+          class="d-flex h-100 w-100 justify-content-center align-items-center flex-column"
+          @dragover="drag_over"
+          @dragleave="drag_leave"
+          @drop="drop"
         >
+          <input
+            type="file"
+            id="File-Input"
+            webkitdirectory=""
+            style="display: none"
+            directory=""
+            @change="on_change"
+            ref="file"
+          />
+          <label for="File-Input">
+            <Icon icon="material-symbols:upload" width="48" height="48"></Icon>
+            <div v-if="is_dragging">Release to drop files here.</div>
+            <div v-else>Drop files here or click anywhere to upload.</div>
+          </label>
           <div
-            id="Upload-DropZone"
-            class="d-flex h-100 w-100 justify-content-center align-items-center flex-column"
-            @dragover="drag_over"
-            @dragleave="drag_leave"
-            @drop="drop"
+            id="FilesPreview"
+            class="d-flex h-25 bg-body-secondary w-100 shadow-sm rounded-bottom p-2 overflow-y-hidden overflow-x-scroll border-top gap-3 justify-content-center align-items-center Overflow"
+            v-if="files.length"
           >
-            <input
-              type="file"
-              id="File-Input"
-              webkitdirectory=""
-              style="display: none"
-              directory=""
-              @change="on_change"
-              ref="file"
-            />
-            <label for="File-Input">
-              <Icon
-                icon="material-symbols:upload"
-                width="48"
-                height="48"
-              ></Icon>
-              <div v-if="is_dragging">Release to drop files here.</div>
-              <div v-else>Drop files here or click anywhere to upload.</div>
-            </label>
             <div
-              id="FilesPreview"
-              class="d-flex h-25 bg-body-secondary w-100 shadow-sm rounded-bottom p-2 overflow-y-hidden overflow-x-scroll border-top gap-3 justify-content-center align-items-center Overflow"
-              v-if="files.length"
+              class="border overflow-hidden rounded-3 d-flex flex-shrink-0 p-1"
+              style="width: 250px"
+              v-for="file in files"
+              :key="file.name"
             >
-              <div
-                class="border overflow-hidden rounded-3 d-flex flex-shrink-0 p-1"
-                style="width: 250px"
-                v-for="file in files"
-                :key="file.name"
-              >
-                <BRow class="g-0 w-100 d-flex justify-content-evenly">
-                  <BCol
-                    cols="2"
-                    class="d-flex align-items-center justify-content-center"
+              <BRow class="g-0 w-100 d-flex justify-content-evenly">
+                <BCol
+                  cols="2"
+                  class="d-flex align-items-center justify-content-center"
+                >
+                  <Icon
+                    icon="material-symbols:image-outline"
+                    width="auto"
+                    height="100%"
+                    v-if="file.type.startsWith('image/')"
+                  />
+                </BCol>
+                <BCol cols="10">
+                  <BCardBody
+                    class="overflow-hidden d-flex w-100 justify-content-between align-items-center"
                   >
-                    <Icon
-                      icon="material-symbols:image-outline"
-                      width="auto"
-                      height="100%"
-                      v-if="file.type.startsWith('image/')"
-                    />
-                  </BCol>
-                  <BCol cols="10">
-                    <BCardBody
-                      class="overflow-hidden d-flex w-100 justify-content-between align-items-center"
+                    <BCardText
+                      class="d-flex justify-content-center align-items-center"
+                      style="max-width: 170px"
                     >
-                      <BCardText
-                        class="d-flex justify-content-center align-items-center"
-                        style="max-width: 170px"
-                      >
-                        <small class="text-truncate">{{ file.name }}</small>
-                      </BCardText>
-                      <BButton
-                        size="sm"
-                        resume_upload
-                        variant="outline-danger"
-                        type="button"
-                        @click="remove(files.indexOf(file))"
-                        title="Remove file"
-                      >
-                        x
-                      </BButton>
-                    </BCardBody>
-                  </BCol>
-                </BRow>
-              </div>
+                      <small class="text-truncate">{{ file.name }}</small>
+                    </BCardText>
+                    <BButton
+                      size="sm"
+                      resume_upload
+                      variant="outline-danger"
+                      type="button"
+                      @click="remove(files.indexOf(file))"
+                      title="Remove file"
+                    >
+                      x
+                    </BButton>
+                  </BCardBody>
+                </BCol>
+              </BRow>
             </div>
           </div>
         </div>
-      </BCol>
-      <BCol cols="3" class="d-flex flex-column m-0 h-100">
-        <h3>Upload Details</h3>
-        <div
-          class="d-flex flex-column flex-grow-1 w-100 bg-body-tertiary rounded-top-3 shadow p-2"
-        >
-          <h4>Destination</h4>
-          <BListGroup>
-            <BListGroupItem>
-              <strong>Project:</strong> {{ pStore.CurrentProject?.name }}
-            </BListGroupItem>
-            <BListGroupItem>
-              <strong>Herd Unit:</strong> {{ pStore.CurrentHerdUnit?.name }}
-            </BListGroupItem>
-            <BListGroupItem>
-              <strong>Survey:</strong> {{ pStore.CurrentSurvey?.name }}
-            </BListGroupItem>
-          </BListGroup>
-          <h4 class="mt-2">Upload Info</h4>
-          <BListGroup>
-            <BListGroupItem>
-              <strong>Upload Size:</strong> {{ uploadSize }}
-            </BListGroupItem>
-            <BListGroupItem>
-              <strong>Number of Files:</strong> {{ numFiles }}
-            </BListGroupItem>
-          </BListGroup>
-          <br />
-          <BButton
-            variant="outline-danger"
-            size="sm"
-            v-if="numFiles > 0"
-            @click="clear()"
-          >
-            Clear all Files
-          </BButton>
-          <p class="p-1 mt-4">
-            This utility is designed to allow for entire surveys to be Uploaded
-            at once. Due to the large volume of data it is reccomended to use
-            only use this on a computer connected to AC power with a fast,
-            prefererably wired internet connection.
-          </p>
-        </div>
+      </div>
+    </BCol>
+    <BCol cols="3" class="d-flex flex-column m-0 flex-grow-1">
+      <h3>Upload Details</h3>
+      <div
+        class="d-flex flex-column flex-grow-1 w-100 bg-body-tertiary rounded-top-3 shadow p-2"
+      >
+        <h4>Destination</h4>
+        <BListGroup>
+          <BListGroupItem>
+            <strong>Project:</strong> {{ pStore.CurrentProject?.name }}
+          </BListGroupItem>
+          <BListGroupItem>
+            <strong>Herd Unit:</strong> {{ pStore.CurrentHerdUnit?.name }}
+          </BListGroupItem>
+          <BListGroupItem>
+            <strong>Survey:</strong> {{ pStore.CurrentSurvey?.name }}
+          </BListGroupItem>
+        </BListGroup>
+        <h4 class="mt-2">Upload Info</h4>
+        <BListGroup>
+          <BListGroupItem>
+            <strong>Upload Size:</strong> {{ uploadSize }}
+          </BListGroupItem>
+          <BListGroupItem>
+            <strong>Number of Files:</strong> {{ numFiles }}
+          </BListGroupItem>
+        </BListGroup>
+        <br />
         <BButton
-          variant="primary"
-          class="rounded-top-0 rounded-bottom-3"
-          size="lg"
-          :disabled="!canStart"
-          @click="startUpload()"
+          variant="outline-danger"
+          size="sm"
+          v-if="numFiles > 0"
+          @click="clear()"
         >
-          <Icon
-            icon="glyphs:arrow-solid-line-start-bold"
-            width="24"
-            height="24"
-          />
-          Begin Upload
+          Clear all Files
         </BButton>
-      </BCol>
-    </BRow>
-  </BContainer>
+        <p class="p-1 mt-4">
+          This utility is designed to allow for entire surveys to be Uploaded at
+          once. Due to the large volume of data it is reccomended to use only
+          use this on a computer connected to AC power with a fast, prefererably
+          wired internet connection.
+        </p>
+      </div>
+      <BButton
+        variant="primary"
+        class="rounded-top-0 rounded-bottom-3"
+        size="lg"
+        :disabled="!canStart"
+        @click="startUpload()"
+      >
+        <Icon
+          icon="glyphs:arrow-solid-line-start-bold"
+          width="24"
+          height="24"
+        />
+        Begin Upload
+      </BButton>
+    </BCol>
+  </BRow>
   <BModal
     v-model="is_uploading"
     size="xl"
@@ -492,38 +484,34 @@ export default defineComponent({
     no-header
     @ok="confirm_cancel"
   >
-    <BContainer class="w-100" fluid>
-      <BRow class="h-100">
-        <BCol cols="6" class="h-100 d-flex flex-column align-items-center">
-          <Icon icon="line-md:uploading-loop" height="25%" width="25%" />
-          <BProgress
-            class="mt-4 w-100"
-            :value="current_file_num"
-            :max="numFiles"
-            height="0.5rem"
-            variant="primary"
-          />
-        </BCol>
-        <BCol cols="6" class="h-100">
-          <h5>Now Uploading Image {{ current_file_num }} / {{ numFiles }}</h5>
-          <ul>
-            <li><strong>Name:</strong> {{ current_file_name }}</li>
-            <li>
-              <strong>Uploaded Part:</strong> {{ current_file_part }} /
-              {{ total_file_parts }}
-            </li>
-          </ul>
-          <span v-if="has_info" class="text-warning">{{
-            upload_info_text
-          }}</span>
-          <p>
-            Please keep this tab visible and your computer awake. For larger
-            surveys please allow for plenty of time for the upload process to
-            complete.
-          </p>
-        </BCol>
-      </BRow>
-    </BContainer>
+    <BRow class="h-100">
+      <BCol cols="6" class="h-100 d-flex flex-column align-items-center">
+        <Icon icon="line-md:uploading-loop" height="25%" width="25%" />
+        <BProgress
+          class="mt-4 w-100"
+          :value="current_file_num"
+          :max="numFiles"
+          height="0.5rem"
+          variant="primary"
+        />
+      </BCol>
+      <BCol cols="6" class="h-100">
+        <h5>Now Uploading Image {{ current_file_num }} / {{ numFiles }}</h5>
+        <ul>
+          <li><strong>Name:</strong> {{ current_file_name }}</li>
+          <li>
+            <strong>Uploaded Part:</strong> {{ current_file_part }} /
+            {{ total_file_parts }}
+          </li>
+        </ul>
+        <span v-if="has_info" class="text-warning">{{ upload_info_text }}</span>
+        <p>
+          Please keep this tab visible and your computer awake. For larger
+          surveys please allow for plenty of time for the upload process to
+          complete.
+        </p>
+      </BCol>
+    </BRow>
   </BModal>
   <BModal
     no-close-on-esc

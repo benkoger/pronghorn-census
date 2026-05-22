@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
 import type { CGObject } from "@/types/generatorobjects";
+import { Icon } from "@iconify/vue/dist/iconify.js";
 
 const props = withDefaults(
   defineProps<{
     items: CGObject[];
+    icon?: string;
     activeItem?: CGObject | CGObject[];
     selectAction: (CGObject: any) => void;
     fetchAction?: (page: number, per_page: number) => Promise<void>;
@@ -103,89 +105,61 @@ watch(
 </script>
 
 <template>
-  <h3 v-if="listName != undefined">{{ listName }}</h3>
-  <BListGroup>
-    <BListGroupItem
-      v-for="item in paginatedItems"
-      :key="item.uuid"
-      button
-      :active="isItemActive(item)"
-      @click="selectAction(item)"
-      class="d-flex justify-content-between align-items-center"
-    >
-      <div class="d-flex flex-column">
-        <span class="mb-1 fw-bold">{{ item.name || item.username }}</span>
-        <small>{{ item.uuid }}</small>
-        <div class="d-flex gap-4 w-50 ms-a">
-          <small class="text-muted"
-            ><strong>Created:</strong>
-            {{
-              item.created.toLocaleString("en-US", {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-              })
-            }}
-          </small>
-          <small class="text-muted"
-            ><strong>Modified:</strong>
-            {{
-              item.modified.toLocaleString("en-US", {
-                year: "numeric",
-                month: "numeric",
-                day: "numeric",
-              })
-            }}
-          </small>
-        </div>
-      </div>
-      <div class="d-flex gap-2">
-        <div v-if="props.allowUpdate">
-          <BButton
-            :variant="
-              item === props.activeItem ? 'outline-light' : 'outline-primary'
-            "
-            @click.stop.prevent="showObjectUpdatinator = true"
-          >
-            <Icon icon="material-symbols:edit" width="24" height="24" />
+  <div>
+    <h3 v-if="listName != undefined">{{ listName }}</h3>
+    <BListGroup>
+      <BListGroupItem
+        v-for="item in paginatedItems"
+        :key="item.uuid"
+        button
+        :active="isItemActive(item)"
+        @click="selectAction(item)"
+        class="d-flex justify-content-between align-items-center"
+      >
+        <Icon v-if="props.icon" :icon="props.icon" width="24" />
+        <span>{{ item.name }}</span>
+        <BButtonGroup>
+          <BButton v-if="props.allowUpdate" size="sm" variant="secondary">
+            <Icon icon="mingcute:inspect-fill" />
           </BButton>
-        </div>
-        <div v-if="props.allowDelete">
           <BButton
-            variant="outline-danger"
+            v-if="props.allowDelete"
+            size="sm"
+            variant="danger"
             @click.stop.prevent="getDeleteConsent(item.uuid)"
           >
-            <Icon icon="ic:baseline-delete" width="24" />
+            <Icon icon="material-symbols:delete" />
           </BButton>
-        </div>
-      </div>
-    </BListGroupItem>
-    <BListGroupItem v-if="items.length == 0">
-      <span class="text-muted"> No Objects found </span>
-    </BListGroupItem>
-  </BListGroup>
-  <div v-if="itemNum >= perPage" class="mt-3 d-flex justify-content-center">
-    <BPagination
-      v-model="currentPage"
-      :total-rows="props.fetchAction ? props.itemNum : props.items.length"
-      :per-page="perPage"
-    />
-  </div>
-  <BModal centered v-model="showObjectCreator" title="Create" no-footer>
-    <slot name="create" :Finished="createFinished"> </slot>
-  </BModal>
-  <BModal>
-    <slot name="update"> </slot>
-  </BModal>
-  <div v-if="allowCreate">
-    <BButton
-      :id="listName + ' Create'"
-      class="m-2"
-      variant="outline-primary"
-      @click.stop.prevent="toggleCreate"
-    >
-      <Icon icon="material-symbols:add" />
-    </BButton>
+        </BButtonGroup>
+      </BListGroupItem>
+
+      <BListGroupItem v-if="items.length == 0">
+        <span class="text-muted"> No Objects found </span>
+      </BListGroupItem>
+    </BListGroup>
+    <div v-if="itemNum >= perPage" class="mt-3 d-flex justify-content-center">
+      <BPagination
+        v-model="currentPage"
+        :total-rows="props.fetchAction ? props.itemNum : props.items.length"
+        :per-page="perPage"
+      />
+    </div>
+    <BModal centered v-model="showObjectCreator" title="Create" no-footer>
+      <slot name="create" :Finished="createFinished"> </slot>
+    </BModal>
+    <BModal>
+      <slot name="update"> </slot>
+    </BModal>
+    <div v-if="allowCreate">
+      <BButton
+        :id="listName + ' Create'"
+        class="m-2 d-flex align-items-center"
+        variant="outline-primary"
+        @click.stop.prevent="toggleCreate"
+      >
+        <Icon icon="gridicons:create" />
+      </BButton>
+    </div>
   </div>
   <BModal
     centered

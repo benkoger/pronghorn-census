@@ -105,66 +105,64 @@ watch(
   },
 );
 </script>
-
 <template>
   <ProcessBreadCrumb
     v-model="currentStep"
     :steps="steps"
     :showButtons="true"
     :canContinue="canProceed"
-  >
-    <div v-if="currentStep === 0" class="d-flex flex-column">
-      <div class="flex-grow-1 overflow-y-auto">
-        <SelectorList
-          :items="pStore.projects"
-          :active-item="pStore.CurrentProject"
-          :select-action="pStore.set_current_project"
-          list-name="Project"
-        />
-      </div>
-    </div>
-
-    <div v-if="currentStep === 1" class="d-flex flex-column h-100">
-      <div class="flex-grow-1 overflow-y-auto">
-        <SelectorList
-          list-name="Herd Unit Selection"
-          :select-action="pStore.set_current_herd_unit"
-          :items="pStore.herd_units"
-          :active-item="pStore.CurrentHerdUnit"
-          allow-create
-        >
-          <template #create="{ Finished }">
-            <CreateHerdUnit
-              :project="pStore.CurrentProject as Project"
-              :submit-action="pStore.create_herd_unit"
-              @creation-successful="Finished"
-            />
-          </template>
-        </SelectorList>
-      </div>
-    </div>
-
-    <div v-if="currentStep === 2" class="d-flex flex-column h-100">
-      <div class="flex-grow-1 overflow-y-auto">
-        <SelectorList
-          list-name="Survey Selection"
-          :select-action="pStore.set_current_survey"
-          :items="pStore.surveys"
-          :active-item="pStore.CurrentSurvey"
-          allow-create
-        >
-          <template #create="{ Finished }">
-            <CreateSurvey
-              :project="pStore.CurrentProject as Project"
-              :herd_unit="pStore.CurrentHerdUnit as HerdUnit"
-              :submitAction="pStore.create_survey"
-              @creation-successful="Finished"
-            />
-          </template>
-        </SelectorList>
-      </div>
-    </div>
-
-    <Upload v-if="currentStep === 3" />
-  </ProcessBreadCrumb>
+  />
+  <BRow v-if="currentStep === 0">
+    <BCol>
+      <SelectorList
+        :items="pStore.projects"
+        icon="ix:projects"
+        :active-item="pStore.CurrentProject"
+        :select-action="pStore.set_current_project"
+        list-name="Project"
+      />
+    </BCol>
+  </BRow>
+  <BRow v-if="currentStep === 1">
+    <BCol>
+      <SelectorList
+        list-name="Herd Unit Selection"
+        icon="token:area"
+        :select-action="pStore.set_current_herd_unit"
+        :items="pStore.herd_units"
+        :active-item="pStore.CurrentHerdUnit"
+        allow-create
+      >
+        <template #create="{ Finished }">
+          <CreateHerdUnit
+            :project="pStore.CurrentProject as Project"
+            :submit-action="pStore.create_herd_unit"
+            @creation-successful="Finished"
+          />
+        </template>
+      </SelectorList>
+    </BCol>
+  </BRow>
+  <BRow v-if="currentStep === 2">
+    <BCol>
+      <SelectorList
+        list-name="Survey Selection"
+        icon="roentgen:survey-point"
+        :select-action="pStore.set_current_survey"
+        :items="pStore.surveys"
+        :active-item="pStore.CurrentSurvey"
+        allow-create
+      >
+        <template #create="{ Finished }">
+          <CreateSurvey
+            :project="pStore.CurrentProject as Project"
+            :herd_unit="pStore.CurrentHerdUnit as HerdUnit"
+            :submitAction="pStore.create_survey"
+            @creation-successful="Finished"
+          />
+        </template>
+      </SelectorList>
+    </BCol>
+  </BRow>
+  <Upload v-if="currentStep === 3" />
 </template>

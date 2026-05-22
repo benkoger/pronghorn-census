@@ -52,82 +52,80 @@ const submitAuthRequest = async () => {
 };
 </script>
 <template>
-  <BContainer class="h-100">
-    <BRow align-v="center" align-h="center" class="h-100">
-      <BCol cols="6">
-        <div class="shadow-sm rounded-3">
-          <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 m-0">
-            Authenticate
-          </h2>
-          <BForm
-            @submit.prevent="submitAuthRequest"
-            class="d-flex flex-column bg-body-secondary rounded-bottom-3"
-          >
-            <BInputGroup class="p-3 mt-2">
-              <template #prepend>
-                <BInputGroupText>
-                  <Icon icon="ic:outline-email" width="24" />
-                </BInputGroupText>
-              </template>
-              <BFormFloatingLabel label="Email" label-for="email">
-                <BFormInput
-                  id="email"
-                  type="email"
-                  trim
-                  required
-                  v-model="email"
-                  placeholder=" "
-                />
-              </BFormFloatingLabel>
-            </BInputGroup>
-            <BInputGroup class="p-3">
-              <template #prepend>
-                <BInputGroupText>
-                  <Icon
-                    icon="solar:password-minimalistic-input-bold"
-                    width="24"
-                  />
-                </BInputGroupText>
-              </template>
-              <BFormFloatingLabel label="Password" lagbel-for="password">
-                <BFormInput
-                  id="password"
-                  :type="showPassword ? 'text' : 'password'"
-                  trim
-                  required
-                  v-model="password"
-                  placeholder=" "
-                />
-              </BFormFloatingLabel>
-              <BInputGroupText
-                role="button"
-                @click="showPassword = !showPassword"
-                style="cursor: pointer"
-              >
+  <BRow align-v="center" align-h="center" class="flex-grow-1">
+    <BCol cols="4">
+      <div class="shadow-sm rounded-3">
+        <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 m-0">
+          Authenticate
+        </h2>
+        <BForm
+          @submit.prevent="submitAuthRequest"
+          class="d-flex flex-column bg-body-secondary rounded-bottom-3"
+        >
+          <BInputGroup class="p-3 mt-2">
+            <template #prepend>
+              <BInputGroupText>
+                <Icon icon="ic:outline-email" width="24" />
+              </BInputGroupText>
+            </template>
+            <BFormFloatingLabel label="Email" label-for="email">
+              <BFormInput
+                id="email"
+                type="email"
+                trim
+                required
+                v-model="email"
+                placeholder=" "
+              />
+            </BFormFloatingLabel>
+          </BInputGroup>
+          <BInputGroup class="p-3">
+            <template #prepend>
+              <BInputGroupText>
                 <Icon
-                  :icon="showPassword ? 'mdi:eye-off' : 'mdi-eye'"
-                  width="20"
+                  icon="solar:password-minimalistic-input-bold"
+                  width="24"
                 />
               </BInputGroupText>
-            </BInputGroup>
-            <BButton
-              type="submit"
-              variant="primary"
-              size="lg"
-              class="w-100 mt-auto rounded-top-0"
+            </template>
+            <BFormFloatingLabel label="Password" lagbel-for="password">
+              <BFormInput
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                trim
+                required
+                v-model="password"
+                placeholder=" "
+              />
+            </BFormFloatingLabel>
+            <BInputGroupText
+              role="button"
+              @click="showPassword = !showPassword"
+              style="cursor: pointer"
             >
-              Sign in
-            </BButton>
-          </BForm>
-        </div>
-        <a
-          :href="google_auth"
-          class="btn btn-light gap-2 btn-lg d-flex align-items-center justify-content-center shadow-sm border px-4 py-2 mt-4"
-        >
-          <Icon icon="material-icon-theme:google" />
-          Sign in with Google
-        </a>
-      </BCol>
-    </BRow>
-  </BContainer>
+              <Icon
+                :icon="showPassword ? 'mdi:eye-off' : 'mdi-eye'"
+                width="20"
+              />
+            </BInputGroupText>
+          </BInputGroup>
+          <BButton
+            type="submit"
+            variant="primary"
+            size="lg"
+            class="w-100 mt-auto rounded-top-0"
+          >
+            Sign in
+          </BButton>
+        </BForm>
+      </div>
+      <a
+        :href="google_auth"
+        class="btn btn-light gap-2 btn-lg d-flex align-items-center justify-content-center shadow-sm border px-4 py-2 mt-4"
+      >
+        <Icon icon="material-icon-theme:google" />
+        Sign in with Google
+      </a>
+    </BCol>
+  </BRow>
 </template>

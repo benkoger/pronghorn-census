@@ -1,6 +1,6 @@
-import "@/assets/custom.scss";
-import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
+import "@/assets/custom.scss";
+
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
@@ -18,5 +18,11 @@ app.use(router);
 app.use(VueKonva);
 
 app.component("Icon", Icon);
+
+app.config.errorHandler = (err, instance, info) => {
+  console.error("Global error:", err);
+  console.log("Vue Instance:", instance);
+  console.log("Error Info:", info);
+};
 
 app.mount("#app");
