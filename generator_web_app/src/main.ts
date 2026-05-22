@@ -1,6 +1,6 @@
-import "@/assets/custom.scss";
-import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
+import "@/assets/custom.scss";
+
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";

@@ -390,12 +390,10 @@ export default defineComponent({
 });
 </script>
 <template>
-  <div v-if="cvs.bootStrapped && !cvs.loading" class="d-flex h-100 flex-column">
-    <BContainer fluid class="h-100 overflow-y-hidden">
-      <BRow class="h-100">
-        <BCol cols="2" class="bg-body-tertiary rounded-3 shadow h-100 p-0">
+      <BRow class="flex-grow-1 p-2 overflow-y-hidden min-vh-0" v-if="cvs.bootStrapped && !cvs.loading" >
+        <BCol cols="2" class="bg-body-tertiary rounded-3 shadow h-100 overflow-hidden">
           <h3 class="mt-2">Crop Explorer</h3>
-          <BListGroup class="overflow-y-auto overflow-x-hidden" style="max-height: 90% !important">
+          <BListGroup class="h-100 overflow-y-auto">
             <BListGroupItem v-for="label in pStore.SortedLabels"
               class="p-1 m-0 d-flex flex-column justify-content-center">
               <div class="d-flex justify-content-between w-100 align-items-center">
@@ -438,7 +436,7 @@ export default defineComponent({
             </BListGroupItem>
           </BListGroup>
         </BCol>
-        <BCol cols="10" class="h-100">
+        <BCol cols="10" class="flex-grow-1">
           <div id="stagewrapper" ref="stagewrapper" class="h-100 bg-body-tertiary rounded-3 shadow">
             <v-stage :config="{
               width: stageWidth,
@@ -521,8 +519,11 @@ export default defineComponent({
           </div>
         </Bcol>
       </BRow>
-    </BContainer>
-    <BButtonToolbar key-nav justify aria-label="Crop Explorer Controls" class="bg-body-secondary mt-3">
+      <BRow v-else class="flex-grow-1" align-v="center">
+    <Icon :key="cvs.loading" icon="line-md:loading-twotone-loop" width="96" height="96" />
+  </BRow>
+
+    <BButtonToolbar justify aria-label="Crop Explorer Controls" class="bg-body-secondary mt-3">
       <BButtonGroup>
         <BButton class="w-100" @click="handleLeftArrow()" variant="primary">
           <Icon icon="ooui:next-rtl" />
@@ -550,11 +551,7 @@ export default defineComponent({
         </BButton>
       </BButtonGroup>
     </BButtonToolbar>
-  </div>
-  <div v-else class="d-flex justify-content-center align-items-center h-100">
-    <Icon :key="cvs.loading" icon="line-md:loading-twotone-loop" width="96" height="96" />
-  </div>
-  <BModal centered no-footer v-model="cvs.outofcrops" title="No more crops to verify" size="md">
+    <BModal centered no-footer v-model="cvs.outofcrops" title="No more crops to verify" size="md">
     <BContainer class="d-flex flex-row align-items-center justify-content-center">
       <BRow>
         <BCol class="d-flex align-items-center">
@@ -576,4 +573,4 @@ export default defineComponent({
   border-radius: 4px;
   margin: 0;
 }
-</style>
+</style> 
