@@ -385,7 +385,7 @@ onBeforeUnmount(async () => {
             >
               <span>Name</span>
             </BCol>
-            <BCol cols="10" class="text-truncate">
+            <BCol cols="10" class="text-truncate text-center">
               <span>{{ cStore.currentImage.name }}</span>
             </BCol>
           </BListGroupItem>
@@ -396,7 +396,7 @@ onBeforeUnmount(async () => {
             >
               <span>Created</span>
             </BCol>
-            <BCol cols="10" class="text-truncate">
+            <BCol cols="10" class="text-truncate text-center">
               <span>{{ cStore.currentImage.created }}</span>
             </BCol>
           </BListGroupItem>
@@ -407,22 +407,32 @@ onBeforeUnmount(async () => {
             >
               <span>Modified</span>
             </BCol>
-            <BCol cols="10" class="text-truncate">
+            <BCol cols="10" class="text-truncate text-center">
               <span>{{ cStore.currentImage.modified }}</span>
             </BCol>
           </BListGroupItem>
+          <BListGroupItem class="d-flex p-0">
+            <BCol
+              cols="2"
+              class="ps-1 bg-body-secondary rounded-bottom-1 justify-content-evenly align-items-center gap-1 pe-2"
+            >
+              <span>UUID</span>
+            </BCol>
+            <BCol cols="10" class="text-truncate text-center">
+              <span>{{ cStore.currentImage.uuid }}</span>
+            </BCol>
+          </BListGroupItem>
         </BListGroup>
-        <BListGroup class="ms-2 me-2">
+        <h4><Icon icon="bx:label" /> Label Legend:</h4>
+        <BListGroup class="ms-2 me-2 w-25">
           <BListGroupItem
             v-for="label in pStore.SortedLabels"
-            class="p-1 m-0 d-flex flex-column justify-content-center"
+            class="p-1 m-0 d-flex justify-content-center w-100"
           >
-            <div
-              class="d-flex justify-content-between w-100 align-items-center"
-            >
+            <div>
               <h4
                 :style="{ color: label.color, borderColor: label.color }"
-                class="label"
+                class="label ms-auto me-auto"
               >
                 {{ label.label }}
               </h4>
