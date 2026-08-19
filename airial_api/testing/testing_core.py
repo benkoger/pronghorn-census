@@ -1,9 +1,8 @@
-import os
-
 import pytest
 
-from annotation_api.app import create_app
-from annotation_api.app.extensions import base
+from app import create_app
+from app.extensions import base
+from database.object_models.user_management.users import CreateUserReq
 
 class APITester:
     @pytest.fixture
@@ -29,11 +28,8 @@ class APITester:
             yield client
     
     @pytest.fixture
-    def auth_client(self, client, app):
-        with app.app_context():
-            user = base.create_user('tRunner', 'testing123', 'manual-token', 'en-us')
-            
-        client.post('/api/v1/authenticate', json={'external-id': 'testing123'}, follow_redirects=True)
+    def auth_client(self, client, app):     
+        client.post('/api/v1/authenticate', json={'email': 'tester@local.host', 'password': 'Learning2Count'}, follow_redirects=True)
         yield client
 
     @pytest.fixture

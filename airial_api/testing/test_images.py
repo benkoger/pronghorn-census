@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from annotation_testing_core import APITester
+from testing_core import APITester
 
 class TestImages(APITester):
     

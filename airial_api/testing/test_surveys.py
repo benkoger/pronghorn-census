@@ -1,4 +1,4 @@
-from annotation_testing_core import APITester
+from testing_core import APITester
 from datetime import datetime
 import urllib.parse
 

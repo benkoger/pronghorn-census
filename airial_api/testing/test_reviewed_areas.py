@@ -1,7 +1,7 @@
 from uuid import uuid4
 import urllib.parse
 
-from annotation_testing_core import APITester
+from testing_core import APITester
 
 class TestReviedAreas(APITester):
 
