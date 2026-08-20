@@ -361,7 +361,7 @@ def abort_upload(body: AbortMulitPartUploadReq):
 
 @imageBp.post("/prediction_crops")
 @login_required
-@permission_required("acecss")
+@permission_required("access")
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
     """"""
@@ -393,7 +393,7 @@ def get_prediciton(body: CreatePredictionCropReq):
 
 @imageBp.patch("/<string:image_id>")
 @login_required
-@permission_required("acecss")
+@permission_required("access")
 @validate()
 def update(body: UpdateImageReq, image_id: str):
     """
@@ -423,7 +423,7 @@ def update(body: UpdateImageReq, image_id: str):
 
 @imageBp.patch("/close-user-images")
 @login_required
-@permission_required("acess")
+@permission_required("access")
 def close_user_images():
     """ """
 

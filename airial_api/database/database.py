@@ -15,6 +15,7 @@ from authzed.api.v1 import (
     BulkCheckPermissionRequestItem,
     CheckPermissionRequest,
     CheckPermissionResponse,
+    BulkCheckPermissionResponse,
     InsecureClient,
     Client,
     LookupResourcesRequest,
@@ -23,6 +24,7 @@ from authzed.api.v1 import (
     RelationshipUpdate,
     SubjectReference,
     WriteRelationshipsRequest,
+    Consistency,
 )
 from grpc import (
     access_token_call_credentials,
@@ -245,14 +247,15 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def bulk_check_permission(
-        self, permissions: Iterable[BulkCheckPermissionRequestItem]
-    ):
-        """ """
-        return self._spice_client.BulkCheckPermission(
-            BulkCheckPermissionRequest(
-                items=permissions,
-            )
-        )
+        self,
+        items: Iterable[BulkCheckPermissionRequestItem],
+        consistency: Consistency | None = None,
+    ) -> BulkCheckPermissionResponse:
+        if consistency is None:
+            consistency = Consistency(fully_consistent=True)
+
+        request = BulkCheckPermissionRequest(items=items, consistency=consistency)
+        return self._spice_client.BulkCheckPermission(request)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -5,7 +5,7 @@ from flask_login import current_user
 from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
 from database.object_models.user_management.users import User
-from authzed.api.v1 import CheckPermissionResponse
+from authzed.api.v1 import Consistency, CheckPermissionResponse
 from pydantic import BaseModel
 
 getters = {
@@ -89,7 +89,10 @@ def permission_required(permission: str):
                 extract_and_queue_checks(resources)
 
             if check_items:
-                bulk_res = base.bulk_check_permission(check_items)
+                consistency = Consistency(fully_consistent=True)
+                bulk_res = base.bulk_check_permission(
+                    check_items, consistency=consistency
+                )
 
                 for i, pair in enumerate(bulk_res.pairs):
                     if (
