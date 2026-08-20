@@ -62,7 +62,7 @@ dependencies = [
     "mypy==1.10.1",
     "mypy-extensions==1.1.0",
     "numpy==2.2.6",
-    "opencv-python-headless==4.11.0.86",
+    "opencv-python-headless>=4.10.0.84",
     "packaging==25.0",
     "pendulum==3.2.0",
     "pillow==11.2.1",
@@ -121,9 +121,29 @@ build-backend = "setuptools.build_meta"
 include = ["app*", "database*"]
 
 [tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["testing"]
 pythonpath = ["."]
+
+[tool.pytest_env]
+env_files = [".env.test"]
+
+[tool.coverage.run]
+plugins = []
+# Exclude third-party dynamic C extensions from tracing
+omit = [
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
 
 [dependency-groups]
 dev = [
     "pytest-cov>=7.1.0",
+    "pytest-env>=1.2.0",
 ]

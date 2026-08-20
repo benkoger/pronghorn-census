@@ -11,7 +11,7 @@ from uuid import UUID
 import cv2
 import numpy as np
 import PIL.Image as PillowImage
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 
 from ..base import Box, DBbase
 
@@ -314,8 +314,8 @@ class CreateReviewedAreaReq(BaseModel, ImageMixin):
     reviewed_by_user_id: int = 0
     ra_key: Optional[str] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    
+    model_config = ConfigDict(arbitrary_types_allowed = True)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

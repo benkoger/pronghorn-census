@@ -40,9 +40,6 @@ class FlaskConfig:
         os.environ.get("SESSION_PERMANENT") or "true"
     ).lower() in true_set
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
-    SESSION_USE_SIGNER = (
-        os.environ.get("SESSION_USE_SIGNER") or "true"
-    ).lower() in true_set
     SESSION_REDIS = session_redis
     ORIGIN_URL = os.environ.get("ORIGIN_URL")  # pyright: ignore
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
