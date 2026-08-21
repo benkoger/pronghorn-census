@@ -2676,6 +2676,8 @@ class Database:
         query = sql.SQL(" SELECT * FROM core.annotations WHERE image_id = %s; ")
 
         db_id = self._get_image(cursor, image_id).image_id
+
+        cursor.row_factory = class_row(Annotation)
         cursor.execute((query), (db_id,))
 
         return cursor.fetchall()

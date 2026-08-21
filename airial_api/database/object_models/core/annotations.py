@@ -4,10 +4,10 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, ConfigDict
 
 from ..base import Box, BulkRequestModel, DBbase
 
@@ -38,17 +38,27 @@ class Annotation(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self) -> dict:
-        return {
-            "annotation_id": self.annotation_id,
-            "label_id": self.label_id,
-            "image_id": self.image_id,
-            "herd_unit_id": self.herd_unit_id,
-            "dimensions": self.dimensions.to_dict(),
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        annotation_id: int
+        label_id: int
+        image_id: int
+        herd_unit_id: int
+        dimensions: Dict[str, Dict[str, int]]
+        created: datetime
+        modified: datetime
+        uuid: UUID
+
+        @field_validator("dimensions", mode="before")
+        @classmethod
+        def transform_box(cls, value: Any) -> Dict[str, Dict[str, int]]:
+            if isinstance(value, Box):
+                return value.to_dict()
+            return value
+
+    def to_dict(self) -> Dict[str, Any]:
+        return Annotation.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

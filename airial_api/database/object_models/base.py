@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from msgpack import packb
 from datetime import datetime
-from typing import Any, List, Union
+from typing import Any, Dict, List, Union
 from pydantic import BaseModel
 import numpy as np
 
@@ -80,7 +80,7 @@ class Box(ABC):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Dict[str, int]]:
         return {
             "top_left": {"x": self.top_left[0], "y": self.top_left[1]},
             "bottom_right": {"x": self.bottom_right[0], "y": self.bottom_right[1]},

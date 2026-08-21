@@ -213,13 +213,10 @@ def create_presigned_get(body: PresignedImageGetReq):
 
     image = base.get_image(body.image_id)
 
-    if not image:
-        raise ObjectNotFound("image", str(body.image_id))
-
     response = s3.generate_presigned_url(
         "get_object",
         Params={"Bucket": current_app.config["BUCKET_NAME"], "Key": image.img_key},
-        ExpiresIn=body.image_id,
+        ExpiresIn=3600,
     )
 
     return response, 201
@@ -229,10 +226,10 @@ def create_presigned_get(body: PresignedImageGetReq):
 
 
 @imageBp.post("/presigned-put-url")
-@roles_required("admin")
-@validate()
 @login_required
+@roles_required("admin")
 @permission_required("access")
+@validate()
 def create_chunk_presigned_put(body: CreatePresignedPutReq):
     """
     Generates a pre-signed URL for a single file chunk (UploadPart).
@@ -255,9 +252,6 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
         else data["image_id"]
     )
     image = base._get_image(image_id)
-
-    if image is None:
-        abort(404, "Image not found")
 
     response = s3.generate_presigned_url(
         ClientMethod="upload_part",
@@ -313,7 +307,7 @@ def complete_upload(body: CompleteMultiPartUploadReq):
     Completes a new multipart upload.
     ---
     responses:
-            201:
+            200:
                     description: Multipart upload finished.
             500:
                     description: S3 or system error.
@@ -326,7 +320,7 @@ def complete_upload(body: CompleteMultiPartUploadReq):
         UploadId=body.upload_id,
     )
 
-    return response, 201
+    return response, 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

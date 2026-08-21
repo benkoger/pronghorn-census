@@ -1,29 +1,62 @@
-import pytest
 from contextlib import contextmanager
+from typing import Any
+from unittest.mock import patch
+from moto import mock_aws
+import pytest
 from app import create_app
 from app.extensions import base
-from unittest.mock import patch
+
+import io
+from PIL import Image as PILImage
 
 
 class APITester:
-    @pytest.fixture
-    def app(self):
-        app = create_app()
-        # Important! The host must be overwritten prior to connection
-        base._config["host"] = "localhost"
-        base.create_pool()
-        app.config.update(
-            {
-                "TESTING": True,
-                "SESSION_COOKIE_SECURE": False,
-                "SESSION_COOKIE_DOMAIN": None,
-                "SESSION_COOKIE_HTTPONLY": False,
-                "SERVER_NAME": "localhost",
-            }
-        )
-        yield app
 
-        base.close_pool()
+    @staticmethod
+    def _generate_jpeg_bytes(
+        width: int = 500, height: int = 500, color: str = "red"
+    ) -> bytes:
+        """Generate fresh in-memory JPEG bytes."""
+        buf = io.BytesIO()
+        PILImage.new("RGB", (width, height), color=color).save(buf, format="JPEG")
+        return buf.getvalue()
+
+    @pytest.fixture
+    def app(self, monkeypatch):
+        monkeypatch.delenv("AWS_ENDPOINT_URL_S3", raising=False)
+        monkeypatch.setenv("AWS_ACCESS_KEY_ID", "foobar_key")
+        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "foobar_secret")
+        monkeypatch.setenv("AWS_SECURITY_TOKEN", "foobar_token")
+        monkeypatch.setenv("AWS_SESSION_TOKEN", "foobar_token")
+
+        with mock_aws():
+            with patch("config.s3_config", None):
+                app = create_app()
+
+            base._config["host"] = "localhost"
+            base.create_pool()
+
+            app.config.update(
+                {
+                    "TESTING": True,
+                    "SESSION_COOKIE_SECURE": False,
+                    "SESSION_COOKIE_DOMAIN": None,
+                    "SESSION_COOKIE_HTTPONLY": False,
+                    "SERVER_NAME": "localhost",
+                }
+            )
+
+            with app.app_context():
+                s3_client: Any = getattr(app, "s3")
+                bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
+                s3_client.create_bucket(Bucket=bucket_name)
+
+                self.s3 = s3_client
+                self.bucket_name = bucket_name
+
+            yield app
+
+            base.close_pool()
 
     @pytest.fixture
     def client(self, app):

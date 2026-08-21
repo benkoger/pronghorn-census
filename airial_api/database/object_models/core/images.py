@@ -5,7 +5,7 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import cv2
@@ -80,28 +80,31 @@ class Image(DBbase, ImageMixin):
     viewshed_polygon: List[List[float]]
     has_detection: bool
     dem_name: str
-    bbox_wsen: List[int]
+    bbox_wsen: Optional[List[int]]
     uuid: UUID
 
     image: Optional[np.ndarray] = field(default=None, init=False)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        image_id: int
+        herd_unit_id: int
+        survey_id: int
+        name: str
+        img_key: str
+        in_training: bool
+        crops_generated: int
+        created: datetime
+        modified: datetime
+        image_length_px: int
+        image_width_px: int
+        uuid: UUID
+
     def to_dict(self) -> dict:
-        return {
-            "image_id": self.image_id,
-            "herd_unit_id": self.herd_unit_id,
-            "survey_id": self.survey_id,
-            "img_key": self.img_key,
-            "name": self.name,
-            "in_training": self.in_training,
-            "crops_generated": self.crops_generated,
-            "created": self.created,
-            "modified": self.modified,
-            "image_length_px": self.image_length_px,
-            "image_width_px": self.image_width_px,
-            "uuid": str(self.uuid),
-        }
+        return Image.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -135,19 +138,29 @@ class ReviewedArea(DBbase, ImageMixin):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        reviewed_area_id: int
+        image_id: int
+        name: str
+        dimensions: Dict[str, Dict[str, int]]
+        created: datetime
+        modified: datetime
+        reviewed_area_length_px: int
+        reviewed_area_width_px: int
+        ra_key: str
+        uuid: UUID
+
+        @field_validator("dimensions", mode="before")
+        @classmethod
+        def transform(cls, value):
+            if isinstance(value, Box):
+                return value.to_dict()
+            return value
+
     def to_dict(self) -> dict:
-        return {
-            "reviewed_area_id": self.reviewed_area_id,
-            "image_id": self.image_id,
-            "name": self.name,
-            "dimensions": self.dimensions.to_dict(),
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "reviewed_area_length_px": self.reviewed_area_length_px,
-            "reviewed_area_width_px": self.reviewed_area_width_px,
-            "ra_key": self.ra_key,
-            "uuid": str(self.uuid),
-        }
+        return ReviewedArea.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -168,7 +181,7 @@ class PredictionCrop(DBbase, ImageMixin):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "image_id": self.image_id,
             "score": self.score,
@@ -314,8 +327,7 @@ class CreateReviewedAreaReq(BaseModel, ImageMixin):
     reviewed_by_user_id: int = 0
     ra_key: Optional[str] = None
 
-    
-    model_config = ConfigDict(arbitrary_types_allowed = True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

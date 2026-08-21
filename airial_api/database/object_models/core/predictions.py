@@ -3,10 +3,10 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 
 from ..base import Box, DBbase
 
@@ -36,14 +36,24 @@ class Prediction(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self) -> dict:
-        return {
-            "pred_id": self.pred_id,
-            "score": self.score,
-            "label": self.label,
-            "dimensions": self.dimensions.to_dict(),
-            "uuid": self.uuid,
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        pred_id: int
+        score: float
+        label: int
+        dimensions: Dict[str, Dict[str, int]]
+        uuid: UUID
+
+        @field_validator("dimensions", mode="before")
+        @classmethod
+        def transform_box(cls, value: Any) -> Dict[str, Dict[str, int]]:
+            if isinstance(value, Box):
+                return value.to_dict()
+            return value
+
+    def to_dict(self) -> Dict[str, Any]:
+        return Prediction.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
