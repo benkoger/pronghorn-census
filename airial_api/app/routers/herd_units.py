@@ -24,7 +24,7 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @permission_required("access")
 def get_by_id(herd_unit_id: str):
     """ """
-    return base.get_herd_unit(UUID(herd_unit_id)).to_dict(), 200
+    return base.get_herd_unit(UUID(herd_unit_id)).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -57,7 +57,7 @@ def get_surveys(herd_unit_id: str):
         UUID(herd_unit_id),
     )
 
-    return [survey.to_dict() for survey in surveys], 200
+    return [survey.serialize() for survey in surveys], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ def get_surveys(herd_unit_id: str):
 @validate()
 def create(body: CreateHerdUnitReq):
     """ """
-    return base.create_herd_unit(body).to_dict(), 201
+    return base.create_herd_unit(body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

@@ -27,7 +27,7 @@ surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 @permission_required("access")
 def get_by_id(survey_id: str):
     """ """
-    return base.get_survey(UUID(survey_id)).to_dict()
+    return base.get_survey(UUID(survey_id)).serialize()
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -40,7 +40,7 @@ def get_annotations(survey_id: str):
     """ """
     annotations = base.get_survey_annotations(UUID(survey_id))
 
-    return [annotation.to_dict() for annotation in annotations], 200
+    return [annotation.serialize() for annotation in annotations], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,7 +53,7 @@ def get_herd_units(survey_id: str):
     """ """
     herd_units = base.get_survey_herd_units(UUID(survey_id))
 
-    return [herd_unit.to_dict() for herd_unit in herd_units], 200
+    return [herd_unit.serialize() for herd_unit in herd_units], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,7 +72,7 @@ def get_images(query: SurveyImageQuery, survey_id: str):
     )
 
     return {
-        "images": [image.to_dict() for image in images],
+        "images": [image.serialize() for image in images],
         "total": total_images,
         "page": query.page,
         "per_page": query.per_page,
@@ -114,7 +114,7 @@ def get_annotated_images(survey_id: str):
 @validate()
 def create(body: CreateSurveyReq):
     """ """
-    return base.create_survey(body).to_dict(), 201
+    return base.create_survey(body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ def create(body: CreateSurveyReq):
 @validate()
 def update(body: UpdateSurveyReq, survey_id: str):
     """ """
-    return base.update_survey(UUID(survey_id), body.model_dump()).to_dict(), 200
+    return base.update_survey(UUID(survey_id), body.model_dump()).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

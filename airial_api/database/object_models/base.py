@@ -1,37 +1,127 @@
 from abc import ABC, abstractmethod
 from msgpack import packb
 from datetime import datetime
-from typing import Any, Dict, List, Union
+from typing import Any, ClassVar, Type, TypeVar, NamedTuple, Optional
 from pydantic import BaseModel
+from psycopg import Cursor
 import numpy as np
+from uuid import UUID
+import psycopg.sql as sql
+from authzed.api.v1 import (
+    RelationshipUpdate,
+    Relationship,
+    ObjectReference,
+    SubjectReference,
+)
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
+
+T = TypeVar("T", bound="DBbase")
+
+
+def create_spice_update(
+    object_type: str,
+    object_id: UUID,
+    subject_type: str,
+    subject_id: UUID,
+    relation: str,
+) -> RelationshipUpdate:
+    """ """
+    return RelationshipUpdate(
+        operation=RelationshipUpdate.Operation.OPERATION_CREATE,
+        relationship=Relationship(
+            resource=ObjectReference(object_type=object_type, object_id=str(object_id)),
+            relation=relation,
+            subject=SubjectReference(
+                object=ObjectReference(
+                    object_type=subject_type,
+                    object_id=str(subject_id),
+                )
+            ),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class Keyring(NamedTuple):
+    pkey: int
+    uuid: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 class DBbase(ABC):
+    __tablename__: str
+    __schema__: str
+    __pk_name__: str
+
+    Response: ClassVar[Type[BaseModel]]
+
+    @classmethod
+    def get_table_identifier(cls) -> sql.Identifier:
+        """Returns fully qualified schema.tablename SQL identifier."""
+        if cls.__schema__:
+            return sql.Identifier(cls.__schema__, cls.__tablename__)
+        return sql.Identifier(cls.__tablename__)
+
+    @classmethod
+    def get_pk_identifier(cls) -> sql.Identifier:
+        """Returns primary key column SQL identifier."""
+        return sql.Identifier(cls.__pk_name__)
+
     @abstractmethod
-    def to_dict(self) -> dict:
-        pass
+    def serialize(self) -> dict: ...
+
+    @classmethod
+    @abstractmethod
+    def _create(
+        cls, cursor: Cursor[T], *args: Any, **kwargs: Any
+    ) -> Optional[tuple[T, list[RelationshipUpdate]]]: ...
 
     def to_cache(self):
-        return packb(self.to_dict())
+        return packb(self.serialize())
 
-    def fmt_date(self, dt: Union[datetime, None]):
+    def fmt_date(self, dt: datetime | None):
         """Convert datetime object to a string for serialization"""
         return dt.strftime("%Y-%m-%d %H:%M:%S%z") if isinstance(dt, datetime) else None
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
-class Box(ABC):
+class Relationbase(ABC):
+    __tablename__: str
+    __schema__: str
+    __key__: tuple[str, ...]
+    """Pure interface for junction models"""
+
+    @classmethod
+    @abstractmethod
+    def get_table_identifier(cls) -> sql.Identifier:
+        """Return the qualified table identifier."""
+        if cls.__schema__:
+            return sql.Identifier(cls.__schema__, cls.__tablename__)
+        return sql.Identifier(cls.__tablename__)
+
+    def to_lookup_dict(self) -> dict[str, Any]:
+        """Convert key attributes into query params for base.where()."""
+        return {key: getattr(self, key) for key in self.__key__}
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class Box():
     """A Box contains dimensional data for crops and predictions"""
 
     def __init__(self, top_left: tuple[int, int], bottom_right: tuple[int, int]):
         self.top_left = top_left
         self.bottom_right = bottom_right
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getCenter(self) -> tuple:
         x = np.mean([self.top_left[0], self.bottom_right[0]])
@@ -39,7 +129,7 @@ class Box(ABC):
 
         return (abs(x), abs(y))
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getPoints(self) -> list[int]:
         return [
@@ -49,7 +139,7 @@ class Box(ABC):
             self.bottom_right[1],
         ]
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def calcIou(self, box_2) -> float:
         # Slightly modified from https://machinelearningspace.com/intersection-over-union-iou-a-comprehensive-guide/
@@ -78,17 +168,24 @@ class Box(ABC):
         # Calculate the IoU:
         return intersection / union
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self) -> Dict[str, Dict[str, int]]:
+    def serialize(self) -> dict[str, dict[str, int]]:
         return {
             "top_left": {"x": self.top_left[0], "y": self.top_left[1]},
             "bottom_right": {"x": self.bottom_right[0], "y": self.bottom_right[1]},
         }
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class JunctionRelation(NamedTuple):
+    table_name: str
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 class BulkRequestModel(BaseModel):
-    requests: List[Any]
+    requests: list[Any]

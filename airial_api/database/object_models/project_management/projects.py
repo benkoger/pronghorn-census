@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..base import DBbase
 
@@ -23,16 +23,25 @@ class Project(DBbase):
     modified: datetime
     uuid: UUID
 
+    __tablename__: str = "projects"
+    __schema__: str = "projectmanagement"
+    __pk_name__: str = "project_id"
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self):
-        return {
-            "project_id": self.project_id,
-            "name": self.name,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        project_id: int
+        name: str
+        created: datetime
+        modified: datetime
+        uuid: UUID
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self):
+        return Project.Response.model_validate(self).model_dump(mode="json") 
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

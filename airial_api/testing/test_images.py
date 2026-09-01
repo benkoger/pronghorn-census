@@ -1,17 +1,18 @@
 # Pytest runner for the images router in the Airial API
 # Author Michael B. Lance
 
+from testing_core import APITester
+import pytest
+
 import hashlib
 from typing import List
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from pydantic import TypeAdapter
-import pytest
 
 from database.object_models.core.annotations import Annotation
 from database.object_models.core.images import Image, ReviewedArea
 from database.object_models.core.predictions import Prediction
-from testing_core import APITester
 from app.extensions import cache
 
 import io
@@ -62,7 +63,7 @@ class TestImages(APITester):
             expected_schema.model_validate(data)
 
     # -------------------------------------------------------------------------
-    # 2. GET Not Found / Authorization Edge Cases
+    # 2. GET Not Found
     # -------------------------------------------------------------------------
 
     @pytest.mark.parametrize(
@@ -75,7 +76,7 @@ class TestImages(APITester):
     def test_get_image_not_found(self, auth_client, path_suffix):
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/images/{random_uuid}{path_suffix}")
-        assert response.status_code == 401
+        assert response.status_code == 404
 
     # -------------------------------------------------------------------------
     # 3. POST Endpoint Validation & Payloads
@@ -89,8 +90,14 @@ class TestImages(APITester):
                 "/api/v1/images",
                 {
                     "name": f"pronghorn_{uuid4().hex[:6]}",
-                    "herd_unit_id": 1,
-                    "survey_id": 1,
+                    "herd_unit_ids": {
+                        "pkey": 1,
+                        "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
+                    },
+                    "survey_ids": {
+                        "pkey": 1,
+                        "uuid": "f4c0b5e0-af30-46fa-a276-6169932b6a34",
+                    },
                     "img_key": f"s3://bucket/test_{uuid4().hex}.jpg",
                     "image_length_px": 1080,
                     "image_width_px": 1920,
@@ -164,8 +171,14 @@ class TestImages(APITester):
     def test_delete_image_lifecycle(self, auth_client):
         payload = {
             "name": f"pronghorn_{uuid4().hex[:6]}",
-            "herd_unit_id": 1,
-            "survey_id": 1,
+            "herd_unit_ids": {
+                "pkey": 1,
+                "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
+            },
+            "survey_ids": {
+                "pkey": 1,
+                "uuid": "f4c0b5e0-af30-46fa-a276-6169932b6a34",
+            },
             "img_key": f"s3://temp/delete_{uuid4().hex}.jpg",
             "image_length_px": 100,
             "image_width_px": 101,
@@ -343,4 +356,4 @@ class TestImages(APITester):
 
     def test_close_user_images_success(self, auth_client):
         response = auth_client.patch("/api/v1/images/close-user-images")
-        assert response.status_code == 204
+        assert response.status_code == 200

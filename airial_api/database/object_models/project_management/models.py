@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase
 
@@ -26,16 +26,19 @@ class Model(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self):
-        return {
-            "model_id": self.model_id,
-            "schema_id": self.schema_id,
-            "name": self.name,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+        model_id: int
+        schema_id: int
+        name: str
+        created: datetime
+        modified: datetime
+        uuid: UUID
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self):
+        return Model.Response.model_validate(self).model_dump(mode="json")
 
 # ---------------------------------------------------------------------------------------------------------------------------
 

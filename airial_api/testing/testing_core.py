@@ -65,11 +65,12 @@ class APITester:
 
     @pytest.fixture
     def auth_client(self, client, app):
-        client.post(
+        res = client.post(
             "/api/v1/authenticate",
             json={"email": "tester@local.host", "password": "Learning2Count"},
             follow_redirects=True,
         )
+        assert res.status_code == 200, f"Authentication failed: {res.get_json()}"
         yield client
 
     @pytest.fixture

@@ -1,7 +1,13 @@
+# Pytest runner for the models router in the Airial API
+# Author Michael B. Lance
+
 from testing_core import APITester
-import urllib.parse
 
 class TestModels(APITester):
+
+    # -------------------------------------------------------------------------
+    # 1. GET Single & List Endpoint Schema Validation
+    # -------------------------------------------------------------------------
     pass
     # def test_create_model(self, auth_client):
     #     body = {

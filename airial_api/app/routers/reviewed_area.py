@@ -50,7 +50,7 @@ def get(query: RAQuery):
 
     reviewed_areas = base.get_reviewed_areas(query)
 
-    return [ra.to_dict() for ra in reviewed_areas]
+    return [ra.serialize() for ra in reviewed_areas]
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ def get_annotations(reviewed_area_id: str):
 
     annotations = base.get_reviewed_area_annotations(UUID(reviewed_area_id))
 
-    return [annot.to_dict() for annot in annotations], 200
+    return [annot.serialize() for annot in annotations], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -133,6 +133,6 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):
     return (
         base.update_reviewed_area(
             UUID(reviewed_area_id), body, cast(User, current_user)
-        ).to_dict(),
+        ).serialize(),
         200,
     )

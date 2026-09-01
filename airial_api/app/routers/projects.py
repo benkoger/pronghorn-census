@@ -39,7 +39,7 @@ def get_all(query: ProjectQuery):
 
     projects = base.get_projects(query, org)
 
-    return [proj.to_dict() for proj in projects], 200
+    return [proj.serialize() for proj in projects], 200
 
 
 @projectBp.get("/<string:project_id>")
@@ -65,7 +65,7 @@ def get_by_id(project_id: str):
             description: Database Error.
     """
 
-    return base.get_project(UUID(project_id)).to_dict(), 200
+    return base.get_project(UUID(project_id)).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,7 +94,7 @@ def get_models(project_id: str):
 
     models = base.get_project_models(UUID(project_id))
 
-    return [model.to_dict() for model in models], 200
+    return [model.serialize() for model in models], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +118,7 @@ def get_herd_units(project_id: str):
 
     herd_units = base.get_project_herd_units(UUID(project_id))
 
-    return [herd_unit.to_dict() for herd_unit in herd_units], 200
+    return [herd_unit.serialize() for herd_unit in herd_units], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,7 +132,7 @@ def get_surveys(project_id: str):
 
     schemas = base.get_project_schemas(UUID(project_id))
 
-    return [schema.to_dict() for schema in schemas], 200
+    return [schema.serialize() for schema in schemas], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,7 +173,7 @@ def prediction_count(project_id: str):
 @validate()
 def create(body: createProjectReq):
     """ """
-    return base.create_project(body, cast(User, current_user)).to_dict(), 201
+    return base.create_project(body, cast(User, current_user)).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

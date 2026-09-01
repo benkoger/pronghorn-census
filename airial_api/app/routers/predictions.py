@@ -18,7 +18,7 @@ from database.object_models.core import (
 
 predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ------------------------------------------------------------------------------------------------------------ f---------------#
 # GET
 
 
@@ -27,11 +27,26 @@ predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 @permission_required("access")
 @validate()
 def get_predictions(query: PredictionQuery):
-    """ """
+    """
+     Request a prediction object from the database using its UUID.
+    ---
+    parameters:
+      - name: pred_id
+            in: path
+            type: string
+            required: true
+    responses:
+      200:
+            description: The requested prediction was found.
+      400:
+            description: Invalid UUID format provided.
+      404:
+            description: No prediction record found for the provided ID.
+    """
 
     predictions = base.get_predictions(query)
 
-    return [pred.to_dict() for pred in predictions], 200
+    return [pred.serialize() for pred in predictions], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -43,7 +58,7 @@ def get_predictions(query: PredictionQuery):
 def get_prediction_by_id(prediction_id: str):
     """ """
 
-    return base.get_prediction(UUID(prediction_id)).to_dict(), 200
+    return base.get_prediction(UUID(prediction_id)).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------#
@@ -57,4 +72,4 @@ def get_prediction_by_id(prediction_id: str):
 def create_prediction(body: CreatePredictionReq):
     """ """
 
-    return base.create_prediction(body).to_dict(), 200
+    return base.create_prediction(body).serialize(), 200

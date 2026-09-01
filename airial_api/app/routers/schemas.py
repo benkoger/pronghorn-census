@@ -38,7 +38,7 @@ def get_labels(schema_id: str):
 
     labels = base.get_schema_labels(UUID(schema_id))
 
-    return [label.to_dict() for label in labels], 200
+    return [label.serialize() for label in labels], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -52,7 +52,7 @@ def get_models(schema_id: str):
 
     models = base.get_schema_models(UUID(schema_id))
 
-    return [model.to_dict() for model in models], 200
+    return [model.serialize() for model in models], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def create(body: createSchemaReq):
     """ """
     schema = base.create_schema(body)
 
-    return schema.to_dict(), 201
+    return schema.serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

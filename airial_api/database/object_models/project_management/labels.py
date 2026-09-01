@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 from uuid import UUID
-from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..base import DBbase
 
@@ -30,19 +29,29 @@ class Label(DBbase):
     color: str
     uuid: UUID
 
+    __tablename__: str = "labels"
+    __schema__: str = "projectmanagement"
+    __pk_name__: str = "label_id"
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-    def to_dict(self):
-        return {
-            "label_id": self.label_id,
-            "label": self.label,
-            "name": self.name,
-            "image_link": self.image_link,
-            "color": self.color,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        label_id: int
+        schema_id: int
+        label: int
+        name: str
+        image_link: str
+        created: datetime
+        modified: datetime
+        color: str
+        uuid: UUID
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+    def serialize(self):
+        return Label.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

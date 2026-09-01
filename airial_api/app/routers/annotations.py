@@ -48,7 +48,7 @@ def create(body: CreateAnnotationReq):
     """
     annotation = base.create_annotation(body, cast(User, current_user))
 
-    return annotation.to_dict(), 201
+    return annotation.serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,7 +66,7 @@ def import_annotation(body: BulkCreateAnnotationReq):
     for req in body.requests:
         annotations.append(base.create_annotation(req, cast(User, current_user)))
 
-    return [annot.to_dict() for annot in annotations], 201
+    return [annot.serialize() for annot in annotations], 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ def update(body: UpdateAnnotationReq, annotation_id: str):
         UUID(annotation_id), body, cast(User, current_user)
     )
 
-    return annotation.to_dict(), 200
+    return annotation.serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,7 +133,7 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
             base.update_annotation(req.annotation_id, req, cast(User, current_user))
         )
 
-    return [annot.to_dict() for annot in annotations], 200
+    return [annot.serialize() for annot in annotations], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

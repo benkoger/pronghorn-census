@@ -32,7 +32,7 @@ modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 @permission_required("access")
 def get_by_id(model_id: str):
     """ """
-    return base.get_model(UUID(model_id)).to_dict(), 200
+    return base.get_model(UUID(model_id)).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -43,7 +43,7 @@ def get_by_id(model_id: str):
 @permission_required("access")
 def get_json_all():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,7 +54,7 @@ def get_json_all():
 @permission_required("accesss")
 def get_json_train():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,7 +65,7 @@ def get_json_train():
 @permission_required("acess")
 def get_json_test():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,7 +76,7 @@ def get_json_test():
 @permission_required("access")
 def get_weights():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,7 +87,7 @@ def get_weights():
 @permission_required("access")
 def get_config():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,7 +98,7 @@ def get_config():
 @permission_required("acess")
 def get_readme():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -121,7 +121,7 @@ def get_schema(model_id: str):
     """
 
     return (
-        base.get_model_schema(UUID(model_id), cast(User, current_user)).to_dict(),
+        base.get_model_schema(UUID(model_id), cast(User, current_user)).serialize(),
         200,
     )
 
@@ -159,7 +159,7 @@ def get_training_set():
 @validate()
 def create(body: CreateModelReq):
     """ """
-    return base.create_model(body).to_dict(), 201
+    return base.create_model(body).serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,7 +202,7 @@ def create_weights(mdoel_id: str):
 @login_required
 def create_config(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -213,7 +213,7 @@ def create_config(model_id: str):
 @permission_required("access")
 def create_readme(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -225,7 +225,7 @@ def create_readme(model_id: str):
 @permission_required("access")
 def replace(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -236,7 +236,7 @@ def replace(model_id: str):
 @permission_required("access")
 def replace_train_json(model_id: str):
     """Replace the train.json file to s3 under the model's base key"""
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -247,7 +247,7 @@ def replace_train_json(model_id: str):
 @permission_required("acess")
 def replace_val_json(model_id: str):
     """Replace val.json file to s3 under the model's base key"""
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -258,7 +258,7 @@ def replace_val_json(model_id: str):
 @permission_required("acess")
 def replace_weights(mdoel_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -269,7 +269,7 @@ def replace_weights(mdoel_id: str):
 @permission_required("access")
 def replace_config(mdoel_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -280,7 +280,7 @@ def replace_config(mdoel_id: str):
 @permission_required("access")
 def replace_readme(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -294,7 +294,7 @@ def replace_readme(model_id: str):
 def update(body: UpdateModelReq, model_id: str):
     """ """
 
-    return base.update_model(UUID(model_id), body).to_dict(), 200
+    return base.update_model(UUID(model_id), body).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

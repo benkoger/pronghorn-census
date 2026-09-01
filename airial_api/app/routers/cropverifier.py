@@ -53,7 +53,7 @@ def get(query: RAQuery):
     if reviewed_area is None:
         return "", 204
 
-    return reviewed_area.to_dict(), 200
+    return reviewed_area.serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4,15 +4,14 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from datetime import datetime
-from typing import List, Optional, Union
+from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 @dataclass
@@ -27,21 +26,30 @@ class Survey(DBbase):
     modified: datetime
     uuid: UUID
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    __tablename__: str = "surveys"
+    __schema__: str = "projectmanagement"
+    __pk_name__: str = "survey_id"
 
-    def to_dict(self):
-        return {
-            "survey_id": self.survey_id,
-            "survey_date": self.survey_date,
-            "name": self.name,
-            "additional_info": self.additional_info,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        survey_id: int
+        survey_date: datetime
+        name: str
+        additional_info: str
+        created: datetime
+        modified: datetime
+        uuid: UUID
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self) -> dict:
+        return Survey.Response.model_validate(self).model_dump(mode="json")
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 class CreateSurveyReq(BaseModel):
@@ -52,7 +60,7 @@ class CreateSurveyReq(BaseModel):
     additional_info: Optional[str]
 
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateSurveyReq(BaseModel):

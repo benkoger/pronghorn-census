@@ -26,7 +26,7 @@ class Schema(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self):
+    def serialize(self):
         return {
             "schema_id": self.schema_id,
             "name": self.name,

@@ -27,7 +27,7 @@ labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 def create(body: CreateLabelReq):
     """ """
 
-    return base.create_label(body).to_dict(), 201
+    return base.create_label(body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

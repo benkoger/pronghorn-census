@@ -26,4 +26,4 @@ def get(query: RoleQuery):
 
     roles = base.get_roles(query)
 
-    return [role.to_dict() for role in roles], 200
+    return [role.serialize() for role in roles], 200
