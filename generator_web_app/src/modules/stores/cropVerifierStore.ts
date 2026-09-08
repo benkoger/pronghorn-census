@@ -21,7 +21,7 @@ import {
 import {
   getRAPresignedUrl,
   getReviewedAreaAnnotations,
-  updateReviewedArea,
+  setAsReviewed,
 } from "@/modules/api/reviewedarea";
 import {
   bulkUpdateAnnotations,
@@ -532,7 +532,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
       // Update the reviewed area (set reviewed by user)
       // reviewed by user is handled by the current user object in the session
-      await updateReviewedArea(this.currentCrop.uuid, {});
+      await setAsReviewed(this.currentCrop.uuid);
 
       this.loading = false;
       this.actionStack = [];
@@ -596,5 +596,15 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       this.updates = {};
       this.loading = false;
     },
+
+    // --------------------------------------------------------------------------------------
+    
+    async closeImages() {
+      if (this.loading) return;
+      this.loading = true;
+      await closeUserImages();
+      this.loading = false;
+    }
+
   },
 });

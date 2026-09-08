@@ -6,11 +6,12 @@
 from uuid import UUID
 
 from flask import Blueprint, current_app
-from flask_login import login_required
+from flask_login import current_user, login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base, s3
+from database.object_models.base import PrimaryKey
 from database.object_models.core import UpdateReviewedAreaReq
 from database.object_models.core.annotations import Annotation
 from database.object_models.core.core_bindings import AnnotationsReviewedArea
@@ -156,3 +157,18 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UU
     """
 
     return base.update(ReviewedArea, reviewed_area_id, body).serialize(), 200
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+@raBp.patch("/<int:reviewed_area_id>/set-reviewed")
+@raBp.patch("/<uuid:reviewed_area_id>/set-reviewed")
+@login_required
+@permission_required("access")
+@validate()
+def set_reviewed(reviewed_area_id: PrimaryKey):
+    """
+
+    """
+    req = UpdateReviewedAreaReq(reviewed_by_user_id=current_user.user_id)
+
+    return base.update(ReviewedArea, reviewed_area_id, req).serialize(), 200

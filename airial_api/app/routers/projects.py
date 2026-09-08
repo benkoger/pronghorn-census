@@ -5,7 +5,6 @@
 
 from uuid import UUID
 
-from database.object_models.core.images import Image
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.models import Model
 from database.object_models.project_management.projectmanagement_bindings import (
@@ -27,13 +26,11 @@ from app.decorators import permission_required
 
 from app.extensions import base
 from database.object_models.project_management import (
-    ProjectQuery,
     Project,
     ProjectsHerdUnits,
 )
 
 from database.object_models.user_management import OrganizationProject
-from database.object_models.core import Prediction
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 
@@ -163,6 +160,10 @@ def get_herd_units(project_id: int | UUID):
 def get_surveys(project_id: int | UUID):
     """ """
 
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
+
     surveys = base.get_related(ProjectsSurveys, Survey, {"project_id": project_id})
 
     return [survey.serialize() for survey in surveys], 200
@@ -178,50 +179,13 @@ def get_surveys(project_id: int | UUID):
 def get_schemas(project_id: int | UUID):
     """ """
 
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
+
     schemas = base.get_related(ProjectsSchemas, Schema, {"project_id": project_id})
 
     return [schema.serialize() for schema in schemas], 200
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-@projectBp.get("/<int:project_id>/image-count")
-@projectBp.get("/<uuid:project_id>/image-count")
-@login_required
-@permission_required("access")
-def image_count(project_id: int | UUID):
-    """ """
-
-    count = base.count(
-        Image,
-        Project,
-        project_id,
-        ProjectsHerdUnits,
-    )
-
-    return {"count": count}, 200
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-@projectBp.get("/<int:project_id>/prediction-count")
-@projectBp.get("/<uuid:project_id>/prediction-count")
-@login_required
-@permission_required("access")
-def prediction_count(project_id: int | UUID):
-    """ """
-
-    count = base.count(
-        Prediction,
-        Project,
-        project_id,
-        ProjectsHerdUnits,
-        Image,
-    )
-
-    return {"count": count}, 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

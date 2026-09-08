@@ -727,144 +727,6 @@ class Database:
         return self._delete(cls, pk)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Stats
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _count(
-        self,
-        cursor: Cursor,
-        cls: type[DBbase],
-        parent_cls: type[DBbase],
-        parent_pk: PrimaryKey,
-    ) -> int:
-        """Internal count method."""
-        query = sql.SQL("""
-            SELECT COUNT({target_pk})
-            FROM {target_table}
-            WHERE {parent_fk} = %s;
-        """)
-
-        cursor.row_factory = tuple_row
-        cursor.execute(
-            query.format(
-                target_pk=sql.Identifier(cls.__pk_name__),
-                target_table=cls.get_table_identifier(),
-                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
-            ),
-            (parent_pk,),
-        )
-        res = cursor.fetchone()
-
-        return res[0] if res else 0
-
-    @connect
-    def _count_related(
-        self,
-        cursor: Cursor,
-        cls: type[DBbase],
-        parent_cls: type[DBbase],
-        parent_pk: PrimaryKey,
-        relation_cls: type[Relationbase],
-    ) -> int:
-        """Internal count_related method."""
-        query = sql.SQL("""
-            SELECT COUNT(t.{target_pk})
-            FROM {target_table} t
-            JOIN {relation_table} r ON t.{target_fk} = r.{relation_fk}
-            WHERE r.{parent_fk} = %s;
-        """)
-
-        cursor.row_factory = tuple_row
-        cursor.execute(
-            query.format(
-                target_pk=sql.Identifier(cls.__pk_name__),
-                target_table=cls.get_table_identifier(),
-                relation_table=relation_cls.get_table_identifier(),
-                target_fk=sql.Identifier(f"{cls.__name__.lower()}_id"),
-                relation_fk=sql.Identifier(f"{cls.__name__.lower()}_id"),
-                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
-            ),
-            (parent_pk,),
-        )
-        res = cursor.fetchone()
-
-        return res[0] if res else 0
-
-    @connect
-    def _count_through_intermediate(
-        self,
-        cursor: Cursor,
-        cls: type[DBbase],
-        parent_cls: type[DBbase],
-        parent_pk: PrimaryKey,
-        relation_cls: type[Relationbase],
-        intermediate_cls: type[DBbase],
-    ) -> int:
-        """Internal count_through_intermediate method."""
-        query = sql.SQL("""
-            SELECT COUNT(t.{target_pk})
-            FROM {target_table} t
-            JOIN {intermediate_table} i ON t.{intermediate_fk} = i.{intermediate_pk}
-            JOIN {relation_table} r ON i.{relation_fk} = r.{relation_fk}
-            WHERE r.{parent_fk} = %s;
-        """)
-
-        cursor.row_factory = tuple_row
-        cursor.execute(
-            query.format(
-                target_pk=sql.Identifier(cls.__pk_name__),
-                target_table=cls.get_table_identifier(),
-                intermediate_table=intermediate_cls.get_table_identifier(),
-                intermediate_fk=sql.Identifier(
-                    f"{intermediate_cls.__name__.lower()}_id"
-                ),
-                intermediate_pk=sql.Identifier(intermediate_cls.__pk_name__),
-                relation_table=relation_cls.get_table_identifier(),
-                relation_fk=sql.Identifier(f"{intermediate_cls.__name__.lower()}_id"),
-                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
-            ),
-            (parent_pk,),
-        )
-        res = cursor.fetchone()
-
-        return res[0] if res else 0
-
-    def count(
-        self,
-        cls: type[DBbase],
-        parent_cls: type[DBbase],
-        parent_pk: PrimaryKey,
-        relation_cls: type[Relationbase] | None = None,
-        intermediate_cls: type[DBbase] | None = None,
-    ) -> int:
-        """Returns the total record count for a target model scoped to a parent entity.
-
-        Supports direct parent-child foreign key ownership, single-junction indirect relations,
-        or three-tier relationships through an intermediate parent model.
-
-        Args:
-            cls: The DBbase model class representing the entities being counted.
-            parent_cls: The DBbase model class representing the top-level parent entity.
-            parent_pk: The primary key of the parent record.
-            relation_cls: Optional Relationbase model class for junction joins.
-            intermediate_cls: Optional DBbase model class for intermediate parent entities.
-
-        Returns:
-            int: Total count of matching target records.
-        """
-        if relation_cls and intermediate_cls:
-            return self._count_through_intermediate(
-                cls, parent_cls, parent_pk, relation_cls, intermediate_cls
-            )
-
-        elif relation_cls:
-            return self._count_related(cls, parent_cls, parent_pk, relation_cls)
-
-        else:
-            return self._count(cls, parent_cls, parent_pk)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Batching -- Complex Relations
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1130,6 +992,8 @@ FROM (
 
         cursor.row_factory = class_row(ReviewedArea)
         cursor.execute(query.format(parameter_field=query_params), placeholders)
+
+        print(query.format(parameter_field=query_params).as_string())
 
         return cursor.fetchall()
 

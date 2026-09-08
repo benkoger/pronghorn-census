@@ -212,6 +212,7 @@ class UpdateReviewedAreaReq(BaseModel):
     reviewed_area_length_px: Optional[int] = None
     reviewed_area_width_px: Optional[int] = None
     ra_key: Optional[str] = None
+    reviewed_by_user_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
