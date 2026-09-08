@@ -282,7 +282,7 @@ export async function closeUserImages(): Promise<boolean> {
 // ---------------------------------------------------------------------------------------------------------------------------
 // DELETE
 
-export async function deleteImage(image_id: string): Promise<boolean> {
+export async function delete_image(image_id: string): Promise<boolean> {
   const response = await fetch(`${api_url}/images/${image_id}`, {
     method: "DELETE",
     credentials: "include",

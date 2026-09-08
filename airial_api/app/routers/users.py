@@ -9,6 +9,7 @@ from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user
 from flask_pydantic import validate
 from msgpack import unpackb
+from numpy import isin
 
 from app.decorators import permission_required
 from app.extensions import base, cache, login_manager
@@ -20,10 +21,10 @@ from database.object_models.user_management import (
     RoleNameQuery,
     SetActiveOrgReq,
     User,
+    OrganizationUser,
 )
 
 from database.object_models.base import create_spice_update
-from database.object_models.user_management.organization_users import OrganizationUser
 
 userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -54,7 +55,6 @@ def load(session_user_id: str):
         OrganizationUser,
         Role,
         {"user_id": user_obj.user_id, "organization_id": org.organization_id},
-        fk_field="role_id",
     )
 
     user_obj.roles = [role.name for role in user_roles]
@@ -111,18 +111,21 @@ def get_current_user():
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+@userBp.get("/<int:user_id>/organizations")
 @userBp.get("/<uuid:user_id>/organizations")
-@userBp.get("/<string:user_id>/organizations")
 @login_required
 def get_orgs(user_id: int | UUID):
     """Retrieve organizations linked to a specific user"""
     # slower because we have to look up the pk for the fkey relation
     if isinstance(user_id, UUID):
         user = base.get(User, user_id)
-
         user_id = user.user_id
 
-    orgs = base.where(Organization, {"user_id": user_id})
+    orgs = base.get_related(
+        OrganizationUser,
+        Organization,
+        {"user_id": int(user_id)},
+    )
     return [org.serialize() for org in orgs], 200
 
 

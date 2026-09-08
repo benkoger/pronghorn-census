@@ -5,11 +5,13 @@
 
 
 import atexit
+from datetime import date
 import uuid
 from functools import wraps
 from typing import (
     Any,
     Callable,
+    Optional,
     cast,
     Type,
 )
@@ -40,11 +42,27 @@ from grpc import (
 import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.errors import DatabaseError
-from psycopg.rows import class_row
+from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg_pool import ConnectionPool
-from werkzeug.security import generate_password_hash
 
-from database.object_models.base import DBbase, T, Relationbase
+from database.object_models.autocropper import AutoCropperBatchQuery
+from database.object_models.base import DBbase, T, Relationbase, PrimaryKey, BulkRequest
+
+from database.object_models.core.images import (
+    Image,
+    RAQuery,
+    ReviewedArea,
+    UpdateImageReq,
+)
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.models import Model
+from database.object_models.project_management.surveys import Survey
+from database.object_models.user_management.users import User
+from database.query_builder import (
+    filter_by_object_ids,
+    resolve_identifier,
+    clause_generator,
+)
 
 from .errors import (
     FailedToCreate,
@@ -54,36 +72,6 @@ from .errors import (
 # ---------------------------------------------------------------------------------------------------------------------------
 
 EXT_KEY = "base"
-PrimaryKey = int | UUID
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-def _clause_generator(
-    clauses: dict[str, Any],
-    sep: sql.SQL = sql.SQL(", "),
-    prefix: str = "",
-) -> sql.Composed:
-    """Generate SQL statements from a dictionary."""
-    return sep.join(
-        sql.SQL("{} = {}").format(
-            sql.Identifier(col),
-            sql.Placeholder(f"{prefix}{col}"),
-        )
-        for col in clauses.keys()
-    )
-
-
-def _resolve_identifier(cls, key: PrimaryKey) -> sql.Identifier:
-    """Determine which key type a PrimaryKey object is"""
-    match key:
-        case int():
-            pk_col = cls.get_pk_identifier()
-        case UUID():
-            pk_col = sql.Identifier("uuid")
-
-    return pk_col
-
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -192,8 +180,6 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     def create_bulk_check_request(
         self, object_type: str, object_id: str, subject_id: str, permission: str
     ):
@@ -287,15 +273,13 @@ class Database:
         return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # INSERT
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _insert(self, cursor: Cursor[T], cls: type[T], req: BaseModel) -> T:
+    def _insert(self, cursor: Cursor[T], cls: type[T], req: BaseModel, *args) -> T:
         """Internal insert method."""
-        if not (result := cls._create(cursor, req)):
+        if not (result := cls._create(cursor, req, *args)):
             raise FailedToCreate(cls.__name__)
 
         obj, relations = result
@@ -305,7 +289,7 @@ class Database:
 
         return obj
 
-    def insert(self, cls: type[T], req: BaseModel) -> T:
+    def insert(self, cls: type[T], req: BaseModel, *args) -> T:
         """Inserts a new record into the database and returns the created instance.
 
         Args:
@@ -319,7 +303,7 @@ class Database:
             ForeignKeyViolation: If a foreign key references a non-existent record.
             UniqueViolation: If a unique constraint is violated.
         """
-        return self._insert(cls, req)
+        return self._insert(cls, req, *args)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # UPDATE
@@ -332,23 +316,31 @@ class Database:
         """Internal update method."""
         query = sql.SQL("""
             UPDATE {table}
-            SET {set_clause}, modified = CURRENT_TIMESTAMP
+            SET {set_clause}{modified_statement}
             WHERE {id_col} = %(_pk_val)s
             RETURNING *;
         """)
+
+        if hasattr(cls, "modified"):
+            modified_statement = sql.SQL(", modified = CURRENT_TIMESTAMP ")
+        else:
+            modified_statement = sql.SQL("")
 
         data = req.model_dump(exclude_unset=True, exclude_none=True)
 
         if not data:
             return self._get(cursor, cls, pk)
 
-        set_clause = _clause_generator(data)
+        set_clause = clause_generator(data)
 
-        pk_col = _resolve_identifier(cls, pk)
+        pk_col = resolve_identifier(cls, pk)
 
         cursor.execute(
             query.format(
-                table=cls.get_table_identifier(), id_col=pk_col, set_clause=set_clause
+                table=cls.get_table_identifier(),
+                id_col=pk_col,
+                set_clause=set_clause,
+                modified_statement=modified_statement,
             ),
             {**data, "_pk_val": pk},
         )
@@ -406,8 +398,8 @@ class Database:
         if not data:
             return 0
 
-        set_clause = _clause_generator(data)
-        where_clause = _clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
+        set_clause = clause_generator(data)
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
 
         scope_params = {f"_scope_{k}": v for k, v in scope.items()}
 
@@ -458,7 +450,7 @@ class Database:
         cursor.row_factory = class_row(cls)
         query = sql.SQL(" SELECT * FROM {table} WHERE {id_col} = %s ")
 
-        pk_col = _resolve_identifier(cls, pk)
+        pk_col = resolve_identifier(cls, pk)
 
         cursor.execute(
             query.format(table=cls.get_table_identifier(), id_col=pk_col),
@@ -491,11 +483,9 @@ class Database:
 
             parent_pk = getattr(parent_obj, parent_cls.__pk_name__)
 
-        foreign_key = f"{parent_cls.__name__.lower()}_id"
-
         query = sql.SQL("SELECT * FROM {table} WHERE {fk_col} = %s;").format(
             table=child_cls.get_table_identifier(),
-            fk_col=sql.Identifier(foreign_key),
+            fk_col=parent_cls.get_pk_identifier(),
         )
 
         cursor.row_factory = class_row(child_cls)
@@ -525,6 +515,97 @@ class Database:
         return self._get_children(child_cls, parent_cls, parent_pk)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_related(
+        self,
+        cursor: Cursor[T],
+        relation_cls: Type[Relationbase],
+        target_cls: Type[T],
+        scope: dict[str, Any],
+    ) -> list[T]:
+        """Internal method to fetch target models via a relation join table."""
+        if not scope:
+            raise ValueError("At least one filter condition must be provided.")
+
+        # Build parameterized WHERE clause targeting relation scope fields
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
+        scope_params = {f"_scope_{k}": v for k, v in scope.items()}
+
+        query = sql.SQL(
+            "SELECT t.* FROM {target_table} t "
+            "JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} "
+            "WHERE r.{where_clause};"
+        ).format(
+            target_table=target_cls.get_table_identifier(),
+            relation_table=relation_cls.get_table_identifier(),
+            target_pk=sql.Identifier(target_cls.__pk_name__),
+            fk_field=sql.Identifier(target_cls.__pk_name__),
+            where_clause=where_clause,
+        )
+
+        cursor.row_factory = class_row(target_cls)
+        cursor.execute(query, scope_params)
+        return cursor.fetchall()
+
+    def get_related(
+        self,
+        relation_cls: Type[Relationbase],
+        target_cls: Type[T],
+        scope: dict[str, Any],
+    ) -> list[T]:
+        """
+        Fetches target entity models joined through a BaseRelation junction table.
+
+            Args:
+                relation_cls: The BaseRelation junction model class.
+                target_cls: The concrete entity model class to hydrate and return.
+                scope: Key-value filter pairs applied to the junction table.
+                fk_field: The foreign key column name on the junction table linking to target_cls.
+
+            Returns:
+                list[T]: Concrete entity records matching the criteria.
+
+            Raises:
+                ValueError: If scope is empty.
+        """
+        return self._get_related(relation_cls, target_cls, scope)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _bulk_get(self, cursor: Cursor[T], cls: type[T], req: BulkRequest) -> list[T]:
+        """Internal bulk_get method."""
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("SELECT * FROM {table} as bobj")
+
+        p_filters, data = filter_by_object_ids("bobj", cls.__pk_name__, req.object_ids)
+
+        return cursor.execute(
+            sql.SQL("{q} WHERE {p}").format(
+                q=query.format(table=cls.get_table_identifier()), p=p_filters
+            ),
+            data,
+        ).fetchall()
+
+    def bulk_get(self, cls: type[T], req: BulkRequest) -> list[T]:
+        """
+        Fetch a collection of entities efficiently using a collection of primary keys
+
+        Args:
+            cls: The DBbase entity model class to fetch.
+            req: A pydantic request model including PrimaryKey identifiers
+
+        Returns:
+            A list of entities according to the provided identifiers
+
+        Raises:
+            ObjectNotFound: If one or more provided identifiers do not have a corresponding entity.
+
+        """
+        return self._bulk_get(cls, req)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # WHERE
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -535,7 +616,7 @@ class Database:
             raise ValueError("At least one filter condition must be provided.")
 
         # Build parameterized WHERE clause (e.g., image_uuid = %s)
-        where_clause = _clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
         scope_params = {f"_scope_{k}": v for k, v in scope.items()}
 
         query = sql.SQL("SELECT * FROM {table} WHERE {where_clause};").format(
@@ -564,63 +645,6 @@ class Database:
         """
         return self._where(cls, scope)
 
-    @connect
-    def _get_related(
-        self,
-        cursor: Cursor[T],
-        relation_cls: Type[Relationbase],
-        target_cls: Type[T],
-        scope: dict[str, Any],
-        fk_field: str,
-    ) -> list[T]:
-        """Internal method to fetch target models via a relation join table."""
-        if not scope:
-            raise ValueError("At least one filter condition must be provided.")
-
-        # Build parameterized WHERE clause targeting relation scope fields
-        where_clause = _clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
-        scope_params = {f"_scope_{k}": v for k, v in scope.items()}
-
-        query = sql.SQL(
-            "SELECT t.* FROM {target_table} t "
-            "JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} "
-            "WHERE {where_clause};"
-        ).format(
-            target_table=target_cls.get_table_identifier(),
-            relation_table=relation_cls.get_table_identifier(),
-            target_pk=sql.Identifier(target_cls.__pk_name__),
-            fk_field=sql.Identifier(fk_field),
-            where_clause=where_clause,
-        )
-
-        cursor.row_factory = class_row(target_cls)
-        cursor.execute(query, scope_params)
-        return cursor.fetchall()
-
-    def get_related(
-        self,
-        relation_cls: Type[Relationbase],
-        target_cls: Type[T],
-        scope: dict[str, Any],
-        fk_field: str,
-    ) -> list[T]:
-        """
-        Fetches target entity models joined through a BaseRelation junction table.
-
-            Args:
-                relation_cls: The BaseRelation junction model class.
-                target_cls: The concrete entity model class to hydrate and return.
-                scope: Key-value filter pairs applied to the junction table.
-                fk_field: The foreign key column name on the junction table linking to target_cls.
-
-            Returns:
-                list[T]: Concrete entity records matching the criteria.
-
-            Raises:
-                ValueError: If scope is empty.
-        """
-        return self._get_related(relation_cls, target_cls, scope, fk_field)
-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # EXISTS
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -634,7 +658,7 @@ class Database:
         """Internal exists method"""
         query = sql.SQL("SELECT EXISTS(SELECT 1 FROM {table} WHERE {id_col} = %s);")
 
-        pk_col = _resolve_identifier(cls, pk)
+        pk_col = resolve_identifier(cls, pk)
 
         cursor.execute(
             query.format(
@@ -677,7 +701,7 @@ class Database:
         WHERE {id_col} = %(_pk_val)s
         """)
 
-        pk_col = _resolve_identifier(cls, pk)
+        pk_col = resolve_identifier(cls, pk)
 
         cursor.row_factory = class_row(cls)
         cursor.execute(
@@ -701,3 +725,440 @@ class Database:
             bool: True if the operation was successful.
         """
         return self._delete(cls, pk)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Stats
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _count(
+        self,
+        cursor: Cursor,
+        cls: type[DBbase],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+    ) -> int:
+        """Internal count method."""
+        query = sql.SQL("""
+            SELECT COUNT({target_pk})
+            FROM {target_table}
+            WHERE {parent_fk} = %s;
+        """)
+
+        cursor.row_factory = tuple_row
+        cursor.execute(
+            query.format(
+                target_pk=sql.Identifier(cls.__pk_name__),
+                target_table=cls.get_table_identifier(),
+                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
+            ),
+            (parent_pk,),
+        )
+        res = cursor.fetchone()
+
+        return res[0] if res else 0
+
+    @connect
+    def _count_related(
+        self,
+        cursor: Cursor,
+        cls: type[DBbase],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+        relation_cls: type[Relationbase],
+    ) -> int:
+        """Internal count_related method."""
+        query = sql.SQL("""
+            SELECT COUNT(t.{target_pk})
+            FROM {target_table} t
+            JOIN {relation_table} r ON t.{target_fk} = r.{relation_fk}
+            WHERE r.{parent_fk} = %s;
+        """)
+
+        cursor.row_factory = tuple_row
+        cursor.execute(
+            query.format(
+                target_pk=sql.Identifier(cls.__pk_name__),
+                target_table=cls.get_table_identifier(),
+                relation_table=relation_cls.get_table_identifier(),
+                target_fk=sql.Identifier(f"{cls.__name__.lower()}_id"),
+                relation_fk=sql.Identifier(f"{cls.__name__.lower()}_id"),
+                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
+            ),
+            (parent_pk,),
+        )
+        res = cursor.fetchone()
+
+        return res[0] if res else 0
+
+    @connect
+    def _count_through_intermediate(
+        self,
+        cursor: Cursor,
+        cls: type[DBbase],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+        relation_cls: type[Relationbase],
+        intermediate_cls: type[DBbase],
+    ) -> int:
+        """Internal count_through_intermediate method."""
+        query = sql.SQL("""
+            SELECT COUNT(t.{target_pk})
+            FROM {target_table} t
+            JOIN {intermediate_table} i ON t.{intermediate_fk} = i.{intermediate_pk}
+            JOIN {relation_table} r ON i.{relation_fk} = r.{relation_fk}
+            WHERE r.{parent_fk} = %s;
+        """)
+
+        cursor.row_factory = tuple_row
+        cursor.execute(
+            query.format(
+                target_pk=sql.Identifier(cls.__pk_name__),
+                target_table=cls.get_table_identifier(),
+                intermediate_table=intermediate_cls.get_table_identifier(),
+                intermediate_fk=sql.Identifier(
+                    f"{intermediate_cls.__name__.lower()}_id"
+                ),
+                intermediate_pk=sql.Identifier(intermediate_cls.__pk_name__),
+                relation_table=relation_cls.get_table_identifier(),
+                relation_fk=sql.Identifier(f"{intermediate_cls.__name__.lower()}_id"),
+                parent_fk=sql.Identifier(f"{parent_cls.__name__.lower()}_id"),
+            ),
+            (parent_pk,),
+        )
+        res = cursor.fetchone()
+
+        return res[0] if res else 0
+
+    def count(
+        self,
+        cls: type[DBbase],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+        relation_cls: type[Relationbase] | None = None,
+        intermediate_cls: type[DBbase] | None = None,
+    ) -> int:
+        """Returns the total record count for a target model scoped to a parent entity.
+
+        Supports direct parent-child foreign key ownership, single-junction indirect relations,
+        or three-tier relationships through an intermediate parent model.
+
+        Args:
+            cls: The DBbase model class representing the entities being counted.
+            parent_cls: The DBbase model class representing the top-level parent entity.
+            parent_pk: The primary key of the parent record.
+            relation_cls: Optional Relationbase model class for junction joins.
+            intermediate_cls: Optional DBbase model class for intermediate parent entities.
+
+        Returns:
+            int: Total count of matching target records.
+        """
+        if relation_cls and intermediate_cls:
+            return self._count_through_intermediate(
+                cls, parent_cls, parent_pk, relation_cls, intermediate_cls
+            )
+
+        elif relation_cls:
+            return self._count_related(cls, parent_cls, parent_pk, relation_cls)
+
+        else:
+            return self._count(cls, parent_cls, parent_pk)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Batching -- Complex Relations
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_auto_crop_batch(
+        self, cursor: Cursor[dict], params: AutoCropperBatchQuery, user: User
+    ) -> dict[str, str | int | list[int]]:
+        """ """
+        q_params = {
+            "survey_id": self._get(cursor, Survey, params.survey_id).survey_id,
+            "herd_unit_id": self._get(
+                cursor, HerdUnit, params.herd_unit_id
+            ).herd_unit_id,
+            "model_id": self._get(cursor, Model, params.model_id).model_id,
+            "labels": params.label,
+            "score": params.min_confidence,
+            "batch_size": params.batch_size,
+        }
+
+        cursor.row_factory = dict_row
+        query = sql.SQL(""" 
+		    WITH SelectedImages AS (
+    SELECT I.image_id
+    FROM core.images I
+    INNER JOIN core.predictions P ON I.image_id = P.image_id
+    WHERE I.herd_unit_id = %(herd_unit_id)s
+      AND I.survey_id = %(survey_id)s
+      AND I.opened_by_user_id = 0
+      AND P.model_id = %(model_id)s
+      AND P.reviewed_by_user_id = 0  
+      AND P.label = ANY(%(labels)s)
+      AND P.score > %(score)s
+    GROUP BY I.image_id
+    ORDER BY MAX(P.score) DESC  
+    LIMIT %(batch_size)s
+)
+SELECT json_agg(row_to_json(img_preds))
+FROM (
+        SELECT
+        I.image_id,
+        I.name,
+        I.in_training,
+        I.crops_generated,
+        I.created,
+        I.modified,
+        I.image_length_px,
+        I.image_width_px,
+        I.uuid,
+        json_agg(
+            json_build_object(
+                'pred_id', P.pred_id,
+                'image_id', P.image_id,
+                'model_id', P.model_id,
+                'dimensions', json_build_object(
+                    'top_left', json_build_array(P.box_tx, P.box_ty), 
+                    'bottom_right', json_build_array(P.box_bx, P.box_by)),
+                'score', P.score,
+                'label', P.label,
+                'created', P.created,
+                'uuid', P.uuid
+            )
+            ORDER BY P.score DESC -- Internal array stays perfectly ordered
+        ) AS predictions,
+        MAX(P.score) AS max_score -- Kept for outer sorting parity
+    FROM core.images I
+    INNER JOIN core.predictions P ON I.image_id = P.image_id
+    WHERE I.image_id IN (SELECT image_id FROM SelectedImages)
+      AND P.label = ANY(%(labels)s)
+      AND P.score > %(score)s
+      AND P.model_id = %(model_id)s
+    GROUP BY I.image_id
+    ORDER BY max_score DESC) AS img_preds;
+                        """)
+
+        cursor.execute(query, q_params)
+
+        results = cursor.fetchone()
+
+        if results is None:
+            raise Exception("Failed to fetch batch")
+
+        ids = []
+        for row in cast(dict, results)["json_agg"]:
+            ids.append((user.user_id, row["image_id"]))
+
+        cursor.executemany(
+            sql.SQL(
+                "UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s"
+            ),
+            ids,
+        )
+        return cast(dict, results)["json_agg"]
+
+    def get_auto_crop_batch(
+        self, req: AutoCropperBatchQuery, user: User
+    ) -> dict[str, str | int | list[int]]:
+        """ """
+        return self._get_auto_crop_batch(req, user)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Legacy Holdovers -- Not enough time to rewrite
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # TODO: These methods need to be folded into the greater generics pattern !techdebt!
+
+    @connect
+    def _get_survey_images(
+        self, cursor: Cursor[Any], survey_id: UUID, limit: int, offset: int
+    ) -> tuple[list[Image], int]:
+        """ """
+
+        query_1 = sql.SQL("SELECT COUNT(*) FROM core.images WHERE survey_id = %s")
+        query_2 = sql.SQL(""" 
+            SELECT * FROM core.images 
+            WHERE survey_id = %s
+            ORDER BY image_id ASC 
+            LIMIT %s OFFSET %s; 
+        """)
+
+        survey = self._get(cursor, Survey, survey_id)
+
+        cursor.row_factory = tuple_row
+        res = cursor.execute(query_1, (survey.survey_id,)).fetchone()
+
+        if not res:
+            return [], 0
+
+        total_images = int(res[0])
+
+        cursor.row_factory = class_row(Image)
+
+        images = cursor.execute(query_2, (survey.survey_id, limit, offset)).fetchall()
+
+        return images, total_images
+
+    def get_survey_images(
+        self, survey_id: UUID, limit: int, offset: int
+    ) -> tuple[list[Image], int]:
+        """ """
+        return self._get_survey_images(survey_id, limit, offset)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_survey_annotated_images(
+        self,
+        cursor: Cursor[dict],
+        label_ids: list[int],
+        date_range: tuple[date, date] | None,
+        survey_ids: list[int] | None,
+        herd_unit_ids: list[int] | None,
+    ):
+        """ """
+        cursor.row_factory = dict_row
+
+        params_1 = []
+        placeholders: dict[str, list[int] | date] = {"label_ids": label_ids}
+
+        if survey_ids is not None:
+            params_1.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
+            placeholders["survey_ids"] = survey_ids
+
+        if herd_unit_ids is not None:
+            params_1.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
+            placeholders["herd_unit_ids"] = herd_unit_ids
+
+        if date_range is not None:
+            params_1.append(
+                sql.SQL(
+                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
+                )
+            )
+            placeholders["date_range_lower"] = date_range[0]
+            placeholders["date_range_upper"] = date_range[1]
+
+        image_params = sql.SQL(" AND ").join(params_1)
+
+        query = sql.SQL("""
+			SELECT json_agg(row_to_json(images))
+			FROM (
+				SELECT
+					I.*,
+					json_agg(
+						json_build_object(
+							'annotation_id', a.annotation_id,
+							'label_id', a.label_id,
+							'image_id', a.image_id,
+							'pred_id', a.pred_id,
+							'herd_unit_id', a.herd_unit_id,
+							'box_tx', a.box_tx,
+							'box_ty', a.box_ty,
+							'box_bx', a.box_bx,
+							'box_by', a.box_by,
+							'created_by_user_id', a.created_by_user_id,
+							'created', a.created,
+							'modified', a.modified, 
+							'uuid', a.uuid
+						)
+					) as annotations
+				FROM core.images I
+				INNER JOIN core.annotations A ON A.image_id = I.image_id
+				WHERE {image_args}
+					AND A.label_id = ANY(%(label_ids)s)
+				GROUP BY I.image_id
+			) as images
+		""")
+
+        try:
+            cursor.execute(query.format(image_args=image_params), placeholders)
+        except Exception as e:
+            print(e)
+        results = cursor.fetchall()
+        return results
+
+    def get_survey_annotated_images(
+        self,
+        label_ids: list[int],
+        date_range: tuple[date, date] | None,
+        survey_ids: list[int] | None,
+        herd_unit_ids: list[int] | None,
+    ):
+        """ """
+        return self._get_survey_annotated_images(
+            label_ids, date_range, survey_ids, herd_unit_ids
+        )
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_reviewed_areas(
+        self, cursor: Cursor[ReviewedArea], req: RAQuery
+    ) -> list[ReviewedArea]:
+        """ """
+        query = sql.SQL(""" 
+			SELECT ra.* FROM core.reviewed_area ra
+			JOIN core.images i on i.image_id = ra.image_id
+			WHERE {parameter_field} 
+		""")
+
+        params = []
+        placeholders: dict[str, list[int] | date | int] = {}
+
+        if req.herd_unit_id:
+            herd_unit = self._get(cursor, HerdUnit, req.herd_unit_id[0])
+            params.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
+            placeholders["herd_unit_ids"] = [herd_unit.herd_unit_id]
+
+        if req.survey_id:
+            survey = self._get(cursor, Survey, req.survey_id[0])
+            params.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
+            placeholders["survey_ids"] = [survey.survey_id]
+
+        if not req.include_reviewed:
+            params.append(sql.SQL("RA.reviewed_by_user_id = 0"))
+
+        if not req.include_opened:
+            params.append(sql.SQL("i.opened_by_user_id = 0"))
+
+        query_params = sql.SQL(" AND ").join(params)
+
+        if req.num:
+            query_params += sql.SQL(" LIMIT %(num)s ")  # pyright: ignore
+            placeholders["num"] = req.num
+
+        cursor.row_factory = class_row(ReviewedArea)
+        cursor.execute(query.format(parameter_field=query_params), placeholders)
+
+        return cursor.fetchall()
+
+    def get_reviewed_areas(self, req: RAQuery) -> list[ReviewedArea]:
+        """ """
+        return self._get_reviewed_areas(req)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_crop_to_review(
+        self, cursor: Cursor[ReviewedArea], req: RAQuery, user: User
+    ) -> Optional[ReviewedArea]:
+        """Fetch a batch of reviewed areas that have yet to be reviewed."""
+        reviewed_areas = self._get_reviewed_areas(cursor, req)
+
+        if len(reviewed_areas) > 0:
+            image = self._get(cursor, Image, reviewed_areas[0].image_id)
+            self._update(
+                cursor,
+                Image,
+                image.image_id,
+                UpdateImageReq(opened_by_user_id=user.user_id),
+            )
+
+            return reviewed_areas[0]
+        else:
+            return None
+
+    def get_crop_to_review(self, req: RAQuery, user: User) -> Optional[ReviewedArea]:
+        """ """
+        return self._get_crop_to_review(req, user)

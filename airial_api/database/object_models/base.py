@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from msgpack import packb
 from datetime import datetime
 from typing import Any, ClassVar, Type, TypeVar, NamedTuple, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from psycopg import Cursor
 import numpy as np
 from uuid import UUID
@@ -17,6 +17,10 @@ from authzed.api.v1 import (
 # ---------------------------------------------------------------------------------------------------------------------------
 
 T = TypeVar("T", bound="DBbase")
+
+PrimaryKey = int | UUID
+
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 def create_spice_update(
@@ -48,6 +52,27 @@ def create_spice_update(
 class Keyring(NamedTuple):
     pkey: int
     uuid: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# TODO: Rework these request containers to be less weird
+
+
+class BulkRequest(BaseModel):
+    object_ids: list[PrimaryKey]
+
+    @field_validator("object_ids", mode="before")
+    @classmethod
+    def ensure_list(cls, value):
+        if isinstance(value, list):
+            return value
+        if value is None or value == "":
+            return []
+        return [value]
+
+
+class BulkRequestModel(BaseModel):
+    requests: list[Any]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -114,7 +139,7 @@ class Relationbase(ABC):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class Box():
+class Box:
     """A Box contains dimensional data for crops and predictions"""
 
     def __init__(self, top_left: tuple[int, int], bottom_right: tuple[int, int]):
@@ -182,10 +207,3 @@ class Box():
 
 class JunctionRelation(NamedTuple):
     table_name: str
-
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-class BulkRequestModel(BaseModel):
-    requests: list[Any]

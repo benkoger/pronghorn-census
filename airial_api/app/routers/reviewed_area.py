@@ -3,18 +3,22 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import cast
 from uuid import UUID
 
 from flask import Blueprint, current_app
-from flask_login import current_user, login_required
+from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base, s3
-from database.object_models.core import RAQuery, UpdateReviewedAreaReq
-from database.object_models.core.images import CrateReviewedAreaPresignedGetReq
-from database.object_models.user_management import User
+from database.object_models.core import UpdateReviewedAreaReq
+from database.object_models.core.annotations import Annotation
+from database.object_models.core.core_bindings import AnnotationsReviewedArea
+from database.object_models.core.images import (
+    CrateReviewedAreaPresignedGetReq,
+    RAQuery,
+    ReviewedArea,
+)
 
 raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 
@@ -22,6 +26,7 @@ raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 # GET
 
 
+# TODO: Replace with composable generics
 @raBp.get("")
 @login_required
 @permission_required("access")
@@ -56,13 +61,32 @@ def get(query: RAQuery):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@raBp.get("/<string:reviewed_area_id>/annotations")
+@raBp.get("/<int:reviewed_area_id>")
+@raBp.get("/<uuid:reviewed_area_id>")
 @login_required
 @permission_required("access")
-def get_annotations(reviewed_area_id: str):
+def get_by_id(reviewed_area_id: int | UUID):
+    """ """
+    return base.get(ReviewedArea, reviewed_area_id).serialize(), 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@raBp.get("/<int:reviewed_area_id>/annotations")
+@raBp.get("/<uuid:reviewed_area_id>/annotations")
+@login_required
+@permission_required("access")
+def get_annotations(reviewed_area_id: int | UUID):
     """ """
 
-    annotations = base.get_reviewed_area_annotations(UUID(reviewed_area_id))
+    if isinstance(reviewed_area_id, UUID):
+        reviewed_area = base.get(ReviewedArea, reviewed_area_id)
+        reviewed_area_id = reviewed_area.reviewed_area_id
+
+    annotations = base.get_related(
+        AnnotationsReviewedArea, Annotation, {"reviewed_area_id": reviewed_area_id}
+    )
 
     return [annot.serialize() for annot in annotations], 200
 
@@ -89,7 +113,7 @@ def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
             500:
                     description: Storage or database error.
     """
-    ra = base.get_reviewed_area(body.reviewed_area_id)
+    ra = base.get(ReviewedArea, body.reviewed_area_id)
 
     response = s3.generate_presigned_url(
         "get_object",
@@ -104,11 +128,12 @@ def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
 # PATCH
 
 
-@raBp.patch("/<string:reviewed_area_id>")
+@raBp.patch("/<int:reviewed_area_id>")
+@raBp.patch("/<uuid:reviewed_area_id>")
 @login_required
 @permission_required("access")
 @validate()
-def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):
+def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UUID):
     """
     Update reviewed areas in the database.
     ---
@@ -130,9 +155,4 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: str):
                 description: An unexpected error has occured.
     """
 
-    return (
-        base.update_reviewed_area(
-            UUID(reviewed_area_id), body, cast(User, current_user)
-        ).serialize(),
-        200,
-    )
+    return base.update(ReviewedArea, reviewed_area_id, body).serialize(), 200

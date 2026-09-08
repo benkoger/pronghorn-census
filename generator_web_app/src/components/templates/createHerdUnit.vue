@@ -22,7 +22,7 @@ const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createHerdUnitOptions>({
   name: "",
-  project_id: props.project.uuid,
+  project_ids: {pkey: props.project.project_id, uuid: props.project.uuid},
 });
 
 const submitReq = async () => {

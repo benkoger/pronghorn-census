@@ -3,7 +3,6 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 import io
-import psycopg.sql as sql
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, Self
@@ -12,12 +11,13 @@ from uuid import UUID
 import cv2
 import numpy as np
 import PIL.Image as PillowImage
+import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, field_validator, ConfigDict
 from authzed.api.v1 import RelationshipUpdate
 
-from ..base import T, Box, DBbase, Keyring, create_spice_update
+from ..base import Box, Keyring, create_spice_update, DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ class ImageMixin:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def deleteImage(self):
+    def delete_image(self):
         del self.image
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -165,13 +165,13 @@ class CreatePredictionCropReq(BaseModel):
 
 
 class RAQuery(BaseModel):
-    herd_unit_ids: Optional[list[UUID]]
-    survey_ids: Optional[list[UUID]]
+    herd_unit_id: Optional[list[UUID]]
+    survey_id: Optional[list[UUID]]
     include_reviewed: Optional[bool] = False
     include_opened: Optional[bool] = False
     num: Optional[int] = None
 
-    @field_validator("herd_unit_ids", "survey_ids", mode="before")
+    @field_validator("herd_unit_id", "survey_id", mode="before")
     @classmethod
     def ensure_list(cls, value):
         if isinstance(value, list):
@@ -185,7 +185,7 @@ class RAQuery(BaseModel):
 
 
 class CreateReviewedAreaReq(BaseModel, ImageMixin):
-    image_id: UUID
+    image_ids: Keyring
     name: str
     area_tx: int
     area_ty: int
@@ -275,6 +275,7 @@ class Image(DBbase, ImageMixin):
     def _create(
         cls, cursor: Cursor[Self], req: CreateImageReq
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.images (
                 herd_unit_id, survey_id, name, img_key, image_length_px,
@@ -288,9 +289,8 @@ class Image(DBbase, ImageMixin):
                 %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
                 )
             RETURNING *;
-            """)
+        """)
 
-        cursor.row_factory = class_row(cls)
         cursor.execute(
             query,
             {
@@ -380,8 +380,38 @@ class ReviewedArea(DBbase, ImageMixin):
 
     @classmethod
     def _create(
-        cls, cursor: Cursor[Self], req: CreatePredictionCropReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]: ...
+        cls, cursor: Cursor[Self], req: CreateReviewedAreaReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("""
+            INSERT INTO core.reviewed_area (
+                image_id, name, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px,
+                reviewed_area_width_px, reviewed_by_user_id, ra_key
+            )
+            VALUES (
+                %(image_id)s, %(name)s, %(area_tx)s, %(area_ty)s, %(area_bx)s, %(area_by)s, 
+                %(reviewed_area_length_px)s, %(reviewed_area_width_px)s, %(reviewed_by_user_id)s,
+                %(ra_key)s
+            )
+            RETURNING *;
+        """)
+
+        cursor.execute(query, {**req.model_dump(), "image_id": req.image_ids.pkey})
+
+        if not (reviewed_area := cursor.fetchone()):
+            return None
+
+        spice_updates = [
+            create_spice_update(
+                "reviewed_area",
+                reviewed_area.uuid,
+                "image",
+                req.image_ids.uuid,
+                "parent",
+            )
+        ]
+
+        return reviewed_area, spice_updates
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

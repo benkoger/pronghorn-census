@@ -9,35 +9,13 @@ from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
-from pydantic import BaseModel, ConfigDict, field_validator
-
+from pydantic import BaseModel, ConfigDict
 from ..base import DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class RoleQuery(BaseModel):
-    role_id: Optional[List[UUID]] = None
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @field_validator("role_id", mode="before")
-    @classmethod
-    def ensure_list(cls, value):
-        if isinstance(value, list):
-            return value
-        if value is None or value == "":
-            return []
-        return [value]
-
-
-class CreateRoleReq(BaseModel):
-    """Not implemented; Were working on it :)"""
-
-    ...
-
-
-# ---------------------------------------------------------------------------------------------------------------------------
+class CreateRoleReq(BaseModel): ...
 
 
 @dataclass

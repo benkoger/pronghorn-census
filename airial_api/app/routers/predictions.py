@@ -1,7 +1,7 @@
 # Endpoints for managing predictions in the API
 # Author: Michael B. Lance
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
 
@@ -11,14 +11,15 @@ from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
+from database.object_models.base import BulkRequest
 from database.object_models.core import (
-    PredictionQuery,
     CreatePredictionReq,
 )
+from database.object_models.core.predictions import Prediction
 
 predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 
-# ------------------------------------------------------------------------------------------------------------ f---------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 # GET
 
 
@@ -26,7 +27,7 @@ predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 @login_required
 @permission_required("access")
 @validate()
-def get_predictions(query: PredictionQuery):
+def get_predictions(query: BulkRequest):
     """
      Request a prediction object from the database using its UUID.
     ---
@@ -44,7 +45,7 @@ def get_predictions(query: PredictionQuery):
             description: No prediction record found for the provided ID.
     """
 
-    predictions = base.get_predictions(query)
+    predictions = base.bulk_get(Prediction, query)
 
     return [pred.serialize() for pred in predictions], 200
 
@@ -52,13 +53,14 @@ def get_predictions(query: PredictionQuery):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
-@predBp.get("/<string:prediction_id>")
+@predBp.get("/<int:prediction_id>")
+@predBp.get("/<uuid:prediction_id>")
 @permission_required("access")
 @login_required
-def get_prediction_by_id(prediction_id: str):
+def get_prediction_by_id(prediction_id: int | UUID):
     """ """
 
-    return base.get_prediction(UUID(prediction_id)).serialize(), 200
+    return base.get(Prediction, prediction_id).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------#
@@ -72,4 +74,4 @@ def get_prediction_by_id(prediction_id: str):
 def create_prediction(body: CreatePredictionReq):
     """ """
 
-    return base.create_prediction(body).serialize(), 200
+    return base.insert(Prediction, body).serialize(), 200

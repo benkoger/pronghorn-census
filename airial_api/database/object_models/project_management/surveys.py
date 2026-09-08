@@ -4,57 +4,24 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Self
 from uuid import UUID
+
+from authzed.api.v1 import RelationshipUpdate
+from psycopg import Cursor
+from psycopg.rows import class_row
+import psycopg.sql as sql
 
 from pydantic import BaseModel, ConfigDict
 
-from ..base import DBbase
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class Survey(DBbase):
-    """Dataclass for representing Surveys from the database"""
-
-    survey_id: int
-    survey_date: datetime
-    name: str
-    additional_info: str
-    created: datetime
-    modified: datetime
-    uuid: UUID
-
-    __tablename__: str = "surveys"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "survey_id"
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    class Response(BaseModel):
-        model_config = ConfigDict(from_attributes=True)
-
-        survey_id: int
-        survey_date: datetime
-        name: str
-        additional_info: str
-        created: datetime
-        modified: datetime
-        uuid: UUID
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def serialize(self) -> dict:
-        return Survey.Response.model_validate(self).model_dump(mode="json")
-
+from ..base import DBbase, Keyring, create_spice_update
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class CreateSurveyReq(BaseModel):
-    project_id: UUID
-    herd_unit_id: UUID
+    project_ids: Keyring
+    herd_unit_ids: Keyring
     survey_date: datetime
     name: str
     additional_info: Optional[str]
@@ -72,3 +39,97 @@ class UpdateSurveyReq(BaseModel):
 class SurveyImageQuery(BaseModel):
     page: int = 1
     per_page: int = 50
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass
+class Survey(DBbase):
+    """Dataclass for representing Surveys from the database"""
+
+    survey_id: int
+    survey_date: datetime
+    name: str
+    additional_info: str | None
+    created: datetime
+    modified: datetime
+    uuid: UUID
+
+    __tablename__: str = "surveys"
+    __schema__: str = "projectmanagement"
+    __pk_name__: str = "survey_id"
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        survey_id: int
+        survey_date: datetime
+        name: str
+        additional_info: str | None
+        created: datetime
+        modified: datetime
+        uuid: UUID
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @classmethod
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateSurveyReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("""
+            WITH new_survey AS (
+                INSERT INTO projectmanagement.surveys (
+                    survey_date, name, additional_info
+                )
+                VALUES (
+                    %(survey_date)s, %(name)s, %(additional_info)s
+                )
+                RETURNING *
+            ),
+            inserted_project AS (
+                INSERT INTO projectmanagement.projects_surveys (
+                    project_id, survey_id
+                )
+                SELECT %(project_id)s, survey_id FROM new_survey
+            ),
+            inserted_herd_unit AS (
+                INSERT INTO projectmanagement.surveys_herd_units (
+                    herd_unit_id, survey_id
+                )
+                SELECT %(herd_unit_id)s, survey_id FROM new_survey
+            )
+            SELECT * FROM new_survey;
+        """)
+
+        cursor.execute(
+            query,
+            {
+                **req.model_dump(),
+                "project_id": req.project_ids.pkey,
+                "herd_unit_id": req.herd_unit_ids.pkey,
+            },
+        )
+
+        if not (survey := cursor.fetchone()):
+            return None
+
+        spice_updates = [
+            create_spice_update(
+                "survey",
+                survey.uuid,
+                "herd_unit",
+                req.herd_unit_ids.uuid,
+                "parent",
+            )
+        ]
+
+        return survey, spice_updates
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self) -> dict:
+        return Survey.Response.model_validate(self).model_dump(mode="json")

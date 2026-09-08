@@ -12,6 +12,11 @@ from flask_pydantic import validate
 
 from app.extensions import base
 from database.object_models.project_management import CreateHerdUnitReq
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.projectmanagement_bindings import (
+    SurveysHerdUnits,
+)
+from database.object_models.project_management.surveys import Survey
 
 herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 
@@ -19,21 +24,23 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 # GET
 
 
-@herdunitBp.get("/<string:herd_unit_id>")
+@herdunitBp.get("/<int:herd_unit_id>")
+@herdunitBp.get("/<uuid:herd_unit_id>")
 @login_required
 @permission_required("access")
-def get_by_id(herd_unit_id: str):
+def get_by_id(herd_unit_id: int | UUID):
     """ """
-    return base.get_herd_unit(UUID(herd_unit_id)).serialize(), 200
+    return base.get(HerdUnit, herd_unit_id).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 @herdunitBp.get("/<string:herd_unit_id>/surveys")
+@herdunitBp.get("/<uuid:herd_unit_id>/surveys")
 @login_required
 @permission_required("access")
-def get_surveys(herd_unit_id: str):
+def get_surveys(herd_unit_id: int | UUID):
     """
     Retrieve all surveys associated with a herd unit.
     ---
@@ -53,8 +60,14 @@ def get_surveys(herd_unit_id: str):
                     description: Database error.
     """
 
-    surveys = base.get_herd_unit_surveys(
-        UUID(herd_unit_id),
+    if isinstance(herd_unit_id, UUID):
+        herd_unit = base.get(HerdUnit, herd_unit_id)
+        herd_unit_id = herd_unit.herd_unit_id
+
+    surveys = base.get_related(
+        SurveysHerdUnits,
+        Survey,
+        {"herd_unit_id": herd_unit_id},
     )
 
     return [survey.serialize() for survey in surveys], 200
@@ -70,18 +83,19 @@ def get_surveys(herd_unit_id: str):
 @validate()
 def create(body: CreateHerdUnitReq):
     """ """
-    return base.create_herd_unit(body).serialize(), 201
+    return base.insert(HerdUnit, body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@herdunitBp.delete("/<string:herd_unit_id>")
+@herdunitBp.delete("/<int:herd_unit_id>")
+@herdunitBp.delete("/<uuid:herd_unit_id>")
 @login_required
 @permission_required("access")
-def delete(herd_unit_id: str):
+def delete(herd_unit_id: int | UUID):
     """ """
-    base.delete_herd_unit(UUID(herd_unit_id))
+    base.delete(HerdUnit, herd_unit_id)
 
     return "", 204

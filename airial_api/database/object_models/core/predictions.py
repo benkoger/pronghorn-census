@@ -7,17 +7,18 @@ from typing import Any, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
+import psycopg.sql as sql
 from psycopg import Cursor
 from pydantic import BaseModel, field_validator, ConfigDict
 
 
-from ..base import Box, DBbase
+from ..base import Box, DBbase, Keyring, PrimaryKey, create_spice_update
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class PredictionQuery(BaseModel):
-    prediction_id: list[UUID]
+    prediction_id: list[PrimaryKey]
 
     @field_validator("prediction_id")
     @classmethod
@@ -33,8 +34,8 @@ class PredictionQuery(BaseModel):
 
 
 class CreatePredictionReq(BaseModel):
-    image_id: UUID
-    model_id: UUID
+    image_ids: Keyring
+    model_ids: Keyring
     label: int
     score: float
     box_tx: int
@@ -47,13 +48,14 @@ class CreatePredictionReq(BaseModel):
 
 
 class UpdatePredictionReq(BaseModel):
-    reviewed_by_user_id: Optional[UUID] = None
+    reviewed_by_user_id: Optional[int] = None
     label: Optional[int] = None
     score: Optional[float] = None
     box_tx: Optional[int] = None
     box_ty: Optional[int] = None
     box_bx: Optional[int] = None
     box_by: Optional[int] = None
+
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -106,12 +108,42 @@ class Prediction(DBbase):
     @classmethod
     def _create(
         cls, cursor: Cursor[Self], req: CreatePredictionReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]: ...
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        query = sql.SQL("""
+			INSERT INTO core.predictions (
+				image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
+			)
+			VALUES (
+				%(image_id)s, %(model_id)s, %(label)s, %(score)s, %(box_tx)s, %(box_ty)s, %(box_bx)s, %(box_by)s
+			)
+			RETURNING *;
+
+			""")
+
+        cursor.execute(
+            query,
+            {
+                **req.model_dump(),
+                "image_id": req.image_ids.pkey,
+                "model_id": req.model_ids.pkey,
+            },
+        )
+
+        if not (prediction := cursor.fetchone()):
+            return None
+
+        spice_updates = [
+            create_spice_update(
+                "prediction",
+                prediction.uuid,
+                "image",
+                req.image_ids.uuid,
+                "parent",
+            )
+        ]
+        return prediction, spice_updates
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
         return Prediction.Response.model_validate(self).model_dump(mode="json")
-
-
-

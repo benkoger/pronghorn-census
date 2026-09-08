@@ -65,6 +65,6 @@ def get(query: RAQuery):
 @validate()
 def get_selection_count(query: RAQuery):
     """ """
-    count = base.get_crop_to_review_selection_count(query)
+    count = len(base.get_reviewed_areas(query))
 
     return {"count": count}, 200

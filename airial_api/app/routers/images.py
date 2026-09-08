@@ -14,6 +14,7 @@ from app.decorators import permission_required, roles_required
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
 from database.errors import ObjectNotFound
+from database.object_models.base import BulkRequest
 from database.object_models.core import (
     Image,
     Prediction,
@@ -46,7 +47,7 @@ def get_by_id(image_id: int | UUID):
     Request an image object from the database using its integer PK or UUID.
     ---
     parameters:
-      - name: image_id
+      - name: image_i
         in: path
         type: string
         required: true
@@ -376,7 +377,8 @@ def abort_upload(body: AbortMulitPartUploadReq):
 def get_prediciton(body: CreatePredictionCropReq):
     """"""
     image = base.get(Image, body.image_id)
-    predictions = base.get_children(Prediction, Image, body.image_id)
+    req = BulkRequest(object_ids=body.prediction_id) #pyright: ignore
+    predictions = base.bulk_get(Prediction, req)
 
     image_data = cache.get(image.uuid)
 
