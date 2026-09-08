@@ -15,7 +15,7 @@ import {
   createImagePresignedPut,
   createImage,
   abortMultipartUpload,
-  deleteImage,
+  delete_image,
   createMultiPartUpload,
   completeMultiPartUpload,
 } from "@/modules/api/images";
@@ -331,7 +331,7 @@ export default defineComponent({
     },
     async delete_uploaded_images() {
       for (const uuid of this.uploaded_ids) {
-        await deleteImage(uuid);
+        await delete_image(uuid);
       }
     },
   },

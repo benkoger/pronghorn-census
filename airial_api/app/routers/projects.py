@@ -5,7 +5,16 @@
 
 from uuid import UUID
 
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.models import Model
+from database.object_models.project_management.projectmanagement_bindings import (
+    ProjectsModels,
+    ProjectsSchemas,
+    ProjectsSurveys,
+)
 from database.object_models.project_management.projects import createProjectReq
+from database.object_models.project_management.schemas import Schema
+from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management import User, Organization
 from flask import Blueprint, session
 from flask_login import login_required, current_user
@@ -17,8 +26,11 @@ from app.decorators import permission_required
 
 from app.extensions import base
 from database.object_models.project_management import (
-    ProjectQuery,
+    Project,
+    ProjectsHerdUnits,
 )
+
+from database.object_models.user_management import OrganizationProject
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 
@@ -30,22 +42,27 @@ projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 @login_required
 @permission_required("access")
 @validate()
-def get_all(query: ProjectQuery):
+def get_all():
     """ """
 
     org_id = session.get("active_org_uuid")
     active_org = session.get(f"org_{org_id}")
     org = Organization(**unpackb(active_org))
 
-    projects = base.get_projects(query, org)
+    projects = base.get_related(
+        OrganizationProject,
+        Project,
+        {"organization_id": org.organization_id},
+    )
 
-    return [proj.to_dict() for proj in projects], 200
+    return [proj.serialize() for proj in projects], 200
 
 
-@projectBp.get("/<string:project_id>")
+@projectBp.get("/<int:project_id>")
+@projectBp.get("/<uuid:project_id>")
 @login_required
 @permission_required("access")
-def get_by_id(project_id: str):
+def get_by_id(project_id: int | UUID):
     """
     Request a project object from the database using its UUID.
     ---
@@ -65,16 +82,17 @@ def get_by_id(project_id: str):
             description: Database Error.
     """
 
-    return base.get_project(UUID(project_id)).to_dict(), 200
+    return base.get(Project, project_id).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@projectBp.get("/<string:project_id>/models")
+@projectBp.get("/<int:project_id>/models")
+@projectBp.get("/<uuid:project_id>/models")
 @permission_required("access")
 @login_required
-def get_models(project_id: str):
+def get_models(project_id: int | UUID):
     """
     Retrieve models for a specific project
     ---
@@ -92,18 +110,23 @@ def get_models(project_id: str):
             description: Database error.
     """
 
-    models = base.get_project_models(UUID(project_id))
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
 
-    return [model.to_dict() for model in models], 200
+    models = base.get_related(ProjectsModels, Model, {"project_id": project_id})
+
+    return [model.serialize() for model in models], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@projectBp.get("/<string:project_id>/herd-units")
+@projectBp.get("/<int:project_id>/herd-units")
+@projectBp.get("/<uuid:project_id>/herd-units")
 @login_required
 @permission_required("access")
-def get_herd_units(project_id: str):
+def get_herd_units(project_id: int | UUID):
     """
     Retrieve herd units for a specific project
     ---
@@ -116,51 +139,53 @@ def get_herd_units(project_id: str):
             description: Database error.
     """
 
-    herd_units = base.get_project_herd_units(UUID(project_id))
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
 
-    return [herd_unit.to_dict() for herd_unit in herd_units], 200
+    herd_units = base.get_related(
+        ProjectsHerdUnits, HerdUnit, {"project_id": project_id}
+    )
 
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-@projectBp.get("/<string:project_id>/schemas")
-@login_required
-@permission_required("access")
-def get_surveys(project_id: str):
-    """ """
-
-    schemas = base.get_project_schemas(UUID(project_id))
-
-    return [schema.to_dict() for schema in schemas], 200
+    return [herd_unit.serialize() for herd_unit in herd_units], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@projectBp.get("/<string:project_id>/image-count")
+@projectBp.get("/<int:project_id>/surveys")
+@projectBp.get("/<uuid:project_id>/surveys")
 @login_required
 @permission_required("access")
-def image_count(project_id: str):
+def get_surveys(project_id: int | UUID):
     """ """
 
-    count = base.get_project_image_count(UUID(project_id))
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
 
-    return {"count": count}, 200
+    surveys = base.get_related(ProjectsSurveys, Survey, {"project_id": project_id})
+
+    return [survey.serialize() for survey in surveys], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@projectBp.get("/<string:project_id>/prediction-count")
+@projectBp.get("/<int:project_id>/schemas")
+@projectBp.get("/<uuid:project_id>/schemas")
 @login_required
 @permission_required("access")
-def prediction_count(project_id: str):
+def get_schemas(project_id: int | UUID):
     """ """
 
-    count = base.get_project_prediction_count(UUID(project_id))
+    if isinstance(project_id, UUID):
+        project = base.get(Project, project_id)
+        project_id = project.project_id
 
-    return {"count": count}, 200
+    schemas = base.get_related(ProjectsSchemas, Schema, {"project_id": project_id})
+
+    return [schema.serialize() for schema in schemas], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -173,19 +198,20 @@ def prediction_count(project_id: str):
 @validate()
 def create(body: createProjectReq):
     """ """
-    return base.create_project(body, cast(User, current_user)).to_dict(), 201
+    return base.insert(Project, body, cast(User, current_user)).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@projectBp.delete("/<string:project_id>")
+@projectBp.delete("/<int:project_id>")
+@projectBp.delete("<uuid:project_id>")
 @login_required
 @permission_required("access")
-def delete(project_id: str):
+def delete(project_id: int | UUID):
     """ """
 
-    base.delete_project(UUID(project_id))
+    base.delete(Project, project_id)
 
     return "", 204

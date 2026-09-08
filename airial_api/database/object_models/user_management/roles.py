@@ -1,18 +1,21 @@
 # Class definition for Role objects in the database
 # Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------#s
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
 from datetime import datetime
-from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Self
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
-
+from authzed.api.v1 import RelationshipUpdate
+from psycopg import Cursor
+from pydantic import BaseModel, ConfigDict
 from ..base import DBbase
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateRoleReq(BaseModel): ...
 
 
 @dataclass
@@ -23,35 +26,28 @@ class Role(DBbase):
     modified: datetime
     uuid: UUID
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    __tablename__: str = "roles"
+    __schema__: str = "usermanagement"
+    __pk_name__: str = "role_id"
 
-    def to_dict(self):
-        return {
-            "role_id": self.role_id,
-            "name": self.name,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+        role_id: int
+        name: str
+        created: datetime
+        modified: datetime
+        uuid: UUID
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-class RoleQuery(BaseModel):
-    role_id: Optional[List[UUID]] = None
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-    @field_validator("role_id", mode="before")
     @classmethod
-    def ensure_list(cls, value):
-        if isinstance(value, list):
-            return value
-        if value is None or value == "":
-            return []
-        return [value]
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateRoleReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]: ...
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class CreateRoleRequest(BaseModel):
-    name: str
+    def serialize(self):
+        return Role.Response.model_validate(self).model_dump(mode="json")

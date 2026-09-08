@@ -2,22 +2,18 @@
 # Author: Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------#
-
-from datetime import datetime
-
 from uuid import UUID
 
-from flask import Blueprint, request
-from flask_login import login_required, current_user
+from flask import Blueprint
+from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from typing import cast
 
 from database.object_models.project_management import CreateModelReq
-from database.object_models.project_management.models import UpdateModelReq
-from database.object_models.user_management import User
+from database.object_models.project_management.models import Model, UpdateModelReq
+from database.object_models.project_management.schemas import Schema
 
 modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 
@@ -27,12 +23,13 @@ modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 # GET
 
 
-@modelBp.get("/<string:model_id>")
+@modelBp.get("/<int:model_id>")
+@modelBp.get("/<uuid:model_id>")
 @login_required
 @permission_required("access")
-def get_by_id(model_id: str):
+def get_by_id(model_id: int | UUID):
     """ """
-    return base.get_model(UUID(model_id)).to_dict(), 200
+    return base.get(Model, model_id).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -43,7 +40,7 @@ def get_by_id(model_id: str):
 @permission_required("access")
 def get_json_all():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,7 +51,7 @@ def get_json_all():
 @permission_required("accesss")
 def get_json_train():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,7 +62,7 @@ def get_json_train():
 @permission_required("acess")
 def get_json_test():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,7 +73,7 @@ def get_json_test():
 @permission_required("access")
 def get_weights():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,7 +84,7 @@ def get_weights():
 @permission_required("access")
 def get_config():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,16 +95,17 @@ def get_config():
 @permission_required("acess")
 def get_readme():
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.get("/<string:model_id>/schema")
+@modelBp.get("/<int:model_id>/schema")
+@modelBp.get("/<uuid:model_id>/schema")
 @login_required
 @permission_required("access")
-def get_schema(model_id: str):
+def get_schema(model_id: int | UUID):
     """
     Retrieve the schema for a specific model
     ---
@@ -119,34 +117,32 @@ def get_schema(model_id: str):
       500:
             description: Database error.
     """
+    model = base.get(Model, model_id)
 
-    return (
-        base.get_model_schema(UUID(model_id), cast(User, current_user)).to_dict(),
-        200,
-    )
+    return base.get(Schema, model.schema_id).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-@modelBp.get("/training")
-@login_required
-@permission_required("access")
-def get_training_set():
-    """ """
-    date_range = request.args.get("date_range", None)
-    surveys = request.args.getlist("survey", type=int)
-    labels = request.args.getlist("labels", type=int)
-    herd_units = request.args.getlist("herd_unit", type=int)
-    format_pattern = "%m/%d/%Y %H:%M:%S"
-
-    if date_range is not None:
-        date_range = (
-            datetime.strptime(date_range[0], format_pattern),
-            datetime.strptime(date_range[1], format_pattern),
-        )
-
-    return base.get_model_training_data(labels, date_range, surveys, herd_units), 200
+# TODO: Rework
+# @modelBp.get("/training")
+# @login_required
+# @permission_required("access")
+# def get_training_set():
+#     """ """
+#     date_range = request.args.get("date_range", None)
+#     surveys = request.args.getlist("survey", type=int)
+#     labels = request.args.getlist("labels", type=int)
+#     herd_units = request.args.getlist("herd_unit", type=int)
+#     format_pattern = "%m/%d/%Y %H:%M:%S"
+#
+#     if date_range is not None:
+#         date_range = (
+#             datetime.strptime(date_range[0], format_pattern),
+#             datetime.strptime(date_range[1], format_pattern),
+#         )
+#
+#     return base.get_model_training_data(labels, date_range, surveys, herd_units), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -159,7 +155,7 @@ def get_training_set():
 @validate()
 def create(body: CreateModelReq):
     """ """
-    return base.create_model(body).to_dict(), 201
+    return base.insert(Model, body).serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,7 +198,7 @@ def create_weights(mdoel_id: str):
 @login_required
 def create_config(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -213,7 +209,7 @@ def create_config(model_id: str):
 @permission_required("access")
 def create_readme(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -225,7 +221,7 @@ def create_readme(model_id: str):
 @permission_required("access")
 def replace(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -236,7 +232,7 @@ def replace(model_id: str):
 @permission_required("access")
 def replace_train_json(model_id: str):
     """Replace the train.json file to s3 under the model's base key"""
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -247,7 +243,7 @@ def replace_train_json(model_id: str):
 @permission_required("acess")
 def replace_val_json(model_id: str):
     """Replace val.json file to s3 under the model's base key"""
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -258,7 +254,7 @@ def replace_val_json(model_id: str):
 @permission_required("acess")
 def replace_weights(mdoel_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -269,7 +265,7 @@ def replace_weights(mdoel_id: str):
 @permission_required("access")
 def replace_config(mdoel_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -280,33 +276,35 @@ def replace_config(mdoel_id: str):
 @permission_required("access")
 def replace_readme(model_id: str):
     """ """
-    return ""
+    return "", 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # PATCH (since json files are stored on s3 they are not patchable in the same way a database object is)
 
 
-@modelBp.patch("/<string:model_id>")
+@modelBp.patch("/<int:model_id>")
+@modelBp.patch("/<uuid:model_id>")
 @login_required
 @permission_required("access")
 @validate()
-def update(body: UpdateModelReq, model_id: str):
+def update(body: UpdateModelReq, model_id: int | UUID):
     """ """
 
-    return base.update_model(UUID(model_id), body).to_dict(), 200
+    return base.update(Model, model_id, body).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@modelBp.delete("/<string:model_id>")
+@modelBp.delete("/<int:model_id>")
+@modelBp.delete("/<uuid:model_id>")
 @login_required
 @permission_required("access")
-def delete_model(model_id: str):
+def delete_model(model_id: int | UUID):
     """ """
 
-    base.delete_model(UUID(model_id))
+    base.delete(Model, model_id)
 
     return "", 204

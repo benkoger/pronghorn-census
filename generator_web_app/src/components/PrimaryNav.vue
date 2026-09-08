@@ -53,31 +53,24 @@ export default defineComponent({
         <Icon icon="material-symbols:upload" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3">Upload</span>
       </BNavItem>
-      <BNavItem
-        to="/statistics"
-        :active="$route.path.startsWith('/statistics')"
-      >
-        <Icon icon="wpf:statistics" width="24" height="24" />
-        <span v-if="sStore.nav_toggled" class="ms-3">Statistics</span>
-      </BNavItem>
-      <BNavItem v-if="sStore.is_admin" to="/users">
-        <Icon icon="fa7-solid:users" width="24" height="24" />
-        <span v-if="sStore.nav_toggled" class="ms-2">Users</span>
-      </BNavItem>
-      <BNavItem
-        v-if="sStore.is_admin"
-        to="/data"
-        :active="$route.path.startsWith('/data')"
-      >
-        <Icon
-          icon="material-symbols-light:data-table-rounded"
-          width="24"
-          height="24"
-        />
-        <span v-if="sStore.nav_toggled" class="ms-3 d-none d-md-inline"
-          >Data Manager</span
-        >
-      </BNavItem>
+      <!-- <BNavItem v-if="sStore.is_admin" to="/users"> -->
+      <!--   <Icon icon="fa7-solid:users" width="24" height="24" /> -->
+      <!--   <span v-if="sStore.nav_toggled" class="ms-2">Users</span> -->
+      <!-- </BNavItem> -->
+      <!-- <BNavItem -->
+      <!--   v-if="sStore.is_admin" -->
+      <!--   to="/data" -->
+      <!--   :active="$route.path.startsWith('/data')" -->
+      <!-- > -->
+      <!--   <Icon -->
+      <!--     icon="material-symbols-light:data-table-rounded" -->
+      <!--     width="24" -->
+      <!--     height="24" -->
+      <!--   /> -->
+      <!--   <span v-if="sStore.nav_toggled" class="ms-3 d-none d-md-inline" -->
+      <!--     >Data Manager</span -->
+      <!--   > -->
+      <!-- </BNavItem> -->
       <BNavItem to="/settings" :active="$route.path.startsWith('/settings')">
         <Icon icon="material-symbols:settings-rounded" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3">Settings</span>

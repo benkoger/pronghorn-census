@@ -13,6 +13,7 @@ from uuid import UUID
 from database.object_models.project_management import CreateLabelReq
 
 from app.extensions import base
+from database.object_models.project_management.labels import Label
 
 labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 
@@ -27,19 +28,20 @@ labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 def create(body: CreateLabelReq):
     """ """
 
-    return base.create_label(body).to_dict(), 201
+    return base.insert(Label, body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@labelBp.delete("/<string:label_id>")
+@labelBp.delete("/<int:label_id>")
+@labelBp.delete("/<uuid:label_id>")
 @login_required
 @permission_required("access")
-def delete(label_id: str):
+def delete(label_id: int | UUID):
     """ """
 
-    base.delete_label(UUID(label_id))
+    base.delete(Label, label_id)
 
     return "", 204

@@ -5,15 +5,19 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Self
 from uuid import UUID
 
 import cv2
 import numpy as np
 import PIL.Image as PillowImage
-from pydantic import BaseModel, field_validator
+import psycopg.sql as sql
+from psycopg import Cursor
+from psycopg.rows import class_row
+from pydantic import BaseModel, field_validator, ConfigDict
+from authzed.api.v1 import RelationshipUpdate
 
-from ..base import Box, DBbase
+from ..base import Box, Keyring, create_spice_update, DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -43,7 +47,7 @@ class ImageMixin:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def deleteImage(self):
+    def delete_image(self):
         del self.image
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,148 +66,28 @@ class ImageMixin:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@dataclass
-class Image(DBbase, ImageMixin):
-    image_id: int
-    herd_unit_id: int
-    survey_id: int
-    name: str
-    img_key: str
-    in_training: bool
-    crops_generated: int
-    opened_by_user_id: int
-    created: datetime
-    modified: datetime
-    image_length_px: int
-    image_width_px: int
-    area: float
-    viewshed_polygon: List[List[float]]
-    has_detection: bool
-    dem_name: str
-    bbox_wsen: List[int]
-    uuid: UUID
-
-    image: Optional[np.ndarray] = field(default=None, init=False)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def to_dict(self) -> dict:
-        return {
-            "image_id": self.image_id,
-            "herd_unit_id": self.herd_unit_id,
-            "survey_id": self.survey_id,
-            "img_key": self.img_key,
-            "name": self.name,
-            "in_training": self.in_training,
-            "crops_generated": self.crops_generated,
-            "created": self.created,
-            "modified": self.modified,
-            "image_length_px": self.image_length_px,
-            "image_width_px": self.image_width_px,
-            "uuid": str(self.uuid),
-        }
-
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class ReviewedArea(DBbase, ImageMixin):
-    image_id: int
-    name: str
-    created: datetime
-    modified: datetime
-    area_tx: int
-    area_ty: int
-    area_bx: int
-    area_by: int
-    reviewed_area_length_px: int
-    reviewed_area_width_px: int
-    reviewed_area_id: int
-    reviewed_by_user_id: int
-    uuid: UUID
-
-    ra_key: Optional[str] = None
-    dimensions: "Box" = field(init=False)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def __post_init__(self):
-        self.dimensions = Box(
-            (self.area_tx, self.area_ty), (self.area_bx, self.area_by)
-        )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def to_dict(self) -> dict:
-        return {
-            "reviewed_area_id": self.reviewed_area_id,
-            "image_id": self.image_id,
-            "name": self.name,
-            "dimensions": self.dimensions.to_dict(),
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "reviewed_area_length_px": self.reviewed_area_length_px,
-            "reviewed_area_width_px": self.reviewed_area_width_px,
-            "ra_key": self.ra_key,
-            "uuid": str(self.uuid),
-        }
-
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class PredictionCrop(DBbase, ImageMixin):
-    image_id: int
-    name: str
-    pred_id: int
-    score: float
-    label: int
-    uuid: UUID
-    dimensions: "Box"
-    boundingBox: "Box"
-    url: Optional[str] = None
-    approved: bool = field(default=False, init=False)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def to_dict(self) -> dict:
-        return {
-            "image_id": self.image_id,
-            "score": self.score,
-            "pred_id": self.pred_id,
-            "name": self.name,
-            "approved": self.approved,
-            "label": self.label,
-            "dimensions": self.dimensions.to_dict(),
-            "boundingBox": self.boundingBox.to_dict(),
-            "uuid": str(self.uuid),
-        }
-
-
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class CreateImageReq(BaseModel):
     name: str
-    herd_unit_id: Union[int, str]
-    survey_id: Union[int, str]
+    herd_unit_ids: Keyring
+    survey_ids: Keyring
     img_key: str
     image_length_px: int
     image_width_px: int
     area: Optional[int] = None
-    viewshed_polygon: Optional[List[List[float]]] = None
+    viewshed_polygon: Optional[list[list[float]]] = None
     has_detection: bool = False
     dem_name: Optional[str] = None
-    bbox_wsen: Optional[List[int]] = None
+    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class CreatePresignedPutReq(BaseModel):
-    image_id: Union[str, int]
+    image_id: int | UUID
     upload_id: str
     part_number: int
     chunk_size: int
@@ -239,7 +123,7 @@ class AbortMulitPartUploadReq(BaseModel):
 class CompleteMultiPartUploadReq(BaseModel):
     image_key: str
     upload_id: str
-    parts: List[Any]
+    parts: list[Any]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -247,17 +131,15 @@ class CompleteMultiPartUploadReq(BaseModel):
 
 class UpdateImageReq(BaseModel):
     name: Optional[str] = None
-    herd_unit_id: Optional[int] = None
-    survey_id: Optional[int] = None
     img_key: Optional[str] = None
     image_length_px: Optional[int] = None
     image_width_px: Optional[int] = None
     area: Optional[int] = None
     opened_by_user_id: Optional[int] = None
-    viewshed_polygon: Optional[List[List[float]]] = None
+    viewshed_polygon: Optional[list[list[float]]] = None
     has_detection: bool = False
     dem_name: Optional[str] = None
-    bbox_wsen: Optional[List[int]] = None
+    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -265,7 +147,7 @@ class UpdateImageReq(BaseModel):
 
 class CreatePredictionCropReq(BaseModel):
     image_id: UUID
-    prediction_id: List[UUID]
+    prediction_id: list[UUID]
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -283,8 +165,8 @@ class CreatePredictionCropReq(BaseModel):
 
 
 class RAQuery(BaseModel):
-    herd_unit_id: Optional[List[UUID]]
-    survey_id: Optional[List[UUID]]
+    herd_unit_id: Optional[list[UUID]]
+    survey_id: Optional[list[UUID]]
     include_reviewed: Optional[bool] = False
     include_opened: Optional[bool] = False
     num: Optional[int] = None
@@ -303,7 +185,7 @@ class RAQuery(BaseModel):
 
 
 class CreateReviewedAreaReq(BaseModel, ImageMixin):
-    image_id: UUID
+    image_ids: Keyring
     name: str
     area_tx: int
     area_ty: int
@@ -314,8 +196,7 @@ class CreateReviewedAreaReq(BaseModel, ImageMixin):
     reviewed_by_user_id: int = 0
     ra_key: Optional[str] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -331,6 +212,7 @@ class UpdateReviewedAreaReq(BaseModel):
     reviewed_area_length_px: Optional[int] = None
     reviewed_area_width_px: Optional[int] = None
     ra_key: Optional[str] = None
+    reviewed_by_user_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -338,6 +220,258 @@ class UpdateReviewedAreaReq(BaseModel):
 
 class CrateReviewedAreaPresignedGetReq(BaseModel):
     reviewed_area_id: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass
+class Image(DBbase, ImageMixin):
+    image_id: int
+    herd_unit_id: int
+    survey_id: int
+    name: str
+    img_key: str
+    in_training: bool
+    crops_generated: int
+    opened_by_user_id: int
+    created: datetime
+    modified: datetime
+    image_length_px: int
+    image_width_px: int
+    area: float
+    viewshed_polygon: list[list[float]]
+    has_detection: bool
+    dem_name: str
+    bbox_wsen: Optional[list[int]]
+    uuid: UUID
+
+    image: Optional[np.ndarray] = field(default=None, init=False)
+
+    __tablename__: str = "images"
+    __schema__: str = "core"
+    __pk_name__: str = "image_id"
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        image_id: int
+        herd_unit_id: int
+        survey_id: int
+        name: str
+        img_key: str
+        in_training: bool
+        crops_generated: int
+        created: datetime
+        modified: datetime
+        image_length_px: int
+        image_width_px: int
+        uuid: UUID
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @classmethod
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateImageReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("""
+            INSERT INTO core.images (
+                herd_unit_id, survey_id, name, img_key, image_length_px,
+                image_width_px, area, viewshed_polygon, has_detection,
+                dem_name, bbox_wsen
+            )
+            VALUES (
+                %(herd_unit_id)s, %(survey_id)s, %(name)s,
+                %(img_key)s, %(image_length_px)s,
+                %(image_width_px)s, %(area)s, %(viewshed_polygon)s,
+                %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
+                )
+            RETURNING *;
+        """)
+
+        cursor.execute(
+            query,
+            {
+                **req.model_dump(),
+                "herd_unit_id": req.herd_unit_ids.pkey,
+                "survey_id": req.survey_ids.pkey,
+            },
+        )
+
+        if not (image := cursor.fetchone()):
+            return None
+
+        spice_updates = [
+            create_spice_update(
+                "image", image.uuid, "survey", req.survey_ids.uuid, "parent"
+            ),
+            create_spice_update(
+                "image", image.uuid, "herd_unit", req.herd_unit_ids.uuid, "parent"
+            ),
+        ]
+
+        return image, spice_updates
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self) -> dict:
+        return Image.Response.model_validate(self).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass
+class ReviewedArea(DBbase, ImageMixin):
+    reviewed_area_id: int
+    image_id: int
+    name: str
+    created: datetime
+    modified: datetime
+    area_tx: int
+    area_ty: int
+    area_bx: int
+    area_by: int
+    reviewed_area_length_px: int
+    reviewed_area_width_px: int
+    reviewed_by_user_id: int
+    uuid: UUID
+
+    ra_key: Optional[str] = None
+    dimensions: "Box" = field(init=False)
+
+    __tablename__: str = "reviewed_area"
+    __schema__: str = "core"
+    __pk_name__: str = "reviewed_area_id"
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def __post_init__(self):
+        self.dimensions = Box(
+            (self.area_tx, self.area_ty), (self.area_bx, self.area_by)
+        )
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        reviewed_area_id: int
+        image_id: int
+        name: str
+        dimensions: dict[str, dict[str, int]]
+        created: datetime
+        modified: datetime
+        reviewed_area_length_px: int
+        reviewed_area_width_px: int
+        ra_key: str
+        uuid: UUID
+
+        @field_validator("dimensions", mode="before")
+        @classmethod
+        def transform(cls, value):
+            if isinstance(value, Box):
+                return value.serialize()
+            return value
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @classmethod
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateReviewedAreaReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("""
+            INSERT INTO core.reviewed_area (
+                image_id, name, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px,
+                reviewed_area_width_px, reviewed_by_user_id, ra_key
+            )
+            VALUES (
+                %(image_id)s, %(name)s, %(area_tx)s, %(area_ty)s, %(area_bx)s, %(area_by)s, 
+                %(reviewed_area_length_px)s, %(reviewed_area_width_px)s, %(reviewed_by_user_id)s,
+                %(ra_key)s
+            )
+            RETURNING *;
+        """)
+
+        cursor.execute(query, {**req.model_dump(), "image_id": req.image_ids.pkey})
+
+        if not (reviewed_area := cursor.fetchone()):
+            return None
+
+        spice_updates = [
+            create_spice_update(
+                "reviewed_area",
+                reviewed_area.uuid,
+                "image",
+                req.image_ids.uuid,
+                "parent",
+            )
+        ]
+
+        return reviewed_area, spice_updates
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self) -> dict:
+        return ReviewedArea.Response.model_validate(self).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass
+class PredictionCrop(DBbase, ImageMixin):
+    image_id: int
+    name: str
+    pred_id: int
+    score: float
+    label: int
+    uuid: UUID
+    dimensions: "Box"
+    boundingBox: "Box"
+    url: Optional[str] = None
+    approved: bool = field(default=False, init=False)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+
+        image_id: int
+        score: float
+        pred_id: int
+        name: str
+        approved: bool
+        label: int
+        dimensions: dict[str, dict[str, int]]
+        boundingBox: dict[str, dict[str, int]]
+        uuid: UUID
+
+        @field_validator("dimensions", "boundingBox", mode="before")
+        @classmethod
+        def transform(cls, value: Any) -> Any:
+            if isinstance(value, Box):
+                return value.serialize()
+            return value
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @classmethod
+    def _create(
+        cls, cursor: Cursor[Self], req: CreatePredictionCropReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]: ...
+
+    ### This method will never be implemented, just proves we need smarter
+    ### abstraction in the future
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self) -> dict[str, Any]:
+        return PredictionCrop.Response.model_validate(self).model_dump(mode="json")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

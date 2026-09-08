@@ -4,9 +4,10 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { HerdUnit, Survey, Image } from '@/types/generatorobjects.ts';
-import type { HerdUnitIntf, ImageIntf, imageRecords, SurveyIntf } from '@/types/generatorobjects.ts';
+import type { HerdUnitIntf, ImageIntf, imageRecords, Keyring, SurveyIntf } from '@/types/generatorobjects.ts';
 import { ApiError } from '@/modules/api/errors.ts'
 import { api_url } from '@/modules/api/apiV1Methods.ts';
+import type { Key } from 'readline';
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -54,8 +55,8 @@ export async function getSurveyImages(survey_id: string, page: number, per_page:
 
 export interface createSurveyOptions {
   "name": string;
-  "project_id": string;
-  "herd_unit_id": string;
+  "project_ids": Keyring;
+  "herd_unit_ids": Keyring;
   "survey_date": string;
   "additional_info": string;
 }

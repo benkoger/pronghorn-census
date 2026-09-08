@@ -53,7 +53,7 @@ def get(query: RAQuery):
     if reviewed_area is None:
         return "", 204
 
-    return reviewed_area.to_dict(), 200
+    return reviewed_area.serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,6 +65,6 @@ def get(query: RAQuery):
 @validate()
 def get_selection_count(query: RAQuery):
     """ """
-    count = base.get_crop_to_review_selection_count(query)
+    count = len(base.get_reviewed_areas(query))
 
     return {"count": count}, 200

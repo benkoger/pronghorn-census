@@ -3,23 +3,33 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
+
+import atexit
+from datetime import date
 import uuid
-from datetime import date, datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Optional,
+    cast,
+    Type,
+)
+
+from collections.abc import Iterable
+from pydantic import BaseModel
 from uuid import UUID
 
-import psycopg.sql as sql
 from authzed.api.v1 import (
     BulkCheckPermissionRequest,
     BulkCheckPermissionRequestItem,
+    BulkCheckPermissionResponse,
     CheckPermissionRequest,
-    CheckPermissionResponse,
-    InsecureClient,
     Client,
+    Consistency,
+    InsecureClient,
     LookupResourcesRequest,
     ObjectReference,
-    Relationship,
     RelationshipUpdate,
     SubjectReference,
     WriteRelationshipsRequest,
@@ -29,76 +39,41 @@ from grpc import (
     composite_channel_credentials,
     ssl_channel_credentials,
 )
+import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg_pool import ConnectionPool
-from werkzeug.security import generate_password_hash
+
+from database.object_models.autocropper import AutoCropperBatchQuery
+from database.object_models.base import DBbase, T, Relationbase, PrimaryKey, BulkRequest
 
 from database.object_models.core.images import (
-    CreateImageReq,
-    CreateReviewedAreaReq,
+    Image,
     RAQuery,
-    UpdateReviewedAreaReq,
+    ReviewedArea,
+    UpdateImageReq,
 )
-
-import atexit
-
-from database.object_models.project_management.models import (
-    CreateModelReq,
-    UpdateModelReq,
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.models import Model
+from database.object_models.project_management.surveys import Survey
+from database.object_models.user_management.users import User
+from database.query_builder import (
+    filter_by_object_ids,
+    resolve_identifier,
+    clause_generator,
 )
-from database.object_models.project_management.projects import createProjectReq
-from database.object_models.project_management.schemas import createSchemaReq
-from database.object_models.project_management.surveys import CreateSurveyReq
-from database.object_models.user_management.users import UserQuery
 
 from .errors import (
-    AuthorizationFailure,
     FailedToCreate,
     ObjectNotFound,
-    UserNotFound,
 )
-from .object_models import (
-    Annotation,
-    HerdUnit,
-    Image,
-    Label,
-    Model,
-    Organization,
-    Prediction,
-    Project,
-    ReviewedArea,
-    Role,
-    Schema,
-    Survey,
-    User,
-)
-from .object_models.autocropper import AutoCropperBatchQuery
-from .object_models.core import (
-    CreateAnnotationReq,
-    CreatePredictionReq,
-    PredictionQuery,
-    UpdateImageReq,
-    UpdateAnnotationReq,
-)
-from .object_models.project_management import (
-    CreateHerdUnitReq,
-    LabelQuery,
-    ProjectQuery,
-    CreateLabelReq,
-)
-from .object_models.user_management import (
-    CreateUserReq,
-    RoleQuery,
-    UpdateOrganizationReq,
-    createOrganizationReq,
-)
-from .query_builder import QueryBuilder
+
+# ---------------------------------------------------------------------------------------------------------------------------
 
 EXT_KEY = "base"
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# ---------------------------------------------------------------------------------------------------------------------------
 
 
 class Database:
@@ -106,8 +81,8 @@ class Database:
 
     def __init__(
         self,
-        db_config: Dict[str, str],
-        spice_config: Dict[str, Union[str, bool]],
+        db_config: dict[str, str],
+        spice_config: dict[str, str | bool],
     ):
         self._config = db_config
         self._pool = None
@@ -197,35 +172,10 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def write_spice_relationships(self, updates: List[RelationshipUpdate]):
+    def write_spice_relationships(self, updates: list[RelationshipUpdate]):
         """ """
         return self._spice_client.WriteRelationships(
             WriteRelationshipsRequest(updates=updates)
-        )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def create_spice_update(
-        self,
-        object_type: str,
-        object_id: str,
-        subject_type: str,
-        subject_id: str,
-        relation: str,
-    ) -> RelationshipUpdate:
-        """ """
-        return RelationshipUpdate(
-            operation=RelationshipUpdate.Operation.OPERATION_CREATE,
-            relationship=Relationship(
-                resource=ObjectReference(object_type=object_type, object_id=object_id),
-                relation=relation,
-                subject=SubjectReference(
-                    object=ObjectReference(
-                        object_type=subject_type,
-                        object_id=subject_id,
-                    )
-                ),
-            ),
         )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,14 +195,15 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def bulk_check_permission(
-        self, permissions: Iterable[BulkCheckPermissionRequestItem]
-    ):
-        """ """
-        return self._spice_client.BulkCheckPermission(
-            BulkCheckPermissionRequest(
-                items=permissions,
-            )
-        )
+        self,
+        items: Iterable[BulkCheckPermissionRequestItem],
+        consistency: Consistency | None = None,
+    ) -> BulkCheckPermissionResponse:
+        if consistency is None:
+            consistency = Consistency(fully_consistent=True)
+
+        request = BulkCheckPermissionRequest(items=items, consistency=consistency)
+        return self._spice_client.BulkCheckPermission(request)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -311,7 +262,7 @@ class Database:
     @connect
     def _set_bootstrapped(self, cursor: Cursor) -> bool:
         """ """
-        query = sql.SQL("UPDATE usermanagement.initialization SET first_run = false")
+        query = sql.SQL("UPDATE usermanagement.initialization SET first_run = false;")
 
         cursor.execute(query)
 
@@ -322,3207 +273,474 @@ class Database:
         return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # Project Management - Organizations
-    @connect
-    def _create_organization(
-        self, cursor: Cursor[Organization], req: createOrganizationReq
-    ) -> Organization:
-        """Internal method, do not call directly"""
-        cursor.row_factory = class_row(Organization)
-        cursor.execute(
-            sql.SQL(
-                "INSERT INTO usermanagement.organizations (name, logo_url) VALUES (%(name)s, %(logo_url)s) RETURNING *; "
-            ),
-            req.model_dump(),
-        )
-        org = cursor.fetchone()
-
-        if not org:
-            raise FailedToCreate("Organization")
-
-        return org
-
-    def create_organizaztion(self, req: createOrganizationReq) -> Organization:
-
-        return self._create_organization(req)
-
+    # INSERT
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_organization(
-        self, cursor: Cursor[Organization], organization_id: int | UUID | str
-    ) -> Organization:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Organization)
-        query = sql.SQL(
-            "SELECT * FROM usermanagement.organizations WHERE {id_field} = %s; "
-        )
-        match organization_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("organization_id")),
-                    (organization_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (organization_id,)
-                )
-            case str():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("name")), (organization_id,)
-                )
+    def _insert(self, cursor: Cursor[T], cls: type[T], req: BaseModel, *args) -> T:
+        """Internal insert method."""
+        if not (result := cls._create(cursor, req, *args)):
+            raise FailedToCreate(cls.__name__)
 
-        organization = cursor.fetchone()
+        obj, relations = result
 
-        if not organization:
-            raise ObjectNotFound("organization", str(organization_id))
+        if len(relations) > 0:
+            self.write_spice_relationships(relations)
 
-        return organization
+        return obj
 
-    def get_organization(self, organization_id: int | UUID | str) -> Organization:
-        """Request an organization, or organizations object(S) from the database
+    def insert(self, cls: type[T], req: BaseModel, *args) -> T:
+        """Inserts a new record into the database and returns the created instance.
 
         Args:
-                organization_ids: an integer, uuid, or organization name
-        """
-        return self._get_organization(organization_id)
+            cls: The model class to insert into.
+            **req: Pydantic request model.
 
+        Returns:
+            T: The newly created entity.
+
+        Raises:
+            ForeignKeyViolation: If a foreign key references a non-existent record.
+            UniqueViolation: If a unique constraint is violated.
+        """
+        return self._insert(cls, req, *args)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # UPDATE
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_many_organizations(
-        self, cursor: Cursor[Organization], organization_ids: List[Union[int, UUID]]
-    ) -> List[Organization]:
-        """ """
-        cursor.row_factory = class_row(Organization)
-        ints = [i for i in organization_ids if isinstance(i, int)]
-        uuids = [str(i) for i in organization_ids if not isinstance(i, int)]
+    def _update(
+        self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey, req: BaseModel
+    ) -> T:
+        """Internal update method."""
         query = sql.SQL("""
-			SELECT * FROM usermanagement.organizations
-			WHERE organization_id = ANY(%s)
-			OR uuid = ANY(%s::uuid[])
-			)
-		""")
-
-        cursor.execute(query, (ints, uuids))
-
-        return cursor.fetchall()
-
-    def get_many_organizations(
-        self, organization_ids: List[Union[int, UUID]]
-    ) -> List[Organization]:
-        """ """
-        return self._get_many_organizations(organization_ids)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_organization_projects(
-        self, cursor: Cursor[Project], org_id: Union[int, UUID]
-    ) -> List[Project]:
-        """ """
-        query = sql.SQL("""
-			SELECT P.* FROM projectmanagement.projects AS P
-			JOIN usermanagement.organizations_projects AS OP ON OP.project_id = P.project_id
-			WHERE OP.orgnaization_id = %s;
-		""")
-
-        org = self._get_organization(cursor, org_id)
-        cursor.row_factory = class_row(Project)
-        cursor.execute(query, (org.organization_id,))
-
-        return cursor.fetchall()
-
-    def get_organization_projects(self, org_id: Union[int, UUID]) -> List[Project]:
-        """ """
-        return self._get_organization_projects(org_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_organization(
-        self,
-        cursor: Cursor[Organization],
-        organization_id: Union[int, UUID],
-        req: UpdateOrganizationReq,
-    ) -> Organization:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(""" 
-            UPDATE usermanagement.organizations SET {augmented_field}, 
-            modified = CURRENT_TIMESTAMP
-		    WHERE uuid = %s
-            RETURNING *; 
-        """)
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in req.model_dump().items()
-                if key in set(["name", "logo_url"]) and value is not None
-            ]
-        )
-
-        org = cursor.execute(
-            query.format(augmented_field=kw_augmented_field), (organization_id,)
-        ).fetchone()
-
-        if not org:
-            raise ObjectNotFound("organization", str(organization_id))
-
-        return org
-
-    def update_organization(
-        self, organization_id: UUID, req: UpdateOrganizationReq, user: User
-    ) -> Organization:
-        """Augment an organization in the database by providing either a modified Organization object or a valid id and a new name and or a new logo_url
-
-        Args:
-        """
-        org_id = str(organization_id)
-
-        res = self.check_permission("organization", org_id, user.id, "modify")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._update_organization(organization_id, req)
-        else:
-            raise AuthorizationFailure(
-                user.id, "modify", "organization", str(organization_id)
-            )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_organization(
-        self,
-        cursor: Cursor[Organization],
-        organization_ids: Organization | int | UUID | list[int | UUID],
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " DELETE FROM usermanagement.organizations WHERE {id_field} = %s; "
-        )
-        match organization_ids:
-            case list() if isinstance(organization_ids[0], Organization):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("organization_id")),
-                    [
-                        (cast(Organization, org).organization_id,)
-                        for org in organization_ids
-                    ],
-                )
-            case list() if isinstance(organization_ids[0], int):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("organization_id")),
-                    [(org_id,) for org_id in organization_ids],
-                )
-            case list() if isinstance(organization_ids[0], UUID):
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), organization_ids
-                )
-            case Organization():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("organization_id")),
-                    (organization_ids.organization_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("organization_id")),
-                    (organization_ids,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (organization_ids,)
-                )
-            case _:
-                raise TypeError(
-                    "organization_ids must be an Organization, int, uuid, string, or a list consisting of ONE of the three"
-                )
-        return True if cursor.rowcount > 0 else False
-
-    def delete_organization(
-        self, organization_ids: Organization | int | UUID | list[int | UUID]
-    ) -> bool:
-        """Delete an organization object from the database
-
-        Args:
-                organization_id: either an Organization object, a database id, or a universally unique identifier
-        """
-        return self._delete_organization(organization_ids=organization_ids)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Project Management - Roles
-    @connect
-    def _get_role(self, cursor: Cursor[Role], role_id: int | UUID | str) -> Role:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Role)
-        query = sql.SQL(" SELECT * FROM usermanagement.roles WHERE {id_field} = %s; ")
-        match role_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("role_id")), (role_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (role_id,)
-                )
-            case str():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("name")), (role_id,)
-                )
-
-        role = cursor.fetchone()
-
-        if not role:
-            raise ObjectNotFound("Role", str(role_id))
-
-        return role
-
-    def get_role(self, role_id: int | UUID | str) -> Role:
-        """ """
-        return self._get_role(role_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_roles(self, cursor: Cursor[Role], req: RoleQuery) -> List[Role]:
-        """ """
-        cursor.row_factory = class_row(Role)
-
-        query = sql.SQL(
-            "SELECT * FROM usermanagement.roles as r WHERE r.role_id != 1 AND r.role_id != 0"
-        )
-        if req.role_id:
-            r_filters, data = QueryBuilder.filter_by_object_ids(
-                "r", "role_id", req.role_id
-            )
-
-            cursor.row_factory = class_row(Role)
-            return cursor.execute(
-                sql.SQL("{q} AND {p}").format(q=query, p=r_filters), data
-            ).fetchall()
-        else:
-            cursor.row_factory = class_row(Role)
-            return cursor.execute(query).fetchall()
-
-    def get_roles(self, req: RoleQuery) -> List[Role]:
-        """ """
-        return self._get_roles(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_role(
-        self,
-        cursor: Cursor[Role],
-        role_id: Role | int | UUID | str,
-        name: str | None = None,
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            """ UPDATE usermanagement.roles SET name = %s, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; """
-        )
-        match role_id:
-            case Role():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("role_id")),
-                    (role_id.name, role_id.role_id),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("role_id")), (name, role_id)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (name, role_id)
-                )
-            case str():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("name")), (name, role_id)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def update_role(self, role_id: Role | int | UUID, name: str | None = None) -> Role:
-        return self._update_role(role_id=role_id, name=name)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_role(self, cursor: Cursor[Role], role_ids: int | UUID | str) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(" DELETE FROM usermanagement.roles WHERE {id_field} = %s; ")
-        match role_ids:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("role_id")), (role_ids,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (role_ids,)
-                )
-            case str():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("role")), (role_ids,)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_role(self, role_ids: Role | int | UUID) -> bool:
-        """Delete a role object from the database
-
-        Args:
-                role_id: either a Role object, a database id, or a universally unique identifier
-
-        """
-        return self._delete_role(role_ids=role_ids)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # User Management - Users
-
-    @connect
-    def _create_user(self, cursor: Cursor[User], req: CreateUserReq) -> User:
-        """Internal helper function, do not call directly"""
-        query_1 = sql.SQL("""
-			INSERT INTO usermanagement.users (
-				username, email, external_auth_id, external_auth_provider,
-                status, locale, password_hash, default_org_id
-			)
-			VALUES (
-				%(username)s, %(email)s, %(external_auth_id)s, %(external_auth_provider)s, 
-				%(status)s, %(locale)s, %(password_hash)s, %(default_org_id)s
-			)
-			RETURNING *;
-		""")
-
-        query_2 = sql.SQL("""
-			INSERT INTO usermanagement.organizations_users (
-				user_id, organization_id, role_id
-			)
-			VALUES (
-				%s, %s, %s
-			)
-		""")
-
-        placeholders = req.model_dump()
-
-        placeholders["password_hash"] = generate_password_hash(placeholders["password"])
-        organization = self._get_organization(cursor, req.organization_id)
-        placeholders["default_org_id"] = organization.organization_id
-
-        cursor.row_factory = class_row(User)
-        user = cursor.execute(query_1, placeholders).fetchone()
-
-        if not user:
-            raise FailedToCreate("user")
-
-        if not req.role_ids:
-            raise FailedToCreate("user")
-
-        roles = self._get_roles(cursor, RoleQuery(role_id=req.role_ids))
-
-        cursor.executemany(
-            query_2,
-            [
-                (user.user_id, organization.organization_id, role.role_id)
-                for role in roles
-            ],
-        )
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "organization", str(organization.uuid), "user", user.id, role.name
-                )
-                for role in roles
-            ]
-        )
-
-        return user
-
-    def create_user(self, req: CreateUserReq) -> User:
-        """ """
-        return self._create_user(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_user(self, cursor: Cursor[User], user_id: Union[int, UUID, str]) -> User:
-        """Internal helper function, do not call directly"""
-
-        query = sql.SQL("""
-			SELECT U.* FROM usermanagement.users AS U 
-			WHERE U.{id_field} = %s
-		""")
-
-        cursor.row_factory = class_row(User)
-        match user_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("user_id")), (user_id,)
-                )
-            case str():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("email")), (user_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (user_id,)
-                )
-
-        user = cursor.fetchone()
-        if not user:
-            raise UserNotFound
-
-        return user
-
-    def get_user(self, user_id: Union[int, UUID, str]) -> User:
-        """Query the database for a user
-
-        Args:
-                user_id: The user's unique database id
-        """
-        return self._get_user(user_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # TODO: Users should be queried by organization
-    @connect
-    def _get_users(self, cursor: Cursor[User], req: UserQuery) -> List[User]:
-        """ """
-        org = self._get_organization(req.organization_id)
-
-        cursor.row_factory = class_row(User)
-        query = sql.SQL("""
-            SELECT U.* FROM usermanagement.users AS U
-            JOIN usermanagement.organizations_users AS OU ON OU.user_id = U.user_id 
-            WHERE U.user_id != 0 AND OU.organization_id = %s;
-        """)
-
-        return cursor.execute(query, (org.organization_id,)).fetchall()
-
-    def get_users(self, req: UserQuery):
-        return self._get_users(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_user_roles(
-        self, cursor: Cursor[Role], user_id: Union[int, UUID], org_id: Union[int, UUID]
-    ) -> list[Role]:
-        """Internal helper function, do not call directly"""
-        if isinstance(org_id, UUID):
-            org_id = self._get_organization(cursor, org_id).organization_id
-
-        query = sql.SQL(""" 
-			SELECT R.* FROM usermanagement.roles AS R 
-			JOIN usermanagement.organizations_users AS OU ON OU.role_id = R.role_id 
-			WHERE OU.user_id = %s
-			AND OU.organization_id = %s;
-			""")
-        match user_id:
-            case int():
-                cursor.execute(query, (user_id, org_id))
-            case _:
-                user = self._get_user(cursor, user_id)
-                cursor.execute(query, (user.user_id, org_id))
-
-        cursor.row_factory = class_row(Role)
-        roles = cursor.fetchall()
-        return roles
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_user_roles(
-        self, user_id: Union[int, UUID], org_id: Union[int, UUID]
-    ) -> list[Role]:
-        """Request all roles associated with a user
-
-        Args:
-                user_id: The user's unique database id
-        """
-        return self._get_user_roles(user_id, org_id)
-
-    @connect
-    def _get_user_organizations(
-        self, cursor: Cursor[Organization], user_id: int | UUID
-    ) -> list[Organization]:
-        """ """
-        query = sql.SQL("""
-			SELECT O.* FROM usermanagement.organizations AS O
-			JOIN usermanagement.organizations_users AS OU ON OU.organization_id = O.organization_id
-			WHERE OU.user_id = %s; 
-		""")
-        match user_id:
-            case int():
-                cursor.execute(query, (user_id,))
-            case _:
-                user = self._get_user(cursor, user_id)
-                cursor.execute(query, (user.user_id,))
-
-        cursor.row_factory = class_row(Organization)
-        return cursor.fetchall()
-
-    def get_user_organizations(self, user_id: int | UUID) -> list[Organization]:
-        """ """
-        return self._get_user_organizations(user_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _activate_user(
-        self,
-        cursor: Cursor,
-        email: str,
-        user_id: int | UUID,
-        external_id: str,
-        provider: str,
-    ) -> None:
-        """ """
-        if isinstance(user_id, UUID):
-            user_id = self._get_user(cursor, user_id).user_id
-
-        self._update_user(
-            cursor,
-            user_id,
-            {
-                "status": "active",
-                "email": email,
-                "external_auth_id": external_id,
-                "external_auth_provider": provider,
-                "last_login": datetime.now(timezone.utc),
-            },
-        )
-
-        return
-
-    def activate_user(
-        self, email: str, user_id: int | UUID, external_id: str, provider: str
-    ) -> None:
-        """ """
-        return self._activate_user(email, user_id, external_id, provider)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _login_user(self, cursor: Cursor[User], user_id: int | UUID) -> None:
-        """Internal helper function, do not call directly"""
-
-        self._update_user(
-            cursor,
-            user_id,
-            {"last_login": datetime.now().strftime("%Y-%m-%d %H:%M:%S%z")},
-        )
-
-    def login_user(self, user_id: int | UUID) -> None:
-        """ """
-        return self._login_user(user_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_user(
-        self, cursor: Cursor[User], user_id: int | UUID, parameters: dict
-    ) -> User:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(User)
-        query = sql.SQL(""" 
-			UPDATE usermanagement.users SET {augmented_field}, modified = CURRENT_TIMESTAMP 
-			WHERE {id_field} = %s
-			RETURNING *; 
-		""")
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in parameters.items()
-                if key
-                in set(
-                    [
-                        "username",
-                        "external_auth_id",
-                        "external_auth_provider",
-                        "status",
-                        "locale",
-                        "last_login",
-                        "email",
-                        "password_hash",
-                    ]
-                )
-                and value is not None
-            ]
-        )
-        match user_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("user_id"),
-                    ),
-                    (user_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (user_id,),
-                )
-
-        user = cursor.fetchone()
-
-        if not user:
-            raise UserNotFound
-
-        return user
-
-    def update_user(self, user_id: int | UUID, parameters: dict) -> bool:
-        """ """
-        return self._update_user(user_id, parameters)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_user(
-        self,
-        cursor: Cursor[User],
-        user_ids: User | int | UUID | list[User | int | UUID],
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(" DELETE FROM usermanagement.users WHERE {id_field} = %s")
-        match user_ids:
-            case list() if isinstance(user_ids[0], User):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("user_id")),
-                    [(cast(User, user).user_id,) for user in (user_ids)],
-                )
-            case list() if isinstance(user_ids[0], int):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("user_id")),
-                    [(user_id,) for user_id in user_ids],
-                )
-            case list() if isinstance(user_ids[0], UUID):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("uuid")),
-                    [(user_id,) for user_id in user_ids],
-                )
-            case User():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("user_id")),
-                    (user_ids.user_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("user_id")), (user_ids,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (user_ids,)
-                )
-            case _:
-                raise TypeError(
-                    "user_ids must be a User, int, uuid, , or a list consisting of ONE of the two"
-                )
-        return True if cursor.rowcount > 0 else False
-
-    def delete_user(self, user_ids: User | int | UUID) -> bool:
-        """Delete a user object from the database
-
-        Args:
-                user_ids: either a user object, a database id, or a universally unique identifier or a list consisting of ONE of the two
-        """
-        return self._delete_user(user_ids=user_ids)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # Project Management - Projects
-    @connect
-    def _create_project(
-        self, cursor: Cursor[Project], req: createProjectReq, user: User
-    ) -> Project:
-        """Internal helper function, do not call directly"""
-
-        query_1 = sql.SQL(
-            " INSERT INTO projectmanagement.projects (name) VALUES (%s) RETURNING *; "
-        )
-
-        query_2 = sql.SQL(""" 
-            INSERT INTO usermanagement.organizations_projects (project_id, organization_id) 
-            VALUES (%s, %s);
-        """)
-
-        query_3 = sql.SQL("""
-
-            INSERT INTO projectmanagement.projects_users (project_id, user_id, role_id)
-            VALUES (%s, %s, %s)
-                          """)
-
-        org = self._get_organization(cursor, req.organization_id)
-        role = self._get_role("admin")
-
-        cursor.row_factory = class_row(Project)
-        cursor.execute(
-            query_1,
-            (req.name,),
-        )
-        project = cursor.fetchone()
-        if project is None:
-            raise FailedToCreate("Schema")
-
-        cursor.execute(query_2, (project.project_id, org.organization_id))
-        cursor.execute(query_3, (project.project_id, user.user_id, role.role_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "project",
-                    str(project.uuid),
-                    "organization",
-                    str(org.uuid),
-                    "parent",
-                ),
-                self.create_spice_update(
-                    "project", str(project.uuid), "user", user.id, "annotator"
-                ),
-            ]
-        )
-
-        return project
-
-    def create_project(self, req: createProjectReq, user: User) -> Project:
-        """ """
-        return self._create_project(req, user)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_project(self, cursor: Cursor[Project], project_id: int | UUID) -> Project:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Project)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.projects WHERE {id_field} = %s "
-        )
-        match project_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")), (project_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (project_id,)
-                )
-
-        project = cursor.fetchone()
-        if not project:
-            raise ObjectNotFound("Project", str(project_id))
-
-        return project
-
-    def get_project(self, project_id: int | UUID) -> Project:
-        """Query the database for a project
-
-        Args:
-                project_id: either the project's internal database id or its universally unique identifier
-        """
-        return self._get_project(project_id=project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_projects(
-        self, cursor: Cursor[Project], req: ProjectQuery, org: Organization
-    ) -> List[Project]:
-        """ """
-        query = sql.SQL("""
-			SELECT P.* FROM projectmanagement.projects as P
-			JOIN usermanagement.organizations_projects as OP ON OP.project_id = P.project_id
-			WHERE OP.organization_id = %(org_id)s
-		""")
-
-        if req.project_id:
-            p_filters, data = QueryBuilder.filter_by_object_ids(
-                "P", "project_id", req.project_id
-            )
-            cursor.row_factory = class_row(Project)
-            return cursor.execute(
-                query + sql.SQL("AND") + p_filters,
-                {**data, "org_id": org.organization_id},
-            ).fetchall()
-
-        else:
-            cursor.row_factory = class_row(Project)
-            return cursor.execute(query, {"org_id": org.organization_id}).fetchall()
-
-    def get_projects(self, req: ProjectQuery, org: Organization) -> List[Project]:
-        """ """
-        return self._get_projects(req, org)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_project_models(
-        self, cursor: Cursor[Model], project_id: UUID
-    ) -> List[Model]:
-        """ """
-        project = self._get_project(cursor, project_id)
-        query = sql.SQL(""" 
-			SELECT m.* FROM projectmanagement.models M
-			JOIN projectmanagement.projects_models PM ON PM.model_id = M.model_id
-			WHERE PM.project_id = %s; 
-		""")
-
-        cursor.row_factory = class_row(Model)
-        cursor.execute(query, (project.project_id,))
-
-        return cursor.fetchall()
-
-    def get_project_models(self, project_id: UUID) -> List[Model]:
-        """ """
-        return self._get_project_models(project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_project_herd_units(
-        self, cursor: Cursor[HerdUnit], project_id: UUID
-    ) -> list[HerdUnit]:
-        """ """
-        project = self._get_project(cursor, project_id)
-        query = sql.SQL("""
-			SELECT HU.* FROM projectmanagement.herd_units HU JOIN
-			projectmanagement.projects_herd_units PHU ON PHU.herd_unit_id = HU.herd_unit_id
-			WHERE PHU.project_id = %s; 
-		""")
-
-        cursor.row_factory = class_row(HerdUnit)
-        cursor.execute(query, (project.project_id,))
-
-        return cursor.fetchall()
-
-    def get_project_herd_units(self, project_id: UUID) -> list[HerdUnit]:
-        """ """
-        return self._get_project_herd_units(project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_project_image_count(self, cursor: Cursor, project_id: UUID):
-        """ """
-        query = sql.SQL("""
-            SELECT COUNT(image_id) FROM core.images as I 
-            JOIN projectmanagement.projects_herd_units PH ON I.herd_unit_id = PH.herd_unit_id
-            WHERE PH.project_id = %s
-        """)
-
-        project = self._get_project(cursor, project_id)
-
-        cursor.row_factory = tuple_row
-        count = cursor.execute(query, (project.project_id,)).fetchone()
-
-        if not count:
-            return 0
-
-        else:
-            return count[0]
-
-    def get_project_image_count(self, project_id: UUID):
-        """ """
-        return self._get_project_image_count(project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_project_prediction_count(self, cursor: Cursor, project_id: UUID):
-        """ """
-        query = sql.SQL("""
-            SELECT COUNT(pred_id) FROM core.predictions AS P 
-            WHERE P.image_id IN (
-                SELECT image_id FROM core.images as I 
-            JOIN projectmanagement.projects_herd_units PH ON I.herd_unit_id = PH.herd_unit_id
-            WHERE PH.project_id = %s 
-            )
-        """)
-
-        project = self._get_project(cursor, project_id)
-
-        cursor.row_factory = tuple_row
-        count = cursor.execute(query, (project.project_id,)).fetchone()
-
-        if not count:
-            return 0
-
-        else:
-            return count[0]
-
-    def get_project_prediction_count(self, project_id: UUID):
-        """ """
-        return self._get_project_prediction_count(project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_project(
-        self,
-        cursor: Cursor[Project],
-        project_id: Project | int | UUID,
-        name: str | None = None,
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " UPDATE projectmanagement.projects SET name = %s, modified = CURRENT_TIMESTAMP WHERE {id_field} = %s; "
-        )
-        match project_id:
-            case Project():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")),
-                    (project_id.name, project_id.project_id),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")),
-                    (name, project_id),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (name, project_id)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def update_project(
-        self, project_id: Project | int | UUID, name: str | None = None
-    ) -> bool:
-        """Augment a project in the database by providing either a modified Project object or a valid id and a new name
-
-        Args:
-                project_id: either a project object, a database id, or a universally unique identifier
-                name: the new name for the project
-        """
-        return self._update_project(project_id=project_id, name=name)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_project(
-        self, cursor: Cursor[Project], project_id: Union[int, UUID]
-    ) -> None:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " DELETE FROM projectmanagement.projects WHERE {id_field} = %s; "
-        )
-        match project_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("project_id")), (project_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (project_id,)
-                )
-
-        if cursor.rowcount == 0:
-            raise ObjectNotFound("Project", str(project_id))
-
-    def delete_project(self, project_id: Union[int, UUID]) -> None:
-        """Delete a project object from the database
-
-        Args:
-                project_id: either a project object, a database id, or a universally unique identifier
-        """
-        return self._delete_project(project_id=project_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Project Management - Schemas
-
-    @connect
-    def _create_schema(self, cursor: Cursor[Schema], req: createSchemaReq) -> Schema:
-        """Internal helper function, do not call directly"""
-        query_1 = sql.SQL(
-            " INSERT INTO projectmanagement.schemas (name) VALUES (%s) RETURNING *; "
-        )
-
-        query_2 = sql.SQL(
-            " INSERT INTO projectmanagement.projects_schemas (project_id, schema_id) VALUES (%s, %s); "
-        )
-
-        project = self._get_project(cursor, req.project_id)
-
-        cursor.row_factory = class_row(Schema)
-        cursor.execute(query_1, (req.name,))
-
-        schema = cursor.fetchone()
-
-        if schema is None:
-            raise FailedToCreate("Schema")
-
-        cursor.execute(query_2, (project.project_id, schema.schema_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "schema", str(schema.uuid), "model", str(req.model_id), "parent"
-                )
-            ]
-        )
-
-        return schema
-
-    def create_schema(self, req: createSchemaReq) -> Schema:
-        """Insert a new schema object into the database
-
-        Args:
-                name: the schema name
-        """
-        return self._create_schema(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_schema(self, cursor: Cursor[Schema], schema_id: int | UUID) -> Schema:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Schema)
-        query = sql.SQL(
-            "  SELECT * FROM projectmanagement.schemas WHERE {id_field} = %s "
-        )
-        match schema_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("schema_id")), (schema_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (schema_id,)
-                )
-
-        schema = cursor.fetchone()
-        if not schema:
-            raise ObjectNotFound("Schema", str(schema_id))
-
-        return schema
-
-    def get_schema(self, schema_id: UUID) -> Schema:
-        """Query the database for a schema
-
-        Args:
-                schema_id: either the schema's internal database id or its universally unique identifier
-        """
-        return self._get_schema(schema_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_schema_labels(self, cursor: Cursor[Label], schema_id: UUID) -> List[Label]:
-        """ """
-        schema = self._get_schema(cursor, schema_id)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.labels WHERE schema_id = %s; "
-        )
-
-        cursor.row_factory = class_row(Label)
-        return cursor.execute(query, (schema.schema_id,)).fetchall()
-
-    def get_schema_labels(self, schema_id: UUID) -> List[Label]:
-        """ """
-        return self._get_schema_labels(schema_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_schema_models(self, cursor: Cursor[Model], schema_id: UUID) -> List[Model]:
-        """ """
-        schema = self._get_schema(cursor, schema_id)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.models WHERE schema_id = %s; "
-        )
-
-        cursor.row_factory = class_row(Model)
-        return cursor.execute(query, (schema.schema_id,)).fetchall()
-
-    def get_schema_models(self, schema_id: UUID) -> List[Model]:
-        """ """
-        return self._get_schema_models(schema_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_schema(
-        self,
-        cursor: Cursor[Schema],
-        schema_id: Schema | int | UUID,
-        name: str | None = None,
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " UPDATE projectmanagement.schemas SET name =%s, modified = CURRENT_TIMESTAMP WHERE {id_field} = %s; "
-        )
-        match schema_id:
-            case Schema():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("shcema_id")),
-                    (schema_id.name, schema_id.schema_id),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("schema_id")),
-                    (name, schema_id),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (name, schema_id)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def update_schema(self, schema_id: Schema | int | UUID, name: str):
-        """Augment a schema in the database by providing a modified Project object
-
-        Args:
-                schema: A schema object
-        """
-        return self._update_schema(schema_id=schema_id, name=name)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_schema(
-        self, cursor: Cursor[Schema], schema_id: Schema | int | UUID
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " DELETE FROM projectmanagement.schemas WHERE {id_field} = %s; "
-        )
-        match schema_id:
-            case Schema():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("schema_id")),
-                    (schema_id.schema_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("schema_id")), (schema_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (schema_id,)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_schema(self, schema_id: Schema | int | UUID):
-        """Delete a scehma object from the database
-
-        Args:
-                schema: A schema object
-        """
-        return self._delete_schema(schema_id=schema_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # Project Management - labels
-    @connect
-    def _create_label(self, cursor: Cursor[Label], req: CreateLabelReq) -> Label:
-        """Internal helper function, do not call directly"""
-
-        query = sql.SQL(
-            """ INSERT INTO projectmanagement.labels (name, schema_id, label, image_link, color)
-        VALUES (%(name)s, %(schema_id)s, %(label)s, %(image_link)s, %(color)s)
-        RETURNING *;
-                          """
-        )
-
-        params = req.model_dump()
-
-        schema = self._get_schema(cursor, req.schema_id)
-
-        params["schema_id"] = schema.schema_id
-
-        cursor.row_factory = class_row(Label)
-        label = cursor.execute(query, params).fetchone()
-
-        if not label:
-            raise FailedToCreate("label")
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "label", str(label.uuid), "schema", str(schema.uuid), "parent"
-                )
-            ]
-        )
-
-        return label
-
-    def create_label(self, req: CreateLabelReq) -> Label:
-        """Insert a new label object into the database
-
-        Args:
-                name: The name of the label you want to create
-                label: the integer value associated to the class being labeled
-                image_link: optional parameter for the generator to grab an image representing the class
-        """
-        return self._create_label(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_label(self, cursor: Cursor[Label], label_id: Union[int, UUID]) -> Label:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Label)
-
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.labels WHERE {id_field} = %s; "
-        )
-
-        match label_id:
-            case int():
-                label = cursor.execute(
-                    query.format(id_field=sql.Identifier("label_id")), (label_id,)
-                ).fetchone()
-            case UUID():
-                label = cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (label_id,)
-                ).fetchone()
-
-        if label is None:
-            raise ObjectNotFound("label", str(label_id))
-
-        return label
-
-    def get_label(self, label_id: UUID):
-        """Query the database for a label
-
-        Args:
-                label_id: either the label's internal database id or its universally unique identifier
-        """
-
-        return self._get_label(label_id=label_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_labels(self, cursor: Cursor[Label], req: LabelQuery) -> List[Label]:
-        """ """
-        query = sql.SQL("SELECT l.* FROM projectmanagement.labels as l")
-        l_filters, data = QueryBuilder.filter_by_object_ids(
-            "l", "label_id", req.label_id
-        )
-
-        cursor.row_factory = class_row(Label)
-        return cursor.execute(
-            sql.SQL("{q} WHERE {p}").format(q=query, p=l_filters), data
-        ).fetchall()
-
-    def get_labels(self, req: LabelQuery) -> List[Label]:
-        """ """
-        return self._get_labels(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # todo: update to use pydantic class
-    @connect
-    def _update_label(
-        self,
-        cursor: Cursor[Label],
-        label_id: Label | int | UUID,
-        name: str | None = None,
-        label: int | None = None,
-        color: str | None = None,
-        image_link: str | None = None,
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            """ UPDATE projectmanagement.labels SET {augmented_field}, modified = CURRENT_TIMESTAMP  
-							WHERE {id_field} = %s; """
-        )
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in locals().items()
-                if key in set(["name", "label,image_link", "color"])
-                and value is not None
-            ]
-        )
-        match label_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("label_id"),
-                    ),
-                    (label_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (label_id,),
-                )
-            case _:
-                raise TypeError("label_id must be a Label, int, or UUID")
-        return True if cursor.rowcount > 0 else False
-
-    def update_label(
-        self,
-        label_id: Label | int | UUID,
-        name: str | None = None,
-        label: int | None = None,
-        image_link: str | None = None,
-        **kwargs,
-    ) -> bool:
-        """Augment a label in the database by providing a modified Label object or a valid id and a new name, and or label, and or image_link
-
-        Args:
-                label_id: either a Label object, a database id, or a universally unique identifier
-                label: the integer value representing the label in models
-                name: the new name for the label
-                image_link: a link to an example image of the object the label represents
-        """
-        return self._update_label(
-            label_id=label_id, name=name, label=label, image_link=image_link
-        )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_label(
-        self,
-        cursor: Cursor[Label],
-        label_ids: Label | int | UUID | list[int | UUID | str],
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(" DELETE FROM projectmanagement.labels WHERE {id_field} = %s; ")
-        match label_ids:
-            case list() if isinstance(label_ids[0], Label):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("label_id")),
-                    [(cast(Label, label).label_id,) for label in label_ids],
-                )
-            case list() if isinstance(label_ids[0], int):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("label_id")),
-                    [(label_id,) for label_id in label_ids],
-                )
-            case list() if isinstance(label_ids[0], UUID):
-                cursor.executemany(
-                    query.format(id_field=sql.Identifier("uuid")),
-                    [(label_id,) for label_id in label_ids],
-                )
-            case Label():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("label_id")),
-                    (label_ids.label_id,),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("label_id")), (label_ids,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (label_ids,)
-                )
-            case _:
-                raise TypeError("label_id must be a Label, int, uuid, string")
-        return True if cursor.rowcount > 0 else False
-
-    def delete_label(self, label_ids: Label | int | UUID) -> bool:
-        """Delete a label object from the database
-
-        Args:
-                label: either a label object, a database id, or a universally unique identifier
-        """
-
-        return self._delete_label(label_ids=label_ids)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Project Management - Herd Units
-
-    @connect
-    def _create_herd_unit(
-        self, cursor: Cursor[HerdUnit], req: CreateHerdUnitReq
-    ) -> HerdUnit:
-        """Internal helper function, do not call directly"""
-
-        project = self._get_project(cursor, req.project_id)
-
-        query_1 = sql.SQL("""
-			INSERT INTO projectmanagement.herd_units (
-				name
-			) 
-			VALUES (
-				%(name)s
-			)
-			RETURNING *; """)
-
-        cursor.row_factory = class_row(HerdUnit)
-        cursor.execute(query_1, req.model_dump())
-
-        herd_unit = cursor.fetchone()
-        if not herd_unit:
-            raise Exception("Failed to create herd unit")
-
-        query_2 = sql.SQL("""
-			INSERT INTO projectmanagement.projects_herd_units (
-				project_id, herd_unit_id 
-			)
-			VALUES (
-				%s, %s
-			);
-		""")
-
-        cursor.execute(query_2, (project.project_id, herd_unit.herd_unit_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "herd_unit",
-                    str(herd_unit.uuid),
-                    "project",
-                    str(project.uuid),
-                    "parent",
-                )
-            ]
-        )
-
-        return herd_unit
-
-    def create_herd_unit(self, req: CreateHerdUnitReq) -> HerdUnit:
-        """Insert a new herd unit object into the database
-
-        Args:
-                name: the herd unit name
-        """
-        return self._create_herd_unit(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_herd_unit(
-        self, cursor: Cursor[HerdUnit], herd_unit_id: Union[UUID, int]
-    ) -> HerdUnit:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(HerdUnit)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.herd_units WHERE {id_field} = %s; "
-        )
-
-        match herd_unit_id:
-            case int():
-                herd_unit = cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_id,),
-                ).fetchone()
-            case UUID():
-                herd_unit = cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (herd_unit_id,)
-                ).fetchone()
-
-        if not herd_unit:
-            raise Exception("Herd Unit was not found")
-
-        return herd_unit
-
-    def get_herd_unit(self, herd_unit_id: UUID) -> HerdUnit:
-        """Query the database for a herd unit
-
-        Args:
-        herd_unit_id: A universally unique identifier
-        """
-        return self._get_herd_unit(herd_unit_id=herd_unit_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_herd_unit_surveys(
-        self, cursor: Cursor[Survey], herd_unit_id: UUID
-    ) -> list[Survey]:
-        """ """
-        herd_unit = self._get_herd_unit(herd_unit_id)
-
-        cursor.row_factory = class_row(Survey)
-        query = sql.SQL("""
-			SELECT S.* FROM projectmanagement.surveys as S JOIN
-			projectmanagement.surveys_herd_units AS SHU ON SHU.survey_id = S.survey_id
-			WHERE SHU.herd_unit_id = %s; """)
-
-        cursor.execute(query, (herd_unit.herd_unit_id,))
-        surveys = cursor.fetchall()
-
-        return surveys
-
-    def get_herd_unit_surveys(self, herd_unit_id: UUID) -> list[Survey]:
-        """ """
-
-        return self._get_herd_unit_surveys(herd_unit_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_herd_unit(
-        self,
-        cursor: Cursor[HerdUnit],
-        herd_unit_id: HerdUnit | int | UUID,
-        name: str | None = None,
-    ) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            """ UPDATE projectmanagement.herd_units SET name = %s, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s; """
-        )
-        match herd_unit_id:
-            case HerdUnit():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (herd_unit_id.name, herd_unit_id.herd_unit_id),
-                )
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("herd_unit_id")),
-                    (name, herd_unit_id),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (name, herd_unit_id)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def update_herd_unit(
-        self, herd_unit_id: HerdUnit | int | UUID, name: str | None = None
-    ) -> bool:
-        """Augment a herd unit in the database by providing a modified HerdUnit object or a valid id and a new name
-
-        Args:
-                herd_unit_id: either a HerdUnit object, a database id, or a universally unique identifier
-                name: the new name for the herd unit
-        """
-        return self._update_herd_unit(herd_unit_id=herd_unit_id, name=name)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_herd_unit(self, cursor: Cursor[HerdUnit], herd_unit_id: UUID) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " DELETE FROM projectmanagement.herd_units WHERE {id_field} = %s; "
-        )
-
-        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (herd_unit_id,))
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_herd_unit(self, herd_unit_id: UUID) -> bool:
-        """Delete a herd unit object from the database"""
-        return self._delete_herd_unit(herd_unit_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Project Management - Models
-
-    @connect
-    def _create_model(self, cursor: Cursor[Model], req: CreateModelReq) -> Model:
-        """Internal helper function, do not call directly"""
-        query_1 = sql.SQL(""" 
-			INSERT into projectmanagement.models (
-				name, schema_id
-			)
-			VALUES (
-				%(name)s, %(schema_id)s
-			)
-			RETURNING *; 
-		""")
-
-        query_2 = sql.SQL(""" 
-			INSERT INTO projectmanagement.projects_models (
-				project_id, model_id
-			) 
-			VALUES (
-				%s, %s
-			); 
-		""")
-
-        project = self._get_project(cursor, req.project_id)
-        schema = self._get_schema(cursor, req.schema_id)
-
-        params = req.model_dump()
-
-        params["schema_id"] = schema.schema_id
-
-        cursor.execute(query_1, params)
-
-        cursor.row_factory = class_row(Model)
-        model = cursor.fetchone()
-
-        if not model:
-            raise FailedToCreate("Model")
-
-        cursor.execute(query_2, (project.project_id, model.model_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "model", str(model.uuid), "project", str(project.uuid), "parent"
-                )
-            ]
-        )
-
-        return model
-
-    def create_model(self, req: CreateModelReq) -> Model:
-        """Insert a new model object into the database
-
-        Args:
-                name: the model name
-        """
-        return self._create_model(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_model(self, cursor: Cursor[Model], model_id: int | UUID) -> Model:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Model)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.models WHERE {id_field} = %s; "
-        )
-        match model_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("model_id")), (model_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (model_id,)
-                )
-
-        model = cursor.fetchone()
-        if not model:
-            raise ObjectNotFound("Model", str(model_id))
-
-        return model
-
-    def get_model(self, model_id: int | UUID) -> Model:
-        """Query the database for a model
-
-        Args:
-                model_id: either the models's internal database id or its universally unique identifier
-        """
-        return self._get_model(model_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_model_schema(self, cursor: Cursor[Schema], model_id: UUID) -> Schema:
-        """ """
-        model = self._get_model(model_id)
-
-        cursor.row_factory = class_row(Schema)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.schemas WHERE schema_id = %s; "
-        )
-        cursor.execute(query, (model.schema_id,))
-
-        schema = cursor.fetchone()
-        if not schema:
-            raise ObjectNotFound("Schema for model", str(model_id))
-
-        return schema
-
-    def get_model_schema(self, model_id: UUID, user: User) -> Schema:
-        """ """
-        res = self.check_permission("model", str(model_id), str(user.uuid), "access")
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_model_schema(model_id)
-        else:
-            raise AuthorizationFailure(str(user.uuid), "access", "model", str(model_id))
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_model(
-        self, cursor: Cursor[Model], model_id: int | UUID, body: UpdateModelReq
-    ) -> Model:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Model)
-        query = sql.SQL(
-            """ UPDATE projectmanagement.models SET {augmented_field}, modified = CURRENT_TIMESTAMP 
-							WHERE uuid = %s RETURNING *; """
-        )
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in body.model_dump().items()
-                if key in set(["survey_id", "survey_date", "name", "additional_info"])
-                and value is not None
-            ]
-        )
-
-        cursor.execute(
-            query.format(
-                augmented_field=kw_augmented_field,
-            ),
-            (model_id,),
-        )
-
-        model = cursor.fetchone()
-
-        if not model:
-            raise ObjectNotFound("Model", str(model_id))
-
-        return model
-
-    def update_model(self, model_id: int | UUID, body: UpdateModelReq) -> Model:
-        """Augment a model in the database by providing a modified Model object or a valid id and a new name
-
-        Args:
-                model: either a Model object, a database id, or a universally unique identifier
-                name: the new name for the model
-        """
-        return self._update_model(model_id, body)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_model(self, cursor: Cursor[Model], model_id: UUID) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(" DELETE FROM projectmanagement.models WHERE {id_field} = %s; ")
-
-        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (model_id,))
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_model(self, model_id: UUID) -> bool:
-        """Delete a model object from the database
-
-        Args:
-                model_id: either a model object, a database id, or a universally unique identifier
-        """
-        return self._delete_model(model_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_model_training_data(
-        self,
-        cursor: Cursor[dict],
-        label_ids: List[int],
-        date_range: Tuple[date, date] | None,
-        survey_ids: List[int] | None,
-        herd_unit_ids: List[int] | None,
-    ):
-        """ """
-        cursor.row_factory = dict_row
-
-        params_1 = []
-        placeholders: Dict[str, Union[List[int], date]] = {"label_ids": label_ids}
-
-        if survey_ids:
-            params_1.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
-            placeholders["survey_ids"] = survey_ids
-
-        if herd_unit_ids:
-            params_1.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
-            placeholders["herd_unit_ids"] = herd_unit_ids
-
-        if date_range:
-            params_1.append(
-                sql.SQL(
-                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
-                )
-            )
-            placeholders["date_range_lower"] = date_range[0]
-            placeholders["date_range_upper"] = date_range[1]
-
-        image_params = sql.SQL(" AND ").join(params_1)
-
-        query = sql.SQL("""
-			WITH SelectedImageIds AS (
-				SELECT DISTINCT i.image_id 
-				FROM core.images i
-				WHERE {image_args}
-			)
-			SELECT json_agg(row_to_json(crops)) 
-			FROM (
-				SELECT
-					ra.reviewed_area_id,
-					ra.image_id,
-					ra.name, 
-					ra.ra_key,
-					ra.area_tx,
-					ra.area_ty,
-					ra.area_bx,
-					ra.area_by,
-					ra.reviewed_area_length_px,
-					ra.reviewed_area_width_px,
-					ra.reviewed_by_user_id,
-					ra.created,
-					ra.modified,
-					ra.uuid,
-					json_agg(
-						json_build_object( 
-							'annotation_id', a.annotation_id,
-							'label_id', a.label_id,
-							'image_id', a.image_id,
-							'pred_id', a.pred_id,
-							'herd_unit_id', a.herd_unit_id,
-							'box_tx', a.box_tx,
-							'box_ty', a.box_ty,
-							'box_bx', a.box_bx,
-							'box_by', a.box_by,
-							'created_by_user_id', a.created_by_user_id,
-							'created', a.created,
-							'modified', a.modified, 
-							'uuid', a.uuid
-						)
-					) AS annotations
-				FROM core.reviewed_area ra
-				INNER JOIN core.annotations_reviewed_area a_ra ON ra.reviewed_area_id = a_ra.reviewed_area_id
-				INNER JOIN core.annotations a ON a.annotation_id = a_ra.annotation_id
-				WHERE ra.image_id IN (SELECT image_id FROM SelectedImageIds)
-					AND a.label_id =  ANY(%(label_ids)s)
-				GROUP BY ra.reviewed_area_id
-			) AS crops
-		""")
-
-        try:
-            cursor.execute(query.format(image_args=image_params), placeholders)
-        except Exception as e:
-            print(e)
-        results = cursor.fetchone()
-
-        return results
-
-    def get_model_training_data(
-        self,
-        label_ids: List[int],
-        date_range: Tuple[date, date] | None,
-        survey_ids: List[int] | None,
-        herd_unit_ids: List[int] | None,
-    ):
-        """ """
-        return self._get_model_training_data(
-            label_ids, date_range, survey_ids, herd_unit_ids
-        )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Project Management - Surveys
-
-    @connect
-    def _create_survey(self, cursor: Cursor[Survey], req: CreateSurveyReq) -> Survey:
-        """Internal helper function, do not call directly"""
-
-        project = self._get_project(cursor, req.project_id)
-
-        herd_unit = self._get_herd_unit(cursor, req.herd_unit_id)
-
-        query_1 = sql.SQL(""" 
-			INSERT into projectmanagement.surveys (
-				survey_date, name, additional_info
-			) 
-			VALUES (
-				%(survey_date)s, %(name)s, %(additional_info)s
-			) 
-			RETURNING *; """)
-
-        query_2 = sql.SQL("""
-			INSERT INTO projectmanagement.projects_surveys (
-				project_id, survey_id
-			)
-			VALUES (
-				%s, %s
-			);
-		""")
-
-        query_3 = sql.SQL("""
-			INSERT INTO projectmanagement.surveys_herd_units (
-				survey_id, herd_unit_id
-			)
-			VALUES (
-				%s, %s
-			);
-		""")
-
-        cursor.row_factory = class_row(Survey)
-        cursor.execute(query_1, req.model_dump())
-
-        survey = cursor.fetchone()
-        if not survey:
-            raise Exception("Failed to create survey")
-
-        cursor.execute(query_2, (project.project_id, survey.survey_id))
-        cursor.execute(query_3, (survey.survey_id, herd_unit.herd_unit_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "survey",
-                    str(survey.uuid),
-                    "herd_unit",
-                    str(herd_unit.uuid),
-                    "parent",
-                )
-            ]
-        )
-        return survey
-
-    def create_survey(self, req: CreateSurveyReq) -> Survey:
-        """Insert a new survey object into the database
-
-        Args:
-                survey_date: the year of the survey
-                name: the survey name
-                additional_info: any information that may be important regarding the survey (can be null)
-        """
-        return self._create_survey(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_survey(self, cursor: Cursor[Survey], survey_id: int | UUID) -> Survey:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Survey)
-        query = sql.SQL(
-            " SELECT * FROM projectmanagement.surveys WHERE {id_field} = %s; "
-        )
-        match survey_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("survey_id")), (survey_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (survey_id,)
-                )
-            case _:
-                raise TypeError("survey_id MUST be an integer or a UUID")
-        survey = cursor.fetchone()
-        if not survey:
-            raise Exception("Could not find survey")
-        else:
-            return survey
-
-    def get_survey(self, survey_id: int | UUID) -> Survey:
-        """Query the database for a survey
-
-        Args:
-                survey_id: either the survey's internal database id or its universally unique identifier
-        """
-        return self._get_survey(survey_id=survey_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_survey_annotations(
-        self, cursor: Cursor[Annotation], survey_id: int | UUID
-    ) -> List[Annotation]:
-        """ """
-        cursor.row_factory = class_row(Annotation)
-        query = sql.SQL("""
-			SELECT A.* FROM core.annotations A
-			JOIN core.images I ON I.image_id = A.image_id
-			WHERE I.survey_id = %s;
-		""")
-
-        match survey_id:
-            case int():
-                cursor.execute(query, (survey_id,))
-            case UUID():
-                db_id = self.get_survey(survey_id).survey_id
-                cursor.execute(query, (db_id,))
-
-        return cursor.fetchall()
-
-    def get_survey_annotations(self, survey_id: int | UUID) -> List[Annotation]:
-        """ """
-        return self._get_survey_annotations(survey_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_survey_annotated_images(
-        self,
-        cursor: Cursor[dict],
-        label_ids: List[int],
-        date_range: Tuple[date, date] | None,
-        survey_ids: List[int] | None,
-        herd_unit_ids: List[int] | None,
-    ):
-        """ """
-        cursor.row_factory = dict_row
-
-        params_1 = []
-        placeholders: Dict[str, Union[List[int], date]] = {"label_ids": label_ids}
-
-        if survey_ids is not None:
-            params_1.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
-            placeholders["survey_ids"] = survey_ids
-
-        if herd_unit_ids is not None:
-            params_1.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
-            placeholders["herd_unit_ids"] = herd_unit_ids
-
-        if date_range is not None:
-            params_1.append(
-                sql.SQL(
-                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
-                )
-            )
-            placeholders["date_range_lower"] = date_range[0]
-            placeholders["date_range_upper"] = date_range[1]
-
-        image_params = sql.SQL(" AND ").join(params_1)
-
-        query = sql.SQL("""
-			SELECT json_agg(row_to_json(images))
-			FROM (
-				SELECT
-					I.*,
-					json_agg(
-						json_build_object(
-							'annotation_id', a.annotation_id,
-							'label_id', a.label_id,
-							'image_id', a.image_id,
-							'pred_id', a.pred_id,
-							'herd_unit_id', a.herd_unit_id,
-							'box_tx', a.box_tx,
-							'box_ty', a.box_ty,
-							'box_bx', a.box_bx,
-							'box_by', a.box_by,
-							'created_by_user_id', a.created_by_user_id,
-							'created', a.created,
-							'modified', a.modified, 
-							'uuid', a.uuid
-						)
-					) as annotations
-				FROM core.images I
-				INNER JOIN core.annotations A ON A.image_id = I.image_id
-				WHERE {image_args}
-					AND A.label_id = ANY(%(label_ids)s)
-				GROUP BY I.image_id
-			) as images
-		""")
-
-        try:
-            cursor.execute(query.format(image_args=image_params), placeholders)
-        except Exception as e:
-            print(e)
-        results = cursor.fetchall()
-        return results
-
-    def get_survey_annotated_images(
-        self,
-        label_ids: List[int],
-        date_range: Tuple[date, date] | None,
-        survey_ids: List[int] | None,
-        herd_unit_ids: List[int] | None,
-    ):
-        """ """
-        return self._get_survey_annotated_images(
-            label_ids, date_range, survey_ids, herd_unit_ids
-        )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_survey_herd_units(
-        self, cursor: Cursor[HerdUnit], survey_id: int | UUID
-    ) -> list[HerdUnit]:
-        """ """
-        survey = self._get_survey(cursor, survey_id)
-
-        cursor.row_factory = class_row(HerdUnit)
-        query = sql.SQL("""
-			SELECT H.* FROM projectmanagement.herd_units as H JOIN
-			projectmanagement.surveys_herd_units AS SHU ON SHU.herd_unit_id = H.herd_unit_id
-			WHERE SHU.survey_id = %s; """)
-        cursor.execute(query, (survey.survey_id,))
-        herd_units = cursor.fetchall()
-        if len(herd_units) == 0:
-            raise ObjectNotFound("Herd units for survey", str(survey_id))
-        return herd_units
-
-    def get_survey_herd_units(self, survey_id: int | UUID) -> list[HerdUnit]:
-        """ """
-        return self._get_cropping_herd_units(survey_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_survey(
-        self, cursor: Cursor[Survey], survey_id: int | UUID, parameters: dict
-    ) -> Survey:
-        """Internal helper function, do not call directly"""
-        cursor.row_factory = class_row(Survey)
-        query = sql.SQL(
-            """ UPDATE projectmanagement.surveys SET {augmented_field}, modified = CURRENT_TIMESTAMP
-							WHERE {id_field} = %s
-							RETURNING *; """
-        )
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in parameters.items()
-                if key
-                in set(
-                    [
-                        "survey_date",
-                        "name",
-                        "additional_info",
-                    ]
-                )
-                and value is not None
-            ]
-        )
-        match survey_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("survey_id"),
-                    ),
-                    (survey_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (survey_id,),
-                )
-            case _:
-                raise TypeError("survey_id must be an integer, or uuid")
-
-        survey = cursor.fetchone()
-
-        if survey is None:
-            raise Exception("Failed to update sruvey!")
-
-        return survey
-
-    def update_survey(self, survey_id: int | UUID, parameters: dict):
-        """Augment a survey in the database by providing a modified Survey object or a valid id and a new name, and or survey_date, and or additional_info
-
-        Args:
-                survey_id: either a Survey object, a database id, or a universally unique identifier
-                survey_date: the date the survey was conducted
-                name: the new name for the survey
-                additional_info: a link to an additional info regarding the survey
-        """
-        return self._update_survey(survey_id=survey_id, parameters=parameters)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_survey(self, cursor: Cursor[Survey], survey_id: int | UUID) -> bool:
-        """Internal helper function, do not call directly"""
-        query = sql.SQL(
-            " DELETE FROM projectmanagement.surveys WHERE {id_field} = %s; "
-        )
-        match survey_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("survey_id")), (survey_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (survey_id,)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_survey(self, survey_id: int | UUID) -> bool:
-        """Delete a survey object from the database
-
-        Args:
-                survey_id: either a survey object, a database id, or a universally unique identifier
-        """
-        return self._delete_survey(survey_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Core - Images
-
-    @connect
-    def _create_image(self, cursor: Cursor[Image], req: CreateImageReq) -> Image:
-        """ """
-        parameters = req.model_dump()
-
-        survey = self._get_survey(parameters["survey_id"])
-
-        parameters["survey_id"] = survey.survey_id
-
-        herd_unit = self._get_herd_unit(parameters["herd_unit_id"])
-
-        parameters["herd_unit_id"] = herd_unit.herd_unit_id
-
-        query = sql.SQL(""" 
-			INSERT INTO core.images (
-				herd_unit_id, survey_id, name, img_key, image_length_px, image_width_px,
-				area, viewshed_polygon, has_detection, dem_name, bbox_wsen
-			) 
-			VALUES (
-				%(herd_unit_id)s, %(survey_id)s, %(name)s, %(img_key)s, %(image_length_px)s, 
-				%(image_width_px)s, %(area)s, %(viewshed_polygon)s, %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
-			) 
-			RETURNING *; 
-		""")
-
-        cursor.row_factory = class_row(Image)
-        cursor.execute(query, parameters)
-
-        image = cursor.fetchone()
-
-        if not image:
-            raise FailedToCreate("Image")
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "image", str(image.uuid), "survey", str(survey.uuid), "parent"
-                ),
-                self.create_spice_update(
-                    "image", str(image.uuid), "herd_unit", str(herd_unit.uuid), "parent"
-                ),
-            ]
-        )
-
-        return image
-
-    def create_image(self, req: CreateImageReq) -> Image:
-        """ """
-        return self._create_image(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_image(self, cursor: Cursor[Image], image_id: Union[int, UUID]) -> Image:
-        """ """
-        cursor.row_factory = class_row(Image)
-        query = sql.SQL(" SELECT * FROM core.images WHERE {id_field} = %s; ")
-
-        match image_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("image_id")), (image_id,)
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (image_id,)
-                )
-
-        image = cursor.fetchone()
-        if not image:
-            raise ObjectNotFound("Image", str(image_id))
-
-        return image
-
-    def get_image(self, image_id: UUID) -> Image:
-        """ """
-        return self._get_image(image_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_image_crops(
-        self, cursor: Cursor[ReviewedArea], image_id: Union[int, UUID]
-    ) -> List[ReviewedArea]:
-        """ """
-        image = self._get_image(cursor, image_id)
-        query = sql.SQL(" SELECT * FROM core.reviewed_area WHERE image_id = %s; ")
-
-        cursor.row_factory = class_row(ReviewedArea)
-        cursor.execute(query, (image.image_id,))
-
-        crops = cursor.fetchall()
-        if len(crops) == 0:
-            raise ObjectNotFound("Crops for image", str(image_id))
-
-        return crops
-
-    def get_image_crops(self, image_id: int | UUID) -> List[ReviewedArea]:
-        """ """
-        return self._get_image_crops(image_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_image_predictions(
-        self, cursor: Cursor[Prediction], image_id: UUID
-    ) -> List[Prediction]:
-        """ """
-        image = self._get_image(cursor, image_id)
-        query = sql.SQL(" SELECT * FROM core.predictions WHERE image_id = %s; ")
-
-        cursor.row_factory = class_row(Prediction)
-        cursor.execute(query, (image.image_id,))
-
-        predictions = cursor.fetchall()
-
-        return predictions
-
-    def get_image_predictions(self, image_id: UUID) -> List[Prediction]:
-        """ """
-        return self._get_image_predictions(image_id=image_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_image_annotations(
-        self, cursor: Cursor[Annotation], image_id: UUID
-    ) -> List[Annotation]:
-        """ """
-        query = sql.SQL(" SELECT * FROM core.annotations WHERE image_id = %s; ")
-
-        db_id = self._get_image(cursor, image_id).image_id
-        cursor.execute((query), (db_id,))
-
-        return cursor.fetchall()
-
-    def get_image_annotations(self, image_id: UUID) -> List[Annotation]:
-        """ """
-        return self._get_image_annotations(image_id=image_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_image(
-        self, cursor: Cursor[Image], image_id: Union[int, UUID], req: UpdateImageReq
-    ) -> Image:
-        """ """
-        cursor.row_factory = class_row(Image)
-        query = sql.SQL(""" 
-			UPDATE core.images AS i SET {augmented_field}, modified = CURRENT_TIMESTAMP
-			WHERE i.{id_field} = %s
-			RETURNING *; 
-		""")
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in req.model_dump().items()
-                if key
-                in set(
-                    [
-                        "name",
-                        "img_key",
-                        "image_length_px",
-                        "image_width_px",
-                        "herd_unit_id",
-                        "survey_id",
-                        "opened_by_user_id",
-                        "area",
-                        "polygon",
-                        "has_detection",
-                        "dem_name",
-                        "bbox_wsen",
-                    ]
-                )
-                and value is not None
-            ]
-        )
-        match image_id:
-            case int():
-                image = cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("image_id"),
-                    ),
-                    (image_id,),
-                ).fetchone()
-            case UUID():
-                image = cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (image_id,),
-                ).fetchone()
-
-        if not image:
-            raise ObjectNotFound("Image", str(image_id))
-
-        return image
-
-    def update_image(
-        self,
-        image_id: Union[int, UUID],
-        req: UpdateImageReq,
-    ) -> Image:
-        """ """
-        return self._update_image(image_id, req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_image(self, cursor: Cursor, image_id: UUID) -> bool:
-        """ """
-        query = sql.SQL(""" DELETE FROM core.images WHERE {id_field} = %s; """)
-
-        cursor.execute(query.format(id_field=sql.Identifier("uuid")), (image_id,))
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_image(self, image_id: int | UUID) -> bool:
-        """ """
-        return self._delete_image(image_id=image_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Core - Predictions
-
-    @connect
-    def _create_prediction(
-        self, cursor: Cursor[Prediction], req: CreatePredictionReq
-    ) -> Prediction:
-        """ """
-        image = self._get_image(cursor, req.image_id)
-        model = self._get_model(cursor, req.model_id)
-
-        parameters = req.model_dump()
-
-        parameters["image_id"] = image.image_id
-        parameters["model_id"] = model.model_id
-
-        query = sql.SQL("""
-			INSERT INTO core.predictions (
-				image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
-			)
-			VALUES (
-				%(image_id)s, %(model_id)s, %(label)s, %(score)s, %(box_tx)s, %(box_ty)s, %(box_bx)s, %(box_by)s
-			)
-			RETURNING *;
-
-			""")
-
-        cursor.row_factory = class_row(Prediction)
-        prediction = cursor.execute(query, req.model_dump()).fetchone()
-
-        if not prediction:
-            raise FailedToCreate("prediction")
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "prediction",
-                    str(prediction.uuid),
-                    "image",
-                    str(image.uuid),
-                    "parent",
-                )
-            ]
-        )
-
-        return prediction
-
-    def create_prediction(self, req: CreatePredictionReq) -> Prediction:
-        """ """
-        return self._create_prediction(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_prediction(
-        self, cursor: Cursor[Prediction], prediction_id: UUID
-    ) -> Prediction:
-        """ """
-        cursor.row_factory = class_row(Prediction)
-        query = sql.SQL("SELECT * FROM core.predictions WHERE uuid = %s")
-
-        prediction = cursor.execute(query, (prediction_id,)).fetchone()
-
-        if not prediction:
-            raise ObjectNotFound("prediction", str(prediction_id))
-
-        return prediction
-
-    def get_prediction(self, prediction_id: UUID) -> Prediction:
-        """ """
-        return self._get_prediction(prediction_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    # TODO: Replace PredictionCropQuery with PredictionQuery
-    def _get_predictions(
-        self, cursor: Cursor[Prediction], req: PredictionQuery
-    ) -> List[Prediction]:
-        """ """
-        query = sql.SQL("SELECT p.* FROM core.predictions as p")
-
-        p_filters, data = QueryBuilder.filter_by_object_ids(
-            "p", "pred_id", req.prediction_id
-        )
-        cursor.row_factory = class_row(Prediction)
-        return cursor.execute(
-            sql.SQL("{q} WHERE {p}").format(q=query, p=p_filters), data
-        ).fetchall()
-
-    def get_predictions(self, req: PredictionQuery) -> List[Prediction]:
-        """ """
-        return self._get_predictions(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Core - Annotations
-
-    @connect
-    def _create_annotation(
-        self,
-        cursor: Cursor[Annotation],
-        req: CreateAnnotationReq,
-        user: User,
-    ) -> Annotation:
-        """ """
-        query_1 = sql.SQL(""" 
-			INSERT INTO core.annotations (
-				label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx, box_by, created_by_user_id, pred_id, uuid
-			)
-			VALUES (
-				%(label_id)s, %(image_id)s, %(herd_unit_id)s, %(box_tx)s, %(box_ty)s, 
-				%(box_bx)s, %(box_by)s, %(created_by_user_id)s, %(pred_id)s, %(uuid)s
-			) 
-			RETURNING *; 
-		""")
-
-        query_2 = sql.SQL("""
-			INSERT INTO core.annotations_reviewed_area (
-				reviewed_area_id, annotation_id
-			)
-			VALUES (
-				%s, %s
-			)
-		""")
-
-        params = req.model_dump()
-
-        image = self._get_image(cursor, req.image_id)
-        params["image_id"] = image.image_id
-
-        label = self._get_label(cursor, req.label_id)
-        params["label_id"] = label.label_id
-
-        if req.prediction_id:
-            prediction = self._get_prediction(cursor, req.prediction_id)
-            params["pred_id"] = prediction.pred_id
-        else:
-            params["pred_id"] = 0
-
-        params["created_by_user_id"] = user.user_id
-
-        cursor.row_factory = class_row(Annotation)
-        annotation = cursor.execute(query_1, params).fetchone()
-
-        if not annotation:
-            raise FailedToCreate("Annotation")
-
-        if req.reviewed_area_id:
-            ra_id = self._get_reviewed_area(
-                cursor, req.reviewed_area_id
-            ).reviewed_area_id
-            cursor.execute(query_2, (ra_id, annotation.annotation_id))
-
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "annotation",
-                    str(annotation.uuid),
-                    "image",
-                    str(image.uuid),
-                    "parent",
-                )
-            ]
-        )
-
-        return annotation
-
-    def create_annotation(self, req: CreateAnnotationReq, user: User) -> Annotation:
-        """ """
-        return self._create_annotation(req, user)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_annotation(
-        self, cursor: Cursor[Annotation], annotation_id: Union[int, UUID]
-    ) -> Annotation:
-        """ """
-        cursor.row_factory = class_row(Annotation)
-        query = sql.SQL(
-            """ SELECT * FROM core.annotations WHERE {id_field} = ANY(%s); """
-        )
-        match annotation_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("annotation_id")),
-                    ([annotation_id],),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), ([annotation_id],)
-                )
-
-        annotation = cursor.fetchone()
-
-        if not annotation:
-            raise ObjectNotFound("Annotation", str(annotation_id))
-
-        return annotation
-
-    def get_annotation(
-        self, annotation_id: Union[int, UUID], user: User, bypass: bool = False
-    ) -> Annotation:
-        """ """
-        if bypass or isinstance(annotation_id, int):
-            return self._get_annotation(annotation_id)
-
-        annot_id = str(annotation_id)
-
-        res = self.check_permission("annotation", annot_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._get_annotation(annotation_id)
-        else:
-            raise AuthorizationFailure(
-                user.id, "access", "annotation", str(annotation_id)
-            )
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_annotation_exists(self, cursor: Cursor, annotation_id: int | UUID) -> bool:
-        """ """
-        query = sql.SQL(
-            " SELECT EXISTS (SELECT image_id FROM core.annotations where {id_field} = %s); "
-        )
-        result = False
-        match annotation_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("annotation_id")),
-                    (annotation_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (annotation_id,)
-                )
-
-        result = cursor.fetchone()
-
-        if result is None:
-            return False
-
-        return result[0]
-
-    def get_annotation_exists(self, anntoation_id: int | UUID):
-        """ """
-        return self._get_annotation_exists(annotation_id=anntoation_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_annotation(
-        self,
-        cursor: Cursor[Annotation],
-        annotation_id: Union[int, UUID],
-        req: UpdateAnnotationReq,
-    ) -> Annotation:
-        """ """
-        query = sql.SQL(""" 
-            UPDATE core.annotations SET {augmented_field}, modified = CURRENT_TIMESTAMP
-			WHERE {id_field} = %s
-            RETURNING *; 
-        """)
-
-        # Generate comma separated string containing kwargs for use in update query
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in req.model_dump().items()
-                if key
-                in set(
-                    [
-                        "label_id",
-                        "image_id",
-                        "pred_id",
-                        "herd_unit_id",
-                        "box_tx",
-                        "box_ty",
-                        "box_bx",
-                        "box_by",
-                    ]
-                )
-                and value is not None
-            ]
-        )
-
-        cursor.row_factory = class_row(Annotation)
-        match annotation_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("annotation_id"),
-                    ),
-                    (annotation_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (annotation_id,),
-                )
-
-        annotation = cursor.fetchone()
-
-        if not annotation:
-            raise ObjectNotFound("Annotation", str(annotation_id))
-
-        return annotation
-
-    def update_annotation(
-        self,
-        annotation_id: Union[int, UUID],
-        req: UpdateAnnotationReq,
-        user: User,
-        bypass: bool = False,
-    ) -> Annotation:
-        """ """
-        if bypass or isinstance(annotation_id, int):
-            return self._update_annotation(annotation_id, req)
-
-        annot_id = str(annotation_id)
-
-        if req.image_id and isinstance(req.image_id, UUID):
-            image_access = self.check_permission(
-                "image", str(req.image_id), user.id, "access"
-            )
-            if (
-                image_access.permissionship
-                != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            ):
-                raise AuthorizationFailure(
-                    user.id, "access", "image", str(req.image_id)
-                )
-
-        if req.label_id and isinstance(req.label_id, UUID):
-            label_access = self.check_permission(
-                "label", str(req.label_id), user.id, "access"
-            )
-            if (
-                label_access.permissionship
-                != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-            ):
-                raise AuthorizationFailure(
-                    user.id, "access", "label", str(req.label_id)
-                )
-
-        res = self.check_permission("annotation", annot_id, user.id, "access")
-
-        if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
-            return self._update_annotation(annotation_id, req)
-        else:
-            raise AuthorizationFailure(user.id, "access", "annotation", annot_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _delete_annotation(self, cursor: Cursor, annotation_id: Union[int, UUID]):
-        """ """
-        query = sql.SQL(" DELETE FROM core.annotations WHERE {id_field} = %s; ")
-        match annotation_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("annotation_id")),
-                    (annotation_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (annotation_id,)
-                )
-
-        return True if cursor.rowcount > 0 else False
-
-    def delete_annotation(self, annotation_id: Union[int, UUID]):
-        """ """
-        return self._delete_annotation(annotation_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Core - reviewed_area
-
-    @connect
-    def _create_reviewed_area(
-        self, cursor: Cursor[ReviewedArea], req: CreateReviewedAreaReq
-    ) -> ReviewedArea:
-        """ """
-        query = sql.SQL("""
-            INSERT INTO core.reviewed_area (
-                image_id, name, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px,
-                reviewed_area_width_px, reviewed_by_user_id, ra_key
-            )
-            VALUES (
-                %(image_id)s, %(name)s, %(area_tx)s, %(area_ty)s, %(area_bx)s, %(area_by)s, 
-                %(reviewed_area_length_px)s, %(reviewed_area_width_px)s, %(reviewed_by_user_id)s,
-                %(ra_key)s
-            )
+            UPDATE {table}
+            SET {set_clause}{modified_statement}
+            WHERE {id_col} = %(_pk_val)s
             RETURNING *;
         """)
 
-        image = self._get_image(cursor, req.image_id)
-        params = req.model_dump()
+        if hasattr(cls, "modified"):
+            modified_statement = sql.SQL(", modified = CURRENT_TIMESTAMP ")
+        else:
+            modified_statement = sql.SQL("")
 
-        params["image_id"] = image.image_id
+        data = req.model_dump(exclude_unset=True, exclude_none=True)
 
-        cursor.row_factory = class_row(ReviewedArea)
-        crop = cursor.execute(query, params).fetchone()
+        if not data:
+            return self._get(cursor, cls, pk)
 
-        if not crop:
-            raise FailedToCreate("Reviewed Area")
+        set_clause = clause_generator(data)
 
-        self.write_spice_relationships(
-            [
-                self.create_spice_update(
-                    "reviewed_area",
-                    str(crop.uuid),
-                    "image",
-                    str(req.image_id),
-                    "parent",
-                )
-            ]
+        pk_col = resolve_identifier(cls, pk)
+
+        cursor.execute(
+            query.format(
+                table=cls.get_table_identifier(),
+                id_col=pk_col,
+                set_clause=set_clause,
+                modified_statement=modified_statement,
+            ),
+            {**data, "_pk_val": pk},
         )
 
-        return crop
+        cursor.row_factory = class_row(cls)
+        if not (obj := cursor.fetchone()):
+            raise ObjectNotFound(cls.__name__, str(pk))
 
-    def create_reviewed_area(self, req: CreateReviewedAreaReq) -> ReviewedArea:
-        """ """
-        return self._create_reviewed_area(req)
+        return obj
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def update(
+        self,
+        cls: type[T],
+        pk: PrimaryKey,
+        req: BaseModel,
+    ) -> T:
+        """Update an existing record's metadata using its primary key and update payload.
 
-    @connect
-    def _get_reviewed_area(
-        self, cursor: Cursor[ReviewedArea], reviewed_area_id: int | UUID
-    ):
-        """ """
-        cursor.row_factory = class_row(ReviewedArea)
-        query = sql.SQL(" SELECT * FROM core.reviewed_area  WHERE {id_field} = %s ")
+        Partial updates are supported; unset or None fields in the request model
+        are excluded from the SQL update clause.
 
-        match reviewed_area_id:
-            case int():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("reviewed_area_id")),
-                    (reviewed_area_id,),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(id_field=sql.Identifier("uuid")), (reviewed_area_id,)
-                )
+        Args:
+            cls: The DBbase entity model class to update.
+            pk: The primary key (int or UUID) of the target record.
+            req: A Pydantic request model containing fields to set.
 
-        reviewed_area = cursor.fetchone()
-        if not reviewed_area:
-            raise ObjectNotFound("Reviewed Area", str(reviewed_area_id))
+        Returns:
+            The updated entity instance re-hydrated from the database.
 
-        return reviewed_area
-
-    def get_reviewed_area(self, reviewed_area_id: int | UUID) -> ReviewedArea:
-        return self._get_reviewed_area(reviewed_area_id)
+        Raises:
+            ObjectNotFound: If no database record matches the provided primary key.
+        """
+        return self._update(cls, pk, req)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_reviewed_areas(
-        self, cursor: Cursor[ReviewedArea], req: RAQuery
-    ) -> List[ReviewedArea]:
+    def _bulk_update(
+        self,
+        cursor: Cursor[T],
+        cls: type[T],
+        req: BaseModel,
+        scope: dict[str, Any],
+    ) -> int:
         """ """
-        query = sql.SQL(""" 
-			SELECT ra.* FROM core.reviewed_area ra
-			JOIN core.images i on i.image_id = ra.image_id
-			WHERE {parameter_field} 
-		""")
+        query = sql.SQL("""
+            UPDATE {table}
+            SET {set_clause}, modified = CURRENT_TIMESTAMP
+            WHERE {where_clause}
+        """)
 
-        params = []
-        placeholders: Dict[str, Union[List[int], date, int]] = {}
+        data = req.model_dump(exclude_unset=True, exclude_none=True)
 
-        if req.herd_unit_id:
-            herd_unit = self._get_herd_unit(cursor, req.herd_unit_id[0])
-            params.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
-            placeholders["herd_unit_ids"] = [herd_unit.herd_unit_id]
+        # if there is nothing to change, technically the operation was sucecssful :D
+        if not data:
+            return 0
 
-        if req.survey_id:
-            survey = self._get_survey(cursor, req.survey_id[0])
-            params.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
-            placeholders["survey_ids"] = [survey.survey_id]
+        set_clause = clause_generator(data)
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
 
-        if not req.include_reviewed:
-            params.append(sql.SQL("RA.reviewed_by_user_id = 0"))
+        scope_params = {f"_scope_{k}": v for k, v in scope.items()}
 
-        if not req.include_opened:
-            params.append(sql.SQL("i.opened_by_user_id = 0"))
+        cursor.execute(
+            query.format(
+                table=cls.get_table_identifier(),
+                set_clause=set_clause,
+                where_clause=where_clause,
+            ),
+            {**data, **scope_params},
+        )
 
-        query_params = sql.SQL(" AND ").join(params)
+        return cursor.rowcount
 
-        if req.num:
-            query_params += sql.SQL(" LIMIT %(num)s ")  # pyright: ignore
-            placeholders["num"] = req.num
+    def bulk_update(
+        self,
+        cls: type[T],
+        req: BaseModel,
+        scope: dict[str, Any],
+    ) -> int:
+        """Perform a multi-row scoped update across entities matching filter criteria.
 
-        cursor.row_factory = class_row(ReviewedArea)
-        cursor.execute(query.format(parameter_field=query_params), placeholders)
+        Executes a bulk SQL UPDATE statement on records that match all key-value pairs
+        specified in the scope dictionary. Unset or None fields in the request model
+        are excluded from the update.
 
+        Args:
+            cls: The DBbase entity model class to update.
+            req: A Pydantic request model containing fields and values to update.
+            scope: A dictionary of column-value condition pairs defining the WHERE
+                filter scope (e.g., {"user_id": 123, "status": "active"}).
+
+        Returns:
+            The total number of rows modified in the database.
+
+        Raises:
+            ValueError: If the `scope` dictionary is empty.
+        """
+        return self._bulk_update(cls=cls, req=req, scope=scope)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # GET
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get(self, cursor: Cursor[T], cls: Type[T], pk: PrimaryKey) -> T:
+        """Internal get method."""
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL(" SELECT * FROM {table} WHERE {id_col} = %s ")
+
+        pk_col = resolve_identifier(cls, pk)
+
+        cursor.execute(
+            query.format(table=cls.get_table_identifier(), id_col=pk_col),
+            (pk,),
+        )
+        obj = cursor.fetchone()
+
+        if not obj:
+            raise ObjectNotFound(cls.__name__, str(pk))
+
+        return obj
+
+    def get(self, cls: Type[T], pk: PrimaryKey) -> T:
+        """Selects a single record by primary key and returns an instantiated object."""
+        return self._get(cls, pk)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_children(
+        self,
+        cursor: Cursor[T],
+        child_cls: type[T],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+    ) -> list[T]:
+        """Internal get_children method."""
+        if isinstance(parent_pk, UUID):
+            parent_obj = self._get(cursor, parent_cls, parent_pk)
+
+            parent_pk = getattr(parent_obj, parent_cls.__pk_name__)
+
+        query = sql.SQL("SELECT * FROM {table} WHERE {fk_col} = %s;").format(
+            table=child_cls.get_table_identifier(),
+            fk_col=parent_cls.get_pk_identifier(),
+        )
+
+        cursor.row_factory = class_row(child_cls)
+        cursor.execute(query, (parent_pk,))
         return cursor.fetchall()
 
-    def get_reviewed_areas(self, req: RAQuery) -> List[ReviewedArea]:
-        """ """
-        return self._get_reviewed_areas(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_reviewed_area_annotations(
-        self, cursor: Cursor[Annotation], ra_id: UUID
-    ) -> list[Annotation]:
-        """ """
-        cursor.row_factory = class_row(Annotation)
-        query = sql.SQL(""" SELECT * FROM core.annotations WHERE annotation_id IN (
-								SELECT annotation_id FROM core.annotations_reviewed_area
-								WHERE reviewed_area_id = %s ); """)
-
-        ra = self._get_reviewed_area(ra_id)
-        cursor.execute(query, (ra.reviewed_area_id,))
-
-        annotations = cursor.fetchall()
-        if annotations is None:
-            raise Exception("Crop has no annotations")
-        return annotations
-
-    def get_reviewed_area_annotations(self, reviewed_area_id: UUID) -> list[Annotation]:
-        """ """
-        return self._get_reviewed_area_annotations(reviewed_area_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _update_reviewed_area(
+    def get_children(
         self,
-        cursor: Cursor[ReviewedArea],
-        reviewed_area_id: Union[int, UUID],
-        req: UpdateReviewedAreaReq,
-        user: User,
-    ) -> ReviewedArea:
-        """ """
-        query = sql.SQL(""" UPDATE core.reviewed_area SET {augmented_field} 
-            modified = CURRENT_TIMESTAMP, reviewed_by_user_id = %s
-			WHERE {id_field} = %s
-            RETURNING *; """)
+        child_cls: type[T],
+        parent_cls: type[DBbase],
+        parent_pk: PrimaryKey,
+    ) -> list[T]:
+        """Fetches child records owned by a parent record.
 
-        kw_augmented_field = sql.SQL(",").join(
-            [
-                sql.SQL("{} = '%s'" % (value)).format(sql.Identifier(key))
-                for key, value in req.model_dump().items()
-                if key
-                in set(
-                    [
-                        "image_id",
-                        "name",
-                        "ra_key",
-                        "area_tx",
-                        "area_ty",
-                        "area_bx",
-                        "area_by",
-                        "reviewed_area_length_px",
-                        "reviewed_area_width_px",
-                    ]
-                )
-                and value is not None
-            ]
-        )
+        Args:
+            child_cls: The child model class to return.
+            parent_cls: The parent model class.
+            parent_pk: The primary key of the parent record.
+            foreign_key: Foreign key column name on the child. Inferred if omitted.
 
-        cursor.row_factory = class_row(ReviewedArea)
-        match reviewed_area_id:
-            case int():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("reviewed_area_id"),
-                    ),
-                    (user.user_id, reviewed_area_id),
-                )
-            case UUID():
-                cursor.execute(
-                    query.format(
-                        augmented_field=kw_augmented_field,
-                        id_field=sql.Identifier("uuid"),
-                    ),
-                    (user.user_id, reviewed_area_id),
-                )
-        reviewed_area = cursor.fetchone()
+        Returns:
+            list[T]: The child records, or an empty list if none exist.
 
-        if not reviewed_area:
-            raise ObjectNotFound("Reviewed Area", str(reviewed_area))
-
-        return reviewed_area
-
-    def update_reviewed_area(
-        self,
-        reviewed_area_id: Union[int, UUID],
-        req: UpdateReviewedAreaReq,
-        user: User,
-        bypass: bool = False,
-    ) -> ReviewedArea:
-        """ """
-        return self._update_reviewed_area(reviewed_area_id, req, user)
+        Raises:
+            ObjectNotFound: If the parent record does not exist.
+        """
+        return self._get_children(child_cls, parent_cls, parent_pk)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_project_users(
-        self, cursor: Cursor[User], project_id: Project | int | UUID
-    ) -> list[User] | User | None:
-        """ """
-        cursor.row_factory = class_row(User)
+    def _get_related(
+        self,
+        cursor: Cursor[T],
+        relation_cls: Type[Relationbase],
+        target_cls: Type[T],
+        scope: dict[str, Any],
+    ) -> list[T]:
+        """Internal method to fetch target models via a relation join table."""
+        if not scope:
+            raise ValueError("At least one filter condition must be provided.")
+
+        # Build parameterized WHERE clause targeting relation scope fields
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
+        scope_params = {f"_scope_{k}": v for k, v in scope.items()}
+
         query = sql.SQL(
-            """
-			SELECT users.user_id, username, external_auth_id, external_auth_provider, status, created, 
-			modified, last_login, locale, uuid FROM usermanagement.users AS users JOIN projectmanagement.projects_users
-			as projects_users ON projects_users.user_id = users.user_id WHERE projects_users.project_id = %s; """
-        )
-        match project_id:
-            case Project():
-                cursor.execute(query, (project_id.project_id,))
-            case int():
-                cursor.execute(query, (project_id,))
-            case _:
-                project = self._get_project(project_id)
-                cursor.execute(query, (project.project_id,))
-        users = cursor.fetchall()
-        return (
-            users[0]
-            if len(users) == 1 and isinstance(users[0], User)
-            else users if all(isinstance(user, User) for user in users) else None
+            "SELECT t.* FROM {target_table} t "
+            "JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} "
+            "WHERE r.{where_clause};"
+        ).format(
+            target_table=target_cls.get_table_identifier(),
+            relation_table=relation_cls.get_table_identifier(),
+            target_pk=sql.Identifier(target_cls.__pk_name__),
+            fk_field=sql.Identifier(target_cls.__pk_name__),
+            where_clause=where_clause,
         )
 
-    def get_project_users(
-        self, project_id: Project | int | UUID
-    ) -> list[User] | User | None:
-        """ """
-        return self._get_project_users(project_id=project_id)
+        cursor.row_factory = class_row(target_cls)
+        cursor.execute(query, scope_params)
+        return cursor.fetchall()
+
+    def get_related(
+        self,
+        relation_cls: Type[Relationbase],
+        target_cls: Type[T],
+        scope: dict[str, Any],
+    ) -> list[T]:
+        """
+        Fetches target entity models joined through a BaseRelation junction table.
+
+            Args:
+                relation_cls: The BaseRelation junction model class.
+                target_cls: The concrete entity model class to hydrate and return.
+                scope: Key-value filter pairs applied to the junction table.
+                fk_field: The foreign key column name on the junction table linking to target_cls.
+
+            Returns:
+                list[T]: Concrete entity records matching the criteria.
+
+            Raises:
+                ValueError: If scope is empty.
+        """
+        return self._get_related(relation_cls, target_cls, scope)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_user_projects(
-        self, cursor: Cursor[Project], user_id: User | int | UUID
-    ) -> list[Project]:
-        """ """
-        cursor.row_factory = class_row(Project)
-        query = sql.SQL(""" 
-			SELECT projects.project_id, name, created, modified, uuid FROM projectmanagement.projects as projects JOIN 
-			projectmanagement.projects_users AS projects_users ON projects_users.project_id = projects.project_id
-			WHERE projects_users.user_id = %s; """)
-        match user_id:
-            case User():
-                cursor.execute(query, (user_id.user_id,))
-            case int():
-                cursor.execute(query, (user_id,))
-            case _:
-                user = self._get_user(user_id)
-                cursor.execute(query, (user.user_id,))
-        projects = cursor.fetchall()
-        if projects is None:
-            raise Exception("User has no projects")
-        return projects
+    def _bulk_get(self, cursor: Cursor[T], cls: type[T], req: BulkRequest) -> list[T]:
+        """Internal bulk_get method."""
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("SELECT * FROM {table} as bobj")
 
-    def get_user_projects(self, user_id: User | int | UUID) -> list[Project]:
-        """ """
-        return self._get_user_projects(user_id=user_id)
+        p_filters, data = filter_by_object_ids("bobj", cls.__pk_name__, req.object_ids)
 
+        return cursor.execute(
+            sql.SQL("{q} WHERE {p}").format(
+                q=query.format(table=cls.get_table_identifier()), p=p_filters
+            ),
+            data,
+        ).fetchall()
+
+    def bulk_get(self, cls: type[T], req: BulkRequest) -> list[T]:
+        """
+        Fetch a collection of entities efficiently using a collection of primary keys
+
+        Args:
+            cls: The DBbase entity model class to fetch.
+            req: A pydantic request model including PrimaryKey identifiers
+
+        Returns:
+            A list of entities according to the provided identifiers
+
+        Raises:
+            ObjectNotFound: If one or more provided identifiers do not have a corresponding entity.
+
+        """
+        return self._bulk_get(cls, req)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # WHERE
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get_project_schemas(
-        self, cursor: Cursor[Schema], project_id: UUID
-    ) -> list[Schema]:
-        """ """
-        cursor.row_factory = class_row(Schema)
+    def _where(self, cursor: Cursor[T], cls: Type[T], scope: dict[str, Any]) -> list[T]:
+        """Internal where method."""
+        if not scope:
+            raise ValueError("At least one filter condition must be provided.")
+
+        # Build parameterized WHERE clause (e.g., image_uuid = %s)
+        where_clause = clause_generator(scope, sep=sql.SQL(" AND "), prefix="_scope_")
+        scope_params = {f"_scope_{k}": v for k, v in scope.items()}
+
+        query = sql.SQL("SELECT * FROM {table} WHERE {where_clause};").format(
+            table=cls.get_table_identifier(),
+            where_clause=where_clause,
+        )
+
+        cursor.row_factory = class_row(cls)
+        cursor.execute(query, scope_params)
+        return cursor.fetchall()
+
+    def where(self, cls: Type[T], scope: dict[str, Any]) -> list[T]:
+        """
+        Fetches records matching column filter criteria.
+
+            Args:
+                cls: The target model class to return.
+                **filters: Key-value pairs to filter by (e.g., status="active").
+
+            Returns:
+                list[T]: Records matching all criteria.
+
+            Raises:
+                ValueError: If no filter parameters are passed.
+                ObjectNotFound: If no matching records are found.
+        """
+        return self._where(cls, scope)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # EXISTS
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    @connect
+    def _exists(
+        self,
+        cursor: Cursor[Any],
+        cls: type[DBbase],
+        pk: PrimaryKey,
+    ) -> bool:
+        """Internal exists method"""
+        query = sql.SQL("SELECT EXISTS(SELECT 1 FROM {table} WHERE {id_col} = %s);")
+
+        pk_col = resolve_identifier(cls, pk)
+
+        cursor.execute(
+            query.format(
+                table=cls.get_table_identifier(),
+                id_col=pk_col,
+            ),
+            (pk,),
+        )
+        res = cursor.fetchone()
+
+        if not res or res[0] is False:
+            raise ObjectNotFound(cls.__name__, str(pk))
+
+        return True
+
+    def exists(self, cls: type[DBbase], pk: PrimaryKey) -> bool:
+        """Asserts that a record exists in the database.
+
+        Args:
+            cls: The model class to check.
+            pk: The primary key of the record.
+
+        Returns:
+            bool: True if the record exists.
+
+        Raises:
+            ObjectNotFound: If no record matches the given primary key.
+        """
+        return self._exists(cls, pk)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # DELETE
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _delete(self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey) -> bool:
+        """internal delete method"""
         query = sql.SQL("""
-			SELECT schemas.schema_id, name, created, modified, uuid FROM projectmanagement.schemas AS schemas 
-			JOIN projectmanagement.projects_schemas AS projects_schemas ON projects_schemas.schema_id = schemas.schema_id 
-			WHERE projects_schemas.project_id =  %s; """)
-        project = self._get_project(project_id)
+        DELETE FROM {table}
+        WHERE {id_col} = %(_pk_val)s
+        """)
 
-        cursor.execute(query, (project.project_id,))
-        schemas = cursor.fetchall()
-        return schemas
+        pk_col = resolve_identifier(cls, pk)
 
-    def get_project_schemas(self, project_id: UUID) -> list[Schema]:
-        """ """
-        return self._get_project_schemas(project_id=project_id)
+        cursor.row_factory = class_row(cls)
+        cursor.execute(
+            query.format(
+                table=cls.get_table_identifier(),
+                id_col=pk_col,
+            ),
+            {"_pk_val": pk},
+        )
+
+        return True
+
+    def delete(self, cls: type[T], pk: PrimaryKey) -> bool:
+        """Delete an object from the database
+
+        Args:
+        cls: the model class to delete.
+        pk: The primary key of the record.
+
+        Returns:
+            bool: True if the operation was successful.
+        """
+        return self._delete(cls, pk)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Relationship Management - projectmanagement <-> projectmanagement: surveys <-> herdunits
-
-    @connect
-    def _get_cropping_herd_units(
-        self, cursor: Cursor[HerdUnit], survey_id: Survey | int | UUID
-    ) -> list[HerdUnit]:
-        """ """
-        cursor.row_factory = class_row(HerdUnit)
-        survey = (
-            self._get_survey(survey_id)
-            if not isinstance(survey_id, Survey)
-            else survey_id
-        )
-        query = sql.SQL("""
-			SELECT herd_units.herd_unit_id, name, created, modified, uuid FROM projectmanagement.herd_units as herd_units JOIN
-			projectmanagement.surveys_herd_units AS surveys_herd_units ON surveys_herd_units.herd_unit_id = herd_units.herd_unit_id
-			WHERE surveys_herd_units.survey_id = %s; """)
-        cursor.execute(query, (survey.survey_id,))
-        herd_units = cursor.fetchall()
-        if herd_units is None:
-            raise Exception("No herd units found")
-        return herd_units
-
-    def get_cropping_herd_units(self, survey_id: Survey | int | UUID) -> list[HerdUnit]:
-        """ """
-        return self._get_cropping_herd_units(survey_id=survey_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Relationship Management - projectmanagement <-> projectmanagement: projects <-> surveys
-
-    @connect
-    def _get_project_surveys(
-        self, cursor: Cursor[Survey], project_id: Project | int | UUID
-    ) -> list[Survey]:
-        """ """
-        cursor.row_factory = class_row(Survey)
-        project = (
-            self._get_project(project_id)
-            if not isinstance(project_id, Project)
-            else project_id
-        )
-        query = sql.SQL("""
-			SELECT surveys.survey_id, survey_date, name, additional_info, created, modified, uuid from projectmanagement.surveys AS surveys
-			JOIN projectmanagement.projects_surveys AS projects_surveys ON projects_surveys.survey_id = surveys.survey_id 
-			WHERE projects_surveys.project_id = %s; """)
-        cursor.execute(query, (project.project_id,))
-        surveys = cursor.fetchall()
-        if surveys is None:
-            raise Exception("Could not find surveys for project")
-        return surveys
-
-    def get_project_surveys(self, project_id: Project | int | UUID) -> list[Survey]:
-        """ """
-        return self._get_project_surveys(project_id=project_id)
-
+    # Batching -- Complex Relations
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
     def _get_auto_crop_batch(
-        self, cursor: Cursor[Dict], params: AutoCropperBatchQuery, user: User
-    ) -> dict[str, Union[str, int, List[int]]]:
+        self, cursor: Cursor[dict], params: AutoCropperBatchQuery, user: User
+    ) -> dict[str, str | int | list[int]]:
         """ """
         q_params = {
-            "survey_id": self._get_survey(cursor, params.survey_id).survey_id,
-            "herd_unit_id": self._get_herd_unit(
-                cursor, params.herd_unit_id
+            "survey_id": self._get(cursor, Survey, params.survey_id).survey_id,
+            "herd_unit_id": self._get(
+                cursor, HerdUnit, params.herd_unit_id
             ).herd_unit_id,
-            "model_id": self._get_model(cursor, params.model_id).model_id,
+            "model_id": self._get(cursor, Model, params.model_id).model_id,
             "labels": params.label,
             "score": params.min_confidence,
             "batch_size": params.batch_size,
@@ -3604,63 +822,19 @@ FROM (
 
     def get_auto_crop_batch(
         self, req: AutoCropperBatchQuery, user: User
-    ) -> dict[str, Union[str, int, List[int]]]:
+    ) -> dict[str, str | int | list[int]]:
         """ """
         return self._get_auto_crop_batch(req, user)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Functionality - Set predictions as reviewed
-
-    @connect
-    def _set_predictions_reviewed(
-        self,
-        cursor: Cursor,
-        prediction_ids: List[UUID],
-        user: User,
-    ) -> bool:
-        """ """
-        query = sql.SQL(
-            " UPDATE core.predictions AS p SET reviewed_by_user_id = %s WHERE p.uuid = %s "
-        )
-        cursor.executemany(
-            query,
-            [(user.user_id, uuid) for uuid in prediction_ids],
-        )
-        return True
-
-    def set_predictions_reviewed(self, prediction_ids: List[UUID], user: User) -> bool:
-        """ """
-        return self._set_predictions_reviewed(prediction_ids, user)
-
+    # Legacy Holdovers -- Not enough time to rewrite
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Functionality - Close previously opened images
-
-    @connect
-    def _close_user_images(self, cursor: Cursor, user_id: int | UUID) -> bool:
-        """ """
-        query = sql.SQL(
-            " UPDATE core.images SET opened_by_user_id = 0 WHERE opened_by_user_id = %s; "
-        )
-        match user_id:
-            case int():
-                cursor.execute(query, (user_id,))
-            case UUID():
-                user = self._get_user(user_id)
-                cursor.execute(query, (user.user_id,))
-
-        return True if cursor.rowcount > 0 else False
-
-    def close_user_images(self, user_id: int | UUID) -> bool:
-        """ """
-        return self._close_user_images(user_id=user_id)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Functionality - Get Images by survey
+    # TODO: These methods need to be folded into the greater generics pattern !techdebt!
 
     @connect
     def _get_survey_images(
         self, cursor: Cursor[Any], survey_id: UUID, limit: int, offset: int
-    ) -> Tuple[List[Image], int]:
+    ) -> tuple[list[Image], int]:
         """ """
 
         query_1 = sql.SQL("SELECT COUNT(*) FROM core.images WHERE survey_id = %s")
@@ -3671,7 +845,7 @@ FROM (
             LIMIT %s OFFSET %s; 
         """)
 
-        survey = self._get_survey(cursor, survey_id)
+        survey = self._get(cursor, Survey, survey_id)
 
         cursor.row_factory = tuple_row
         res = cursor.execute(query_1, (survey.survey_id,)).fetchone()
@@ -3689,25 +863,159 @@ FROM (
 
     def get_survey_images(
         self, survey_id: UUID, limit: int, offset: int
-    ) -> Tuple[list[Image], int]:
+    ) -> tuple[list[Image], int]:
         """ """
         return self._get_survey_images(survey_id, limit, offset)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Functionality - Get crops to review
+
+    @connect
+    def _get_survey_annotated_images(
+        self,
+        cursor: Cursor[dict],
+        label_ids: list[int],
+        date_range: tuple[date, date] | None,
+        survey_ids: list[int] | None,
+        herd_unit_ids: list[int] | None,
+    ):
+        """ """
+        cursor.row_factory = dict_row
+
+        params_1 = []
+        placeholders: dict[str, list[int] | date] = {"label_ids": label_ids}
+
+        if survey_ids is not None:
+            params_1.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
+            placeholders["survey_ids"] = survey_ids
+
+        if herd_unit_ids is not None:
+            params_1.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
+            placeholders["herd_unit_ids"] = herd_unit_ids
+
+        if date_range is not None:
+            params_1.append(
+                sql.SQL(
+                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
+                )
+            )
+            placeholders["date_range_lower"] = date_range[0]
+            placeholders["date_range_upper"] = date_range[1]
+
+        image_params = sql.SQL(" AND ").join(params_1)
+
+        query = sql.SQL("""
+			SELECT json_agg(row_to_json(images))
+			FROM (
+				SELECT
+					I.*,
+					json_agg(
+						json_build_object(
+							'annotation_id', a.annotation_id,
+							'label_id', a.label_id,
+							'image_id', a.image_id,
+							'pred_id', a.pred_id,
+							'herd_unit_id', a.herd_unit_id,
+							'box_tx', a.box_tx,
+							'box_ty', a.box_ty,
+							'box_bx', a.box_bx,
+							'box_by', a.box_by,
+							'created_by_user_id', a.created_by_user_id,
+							'created', a.created,
+							'modified', a.modified, 
+							'uuid', a.uuid
+						)
+					) as annotations
+				FROM core.images I
+				INNER JOIN core.annotations A ON A.image_id = I.image_id
+				WHERE {image_args}
+					AND A.label_id = ANY(%(label_ids)s)
+				GROUP BY I.image_id
+			) as images
+		""")
+
+        try:
+            cursor.execute(query.format(image_args=image_params), placeholders)
+        except Exception as e:
+            print(e)
+        results = cursor.fetchall()
+        return results
+
+    def get_survey_annotated_images(
+        self,
+        label_ids: list[int],
+        date_range: tuple[date, date] | None,
+        survey_ids: list[int] | None,
+        herd_unit_ids: list[int] | None,
+    ):
+        """ """
+        return self._get_survey_annotated_images(
+            label_ids, date_range, survey_ids, herd_unit_ids
+        )
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_reviewed_areas(
+        self, cursor: Cursor[ReviewedArea], req: RAQuery
+    ) -> list[ReviewedArea]:
+        """ """
+        query = sql.SQL(""" 
+			SELECT ra.* FROM core.reviewed_area ra
+			JOIN core.images i on i.image_id = ra.image_id
+			WHERE {parameter_field} 
+		""")
+
+        params = []
+        placeholders: dict[str, list[int] | date | int] = {}
+
+        if req.herd_unit_id:
+            herd_unit = self._get(cursor, HerdUnit, req.herd_unit_id[0])
+            params.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
+            placeholders["herd_unit_ids"] = [herd_unit.herd_unit_id]
+
+        if req.survey_id:
+            survey = self._get(cursor, Survey, req.survey_id[0])
+            params.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
+            placeholders["survey_ids"] = [survey.survey_id]
+
+        if not req.include_reviewed:
+            params.append(sql.SQL("RA.reviewed_by_user_id = 0"))
+
+        if not req.include_opened:
+            params.append(sql.SQL("i.opened_by_user_id = 0"))
+
+        query_params = sql.SQL(" AND ").join(params)
+
+        if req.num:
+            query_params += sql.SQL(" LIMIT %(num)s ")  # pyright: ignore
+            placeholders["num"] = req.num
+
+        cursor.row_factory = class_row(ReviewedArea)
+        cursor.execute(query.format(parameter_field=query_params), placeholders)
+
+        print(query.format(parameter_field=query_params).as_string())
+
+        return cursor.fetchall()
+
+    def get_reviewed_areas(self, req: RAQuery) -> list[ReviewedArea]:
+        """ """
+        return self._get_reviewed_areas(req)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
     def _get_crop_to_review(
         self, cursor: Cursor[ReviewedArea], req: RAQuery, user: User
-    ) -> Union[ReviewedArea, None]:
+    ) -> Optional[ReviewedArea]:
         """Fetch a batch of reviewed areas that have yet to be reviewed."""
         reviewed_areas = self._get_reviewed_areas(cursor, req)
 
         if len(reviewed_areas) > 0:
-            image = self._get_image(reviewed_areas[0].image_id)
-            self._update_image(
+            image = self._get(cursor, Image, reviewed_areas[0].image_id)
+            self._update(
                 cursor,
-                image.uuid,
+                Image,
+                image.image_id,
                 UpdateImageReq(opened_by_user_id=user.user_id),
             )
 
@@ -3715,17 +1023,6 @@ FROM (
         else:
             return None
 
-    def get_crop_to_review(self, req: RAQuery, user: User) -> Union[ReviewedArea, None]:
+    def get_crop_to_review(self, req: RAQuery, user: User) -> Optional[ReviewedArea]:
         """ """
         return self._get_crop_to_review(req, user)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_crop_to_review_selection_count(self, cursor, req: RAQuery) -> int:
-        """ """
-        return len(self._get_reviewed_areas(cursor, req))
-
-    def get_crop_to_review_selection_count(self, req: RAQuery) -> int:
-        """ """
-        return self._get_crop_to_review_selection_count(req)

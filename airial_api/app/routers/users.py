@@ -3,24 +3,28 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from app.decorators import permission_required
-from database.object_models.user_management import (
-    User,
-    RoleNameQuery,
-    CreateUserReq,
-    SetActiveOrgReq,
-    UserQuery,
-)
 from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user
 from flask_pydantic import validate
 from msgpack import unpackb
+from numpy import isin
 
+from app.decorators import permission_required
 from app.extensions import base, cache, login_manager
-
 from authzed.api.v1 import CheckPermissionResponse
+from database.object_models.user_management import (
+    CreateUserReq,
+    Organization,
+    Role,
+    RoleNameQuery,
+    SetActiveOrgReq,
+    User,
+    OrganizationUser,
+)
+
+from database.object_models.base import create_spice_update
 
 userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -33,19 +37,27 @@ def load(session_user_id: str):
     cached_user = cache.get(user_key)
 
     if cached_user:
-        user = User(**unpackb(cached_user))
-        return user
+        return User(**unpackb(cached_user))
 
-    user_obj = base.get_user(UUID(session_user_id))
+    user_obj = base.get(User, pk=UUID(session_user_id))
+    if not user_obj:
+        return None
 
     if "active_org_uuid" in session:
         org_id = UUID(session.get("active_org_uuid"))
     else:
         org_id = user_obj.default_org_id
 
-    user_obj.roles = [
-        role.name for role in base.get_user_roles(user_obj.user_id, org_id)
-    ]
+    org = base.get(Organization, org_id)
+
+    # Retrieve active user roles
+    user_roles = base.get_related(
+        OrganizationUser,
+        Role,
+        {"user_id": user_obj.user_id, "organization_id": org.organization_id},
+    )
+
+    user_obj.roles = [role.name for role in user_roles]
 
     cache.set(user_key, user_obj.to_cache(), timeout=3600)
 
@@ -65,13 +77,15 @@ def unathorizated_callback():
 @login_required
 @permission_required("access")
 def get_all():
-    """ """
+    """Retrieve all users under the active organization"""
+    active_org = session.get("active_org_uuid")
 
-    query = UserQuery(organization_id=session["active_org_uuid"])
+    if not active_org:
+        abort(400, "No active organization selected.")
 
-    users = base.get_users(query)
+    users = base.where(User, {"organization_id": UUID(active_org)})
 
-    return [user.to_dict() for user in users], 200
+    return [user.serialize() for user in users], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -91,21 +105,28 @@ def check_auth():
 @userBp.get("/current-user")
 @login_required
 def get_current_user():
-    """ """
-    return current_user.to_dict(), 200
+    return current_user.serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@userBp.get("/<string:user_id>/organizations")
+@userBp.get("/<int:user_id>/organizations")
+@userBp.get("/<uuid:user_id>/organizations")
 @login_required
-def get_orgs(user_id: str):
-    """ """
+def get_orgs(user_id: int | UUID):
+    """Retrieve organizations linked to a specific user"""
+    # slower because we have to look up the pk for the fkey relation
+    if isinstance(user_id, UUID):
+        user = base.get(User, user_id)
+        user_id = user.user_id
 
-    orgs = base.get_user_organizations(UUID(user_id))
-
-    return [org.to_dict() for org in orgs]
+    orgs = base.get_related(
+        OrganizationUser,
+        Organization,
+        {"user_id": int(user_id)},
+    )
+    return [org.serialize() for org in orgs], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -115,8 +136,6 @@ def get_orgs(user_id: str):
 @login_required
 @validate()
 def check_role(query: RoleNameQuery):
-    """ """
-
     if current_user.roles and query.role_name in current_user.roles:
         return "true", 200
     else:
@@ -132,8 +151,9 @@ def check_role(query: RoleNameQuery):
 @permission_required("access")
 @validate()
 def create(body: CreateUserReq):
-    """ """
-    return base.create_user(body).to_dict(), 201
+    """Create a standard user using _insert"""
+    user = base.insert(User, body)
+    return user.serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,26 +163,29 @@ def create(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def create_super(body: CreateUserReq):
-    """ """
-    # Disable this endpoint if databae is initialized
+    """Bootstrap root super user"""
     bootstrapped = base.check_bootstrapped()
     if bootstrapped:
-        abort(401)
+        abort(401, "Database already bootstrapped.")
 
-    role = base.get_role("root")
-    body.role_ids = [role.uuid]
+    roles = base.where(Role, {"name": "root"})
+    if not roles:
+        abort(500, "Root role missing.")
+    body.role_ids = [roles[0].uuid]
 
-    org = base.get_organization("Root")
-    body.organization_id = org.uuid
+    orgs = base.where(Organization, {"name": "Root"})
+    if not orgs:
+        abort(500, "Root organization missing.")
+    body.organization_id = orgs[0].uuid
 
-    user = base.create_user(body)
+    user = base.insert(User, body)
 
     base.write_spice_relationships(
-        [base.create_spice_update("platform", "airial", "user", user.id, "root")]
+        [create_spice_update("platform", uuid4(), "user", user.uuid, "root")]
     )
 
     login_user(user)
-    return user.to_dict(), 200
+    return user.serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -174,25 +197,23 @@ def create_super(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def set_org(body: SetActiveOrgReq):
-    """ """
-    organization = base.get_organization(body.org_id)
+    """Set active organization context in session"""
+    organization = base.get(Organization, pk=body.org_id)
+    if not organization:
+        abort(404, "Organization not found.")
 
     res = base.check_permission(
         "organization", str(organization.uuid), str(current_user.uuid), "access"
     )
 
     if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
+        session["active_org_uuid"] = str(organization.uuid)
 
-        session["active_org_uuid"] = organization.uuid
-
-        # Flush the user from the cache to force admin status to update
         user_key = f"user_{str(current_user.uuid)}"
         cache.delete(user_key)
 
-        # Cache the new organization in the session
         session[f"org_{organization.uuid}"] = organization.to_cache()
 
         return "", 200
-
     else:
         abort(401)

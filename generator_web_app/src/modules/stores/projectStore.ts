@@ -56,7 +56,7 @@ import {
   type createLabelOptions,
 } from "../api/labels";
 import {
-  deleteImage,
+  delete_image,
   getImageAnnotations,
   getImagePredictions,
 } from "../api/images";
@@ -312,7 +312,7 @@ export const useProjectStore = defineStore("pStore", {
     },
 
     async delete_image(id: string) {
-      await deleteImage(id);
+      await delete_image(id);
       delete this.imageRecords.images[id];
     },
 
