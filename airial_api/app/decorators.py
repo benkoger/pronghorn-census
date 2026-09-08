@@ -1,19 +1,34 @@
 from functools import wraps
 from typing import cast
+
+from authzed.api.v1 import CheckPermissionResponse, Consistency
 from flask import abort, current_app
 from flask_login import current_user
-from app.extensions import base
-from database.errors import AuthorizationFailure, ObjectNotFound
-from database.object_models.user_management.users import User
-from authzed.api.v1 import CheckPermissionResponse
 from pydantic import BaseModel
 
-getters = {
-    "image": base.get_image,
-    "label": base.get_label,
-    "herd_unit": base.get_herd_unit,
-    "org": base.get_organization,
-    "organization": base.get_organization,
+from app.extensions import base
+from database.errors import AuthorizationFailure, ObjectNotFound
+from database.object_models.project_management import HerdUnit
+from database.object_models.core.images import Image
+from database.object_models.project_management.labels import Label
+from database.object_models.user_management.organizations import Organization
+from database.object_models.user_management.users import User
+
+# Model map replacing obsolete base methods
+MODEL_MAP = {
+    "image": Image,
+    "label": Label,
+    "herd_unit": HerdUnit,
+    "org": Organization,
+    "organization": Organization,
+}
+
+check_exist = {
+    "image": lambda val: base._exists(Image, val),
+    "label": lambda val: base._exists(Label, val),
+    "herd_unit": lambda val: base._exists(HerdUnit, val),
+    "org": lambda val: base._exists(Organization, val),
+    "organization": lambda val: base._exists(Organization, val),
 }
 
 
@@ -24,7 +39,7 @@ def roles_required(*roles):
             if not current_user.is_authenticated:
                 return abort(401)
 
-            if not any(current_user.has_role(r) for r in roles):
+            if not any(current_user.hasRole(r) for r in roles):
                 return abort(403)
 
             return f(*args, **kwargs)
@@ -56,9 +71,21 @@ def permission_required(permission: str):
                     if field_name.endswith("_id") and value is not None:
                         obj_type = field_name.rsplit("_id", 1)[0]
 
+                        if obj_type not in check_exist:
+                            continue
+
+                        exists = check_exist[obj_type](value)
+                        if not exists:
+                            abort(404, f"{obj_type} with id of {value} does not exist!")
+
                         if isinstance(value, int):
                             try:
-                                db_obj = getters[obj_type](value)
+                                model_cls = MODEL_MAP[obj_type]
+                                db_obj = base._get(model_cls, value)
+                                if not db_obj:
+                                    abort(
+                                        404, f"{obj_type} with id of {value} not found."
+                                    )
                                 obj_id = str(getattr(db_obj, "uuid", db_obj))
                             except (ObjectNotFound, KeyError) as e:
                                 current_app.logger.exception(e)
@@ -89,7 +116,10 @@ def permission_required(permission: str):
                 extract_and_queue_checks(resources)
 
             if check_items:
-                bulk_res = base.bulk_check_permission(check_items)
+                consistency = Consistency(fully_consistent=True)
+                bulk_res = base.bulk_check_permission(
+                    check_items, consistency=consistency
+                )
 
                 for i, pair in enumerate(bulk_res.pairs):
                     if (

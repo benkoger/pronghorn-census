@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, model_validator
 
+from database.object_models.base import PrimaryKey
+
 from .core import Prediction
 
 
@@ -18,7 +20,7 @@ class AutoCropperBatchQuery(BaseModel):
 class AutoCropReq(BaseModel):
     image_id: UUID
     predictions: List[Prediction]
-    label_ids: List[UUID]
+    label_ids: List[PrimaryKey]
 
     @model_validator(mode="before")
     @classmethod

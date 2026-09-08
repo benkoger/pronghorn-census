@@ -30,15 +30,15 @@ const router = createRouter({
         requiresNoLayout: false,
       },
     },
-    {
-      path: "/users/:uuid?",
-      name: "users",
-      component: () => import("@/pages/users.vue"),
-      meta: {
-        requiresAuth: true,
-        requiresNoLayout: false,
-      },
-    },
+    // {
+    //   path: "/users/:uuid?",
+    //   name: "users",
+    //   component: () => import("@/pages/users.vue"),
+    //   meta: {
+    //     requiresAuth: true,
+    //     requiresNoLayout: false,
+    //   },
+    // },
     {
       path: "/auto-cropper/",
       name: "auto-cropper",
@@ -67,15 +67,6 @@ const router = createRouter({
       },
     },
     {
-      path: "/statistics",
-      name: "statistics",
-      component: () => import("@/pages/statistics.vue"),
-      meta: {
-        requiresAuth: true,
-        requiresNoLayout: false,
-      },
-    },
-    {
       path: "/upload/",
       name: "upload",
       component: () => import("@/pages/uploader/uploaderPage.vue"),
@@ -84,15 +75,15 @@ const router = createRouter({
         requiresNoLayout: false,
       },
     },
-    {
-      path: "/data",
-      name: "data-manager",
-      component: () => import("@/pages/dataManager.vue"),
-      meta: {
-        requiresAuth: true,
-        requiresNoLayout: false,
-      },
-    },
+    // {
+    //   path: "/data",
+    //   name: "data-manager",
+    //   component: () => import("@/pages/dataManager.vue"),
+    //   meta: {
+    //     requiresAuth: true,
+    //     requiresNoLayout: false,
+    //   },
+    // },
   ],
 });
 

@@ -5,6 +5,7 @@
 
 from flask import Blueprint, request
 from app.decorators import permission_required
+from database.object_models.core.annotations import Annotation
 from database.object_models.project_management import CreateSurveyReq, UpdateSurveyReq
 from app.extensions import base
 from datetime import datetime
@@ -14,7 +15,8 @@ from flask_login import (
 )
 from uuid import UUID
 
-from database.object_models.project_management.surveys import SurveyImageQuery
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.surveys import Survey, SurveyImageQuery
 
 surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 
@@ -22,43 +24,47 @@ surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 # GET
 
 
-@surveyBp.get("/<string:survey_id>")
+@surveyBp.get("/<int:survey_id>")
+@surveyBp.get("/<uuid:survey_id>")
 @login_required
 @permission_required("access")
-def get_by_id(survey_id: str):
+def get_by_id(survey_id: int | UUID):
     """ """
-    return base.get_survey(UUID(survey_id)).to_dict()
+    return base.get(Survey, survey_id).serialize()
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@surveyBp.get("/<string:survey_id>/annotations")
+@surveyBp.get("/<int:survey_id>/annotations")
+@surveyBp.get("/<uuid:survey_id>/annotations")
 @login_required
 @permission_required("access")
-def get_annotations(survey_id: str):
+def get_annotations(survey_id: int | UUID):
     """ """
-    annotations = base.get_survey_annotations(UUID(survey_id))
+    annotations = base.get_children(Annotation, Survey, survey_id)
 
-    return [annotation.to_dict() for annotation in annotations], 200
+    return [annotation.serialize() for annotation in annotations], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@surveyBp.get("/<string:survey_id>/herd-units")
+@surveyBp.get("/<int:survey_id>/herd-units")
+@surveyBp.get("/<uuid:survey_id>/herd-units")
 @login_required
 @permission_required("access")
-def get_herd_units(survey_id: str):
+def get_herd_units(survey_id: int | UUID):
     """ """
-    herd_units = base.get_survey_herd_units(UUID(survey_id))
+    herd_units = base.get_children(HerdUnit, Survey, survey_id)
 
-    return [herd_unit.to_dict() for herd_unit in herd_units], 200
+    return [herd_unit.serialize() for herd_unit in herd_units], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+# TODO update get_children method to use pagination and get this to use get_children
 @surveyBp.get("/<string:survey_id>/images")
 @login_required
 @permission_required("access")
@@ -72,7 +78,7 @@ def get_images(query: SurveyImageQuery, survey_id: str):
     )
 
     return {
-        "images": [image.to_dict() for image in images],
+        "images": [image.serialize() for image in images],
         "total": total_images,
         "page": query.page,
         "per_page": query.per_page,
@@ -83,13 +89,14 @@ def get_images(query: SurveyImageQuery, survey_id: str):
 
 
 # TODO: Update to use pydantic query class
-@surveyBp.get("/<string:survey_id>/annotated_images")
+@surveyBp.get("/<int:survey_id>/annotated_images")
+@surveyBp.get("/<uuid:survey_id>/annotated_images")
 @login_required
 @permission_required("access")
-def get_annotated_images(survey_id: str):
+def get_annotated_images(survey_id: int | UUID):
     """ """
     date_range = request.args.get("date_range", None)
-    surveys = [base.get_survey(UUID(survey_id)).survey_id]
+    surveys = [base.get(Survey, survey_id).survey_id]
     labels = request.args.getlist("label", type=int)
     herd_units = request.args.getlist("herd_unit", type=int)
     format_pattern = "%m/%d/%Y %H:%M:%S"
@@ -114,7 +121,7 @@ def get_annotated_images(survey_id: str):
 @validate()
 def create(body: CreateSurveyReq):
     """ """
-    return base.create_survey(body).to_dict(), 201
+    return base.insert(Survey, body).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -124,24 +131,26 @@ def create(body: CreateSurveyReq):
 # PATCH
 
 
-@surveyBp.patch("/<string:survey_id>")
+@surveyBp.patch("/<int:survey_id>")
+@surveyBp.patch("/<uuid:survey_id>")
 @login_required
 @permission_required("access")
 @validate()
-def update(body: UpdateSurveyReq, survey_id: str):
+def update(body: UpdateSurveyReq, survey_id: int | UUID):
     """ """
-    return base.update_survey(UUID(survey_id), body.model_dump()).to_dict(), 200
+    return base.update(Survey, survey_id, body).serialize(), 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # Delete
 
 
-@surveyBp.delete("/<string:survey_id>")
+@surveyBp.delete("/<int:survey_id>")
+@surveyBp.delete("/<int:survey_id>")
 @login_required
 @permission_required("access")
-def delete_survey(survey_id: str):
+def delete_survey(survey_id: int | UUID):
     """ """
-    base.delete_survey(UUID(survey_id))
+    base.delete(Survey, survey_id)
 
     return "", 204

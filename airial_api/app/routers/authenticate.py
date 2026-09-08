@@ -6,17 +6,23 @@
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 import secrets
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+import requests
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
 from flask_login import login_required, login_user, logout_user
 from flask_pydantic import validate
-import requests
 from werkzeug.security import check_password_hash
 
 from app.extensions import base
 from database import AuthenticationFailure
-from database.object_models.user_management import LegacyAuthReq
+from database.object_models.user_management import (
+    LegacyAuthReq,
+    Organization,
+    User,
+    UpdateUserReq,
+)
 
 authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
@@ -26,7 +32,7 @@ authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
 @authBp.get("/authorize/<string:provider>")
 def oauth2_authorize(provider: str):
-    """ """
+    """Initiate OAuth2 authorization redirect"""
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -54,7 +60,7 @@ def oauth2_authorize(provider: str):
 
 @authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-    """ """
+    """OAuth2 callback handler updating user status via base._update"""
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -101,22 +107,36 @@ def oauth2_callback(provider: str):
     )
     if response.status_code != 200:
         abort(401)
-    email = provider_data["userinfo"]["email"](response.json())
 
-    user = base.get_user(email)
+    email = provider_data["userinfo"]["email"](response.json())
+    users = base._where(User, email=email)
+    if not users:
+        abort(404, "User not found.")
+
+    user = users[0]
 
     if user.status == "invited":
-        base.activate_user(
-            user.email, user.user_id, response.json().get("sub"), provider
+        base._update(
+            User,
+            user.user_id,
+            status="active",
+            oauth_sub=response.json().get("sub"),
+            oauth_provider=provider,
+            last_login=datetime.now(timezone.utc),
         )
     else:
-        base.login_user(user.user_id)
+        base._update(
+            User,
+            user.user_id,
+            last_login=datetime.now(timezone.utc),
+        )
 
     login_user(user)
 
-    default_org = base.get_organization(user.default_org_id)
-    session["active_org_uuid"] = str(default_org.uuid)
-    session[f"org_{default_org.uuid}"] = default_org.to_cache()
+    default_org = base._get(Organization, id=user.default_org_id)
+    if default_org:
+        session["active_org_uuid"] = str(default_org.uuid)
+        session[f"org_{default_org.uuid}"] = default_org.to_cache()
 
     frontend_url = current_app.config.get("ORIGIN_URL")
     return redirect(f"{frontend_url}/")
@@ -128,22 +148,29 @@ def oauth2_callback(provider: str):
 @authBp.post("/authenticate")
 @validate()
 def authenticate(body: LegacyAuthReq):
-    """Basic email password authentication"""
+    """Basic email/password authentication"""
 
-    user = base.get_user(body.email)
+    users = base.where(User, {"email": body.email})
+    if not users:
+        raise AuthenticationFailure()
+
+    user = users[0]
     if not user.password_hash:
-        abort(400)
+        abort(400, "User account is not configured for password authentication.")
 
     if check_password_hash(user.password_hash, body.password):
-        base.login_user(user.user_id)
+        base.update(
+            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
+        )
     else:
         raise AuthenticationFailure()
 
     login_user(user)
 
-    default_org = base.get_organization(user.default_org_id)
-    session["active_org_uuid"] = str(default_org.uuid)
-    session[f"org_{default_org.uuid}"] = default_org.to_cache()
+    default_org = base.get(Organization, pk=user.default_org_id)
+    if default_org:
+        session["active_org_uuid"] = str(default_org.uuid)
+        session[f"org_{default_org.uuid}"] = default_org.to_cache()
 
     return "", 200
 
@@ -154,5 +181,6 @@ def authenticate(body: LegacyAuthReq):
 @authBp.post("/deauthenticate")
 @login_required
 def logout():
+    """Logout current user session"""
     logout_user()
     return "", 200

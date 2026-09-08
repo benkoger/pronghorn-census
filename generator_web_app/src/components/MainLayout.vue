@@ -42,7 +42,7 @@ onErrorCaptured((err) => {
     <BContainer
       fluid
       id="Router View Content"
-      class="flex-grow-1 d-flex flex-column mb-1"
+      class="flex-grow-1 d-flex flex-column mb-3"
     >
       <h2
         v-if="!$route.meta.requiresNoTitle"

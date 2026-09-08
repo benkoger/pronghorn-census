@@ -4,3 +4,4 @@ from .models import *
 from .projects import *
 from .schemas import *
 from .surveys import *
+from .projectmanagement_bindings import *

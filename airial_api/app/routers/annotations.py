@@ -3,15 +3,16 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import cast, List
+from typing import cast
 
-from flask import Blueprint, abort
+from flask import Blueprint
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 from app.decorators import permission_required
 from app.extensions import base
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
+    Annotation,
     BulkCreateAnnotationReq,
     BulkUpdateAnnotationsReq,
     BulkDeleteAnnotationsReq,
@@ -46,14 +47,15 @@ def create(body: CreateAnnotationReq):
             500:
                     description: Unexpected error.
     """
-    annotation = base.create_annotation(body, cast(User, current_user))
+    annotation = base.insert(Annotation, body, cast(User, current_user))
 
-    return annotation.to_dict(), 201
+    return annotation.serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+# This could be optimized pretty heavily
 @annotBp.post("/bulk-import")
 @validate()
 @login_required
@@ -64,20 +66,21 @@ def import_annotation(body: BulkCreateAnnotationReq):
     annotations = []
 
     for req in body.requests:
-        annotations.append(base.create_annotation(req, cast(User, current_user)))
+        annotations.append(base.insert(Annotation, req, cast(User, current_user)))
 
-    return [annot.to_dict() for annot in annotations], 201
+    return [annot.serialize() for annot in annotations], 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # PATCH
 
 
-@annotBp.patch("/<string:annotation_id>")
+@annotBp.patch("/<int:annotation_id>")
+@annotBp.patch("/<uuid:annotation_id>")
 @login_required
 @permission_required("access")
 @validate()
-def update(body: UpdateAnnotationReq, annotation_id: str):
+def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
     """
     Update annotation objects in the database.
     ---
@@ -97,11 +100,9 @@ def update(body: UpdateAnnotationReq, annotation_id: str):
                     description: Unexpected error.
     """
 
-    annotation = base.update_annotation(
-        UUID(annotation_id), body, cast(User, current_user)
-    )
+    annotation = base.update(Annotation, annotation_id, body)
 
-    return annotation.to_dict(), 200
+    return annotation.serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,26 +130,28 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
     annotations = []
 
     for req in body.requests:
-        annotations.append(
-            base.update_annotation(req.annotation_id, req, cast(User, current_user))
-        )
+        if not req.annotation_id:
+            continue
 
-    return [annot.to_dict() for annot in annotations], 200
+        annotations.append(base.update(Annotation, req.annotation_id, req))
+
+    return [annot.serialize() for annot in annotations], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@annotBp.delete("/<string:annotation_id>")
+@annotBp.delete("/<int:annotation_id>")
+@annotBp.delete("/<uuid:annotation_id>")
 @login_required
 @permission_required("access")
-def delete(annotation_id: str):
+def delete(annotation_id: int | UUID):
     """ """
 
-    res = base.delete_annotation(UUID(annotation_id))
+    base.delete(Annotation, annotation_id)
 
-    return "", 200 if res else abort(500)
+    return "", 204
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,9 +163,7 @@ def delete(annotation_id: str):
 @validate()
 def bulk_delete(body: BulkDeleteAnnotationsReq):
     """ """
-    results: List[bool] = []
-
     for req in body.requests:
-        results.append(base.delete_annotation(req.annotation_id))
+        base.delete(Annotation, req.annotation_id)
 
-    return "", 200 if all(results) else abort(500)
+    return "", 204

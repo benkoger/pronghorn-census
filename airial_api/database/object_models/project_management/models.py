@@ -4,11 +4,32 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional, Self
 from uuid import UUID
 
-from pydantic import BaseModel
+from authzed.api.v1 import RelationshipUpdate
+from psycopg import Cursor
+from psycopg.rows import class_row
+from pydantic import BaseModel, ConfigDict
+import psycopg.sql as sql
 
-from ..base import DBbase
+from ..base import DBbase, Keyring, create_spice_update
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateModelReq(BaseModel):
+    name: str
+    project_ids: Keyring
+    schema_ids: Keyring
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class UpdateModelReq(BaseModel):
+    name: str
+
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -24,32 +45,54 @@ class Model(DBbase):
     modified: datetime
     uuid: UUID
 
+    __tablename__: str = "models"
+    __schema__: str = "projectmanagement"
+    __pk_name__: str = "model_id"
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_dict(self):
-        return {
-            "model_id": self.model_id,
-            "schema_id": self.schema_id,
-            "name": self.name,
-            "created": self.fmt_date(self.created),
-            "modified": self.fmt_date(self.modified),
-            "uuid": str(self.uuid),
-        }
+    class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
+        model_id: int
+        schema_id: int
+        name: str
+        created: datetime
+        modified: datetime
+        uuid: UUID
 
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# ---------------------------------------------------------------------------------------------------------------------------
+    @classmethod
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateModelReq
+    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
+        query = sql.SQL("""
+            WITH new_model AS (
+                INSERT INTO projectmanagement.models (name)
+                VALUES (%(name)s)
+                RETURNING *
+            )
+            INSERT INTO projectmanagement.projects_models (project_id, model_id)
+            VALUES (%(project_id)s, (SELECT model_id FROM new_model));
 
+            SELECT * FROM new_model;
+        """)
 
-class CreateModelReq(BaseModel):
-    name: str
-    project_id: UUID
-    schema_id: UUID
+        cursor.execute(query, {**req.model_dump(), "project_id": req.project_ids.pkey})
 
+        if not (model := cursor.fetchone()):
+            return None
 
-# ---------------------------------------------------------------------------------------------------------------------------
+        spice_updates = [
+            create_spice_update(
+                "model", model.uuid, "project", req.project_ids.uuid, "parent"
+            )
+        ]
 
+        return model, spice_updates
 
-class UpdateModelReq(BaseModel):
-    name: str
-    project_id: UUID
-    schema_id: UUID
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def serialize(self):
+        return Model.Response.model_validate(self).model_dump(mode="json")
