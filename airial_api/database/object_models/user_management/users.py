@@ -117,7 +117,8 @@ class UpdateUserReq(BaseModel):
     username: Optional[str] = None
     last_login: Optional[datetime] = None
     status: Optional[str] = None
-    oauth_provider: Optional[str] = None
+    external_auth_provider: Optional[str] = None
+    external_auth_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

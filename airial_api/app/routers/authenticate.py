@@ -121,7 +121,8 @@ def oauth2_callback(provider: str):
             user.user_id,
             UpdateUserReq(
                 status="active",
-                oauth_provider=provider,
+                external_auth_provider=provider,
+                external_auth_id=response.json().get("sub"),
                 last_login=datetime.now(timezone.utc),
             ),
         )
