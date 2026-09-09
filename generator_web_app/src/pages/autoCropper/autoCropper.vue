@@ -386,7 +386,7 @@ onBeforeUnmount(async () => {
               <span>Name</span>
             </BCol>
             <BCol cols="10" class="text-truncate text-center">
-              <span>{{ cStore.currentImage.name }}</span>
+              <span>{{ cStore.currentImage?.name }}</span>
             </BCol>
           </BListGroupItem>
           <BListGroupItem class="d-flex p-0">
@@ -397,7 +397,7 @@ onBeforeUnmount(async () => {
               <span>Created</span>
             </BCol>
             <BCol cols="10" class="text-truncate text-center">
-              <span>{{ cStore.currentImage.created }}</span>
+              <span>{{ cStore.currentImage?.created }}</span>
             </BCol>
           </BListGroupItem>
           <BListGroupItem class="d-flex p-0">
@@ -408,7 +408,7 @@ onBeforeUnmount(async () => {
               <span>Modified</span>
             </BCol>
             <BCol cols="10" class="text-truncate text-center">
-              <span>{{ cStore.currentImage.modified }}</span>
+              <span>{{ cStore.currentImage?.modified }}</span>
             </BCol>
           </BListGroupItem>
           <BListGroupItem class="d-flex p-0">
@@ -419,7 +419,7 @@ onBeforeUnmount(async () => {
               <span>UUID</span>
             </BCol>
             <BCol cols="10" class="text-truncate text-center">
-              <span>{{ cStore.currentImage.uuid }}</span>
+              <span>{{ cStore.currentImage?.uuid }}</span>
             </BCol>
           </BListGroupItem>
         </BListGroup>
