@@ -993,8 +993,6 @@ FROM (
         cursor.row_factory = class_row(ReviewedArea)
         cursor.execute(query.format(parameter_field=query_params), placeholders)
 
-        print(query.format(parameter_field=query_params).as_string())
-
         return cursor.fetchall()
 
     def get_reviewed_areas(self, req: RAQuery) -> list[ReviewedArea]:

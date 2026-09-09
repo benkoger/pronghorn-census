@@ -109,31 +109,30 @@ def oauth2_callback(provider: str):
         abort(401)
 
     email = provider_data["userinfo"]["email"](response.json())
-    users = base._where(User, email=email)
+    users = base.where(User, {"email": email})
     if not users:
         abort(404, "User not found.")
 
     user = users[0]
 
     if user.status == "invited":
-        base._update(
+        base.update(
             User,
             user.user_id,
-            status="active",
-            oauth_sub=response.json().get("sub"),
-            oauth_provider=provider,
-            last_login=datetime.now(timezone.utc),
+            UpdateUserReq(
+                status="active",
+                oauth_provider=provider,
+                last_login=datetime.now(timezone.utc),
+            ),
         )
     else:
-        base._update(
-            User,
-            user.user_id,
-            last_login=datetime.now(timezone.utc),
+        base.update(
+            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
         )
 
     login_user(user)
 
-    default_org = base._get(Organization, id=user.default_org_id)
+    default_org = base.get(Organization, user.default_org_id)
     if default_org:
         session["active_org_uuid"] = str(default_org.uuid)
         session[f"org_{default_org.uuid}"] = default_org.to_cache()

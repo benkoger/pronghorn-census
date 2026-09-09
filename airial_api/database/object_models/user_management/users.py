@@ -27,11 +27,11 @@ class User(UserMixin, DBbase):
     created: datetime
     modified: datetime
     last_login: datetime
-    locale: str
     uuid: UUID
     default_org_id: int
     password_hash: str
     roles: Optional[List[str]] = None
+    locale: Optional[str] = None
     id: str = field(init=False)
 
     __tablename__: str = "users"
@@ -50,7 +50,7 @@ class User(UserMixin, DBbase):
         created: datetime
         modified: datetime
         last_login: datetime
-        locale: str
+        locale: Optional[str]
         default_org_id: int
         uuid: UUID
 
@@ -116,6 +116,8 @@ class CreateUserReq(BaseModel):
 class UpdateUserReq(BaseModel):
     username: Optional[str] = None
     last_login: Optional[datetime] = None
+    status: Optional[str] = None
+    oauth_provider: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
