@@ -60,7 +60,7 @@ def oauth2_authorize(provider: str):
 
 @authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-    """OAuth2 callback handler updating user status via base._update"""
+    """OAuth2 callback handler"""
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
