@@ -179,12 +179,3 @@ npm install
 npm run dev
 ```
 
----
-
-## Project Status & Development Philosophy
-
-Airial is an active academic research initiative developed by the Ben Koger Lab at the University of Wyoming and Michael B. Lance.
-
-* **Development Reality**: 1 human developer leading architecture and systems design, assisted by coding agents for implementation.
-* **Objective**: Rapid delivery of a functional, feature-complete, end-to-end working product.
-* **Testing Status**: Automated tests are currently deferred / not implemented by design. Work in this repository prioritizes functional completeness, robust error handling, and working end-to-end capabilities over unit test coverage suites.

@@ -8,7 +8,7 @@ This document is the primary onboarding and operational guide for AI coding assi
 
 * **Project**: **Airial** (also referred to as *Pronghorn Census* / *Assisted Labeling & Census Software*).
 * **Domain**: Computer vision-assisted wildlife census and abundance estimation (specifically aerial surveys of wildlife like pronghorn).
-* **Organization**: Academic / Non-profit wildlife conservation research (University of Wyoming - Ben Koger Lab & Michael B. Lance).
+* **Organization**: Academic / Non-profit wildlife conservation research (University of Wyoming - Ben Koger Lab).
 * **Development Reality**:
   * **Team size**: **1 human developer**.
   * **Goal**: Deliver a functional, feature-complete, end-to-end working product as rapidly as possible.
