@@ -9,7 +9,6 @@ from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user
 from flask_pydantic import validate
 from msgpack import unpackb
-from numpy import isin
 
 from app.decorators import permission_required
 from app.extensions import base, cache, login_manager
@@ -77,7 +76,19 @@ def unathorizated_callback():
 @login_required
 @permission_required("access")
 def get_all():
-    """Retrieve all users under the active organization"""
+    """
+    Retrieve all users under the currently active session organization.
+    ---
+    responses:
+      200:
+        description: List of users under the active organization.
+      400:
+        description: No active organization selected in session.
+      401:
+        description: User not authenticated or not authorized.
+      500:
+        description: Database error.
+    """
     active_org = session.get("active_org_uuid")
 
     if not active_org:
@@ -93,6 +104,13 @@ def get_all():
 
 @userBp.get("/check-auth")
 def check_auth():
+    """
+    Check if the current request session is authenticated.
+    ---
+    responses:
+      200:
+        description: String "true" if authenticated, "false" otherwise.
+    """
     if current_user.is_authenticated:
         return "true", 200
     else:
@@ -105,6 +123,15 @@ def check_auth():
 @userBp.get("/current-user")
 @login_required
 def get_current_user():
+    """
+    Retrieve profile and role information for the currently logged-in user.
+    ---
+    responses:
+      200:
+        description: Serialized current user object.
+      401:
+        description: User not authenticated.
+    """
     return current_user.serialize(), 200
 
 
@@ -115,7 +142,33 @@ def get_current_user():
 @userBp.get("/<uuid:user_id>/organizations")
 @login_required
 def get_orgs(user_id: int | UUID):
-    """Retrieve organizations linked to a specific user"""
+    """
+    Retrieve organizations linked to a specific user.
+    ---
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the user (integer ID or UUID).
+    responses:
+      200:
+        description: List of organizations associated with the user.
+      400:
+        description: Invalid user ID format.
+      401:
+        description: User not authenticated.
+      404:
+        description: User not found.
+      500:
+        description: Database error.
+    """
     # slower because we have to look up the pk for the fkey relation
     if isinstance(user_id, UUID):
         user = base.get(User, user_id)
@@ -136,6 +189,21 @@ def get_orgs(user_id: int | UUID):
 @login_required
 @validate()
 def check_role(query: RoleNameQuery):
+    """
+    Check if the current authenticated user has a specific role.
+    ---
+    parameters:
+      - name: role_name
+        in: query
+        required: true
+        type: string
+        description: Name of the role to check.
+    responses:
+      200:
+        description: String "true" if the user has the role, "false" otherwise.
+      401:
+        description: User not authenticated.
+    """
     if current_user.roles and query.role_name in current_user.roles:
         return "true", 200
     else:
@@ -151,7 +219,27 @@ def check_role(query: RoleNameQuery):
 @permission_required("access")
 @validate()
 def create(body: CreateUserReq):
-    """Create a standard user using _insert"""
+    """
+    Create a standard user in the database.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreateUserReq
+        description: User creation payload containing username, email, password, and organization context.
+    responses:
+      201:
+        description: User created successfully.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized to create users.
+      409:
+        description: Username or email already exists.
+      500:
+        description: Database error.
+    """
     user = base.insert(User, body)
     return user.serialize(), 201
 
@@ -163,7 +251,25 @@ def create(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def create_super(body: CreateUserReq):
-    """Bootstrap root super user"""
+    """
+    Bootstrap the initial root super user during first-time platform setup.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreateUserReq
+        description: Super user creation payload.
+    responses:
+      200:
+        description: Super user created and authenticated.
+      400:
+        description: Invalid request payload.
+      401:
+        description: System already bootstrapped.
+      500:
+        description: Root role or organization missing in database.
+    """
     bootstrapped = base.check_bootstrapped()
     if bootstrapped:
         abort(401, "Database already bootstrapped.")
@@ -197,7 +303,27 @@ def create_super(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def set_org(body: SetActiveOrgReq):
-    """Set active organization context in session"""
+    """
+    Set active organization context in the user's session.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: SetActiveOrgReq
+        description: Payload containing the target organization UUID.
+    responses:
+      200:
+        description: Active organization successfully updated in session.
+      400:
+        description: Validation error or invalid UUID.
+      401:
+        description: User does not have access permissions for this organization.
+      404:
+        description: Organization not found.
+      500:
+        description: Database or cache error.
+    """
     organization = base.get(Organization, pk=body.org_id)
     if not organization:
         abort(404, "Organization not found.")

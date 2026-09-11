@@ -29,20 +29,28 @@ predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 @validate()
 def get_predictions(query: BulkRequest):
     """
-     Request a prediction object from the database using its UUID.
+    Retrieve multiple prediction objects by a list of integer IDs or UUIDs.
     ---
     parameters:
-      - name: pred_id
-            in: path
-            type: string
-            required: true
+      - name: object_ids
+        in: query
+        required: true
+        type: array
+        items:
+          oneOf:
+            - type: integer
+            - type: string
+              format: uuid
+        description: List of prediction primary keys (integer IDs or UUIDs).
     responses:
       200:
-            description: The requested prediction was found.
+        description: List of predictions found.
       400:
-            description: Invalid UUID format provided.
-      404:
-            description: No prediction record found for the provided ID.
+        description: Invalid query format.
+      401:
+        description: User not authorized.
+      500:
+        description: Database error.
     """
 
     predictions = base.bulk_get(Prediction, query)
@@ -58,7 +66,33 @@ def get_predictions(query: BulkRequest):
 @permission_required("access")
 @login_required
 def get_prediction_by_id(prediction_id: int | UUID):
-    """ """
+    """
+    Retrieve a single prediction by its integer ID or UUID.
+    ---
+    parameters:
+      - name: prediction_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the prediction (integer ID or UUID).
+    responses:
+      200:
+        description: Prediction record found and returned.
+      400:
+        description: Invalid ID format.
+      401:
+        description: User not authorized to access this prediction.
+      404:
+        description: Prediction not found.
+      500:
+        description: Database error.
+    """
 
     return base.get(Prediction, prediction_id).serialize(), 200
 
@@ -72,6 +106,24 @@ def get_prediction_by_id(prediction_id: int | UUID):
 @permission_required("access")
 @validate()
 def create_prediction(body: CreatePredictionReq):
-    """ """
+    """
+    Create a new prediction record.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreatePredictionReq
+        description: Prediction creation payload with bounding box coordinates, label, score, model_ids, and image_ids.
+    responses:
+      200:
+        description: Prediction created successfully.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized to create predictions.
+      500:
+        description: Database error.
+    """
 
     return base.insert(Prediction, body).serialize(), 200

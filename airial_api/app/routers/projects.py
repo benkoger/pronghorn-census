@@ -43,7 +43,17 @@ projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 @permission_required("access")
 @validate()
 def get_all():
-    """ """
+    """
+    Retrieve all projects belonging to the currently active session organization.
+    ---
+    responses:
+      200:
+        description: List of projects for the active organization.
+      401:
+        description: User not authenticated or session lacks active organization.
+      500:
+        description: Database or session error.
+    """
 
     org_id = session.get("active_org_uuid")
     active_org = session.get(f"org_{org_id}")
@@ -64,22 +74,31 @@ def get_all():
 @permission_required("access")
 def get_by_id(project_id: int | UUID):
     """
-    Request a project object from the database using its UUID.
+    Request a project object from the database using its integer PK or UUID.
     ---
     parameters:
-      - project_id
-            in: path
-            type: string
-            required: true
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project (integer ID or UUID).
     responses:
       200:
-            description: The requested project was found.
+        description: The requested project was found.
       400:
-            description: Invalid UUID format provided.
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this project.
       404:
-            description: No project record found for the provided ID.
+        description: No project record found for the provided ID.
       500:
-            description: Database Error.
+        description: Database error.
     """
 
     return base.get(Project, project_id).serialize(), 200
@@ -94,20 +113,31 @@ def get_by_id(project_id: int | UUID):
 @login_required
 def get_models(project_id: int | UUID):
     """
-    Retrieve models for a specific project
+    Retrieve all models associated with a specific project.
     ---
     parameters:
-            - name: project_id
-            in: path
-            type: string
-            required: true
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project (integer ID or UUID).
     responses:
       200:
-            description: List of models.
+        description: List of models (returns empty list if none exist).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this project.
       404:
-            description: No project found.
+        description: Project not found.
       500:
-            description: Database error.
+        description: Database error.
     """
 
     if isinstance(project_id, UUID):
@@ -128,15 +158,31 @@ def get_models(project_id: int | UUID):
 @permission_required("access")
 def get_herd_units(project_id: int | UUID):
     """
-    Retrieve herd units for a specific project
+    Retrieve all herd units associated with a specific project.
     ---
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project (integer ID or UUID).
     responses:
       200:
-            description: List of herd units.
+        description: List of herd units (returns empty list if none exist).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this project.
       404:
-            description: No project found.
+        description: Project not found.
       500:
-            description: Database error.
+        description: Database error.
     """
 
     if isinstance(project_id, UUID):
@@ -158,7 +204,33 @@ def get_herd_units(project_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_surveys(project_id: int | UUID):
-    """ """
+    """
+    Retrieve all surveys associated with a specific project.
+    ---
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project (integer ID or UUID).
+    responses:
+      200:
+        description: List of surveys (returns empty list if none exist).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this project.
+      404:
+        description: Project not found.
+      500:
+        description: Database error.
+    """
 
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
@@ -177,7 +249,33 @@ def get_surveys(project_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_schemas(project_id: int | UUID):
-    """ """
+    """
+    Retrieve all schemas associated with a specific project.
+    ---
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project (integer ID or UUID).
+    responses:
+      200:
+        description: List of schemas (returns empty list if none exist).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this project.
+      404:
+        description: Project not found.
+      500:
+        description: Database error.
+    """
 
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
@@ -197,7 +295,27 @@ def get_schemas(project_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: createProjectReq):
-    """ """
+    """
+    Create a new project object.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: createProjectReq
+        description: Project creation payload containing name and organization_ids.
+    responses:
+      201:
+        description: Project created successfully.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized to create projects.
+      409:
+        description: Conflict or unique constraint violation.
+      500:
+        description: Database error.
+    """
     return base.insert(Project, body, cast(User, current_user)).serialize(), 201
 
 
@@ -206,11 +324,37 @@ def create(body: createProjectReq):
 
 
 @projectBp.delete("/<int:project_id>")
-@projectBp.delete("<uuid:project_id>")
+@projectBp.delete("/<uuid:project_id>")
 @login_required
 @permission_required("access")
 def delete(project_id: int | UUID):
-    """ """
+    """
+    Delete a project by its integer ID or UUID.
+    ---
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the project to delete.
+    responses:
+      204:
+        description: Project deleted successfully.
+      400:
+        description: Invalid ID format.
+      401:
+        description: User not authorized to delete this project.
+      404:
+        description: Project not found.
+      500:
+        description: Database error.
+    """
 
     base.delete(Project, project_id)
 
