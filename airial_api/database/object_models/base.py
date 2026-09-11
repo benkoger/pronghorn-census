@@ -124,7 +124,6 @@ class Relationbase(ABC):
     """Pure interface for junction models"""
 
     @classmethod
-    @abstractmethod
     def get_table_identifier(cls) -> sql.Identifier:
         """Return the qualified table identifier."""
         if cls.__schema__:

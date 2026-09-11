@@ -17,7 +17,7 @@ from psycopg.rows import class_row
 from pydantic import BaseModel, field_validator, ConfigDict
 from authzed.api.v1 import RelationshipUpdate
 
-from ..base import Box, Keyring, create_spice_update, DBbase
+from ..base import Box, Keyring, Relationbase, create_spice_update, DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -226,7 +226,7 @@ class CrateReviewedAreaPresignedGetReq(BaseModel):
 
 
 @dataclass
-class Image(DBbase, ImageMixin):
+class Image(DBbase, ImageMixin, Relationbase):
     image_id: int
     herd_unit_id: int
     survey_id: int

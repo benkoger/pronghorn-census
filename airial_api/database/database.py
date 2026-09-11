@@ -62,6 +62,7 @@ from database.query_builder import (
     filter_by_object_ids,
     resolve_identifier,
     clause_generator,
+    build_traversal_query,
 )
 
 from .errors import (
@@ -476,6 +477,7 @@ class Database:
         child_cls: type[T],
         parent_cls: type[DBbase],
         parent_pk: PrimaryKey,
+        via: list[type[DBbase | Relationbase] | tuple[type[DBbase | Relationbase], str]] | None = None,
     ) -> list[T]:
         """Internal get_children method."""
         if isinstance(parent_pk, UUID):
@@ -483,10 +485,13 @@ class Database:
 
             parent_pk = getattr(parent_obj, parent_cls.__pk_name__)
 
-        query = sql.SQL("SELECT * FROM {table} WHERE {fk_col} = %s;").format(
-            table=child_cls.get_table_identifier(),
-            fk_col=parent_cls.get_pk_identifier(),
-        )
+        if via:
+            query = build_traversal_query(child_cls, parent_cls, via)
+        else:
+            query = sql.SQL("SELECT * FROM {table} WHERE {fk_col} = %s;").format(
+                table=child_cls.get_table_identifier(),
+                fk_col=parent_cls.get_pk_identifier(),
+            )
 
         cursor.row_factory = class_row(child_cls)
         cursor.execute(query, (parent_pk,))
@@ -497,14 +502,15 @@ class Database:
         child_cls: type[T],
         parent_cls: type[DBbase],
         parent_pk: PrimaryKey,
+        via: list[type[DBbase | Relationbase] | tuple[type[DBbase | Relationbase], str]] | None = None,
     ) -> list[T]:
-        """Fetches child records owned by a parent record.
+        """Fetches child records owned by a parent record, optionally traversing intermediate models.
 
         Args:
             child_cls: The child model class to return.
             parent_cls: The parent model class.
             parent_pk: The primary key of the parent record.
-            foreign_key: Foreign key column name on the child. Inferred if omitted.
+            via: Optional sequence of intermediate models to traverse.
 
         Returns:
             list[T]: The child records, or an empty list if none exist.
@@ -512,7 +518,7 @@ class Database:
         Raises:
             ObjectNotFound: If the parent record does not exist.
         """
-        return self._get_children(child_cls, parent_cls, parent_pk)
+        return self._get_children(child_cls, parent_cls, parent_pk, via=via)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

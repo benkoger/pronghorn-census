@@ -6,6 +6,7 @@
 from flask import Blueprint, request
 from app.decorators import permission_required
 from database.object_models.core.annotations import Annotation
+from database.object_models.core.images import Image
 from database.object_models.project_management import CreateSurveyReq, UpdateSurveyReq
 from app.extensions import base
 from datetime import datetime
@@ -16,6 +17,9 @@ from flask_login import (
 from uuid import UUID
 
 from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.projectmanagement_bindings import (
+    SurveysHerdUnits,
+)
 from database.object_models.project_management.surveys import Survey, SurveyImageQuery
 
 surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
@@ -94,7 +98,8 @@ def get_annotations(survey_id: int | UUID):
       500:
         description: Database error.
     """
-    annotations = base.get_children(Annotation, Survey, survey_id)
+
+    annotations = base.get_children(Annotation, Survey, survey_id, via=[Image])
 
     return [annotation.serialize() for annotation in annotations], 200
 
@@ -134,7 +139,7 @@ def get_herd_units(survey_id: int | UUID):
       500:
         description: Database error.
     """
-    herd_units = base.get_children(HerdUnit, Survey, survey_id)
+    herd_units = base.get_children(HerdUnit, Survey, survey_id, via=[SurveysHerdUnits])
 
     return [herd_unit.serialize() for herd_unit in herd_units], 200
 

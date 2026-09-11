@@ -5,7 +5,6 @@ from testing_core import APITester
 import pytest
 
 import hashlib
-from typing import List
 from uuid import uuid4, UUID
 
 from pydantic import TypeAdapter
@@ -58,7 +57,7 @@ class TestImages(APITester):
 
         data = response.get_json()
         if is_list:
-            TypeAdapter(List[expected_schema]).validate_python(data)
+            TypeAdapter(list[expected_schema]).validate_python(data)
         else:
             expected_schema.model_validate(data)
 
