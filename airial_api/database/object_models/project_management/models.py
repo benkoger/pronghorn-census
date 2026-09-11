@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Optional, Self
 from uuid import UUID
 
@@ -18,8 +19,19 @@ from ..base import DBbase, Keyring, create_spice_update
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+class ModelType(StrEnum):
+    DETECTION = "detection"
+    REGRESSION = "regression"
+    DEPTH_ESTIMATION = "depth estimation"
+    REGRESION = "regression"
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class CreateModelReq(BaseModel):
     name: str
+    model_type: ModelType
     project_ids: Keyring
     schema_ids: Keyring
 
@@ -41,6 +53,7 @@ class Model(DBbase):
     model_id: int
     schema_id: int
     name: str
+    model_type: ModelType
     created: datetime
     modified: datetime
     uuid: UUID
@@ -56,6 +69,7 @@ class Model(DBbase):
         model_id: int
         schema_id: int
         name: str
+        model_type: ModelType
         created: datetime
         modified: datetime
         uuid: UUID
@@ -66,11 +80,12 @@ class Model(DBbase):
     def _create(
         cls, cursor: Cursor[Self], req: CreateModelReq
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_model AS (
-                INSERT INTO projectmanagement.models (name)
-                VALUES (%(name)s)
+                INSERT INTO projectmanagement.models (name, model_type)
+                VALUES (%(name)s, %(model_type)s)
                 RETURNING *
             )
             INSERT INTO projectmanagement.projects_models (project_id, model_id)

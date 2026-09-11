@@ -16,8 +16,6 @@ export default defineComponent({
   },
   data() {
     return {
-      scaleX: 1,
-      scaleY: 1,
       // Note: these numbers dont matter because the resize event listener will overwrite them
       sceneWidth: 200,
       sceneHeight: 200,
@@ -42,6 +40,7 @@ export default defineComponent({
 
       this.resizeo = new ResizeObserver(this.updateSizeX);
       this.resizeo.observe((this.$refs.stagewrapper as HTMLDivElement));
+      this.fitImageToStage();
     });
     document.addEventListener('keydown', this.handleKeyPress);
   },
@@ -52,8 +51,21 @@ export default defineComponent({
     await this.cvs.endSession();
   },
   computed: {
-    stageWidth() { return this.sceneWidth * this.scaleX },
-    stageHeight() { return this.sceneHeight * this.scaleY }
+    stageWidth(): number { return this.sceneWidth },
+    stageHeight(): number { return this.sceneHeight },
+    isImageLoaded(): boolean {
+      return Boolean(this.cvs.currentImage && this.cvs.currentImage[1]?.value === 'loaded');
+    }
+  },
+  watch: {
+    isImageLoaded(loaded: boolean) {
+      if (loaded) {
+        this.fitImageToStage();
+      }
+    },
+    "cvs.activeCropId"() {
+      this.fitImageToStage();
+    },
   },
   methods: {
     degToRad: (angle: number) => (angle / 180) * Math.PI,
@@ -327,17 +339,28 @@ export default defineComponent({
     //--------------------------------------------------------------------------------------
 
     async handleRightArrow() {
+      if (this.cvs.outofcrops) {
+        this.cvs.outofcrops = false;
+        return;
+      }
       await this.cvs.nextImage();
     },
 
     //--------------------------------------------------------------------------------------
 
     async handleLeftArrow() {
+      if (this.cvs.outofcrops) {
+        this.cvs.outofcrops = false;
+      }
       await this.cvs.previousImage();
     },
 
     //--------------------------------------------------------------------------------------
     async handleEnter() {
+      if (this.cvs.outofcrops) {
+        this.cvs.outofcrops = false;
+        return;
+      }
       await this.cvs.submit();
     },
 
@@ -361,6 +384,9 @@ export default defineComponent({
     handleKeyPress(event: KeyboardEvent) {
       switch (true) {
         case event.code === 'Escape': {
+          if (this.cvs.outofcrops) {
+            this.cvs.outofcrops = false;
+          }
           this.cancelDraw();
           break;
         };
@@ -380,11 +406,74 @@ export default defineComponent({
           this.handleLeftArrow();
           break;
         };
+        case event.code === 'ArrowUp':
+        case event.code === 'ArrowDown':
+        case event.code === 'PageUp':
+        case event.code === 'PageDown':
+        case event.code === 'Home':
+        case event.code === 'End': {
+          if (this.cvs.outofcrops) {
+            this.cvs.outofcrops = false;
+          }
+          break;
+        };
         case event.code === 'Enter': {
           this.handleEnter();
           break;
         };
       }
+    },
+
+    //--------------------------------------------------------------------------------------
+
+    fitImageToStage() {
+      this.$nextTick(() => {
+        if (!this.$refs.stageRef) return;
+        // @ts-ignore
+        const stage = (this.$refs.stageRef as Konva.Stage).getNode();
+        if (!stage) return;
+
+        const stageWidth = this.stageWidth || stage.width();
+        const stageHeight = this.stageHeight || stage.height();
+        if (!stageWidth || !stageHeight) return;
+
+        let imgWidth = 0;
+        let imgHeight = 0;
+
+        if (this.cvs.currentImage && this.cvs.currentImage[0]?.value) {
+          const img = this.cvs.currentImage[0].value as HTMLImageElement;
+          imgWidth = img.naturalWidth || img.width;
+          imgHeight = img.naturalHeight || img.height;
+        }
+
+        if (!imgWidth || !imgHeight) {
+          if (this.cvs.currentCrop) {
+            imgWidth = this.cvs.currentCrop.reviewed_area_width_px;
+            imgHeight = this.cvs.currentCrop.reviewed_area_length_px;
+          }
+        }
+
+        if (!imgWidth || !imgHeight) {
+          imgWidth = 2100;
+          imgHeight = 2100;
+        }
+
+        const padding = 20;
+        const availableWidth = Math.max(stageWidth - padding * 2, 50);
+        const availableHeight = Math.max(stageHeight - padding * 2, 50);
+
+        const scale = Math.min(
+          availableWidth / imgWidth,
+          availableHeight / imgHeight,
+        );
+
+        const x = (stageWidth - imgWidth * scale) / 2;
+        const y = (stageHeight - imgHeight * scale) / 2;
+
+        stage.scale({ x: scale, y: scale });
+        stage.position({ x, y });
+        stage.batchDraw();
+      });
     },
   }
 });
@@ -442,8 +531,6 @@ export default defineComponent({
               width: stageWidth,
               height: stageHeight,
               draggable: true,
-              scaleX: scaleX,
-              scaleY: scaleY,
               dragBoundFunc: function (pos: number, e: MouseEvent) {
                 //@ts-ignore
                 return isDrawing ? this.getAbsolutePosition() : pos;

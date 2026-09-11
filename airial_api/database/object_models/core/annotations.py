@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, List, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -13,17 +13,14 @@ from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, field_validator, ConfigDict
 
-from database.object_models.project_management.herd_units import HerdUnit
-from database.object_models.user_management.users import User
-
 from ..base import (
     Box,
     BulkRequestModel,
     DBbase,
     Keyring,
-    PrimaryKey,
     create_spice_update,
 )
+from .activity import ActivityType
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -37,6 +34,7 @@ class CreateAnnotationReq(BaseModel):
     box_bx: int
     box_by: int
     uuid: UUID
+    type: ActivityType = ActivityType.AUTO_CROPPER
     prediction_ids: Optional[Keyring] = None
     reviewed_area_ids: Optional[Keyring] = None
 
@@ -53,9 +51,9 @@ class BulkCreateAnnotationReq(BaseModel):
 
 
 class UpdateAnnotationReq(BaseModel):
-    annotation_id: Optional[PrimaryKey]
     image_id: Optional[Keyring] = None
     label_id: Optional[Keyring] = None
+    type: Optional[ActivityType] = None
     box_tx: Optional[int] = None
     box_ty: Optional[int] = None
     box_bx: Optional[int] = None
@@ -88,6 +86,7 @@ class BulkDeleteAnnotationsReq(BulkRequestModel):
 class Annotation(DBbase):
     label_id: int
     image_id: int
+    type: ActivityType
     pred_id: int
     herd_unit_id: int
     box_tx: int
@@ -118,15 +117,16 @@ class Annotation(DBbase):
         annotation_id: int
         label_id: int
         image_id: int
+        type: ActivityType
         herd_unit_id: int
-        dimensions: Dict[str, Dict[str, int]]
+        dimensions: dict[str, dict[str, int]]
         created: datetime
         modified: datetime
         uuid: UUID
 
         @field_validator("dimensions", mode="before")
         @classmethod
-        def transform_box(cls, value: Any) -> Dict[str, Dict[str, int]]:
+        def transform_box(cls, value: Any) -> dict[str, dict[str, int]]:
             if isinstance(value, Box):
                 return value.serialize()
             return value
@@ -141,15 +141,16 @@ class Annotation(DBbase):
         user_key: Keyring,
         herd_unit_key: Keyring,
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_annotation AS (
                 INSERT INTO core.annotations (
-                    label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx,
+                    label_id, image_id, type, herd_unit_id, box_tx, box_ty, box_bx,
                     box_by, created_by_user_id, pred_id, uuid
                 )
                 VALUES (
-                    %(label_id)s, %(image_id)s, %(herd_unit_id)s, %(box_tx)s,
+                    %(label_id)s, %(image_id)s, %(type)s, %(herd_unit_id)s, %(box_tx)s,
                     %(box_ty)s, %(box_bx)s, %(box_by)s, %(created_by_user_id)s, 
                     %(pred_id)s, %(uuid)s
                 )
@@ -175,7 +176,7 @@ class Annotation(DBbase):
                 "image_id": req.image_ids.pkey,
                 "pred_id": req.prediction_ids.pkey if req.prediction_ids else 0,
                 "created_by_user_id": user_key.pkey,
-                "reviewed_area_id": req.reviewed_area_ids.pkey, 
+                "reviewed_area_id": req.reviewed_area_ids.pkey,
             },
         )
 
@@ -192,5 +193,5 @@ class Annotation(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         return Annotation.Response.model_validate(self).model_dump(mode="json")

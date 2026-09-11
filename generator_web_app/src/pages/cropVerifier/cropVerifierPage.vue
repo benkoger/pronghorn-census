@@ -22,12 +22,15 @@ export default defineComponent({
     if (pStore.projects.length == 0) pStore.get_projects();
     return { pStore, cvStore };
   },
-  mounted() {
+  async mounted() {
     if (this.pStore.CurrentProject) {
       this.$router.push({
         name: "crop-verifier",
         params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
       });
+    }
+    if (this.CurrentHerdUnit && this.CurrentSurvey) {
+      await this.cvStore.getReviewCount();
     }
   },
   data() {
@@ -62,6 +65,11 @@ export default defineComponent({
     },
   },
   watch: {
+    async currentStep(newStep: number) {
+      if (newStep === 2 && this.CurrentHerdUnit && this.CurrentSurvey) {
+        await this.cvStore.getReviewCount();
+      }
+    },
     CurrentProject(newValue: Project, oldValue: Project) {
       const currentQuery = { ...this.$route.query };
       this.pStore.clear_models();
@@ -111,6 +119,7 @@ export default defineComponent({
     CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
       const currentQuery = { ...this.$route.query };
       this.pStore.clear_surveys();
+      this.cvStore.needingReviewed = 0;
       if (newValue != oldValue && newValue != undefined) {
         this.pStore.get_herd_unit_surveys();
         const newQuery = {
@@ -143,6 +152,7 @@ export default defineComponent({
           survey: undefined,
         };
         this.$router.push({ query: newQuery });
+        this.cvStore.needingReviewed = 0;
       }
     },
     async alreadyReviewed(newValue: boolean, oldValue: boolean) {
@@ -204,8 +214,7 @@ export default defineComponent({
           <h3>Cropper session settings</h3>
           <BTabs content-class="mt-3">
             <BTab title="general settings">
-              <BFormCheckbox id="checkbox-1" v-model="cvStore.alreadyReviewed" name="checkbox-1" value="true"
-                unchecked-value="false" switch>
+              <BFormCheckbox id="checkbox-1" v-model="alreadyReviewed" name="checkbox-1" switch>
                 Include crops that have already been approved
               </BFormCheckbox>
               <BButton class="mt-1" :loading="cvStore.loading" @click="cvStore.closeImages">

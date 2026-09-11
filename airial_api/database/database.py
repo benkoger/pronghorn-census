@@ -40,14 +40,16 @@ from grpc import (
     ssl_channel_credentials,
 )
 import psycopg.sql as sql
-from psycopg import Cursor
+from psycopg import Connection, Cursor
 from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row, tuple_row
+from psycopg.types.enum import EnumInfo, register_enum
 from psycopg_pool import ConnectionPool
 
 from database.object_models.autocropper import AutoCropperBatchQuery
 from database.object_models.base import DBbase, T, Relationbase, PrimaryKey, BulkRequest
 
+from database.object_models.core.activity import ActivityType
 from database.object_models.core.images import (
     Image,
     RAQuery,
@@ -55,7 +57,7 @@ from database.object_models.core.images import (
     UpdateImageReq,
 )
 from database.object_models.project_management.herd_units import HerdUnit
-from database.object_models.project_management.models import Model
+from database.object_models.project_management.models import Model, ModelType
 from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management.users import User
 from database.query_builder import (
@@ -72,6 +74,23 @@ from .errors import (
 # ---------------------------------------------------------------------------------------------------------------------------
 
 EXT_KEY = "base"
+
+
+def configure_connection(conn: Connection):
+    for enum_name, enum_cls in [
+        ("projectmanagement.model_type", ModelType),
+        ("core.activity_type", ActivityType),
+    ]:
+        try:
+            info = EnumInfo.fetch(conn, enum_name)
+            if not info:
+                info = EnumInfo.fetch(conn, enum_name.split(".")[-1])
+            if info:
+                mapping = [(member, member.value) for member in enum_cls]
+                register_enum(info, context=conn, enum=enum_cls, mapping=mapping)
+        except Exception:
+            continue
+
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -133,6 +152,7 @@ class Database:
             open=True,
             max_lifetime=290,
             check=ConnectionPool.check_connection,
+            configure=configure_connection,
         )
 
         atexit.register(self.close_pool)
