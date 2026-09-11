@@ -20,6 +20,7 @@ from ..base import (
     Keyring,
     create_spice_update,
 )
+from .activity import ActivityType
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -33,6 +34,7 @@ class CreateAnnotationReq(BaseModel):
     box_bx: int
     box_by: int
     uuid: UUID
+    type: ActivityType = ActivityType.AUTO_CROPPER
     prediction_ids: Optional[Keyring] = None
     reviewed_area_ids: Optional[Keyring] = None
 
@@ -51,6 +53,7 @@ class BulkCreateAnnotationReq(BaseModel):
 class UpdateAnnotationReq(BaseModel):
     image_id: Optional[Keyring] = None
     label_id: Optional[Keyring] = None
+    type: Optional[ActivityType] = None
     box_tx: Optional[int] = None
     box_ty: Optional[int] = None
     box_bx: Optional[int] = None
@@ -83,6 +86,7 @@ class BulkDeleteAnnotationsReq(BulkRequestModel):
 class Annotation(DBbase):
     label_id: int
     image_id: int
+    type: ActivityType
     pred_id: int
     herd_unit_id: int
     box_tx: int
@@ -113,6 +117,7 @@ class Annotation(DBbase):
         annotation_id: int
         label_id: int
         image_id: int
+        type: ActivityType
         herd_unit_id: int
         dimensions: dict[str, dict[str, int]]
         created: datetime
@@ -141,11 +146,11 @@ class Annotation(DBbase):
         query = sql.SQL("""
             WITH new_annotation AS (
                 INSERT INTO core.annotations (
-                    label_id, image_id, herd_unit_id, box_tx, box_ty, box_bx,
+                    label_id, image_id, type, herd_unit_id, box_tx, box_ty, box_bx,
                     box_by, created_by_user_id, pred_id, uuid
                 )
                 VALUES (
-                    %(label_id)s, %(image_id)s, %(herd_unit_id)s, %(box_tx)s,
+                    %(label_id)s, %(image_id)s, %(type)s, %(herd_unit_id)s, %(box_tx)s,
                     %(box_ty)s, %(box_bx)s, %(box_by)s, %(created_by_user_id)s, 
                     %(pred_id)s, %(uuid)s
                 )

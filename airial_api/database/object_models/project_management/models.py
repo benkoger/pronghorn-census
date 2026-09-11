@@ -11,7 +11,6 @@ from uuid import UUID
 from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
-from psycopg.types.enum import EnumInfo, register_enum
 from pydantic import BaseModel, ConfigDict
 import psycopg.sql as sql
 
@@ -22,8 +21,9 @@ from ..base import DBbase, Keyring, create_spice_update
 
 class ModelType(StrEnum):
     DETECTION = "detection"
-    REGRESION = "regression"
+    REGRESSION = "regression"
     DEPTH_ESTIMATION = "depth estimation"
+    REGRESION = "regression"
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -53,6 +53,7 @@ class Model(DBbase):
     model_id: int
     schema_id: int
     name: str
+    model_type: ModelType
     created: datetime
     modified: datetime
     uuid: UUID
@@ -68,6 +69,7 @@ class Model(DBbase):
         model_id: int
         schema_id: int
         name: str
+        model_type: ModelType
         created: datetime
         modified: datetime
         uuid: UUID
@@ -79,18 +81,11 @@ class Model(DBbase):
         cls, cursor: Cursor[Self], req: CreateModelReq
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
 
-        info = EnumInfo.fetch(cursor.connection, "model_type")
-
-        if not info:
-            raise Exception("failed to get enum info")
-
-        register_enum(info, context=cursor, enum=ModelType)
-
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_model AS (
                 INSERT INTO projectmanagement.models (name, model_type)
-                VALUES (%(name)s)
+                VALUES (%(name)s, %(model_type)s)
                 RETURNING *
             )
             INSERT INTO projectmanagement.projects_models (project_id, model_id)

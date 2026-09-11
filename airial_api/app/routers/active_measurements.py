@@ -14,7 +14,7 @@ from app.extensions import base
 from database.object_models.core.am_units import AmUnit
 from database.object_models.project_management.active_measurements import (
     ActiveMeasurement,
-    CreateActiveMeasurment,
+    CreateActiveMeasurement,
     UpdateActiveMeasurement,
 )
 
@@ -106,7 +106,7 @@ def get_am_units(active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 @validate()
-def create(body: CreateActiveMeasurment):
+def create(body: CreateActiveMeasurement):
     """
     Create a new active measurement.
     ---
@@ -114,8 +114,8 @@ def create(body: CreateActiveMeasurment):
       - name: body
         in: body
         required: true
-        type: CreateActiveMeasurment
-        description: Active measurement creation payload including survey_ids, label_ids, random_seed, and frozen flag.
+        type: CreateActiveMeasurement
+        description: Active measurement creation payload including survey_ids, label_ids, random_seed, and retraining_cadence.
     responses:
       201:
         description: Active measurement created successfully.
@@ -142,7 +142,7 @@ def create(body: CreateActiveMeasurment):
 @validate()
 def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
     """
-    Update an active measurement by integer ID or UUID (e.g., freezing or unfreezing).
+    Update an active measurement by integer ID or UUID (e.g., retraining cadence).
     ---
     parameters:
       - name: active_measurement_id

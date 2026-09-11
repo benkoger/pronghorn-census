@@ -19,18 +19,21 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class CreateActiveMeasurment(BaseModel):
+class CreateActiveMeasurement(BaseModel):
     survey_ids: Keyring
     label_ids: Keyring
     random_seed: int
-    frozen: bool
+    retraining_cadence: int
+
+
+CreateActiveMeasurment = CreateActiveMeasurement
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateActiveMeasurement(BaseModel):
-    frozen: Optional[bool] = False
+    retraining_cadence: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -42,7 +45,7 @@ class ActiveMeasurement(DBbase):
     survey_id: int
     label_id: int
     random_seed: int
-    frozen: bool
+    retraining_cadence: int
     created: datetime
     modified: datetime
     uuid: UUID
@@ -59,7 +62,7 @@ class ActiveMeasurement(DBbase):
         survey_id: int
         label_id: int
         random_seed: int
-        frozen: bool
+        retraining_cadence: int
         created: datetime
         modified: datetime
         uuid: UUID
@@ -68,17 +71,17 @@ class ActiveMeasurement(DBbase):
 
     @classmethod
     def _create(
-        cls, cursor: Cursor[Self], req: CreateActiveMeasurment
+        cls, cursor: Cursor[Self], req: CreateActiveMeasurement
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
 
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO projectmanagement.active_measurements (
-                survey_id, label_id, random_seed, frozen
+                survey_id, label_id, random_seed, retraining_cadence
             )
             VALUES (
                 %(survey_id)s, %(label_id)s, %(random_seed)s,
-                %(frozen)s
+                %(retraining_cadence)s
             )
             RETURNING *;
         """)

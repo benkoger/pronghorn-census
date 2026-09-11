@@ -1,4 +1,4 @@
-from os import wait
+from database.object_models.core.activity import ActivityType
 
 from .herd_units import *
 from .labels import *

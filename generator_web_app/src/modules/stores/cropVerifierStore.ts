@@ -91,13 +91,15 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
     pStore(): ReturnType<typeof useProjectStore> {
       return useProjectStore();
     },
-    currentImage: (state) => state.batch["crops"][state.activeCropId]["image"],
-    activeCrop: (state) => state.batch["crops"][state.activeCropId],
-    currentCrop: (state) => state.batch["crops"][state.activeCropId]["crop"],
+    currentImage: (state) =>
+      state.batch["crops"]?.[state.activeCropId]?.["image"],
+    activeCrop: (state) => state.batch["crops"]?.[state.activeCropId],
+    currentCrop: (state) =>
+      state.batch["crops"]?.[state.activeCropId]?.["crop"] as ReviewedArea,
     currentAnnotations: (state) =>
-      state.batch["crops"][state.activeCropId]["annotations"],
+      state.batch["crops"]?.[state.activeCropId]?.["annotations"] ?? {},
     currentBoxConfs: (state) =>
-      state.batch["crops"][state.activeCropId]["annotationBoxes"],
+      state.batch["crops"]?.[state.activeCropId]?.["annotationBoxes"] ?? {},
     cropIds(): string[] {
       const ids: string[] = [];
 
@@ -183,15 +185,18 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       if (
         this.pStore.CurrentHerdUnit === undefined ||
         this.pStore.CurrentSurvey === undefined
-      )
+      ) {
+        this.needingReviewed = 0;
         return;
+      }
       const resp = await getCountNeedingReviewed({
         herd_unit_id: [this.pStore.CurrentHerdUnit.uuid],
         survey_id: [this.pStore.CurrentSurvey.uuid],
-        include_reviewed: this.alreadyReviewed,
+        include_reviewed: Boolean(this.alreadyReviewed),
+        include_opened: true,
       });
 
-      this.needingReviewed = resp;
+      this.needingReviewed = resp ?? 0;
     },
 
     // --------------------------------------------------------------------------------------
@@ -534,6 +539,10 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       // reviewed by user is handled by the current user object in the session
       await setAsReviewed(this.currentCrop.uuid);
 
+      if (this.needingReviewed > 0) {
+        this.needingReviewed--;
+      }
+
       this.loading = false;
       this.actionStack = [];
       this.updates = {};
@@ -580,6 +589,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
     async previousImage() {
       if (this.loading) return;
+      this.outofcrops = false;
       if (this.cropIdx == 0) return;
       this.selectedShapeName = "";
       this.loading = true;
@@ -603,6 +613,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       if (this.loading) return;
       this.loading = true;
       await closeUserImages();
+      await this.getReviewCount();
       this.loading = false;
     }
 

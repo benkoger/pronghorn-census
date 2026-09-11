@@ -17,6 +17,7 @@ from database.object_models import (
 )
 from database.object_models.base import Keyring
 from database.object_models.core import (
+    ActivityType,
     CreateAnnotationReq,
     CreateReviewedAreaReq,
     PredictionCrop,
@@ -107,6 +108,7 @@ def auto_crop(
         crop = CreateReviewedAreaReq(
             image_ids=Keyring(image.image_id, image.uuid),
             name=f"{image.name[0:50]}_crop_{crop_num}.JPG",
+            type=ActivityType.AUTO_CROPPER,
             area_tx=x_start,
             area_ty=y_start,
             area_bx=x_end,
@@ -128,6 +130,7 @@ def auto_crop(
 
                 annotation = CreateAnnotationReq(
                     image_ids=Keyring(image.image_id, image.uuid),
+                    type=ActivityType.AUTO_CROPPER,
                     reviewed_area_ids=None,
                     prediction_ids=Keyring(pred.pred_id, pred.uuid),
                     herd_unit_id=image.herd_unit_id,

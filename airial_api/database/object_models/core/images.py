@@ -18,6 +18,7 @@ from pydantic import BaseModel, field_validator, ConfigDict
 from authzed.api.v1 import RelationshipUpdate
 
 from ..base import Box, Keyring, create_spice_update, DBbase
+from .activity import ActivityType
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -187,6 +188,7 @@ class RAQuery(BaseModel):
 class CreateReviewedAreaReq(BaseModel, ImageMixin):
     image_ids: Keyring
     name: str
+    type: ActivityType = ActivityType.AUTO_CROPPER
     area_tx: int
     area_ty: int
     area_bx: int
@@ -204,6 +206,7 @@ class CreateReviewedAreaReq(BaseModel, ImageMixin):
 
 class UpdateReviewedAreaReq(BaseModel):
     image_id: Optional[UUID] = None
+    type: Optional[ActivityType] = None
     name: Optional[str] = None
     area_tx: Optional[int] = None
     area_ty: Optional[int] = None
@@ -328,6 +331,7 @@ class Image(DBbase, ImageMixin):
 class ReviewedArea(DBbase, ImageMixin):
     reviewed_area_id: int
     image_id: int
+    type: ActivityType
     name: str
     created: datetime
     modified: datetime
@@ -361,6 +365,7 @@ class ReviewedArea(DBbase, ImageMixin):
 
         reviewed_area_id: int
         image_id: int
+        type: ActivityType
         name: str
         dimensions: dict[str, dict[str, int]]
         created: datetime
@@ -386,11 +391,11 @@ class ReviewedArea(DBbase, ImageMixin):
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.reviewed_area (
-                image_id, name, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px,
+                image_id, type, name, area_tx, area_ty, area_bx, area_by, reviewed_area_length_px,
                 reviewed_area_width_px, reviewed_by_user_id, ra_key
             )
             VALUES (
-                %(image_id)s, %(name)s, %(area_tx)s, %(area_ty)s, %(area_bx)s, %(area_by)s, 
+                %(image_id)s, %(type)s, %(name)s, %(area_tx)s, %(area_ty)s, %(area_bx)s, %(area_by)s, 
                 %(reviewed_area_length_px)s, %(reviewed_area_width_px)s, %(reviewed_by_user_id)s,
                 %(ra_key)s
             )

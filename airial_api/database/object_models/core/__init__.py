@@ -1,3 +1,4 @@
+from .activity import *
 from .annotations import *
 from .images import *
 from .predictions import *
