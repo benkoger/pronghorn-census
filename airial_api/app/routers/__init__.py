@@ -23,6 +23,8 @@ from .annotations import annotBp
 from .system import systemBp
 from .roles import roleBp
 from .labels import labelBp
+from .active_measurements import activeMeasBp
+from .am_units import amUnitBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -51,3 +53,6 @@ bp.register_blueprint(systemBp)
 
 bp.register_blueprint(roleBp)
 bp.register_blueprint(labelBp)
+
+bp.register_blueprint(activeMeasBp)
+bp.register_blueprint(amUnitBp)
