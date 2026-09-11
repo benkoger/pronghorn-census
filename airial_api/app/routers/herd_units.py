@@ -29,7 +29,33 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @login_required
 @permission_required("access")
 def get_by_id(herd_unit_id: int | UUID):
-    """ """
+    """
+    Request a herd unit object from the database using its integer PK or UUID.
+    ---
+    parameters:
+      - name: herd_unit_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the herd unit (integer ID or UUID).
+    responses:
+      200:
+        description: The requested herd unit was found.
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this herd unit.
+      404:
+        description: No herd unit record found for the provided ID.
+      500:
+        description: Database error.
+    """
     return base.get(HerdUnit, herd_unit_id).serialize(), 200
 
 
@@ -45,19 +71,28 @@ def get_surveys(herd_unit_id: int | UUID):
     Retrieve all surveys associated with a herd unit.
     ---
     parameters:
-            - name: survey_id
-            in: path
-            type: string
-            required: true
+      - name: herd_unit_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the herd unit (integer ID or UUID).
     responses:
-            200:
-                    description: List of surveys.
-            400:
-                    description: Invalid UUID format.
-            404:
-                    description: No surveys found.
-            500:
-                    description: Database error.
+      200:
+        description: List of surveys (returns empty list if none exist).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this herd unit.
+      404:
+        description: Herd unit not found.
+      500:
+        description: Database error.
     """
 
     if isinstance(herd_unit_id, UUID):
@@ -82,7 +117,27 @@ def get_surveys(herd_unit_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateHerdUnitReq):
-    """ """
+    """
+    Create a new herd unit object.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreateHerdUnitReq
+        description: Herd unit creation payload containing name and associated project IDs.
+    responses:
+      201:
+        description: Herd unit created successfully.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized to perform this action.
+      409:
+        description: Conflict or unique constraint violation.
+      500:
+        description: Database error.
+    """
     return base.insert(HerdUnit, body).serialize(), 201
 
 
@@ -95,7 +150,33 @@ def create(body: CreateHerdUnitReq):
 @login_required
 @permission_required("access")
 def delete(herd_unit_id: int | UUID):
-    """ """
+    """
+    Delete a herd unit by its integer ID or UUID.
+    ---
+    parameters:
+      - name: herd_unit_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the herd unit to delete.
+    responses:
+      204:
+        description: Herd unit deleted successfully.
+      400:
+        description: Invalid ID format.
+      401:
+        description: User not authorized to delete this herd unit.
+      404:
+        description: Herd unit not found.
+      500:
+        description: Database error.
+    """
     base.delete(HerdUnit, herd_unit_id)
 
     return "", 204
