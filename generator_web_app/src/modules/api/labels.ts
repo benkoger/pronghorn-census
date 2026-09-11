@@ -1,14 +1,11 @@
 // API methods for managing labels
-// Author: Michael B. Lance
-
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Label, type LabelIntf } from "@/types/generatorobjects";
-import { ApiError } from "./errors";
-import { api_url } from "@/modules/api/apiV1Methods";
+import { apiClient } from "./client";
+import { Label, type LabelIntf } from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// POST
 
 export interface createLabelOptions {
   name: string;
@@ -18,34 +15,23 @@ export interface createLabelOptions {
   color: string;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------
+// GET
+
+export async function getLabel(labelId: string | number): Promise<Label> {
+  return apiClient.get("labels", labelId, Label);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// POST
+
 export async function createLabel(options: createLabelOptions): Promise<Label> {
-  const response = await fetch(`${api_url}/labels`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return new Label((await response.json()) as LabelIntf);
+  return apiClient.insert("labels", options, Label);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // DELETE
 
-export async function deleteLabel(label_id: string): Promise<boolean> {
-  const response = await fetch(`${api_url}/labels/${label_id}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return true;
+export async function deleteLabel(labelId: string): Promise<boolean> {
+  return apiClient.delete("labels", labelId);
 }

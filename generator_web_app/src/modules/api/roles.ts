@@ -1,36 +1,27 @@
 // API methods for managing roles
-// Author: Michael B. Lance
+// Author: Michael B. Lance / Antigravity
+// ---------------------------------------------------------------------------------------------------------------------------
+
+import { apiClient } from "./client";
+import { Role, type RoleIntf } from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Role, type RoleIntf } from "@/types/generatorobjects";
-import { ApiError } from "./errors";
-import { api_url } from "./apiV1Methods";
-
-// ---------------------------------------------------------------------------------------------------------------------------
-
-interface getRolesOptions {
-  object_id?: string[]
+export interface getRolesOptions {
+  object_id?: string[];
 }
 
-export async function getRoles(
-  options: getRolesOptions
-): Promise<Role[]> {
-  const params = new URLSearchParams();
-  options.object_id?.forEach((id) => params.append("role_id", id.toString()));
+// ---------------------------------------------------------------------------------------------------------------------------
+// GET
 
-  const response = await fetch(`${api_url}/roles?${params}`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  }); if (!response.ok) throw new ApiError(await response.json());
+export async function getRole(roleId: string | number): Promise<Role> {
+  return apiClient.get("roles", roleId, Role);
+}
 
-  const resp = await response.json();
-  let roles = [];
-
-  for (const role of resp)
-    roles.push(new Role(role as RoleIntf));
-  return roles;
+export async function getRoles(options?: getRolesOptions): Promise<Role[]> {
+  const queryParams: Record<string, any> = {};
+  if (options?.object_id) {
+    queryParams["role_id"] = options.object_id;
+  }
+  return apiClient.getAll("roles", Role, queryParams);
 }

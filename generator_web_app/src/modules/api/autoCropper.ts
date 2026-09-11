@@ -1,16 +1,18 @@
-// API methods for managing image objects
-// Author: Michael B. Lance
+// API methods for managing autocropper operations
+// Author: Michael B. Lance / Antigravity
+// ---------------------------------------------------------------------------------------------------------------------------
+
+import { apiClient } from "./client";
+import {
+  Image,
+  Prediction,
+  type ImageIntf,
+  type PredictionIntf,
+} from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Image, Prediction } from "@/types/generatorobjects.ts";
-import type { ImageIntf, PredictionIntf } from "@/types/generatorobjects.ts";
-import { ApiError } from "@/modules/api/errors.ts";
-import { api_url } from "@/modules/api/apiV1Methods.ts";
-
-//---------------------------------------------------------------------------------------------------------------------------
-
-interface AutoCropBatchOptions {
+export interface AutoCropBatchOptions {
   survey_id: string;
   herd_unit_id: string;
   label: number[];
@@ -22,60 +24,46 @@ interface AutoCropBatchOptions {
 export async function fetchAutoCropperBatch(
   options: AutoCropBatchOptions,
 ): Promise<[Image[], Prediction[][]]> {
-  const params = new URLSearchParams();
-  options.label.forEach((id) => params.append("label", id.toString()));
-  params.append("survey_id", options.survey_id.toString());
-  params.append("herd_unit_id", options.herd_unit_id.toString());
-  params.append("size", options.batch_size.toString());
-  params.append("model_id", options.model_id.toString());
-  params.append("min_confidence", options.min_confidence.toString());
-  params.append("batch_size", options.batch_size.toString());
-
-  const response = await fetch(`${api_url}/autocropper/batch?${params}`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
+  const resp = await apiClient.get<any[]>("autocropper", "batch", undefined, {
+    label: options.label,
+    survey_id: options.survey_id,
+    herd_unit_id: options.herd_unit_id,
+    model_id: options.model_id,
+    min_confidence: options.min_confidence,
+    batch_size: options.batch_size,
+    size: options.batch_size,
   });
-  if (!response.ok) throw new ApiError(await response.json());
 
-  const resp = await response.json();
   const images: Image[] = [];
   const predictions: Prediction[][] = [];
 
-  for (const img of resp) {
-    images.push(new Image(img as ImageIntf));
-    const preds: Prediction[] = [];
+  if (Array.isArray(resp)) {
+    for (const img of resp) {
+      images.push(new Image(img as ImageIntf));
+      const preds: Prediction[] = [];
 
-    for (const pred of img["predictions"]) {
-      preds.push(new Prediction(pred as PredictionIntf));
+      if (img.predictions && Array.isArray(img.predictions)) {
+        for (const pred of img.predictions) {
+          preds.push(new Prediction(pred as PredictionIntf));
+        }
+      }
+
+      predictions.push(preds);
     }
-
-    predictions.push(preds);
   }
 
-  return [images as Image[], predictions as Prediction[][]];
+  return [images, predictions];
 }
 
-//---------------------------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------------------
 
-interface AutoCropOptions {
+export interface AutoCropOptions {
   image_id: string;
   predictions: Prediction[];
   label_ids: string[];
 }
 
 export async function autoCrop(options: AutoCropOptions): Promise<boolean> {
-  const response = await fetch(`${api_url}/autocropper`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-  if (!response.ok) throw new ApiError(await response.json());
-
+  await apiClient.post("autocropper", options);
   return true;
 }

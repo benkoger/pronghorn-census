@@ -1,8 +1,8 @@
 // API methods for managing image objects
-// Author: Michael B. Lance
-
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
+import { apiClient, api_url } from "./client";
 import {
   Image,
   Prediction,
@@ -13,63 +13,45 @@ import {
   type imageRecords,
   Annotation,
   type AnnotationIntf,
-} from "@/types/generatorobjects";
-import { ApiError } from "@/modules/api/errors";
-import { api_url } from "@/modules/api/apiV1Methods";
+} from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
-//GET
+// GET
+
+export async function getImage(imageId: string | number): Promise<Image> {
+  return apiClient.get("images", imageId, Image);
+}
 
 export async function getImagePredictions(
-  image_id: string,
+  imageId: string,
 ): Promise<imageRecords["predictions"]> {
-  const response = await fetch(`${api_url}/images/${image_id}/predictions`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  const resp = await response.json();
-
-  let predictions: imageRecords["predictions"] = {};
-  for (const pred of resp)
-    predictions[pred.uuid] = new Prediction(pred as PredictionIntf);
-
+  const resp = await apiClient.getChildren<any>("images", imageId, "predictions");
+  const predictions: imageRecords["predictions"] = {};
+  if (Array.isArray(resp)) {
+    for (const pred of resp) {
+      predictions[pred.uuid] = new Prediction(pred as PredictionIntf);
+    }
+  }
   return predictions;
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------
-
 export async function getImageAnnotations(
-  image_id: string,
+  imageId: string,
 ): Promise<imageRecords["annotations"]> {
-  const response = await fetch(`${api_url}/images/${image_id}/annotations`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  const resp = await response.json();
-
-  let annotations: imageRecords["annotations"] = {};
-  for (const annot of resp)
-    annotations[annot.uuid] = new Annotation(annot as AnnotationIntf);
-
+  const resp = await apiClient.getChildren<any>("images", imageId, "annotations");
+  const annotations: imageRecords["annotations"] = {};
+  if (Array.isArray(resp)) {
+    for (const annot of resp) {
+      annotations[annot.uuid] = new Annotation(annot as AnnotationIntf);
+    }
+  }
   return annotations;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-//POST
+// POST
 
-interface createImageOptions {
+export interface createImageOptions {
   survey_id: string | number;
   herd_unit_id: string | number;
   name: string;
@@ -79,23 +61,10 @@ interface createImageOptions {
 }
 
 export async function createImage(options: createImageOptions): Promise<Image> {
-  const response = await fetch(`${api_url}/images`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return new Image((await response.json()) as ImageIntf);
+  return apiClient.insert("images", options, Image);
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------
-
-interface presignedPutOptions {
+export interface presignedPutOptions {
   upload_id: string;
   part_number: number;
   image_id: number | string;
@@ -106,89 +75,40 @@ interface presignedPutOptions {
 export async function createImagePresignedPut(
   options: presignedPutOptions,
 ): Promise<string> {
-  const response = await fetch(`${api_url}/images/presigned-put-url`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return await response.text();
+  return apiClient.post<string>("images/presigned-put-url", options);
 }
-
-// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function createMultiPartUpload(
   image_key: string,
 ): Promise<string> {
-  const response = await fetch(`${api_url}/images/create-multipart-upload`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      image_key: image_key,
-    }),
+  return apiClient.post<string>("images/create-multipart-upload", {
+    image_key,
   });
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return await response.text();
 }
-
-// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function completeMultiPartUpload(
   image_key: string,
   parts: any[],
   upload_id: string,
 ): Promise<string> {
-  const response = await fetch(`${api_url}/images/complete-multipart-upload`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      image_key: image_key,
-      parts: parts,
-      upload_id: upload_id,
-    }),
+  return apiClient.post<string>("images/complete-multipart-upload", {
+    image_key,
+    parts,
+    upload_id,
   });
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return (await response.json()) as string;
 }
-
-// ---------------------------------------------------------------------------------------------------------------------------
 
 export async function abortMultipartUpload(
   image_key: string,
   upload_id: string,
 ): Promise<string> {
-  const response = await fetch(`${api_url}/images/abort-multipart-upload`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      image_key: image_key,
-      upload_id: upload_id,
-    }),
+  return apiClient.post<string>("images/abort-multipart-upload", {
+    image_key,
+    upload_id,
   });
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return (await response.json()) as string;
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------
-
-interface CreatePredCropsOptions {
+export interface CreatePredCropsOptions {
   image_id: string;
   prediction_id: string[];
 }
@@ -196,41 +116,26 @@ interface CreatePredCropsOptions {
 export async function createPredCrops(
   options: CreatePredCropsOptions,
 ): Promise<PredictionCrop[]> {
-  const response = await fetch(`${api_url}/images/prediction_crops`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      image_id: options.image_id,
-      prediction_id: options.prediction_id,
-    }),
+  const resp = await apiClient.post<any[]>("images/prediction_crops", {
+    image_id: options.image_id,
+    prediction_id: options.prediction_id,
   });
 
-  if (!response.ok) throw new ApiError(await response.json());
+  if (!Array.isArray(resp)) return [];
 
-  const resp = await response.json();
-  const pred_crops: PredictionCrop[] = [];
-
-  for (const row of resp) {
-    const predCrop = row as PredictionCropIntf;
-
-    pred_crops.push(
+  return resp.map(
+    (row) =>
       new PredictionCrop(
-        predCrop,
-        `${api_url}/images/prediction_crops/${predCrop.uuid}`,
+        row as PredictionCropIntf,
+        `${api_url}/images/prediction_crops/${row.uuid}`,
       ),
-    );
-  }
-
-  return pred_crops;
+  );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // PATCH
 
-interface updateImageOptions {
+export interface updateImageOptions {
   name?: string;
   herd_unit_id?: number;
   survey_id?: number;
@@ -246,52 +151,20 @@ interface updateImageOptions {
 }
 
 export async function updateImage(
-  image_id: string,
+  imageId: string,
   options: updateImageOptions,
 ): Promise<Image> {
-  const response = await fetch(`${api_url}/images/${image_id}`, {
-    method: "PATCH",
-
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return new Image((await response.json()) as ImageIntf);
+  return apiClient.update("images", imageId, options, Image);
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------
-
 export async function closeUserImages(): Promise<boolean> {
-  const response = await fetch(`${api_url}/images/close-user-images`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-  if (!response.ok) throw new ApiError(await response.json());
-
+  await apiClient.patch("images/close-user-images");
   return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // DELETE
 
-export async function delete_image(image_id: string): Promise<boolean> {
-  const response = await fetch(`${api_url}/images/${image_id}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) throw new ApiError(await response.json());
-
-  return true;
+export async function delete_image(imageId: string): Promise<boolean> {
+  return apiClient.delete("images", imageId);
 }

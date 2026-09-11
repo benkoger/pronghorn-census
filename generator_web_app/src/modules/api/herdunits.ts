@@ -1,34 +1,15 @@
 // API methods for managing herd unit objects
-// Author: Michael B. Lance
-
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { HerdUnit, Survey } from "@/types/generatorobjects.ts";
-import type { HerdUnitIntf, Keyring, SurveyIntf } from "@/types/generatorobjects.ts";
-import { ApiError } from "@/modules/api/errors.ts";
-import { api_url } from "@/modules/api/apiV1Methods.ts";
-
-// ---------------------------------------------------------------------------------------------------------------------------
-
-export async function getHerdUnitSurveys(
-  herd_unit_id: string,
-): Promise<Survey[]> {
-  const response = await fetch(
-    `${api_url}/herd-units/${herd_unit_id}/surveys`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  );
-  if (!response.ok) throw new ApiError(await response.json());
-  const resp = await response.json();
-  let surveys = [];
-  for (const survey of resp) surveys.push(new Survey(survey as SurveyIntf));
-  return surveys;
-}
+import { apiClient } from "./client";
+import {
+  HerdUnit,
+  Survey,
+  type HerdUnitIntf,
+  type Keyring,
+  type SurveyIntf,
+} from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -37,35 +18,31 @@ export interface createHerdUnitOptions {
   name: string;
 }
 
-export async function createHerdUnit(
-  options: createHerdUnitOptions,
-): Promise<HerdUnit> {
-  console.log(options);
-  const response = await fetch(`${api_url}/herd-units`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-  if (!response.ok) throw new ApiError(await response.json());
+// ---------------------------------------------------------------------------------------------------------------------------
+// GET
 
-  return new HerdUnit((await response.json()) as HerdUnitIntf);
+export async function getHerdUnit(herdUnitId: string | number): Promise<HerdUnit> {
+  return apiClient.get("herd-units", herdUnitId, HerdUnit);
+}
+
+export async function getHerdUnitSurveys(
+  herdUnitId: string,
+): Promise<Survey[]> {
+  return apiClient.getChildren("herd-units", herdUnitId, "surveys", Survey);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+// POST
 
-export async function deleteHerdUnit(herd_unit_id: string): Promise<boolean> {
-  const response = await fetch(`${api_url}/herd-units/${herd_unit_id}`, {
-    method: "DELETE",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+export async function createHerdUnit(
+  options: createHerdUnitOptions,
+): Promise<HerdUnit> {
+  return apiClient.insert("herd-units", options, HerdUnit);
+}
 
-  if (!response.ok) throw new ApiError(await response.json());
+// ---------------------------------------------------------------------------------------------------------------------------
+// DELETE
 
-  return true;
+export async function deleteHerdUnit(herdUnitId: string): Promise<boolean> {
+  return apiClient.delete("herd-units", herdUnitId);
 }

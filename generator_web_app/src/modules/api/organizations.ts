@@ -1,11 +1,9 @@
 // API methods for managing organizations
-// Author: Michael B. Lance
-
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import { Organization, type OrganizationIntf } from "@/types/generatorobjects";
-import { ApiError } from "./errors";
-import { api_url } from "./apiV1Methods";
+import { apiClient } from "./client";
+import { Organization, type OrganizationIntf } from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -14,19 +12,29 @@ export interface createOrganizationOptions {
   logo_url?: string;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------
+// GET
+
+export async function getOrganization(
+  orgId: string | number,
+): Promise<Organization> {
+  return apiClient.get("organizations", orgId, Organization);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// POST
+
 export async function createOrganization(
   options: createOrganizationOptions,
 ): Promise<Organization> {
-  const response = await fetch(`${api_url}/organizations`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
+  return apiClient.insert("organizations", options, Organization);
+}
 
-  if (!response.ok) throw new ApiError(await response.json());
+// ---------------------------------------------------------------------------------------------------------------------------
+// DELETE
 
-  return new Organization((await response.json()) as OrganizationIntf);
+export async function deleteOrganization(
+  orgId: string | number,
+): Promise<boolean> {
+  return apiClient.delete("organizations", orgId);
 }

@@ -1,15 +1,13 @@
 // API methods for the crop verifier
-// Author: Michael B. Lance
-
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
+import { apiClient } from "./client";
 import {
   ReviewedArea,
-  Annotation,
-  type ReviewedAreaIntf,
-} from "@/types/generatorobjects.ts";
-import { ApiError } from "@/modules/api/errors.ts";
-import { api_url } from "@/modules/api/apiV1Methods.ts";
+  type Annotation,
+  type ReviewedAreaResponse,
+} from "@/types/models";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -23,31 +21,24 @@ export interface getReviewedAreaOptions {
 export async function getReviewedArea(
   options: getReviewedAreaOptions,
 ): Promise<ReviewedArea | undefined> {
-  const params = new URLSearchParams();
-  options.herd_unit_id.forEach((id) =>
-    params.append("herd_unit_id", id.toString()),
-  );
-  options.survey_id.forEach((id) => params.append("survey_id", id.toString()));
-  params.append("include_reviewed", Boolean(options.include_reviewed).toString());
+  const queryParams: Record<string, any> = {
+    herd_unit_id: options.herd_unit_id,
+    survey_id: options.survey_id,
+    include_reviewed: options.include_reviewed,
+  };
   if (options.include_opened !== undefined) {
-    params.append("include_opened", options.include_opened.toString());
+    queryParams.include_opened = options.include_opened;
   }
 
-  const response = await fetch(
-    `${api_url}/verifier/area-needing-reviewed?${params}`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
+  const resp = await apiClient.get<ReviewedAreaResponse | undefined>(
+    "verifier",
+    "area-needing-reviewed",
+    undefined,
+    queryParams,
   );
 
-  if (!response.ok) throw new ApiError(await response.json());
-  else if (response.status == 204) return undefined;
-
-  return new ReviewedArea((await response.json()) as ReviewedAreaIntf);
+  if (!resp) return undefined;
+  return new ReviewedArea(resp);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -55,27 +46,21 @@ export async function getReviewedArea(
 export async function getCountNeedingReviewed(
   options: getReviewedAreaOptions,
 ): Promise<number> {
-  const params = new URLSearchParams();
-  options.herd_unit_id.forEach((id) =>
-    params.append("herd_unit_id", id.toString()),
-  );
-  options.survey_id.forEach((id) => params.append("survey_id", id.toString()));
-  params.append("include_reviewed", Boolean(options.include_reviewed).toString());
-  params.append("include_opened", (options.include_opened ?? true).toString());
+  const queryParams: Record<string, any> = {
+    herd_unit_id: options.herd_unit_id,
+    survey_id: options.survey_id,
+    include_reviewed: options.include_reviewed,
+    include_opened: options.include_opened ?? true,
+  };
 
-  const response = await fetch(
-    `${api_url}/verifier/needing-reviewed?${params}`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
+  const resp = await apiClient.get<{ count: number }>(
+    "verifier",
+    "needing-reviewed",
+    undefined,
+    queryParams,
   );
-  if (!response.ok) throw new ApiError(await response.json());
-  const resp = await response.json();
-  return resp.count;
+
+  return resp?.count ?? 0;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -90,14 +75,6 @@ export interface submitOptions {
 export async function submitReviewedArea(
   options: submitOptions,
 ): Promise<boolean> {
-  const response = await fetch(`${api_url}/verifier/submit`, {
-    method: "PUT",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
-  if (!response.ok) throw new ApiError(await response.json());
+  await apiClient.put("verifier/submit", options);
   return true;
 }

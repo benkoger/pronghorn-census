@@ -135,3 +135,38 @@ import { Image, Project, User } from "@/models";
 // Legacy import (Fully backward-compatible)
 import { Image, type ImageIntf, Box } from "@/types/generatorobjects";
 ```
+
+---
+
+## 5. Templated API Client (`modules/api/client.ts`)
+
+The frontend API layer mirrors the backend database abstraction pattern (`Database.get`, `Database.insert`, `Database.update`, `Database.delete`, `Database.get_children`) by providing a generic, templated HTTP client.
+
+### Core API Client Operations
+
+| Client Method | HTTP | Purpose | Example |
+| :--- | :--- | :--- | :--- |
+| `apiClient.get(endpoint, id?, model?, params?)` | `GET` | Fetch single entity by ID | `apiClient.get("projects", id, Project)` |
+| `apiClient.getAll(endpoint, model?, params?)` | `GET` | Fetch collection of entities | `apiClient.getAll("projects", Project)` |
+| `apiClient.getChildren(parent, parentId, child, model?, params?)` | `GET` | Fetch hierarchical relation | `apiClient.getChildren("projects", id, "models", Model)` |
+| `apiClient.insert(endpoint, body, model?)` | `POST` | Create new entity | `apiClient.insert("projects", data, Project)` |
+| `apiClient.update(endpoint, idOrBody, body?, model?)` | `PATCH` | Update entity (partial) | `apiClient.update("projects", id, data, Project)` |
+| `apiClient.delete(endpoint, id?)` | `DELETE` | Delete entity | `apiClient.delete("projects", id)` |
+| `apiClient.post(endpoint, body?, model?)` | `POST` | Custom action or bulk op | `apiClient.post("annotations/bulk-import", data)` |
+| `apiClient.put(endpoint, body?, model?)` | `PUT` | Idempotent full update | `apiClient.put("verifier/submit", data)` |
+
+### Resource Factory
+
+A factory function `apiClient.createResourceClient<T>(endpoint, ModelClass)` is also available to generate standard CRUD resource handlers in a single call:
+
+```typescript
+export const projectClient = apiClient.createResourceClient<Project>("projects", Project);
+// provides: get(id), getAll(params), getChildren(id, child, model), create(data), update(id, data), delete(id)
+```
+
+### Automatic Deserialization & Error Handling
+
+- **Type Hydration**: If a model constructor is passed to any client method, incoming JSON objects and arrays are automatically instantiated as domain class instances (`new ModelClass(item)`).
+- **Error Propagation**: Non-2xx HTTP responses are automatically parsed and raised as typed `ApiError` instances containing `code`, `error`, and `message`.
+- **Query Serialization**: Array-valued parameters (e.g. `herd_unit_id: ["id1", "id2"]`) are automatically serialized into multi-param query strings (`?herd_unit_id=id1&herd_unit_id=id2`) matching Flask request expectations.
+- **Session Credentials**: All requests include `credentials: "include"` for cookie-based session authentication with the API.
