@@ -1,0 +1,95 @@
+definition user {}
+
+  definition platform {
+  relation root: user
+}
+
+definition organization {
+  relation platform: platform
+  relation root: user
+  relation admin: user
+  relation annotator: user
+
+permission is_root = platform->root
+  permission access = admin + annotator + is_root + root
+  permission modify = admin + is_root
+}
+
+definition project {
+  relation parent: organization
+  relation annotator: user
+
+  permission is_root = parent->is_root
+  permission access = annotator + parent->access + is_root
+}
+
+definition herd_unit {
+  relation parent: project
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition model {
+  relation parent: project
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition survey {
+  relation parent: herd_unit
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition schema {
+  relation parent: model
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition label {
+  relation parent: schema
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition active_measurement {
+  relation parent: survey
+}
+
+definition am_unit {
+  relation parent: active_measurement
+}
+
+definition image {
+  relation parent: survey | herd_unit
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition prediction {
+  relation parent: image
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition reviewed_area {
+  relation parent: image
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition annotation {
+  relation parent: image
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}

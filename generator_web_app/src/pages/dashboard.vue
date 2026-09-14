@@ -1,19 +1,15 @@
 <script lang="ts">
-import { defineComponent } from 'vue';
-import { useUserStore } from '@/modules/stores/userStore';
+import { defineComponent } from "vue";
+import { useSystemStore } from "@/modules/stores/systemStore";
 
 export default defineComponent({
-    name: 'Dashboard',
-    setup() {
-        const uStore = useUserStore();
-        return { uStore }
-    }
-})
+  name: "Dashboard",
+  setup() {
+    const sStore = useSystemStore();
+    return { sStore };
+  },
+});
 </script>
 <template>
-	<div class="pageContainer">
-		<h2 class="utilityTitle"> Dashboard </h2>
-	</div>
+  <div class="pageContainer"></div>
 </template>
-
-

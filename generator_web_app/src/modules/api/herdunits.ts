@@ -1,48 +1,71 @@
 // API methods for managing herd unit objects
 // Author: Michael B. Lance
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
-import { HerdUnit, Survey } from '@/types/generatorobjects.ts';
-import type { HerdUnitIntf, SurveyIntf } from '@/types/generatorobjects.ts';
-import { ApiError } from '@/modules/api/errors.ts'
-import { api_url } from '@/modules/api/apiV1Methods.ts';
+import { HerdUnit, Survey } from "@/types/generatorobjects.ts";
+import type { HerdUnitIntf, Keyring, SurveyIntf } from "@/types/generatorobjects.ts";
+import { ApiError } from "@/modules/api/errors.ts";
+import { api_url } from "@/modules/api/apiV1Methods.ts";
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
-export async function getHerdUnitSurveys(herd_unit_id: string): Promise<Survey[]> {
-    const response = await fetch(`${api_url}/herd-units/${herd_unit_id}/surveys`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-    });
-    if (!response.ok) throw new ApiError(await response.json());
-    const resp = await response.json();
-    let surveys = [];
-    for (const survey of resp) surveys.push(new Survey(survey as SurveyIntf));
-    return surveys;
+export async function getHerdUnitSurveys(
+  herd_unit_id: string,
+): Promise<Survey[]> {
+  const response = await fetch(
+    `${api_url}/herd-units/${herd_unit_id}/surveys`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  if (!response.ok) throw new ApiError(await response.json());
+  const resp = await response.json();
+  let surveys = [];
+  for (const survey of resp) surveys.push(new Survey(survey as SurveyIntf));
+  return surveys;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+// ---------------------------------------------------------------------------------------------------------------------------
 
-export async function createHerdUnit(project_id: number, name: string): Promise<HerdUnit> {
-    const response = await fetch(`${api_url}/herd-units`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            'project_id': project_id,
-            'name': name
-        }),
-    });
-    if (!response.ok) throw new ApiError(await response.json());
-    
-    return new HerdUnit(await response.json() as HerdUnitIntf);
+export interface createHerdUnitOptions {
+  project_ids: Keyring;
+  name: string;
 }
 
-//---------------------------------------------------------------------------------------------------------------------------//
+export async function createHerdUnit(
+  options: createHerdUnitOptions,
+): Promise<HerdUnit> {
+  console.log(options);
+  const response = await fetch(`${api_url}/herd-units`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+  if (!response.ok) throw new ApiError(await response.json());
 
+  return new HerdUnit((await response.json()) as HerdUnitIntf);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export async function deleteHerdUnit(herd_unit_id: string): Promise<boolean> {
+  const response = await fetch(`${api_url}/herd-units/${herd_unit_id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return true;
+}
