@@ -37,7 +37,6 @@ session_redis = redis.from_url(session_redis_url, **session_redis_kwargs)
 cache_redis = redis.from_url(cache_redis_url, **cache_redis_kwargs)
 
 
-
 class FlaskConfig:
     SECRET_KEY = os.environ.get("SECRET_KEY")
     SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE") or "Lax"
@@ -110,7 +109,6 @@ if cache_redis_url.startswith("rediss://"):
     cache_config["CACHE_REDIS_SSL_CHECK_HOSTNAME"] = False
     if os.path.exists(valkey_cert_path):
         cache_config["CACHE_REDIS_SSL_CA_CERTS"] = valkey_cert_path
-
 
 
 s3_config = Config(
