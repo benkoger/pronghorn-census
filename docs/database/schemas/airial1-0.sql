@@ -187,7 +187,7 @@ CREATE TABLE "projectmanagement"."active_measurements" (
 CREATE TABLE "projectmanagement"."projects_users" (
   "project_id" integer,
   "user_id" integer,
-  "role_id" integer,
+  "role_id" integer NOT NULL DEFAULT 0,
   PRIMARY KEY ("project_id", "user_id", "role_id")
 );
 
@@ -280,7 +280,7 @@ CREATE TABLE "usermanagement"."organizations_projects" (
 CREATE TABLE "usermanagement"."organizations_users" (
   "user_id" integer,
   "organization_id" integer,
-  "role_id" integer,
+  "role_id" integer NOT NULL DEFAULT 0,
   PRIMARY KEY ("user_id", "organization_id", "role_id")
 );
 
