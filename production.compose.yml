@@ -57,7 +57,7 @@ services:
     container_name: prong_valkey
     image: docker.io/valkey/valkey:8.1.1
     healthcheck:
-      test: valkey-cli ping || exit 1
+      test: valkey-cli --tls --insecure -a "${VALKEY_PASS}" ping || exit 1
     restart: always
     volumes:
       - valkey_certs:/etc/valkey/certs:z,U
