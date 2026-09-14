@@ -1,0 +1,109 @@
+import os
+from botocore.config import Config
+from dotenv import load_dotenv
+from boto3.s3.transfer import TransferConfig
+import ssl
+import redis
+
+load_dotenv()
+
+true_set = ("true", "1", "t")
+
+
+# Create redis connections
+session_redis_url = os.environ.get("SESSION_REDIS", "redis://@prong_valkey:6379/0")
+cache_redis_url = os.environ.get("CACHE_REDIS", "redis://@prong_valkey:6379/1")
+
+session_redis_kwargs = {}
+cache_redis_kwargs = {}
+
+if session_redis_url.startswith("rediss://"):
+    session_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    session_redis_kwargs["ssl_check_hostname"] = False
+
+if cache_redis_url.startswith("rediss://"):
+    cache_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    cache_redis_kwargs["ssl_check_hostname"] = False
+
+session_redis = redis.from_url(session_redis_url, **session_redis_kwargs)
+cache_redis = redis.from_url(cache_redis_url, **cache_redis_kwargs)
+
+
+class FlaskConfig:
+    SECRET_KEY = os.environ.get("SECRET_KEY")
+    SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE") or "Lax"
+    SESSION_COOKIE_SECURE = (
+        os.environ.get("SESSION_COOKIE_SECURE") or "true"
+    ).lower() in true_set
+    SESSION_TYPE = "redis"
+    SESSION_PERMANENT = (
+        os.environ.get("SESSION_PERMANENT") or "true"
+    ).lower() in true_set
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
+    SESSION_REDIS = session_redis
+    ORIGIN_URL = os.environ.get("ORIGIN_URL")  # pyright: ignore
+    BUCKET_NAME = os.environ.get("BUCKET_NAME")
+    SESSION_COOKIE_DOMAIN = None
+    SESSION_COOKIE_PATH = "/"
+    OAUTH2_PROVIDERS = {
+        "google": {
+            "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+            "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+            "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+            "token_url": "https://accounts.google.com/o/oauth2/token",
+            "userinfo": {
+                "url": "https://www.googleapis.com/oauth2/v3/userinfo",
+                "email": lambda json: json["email"],
+            },
+            "scopes": ["openid", "email", "profile"],
+        }
+    }
+
+
+db_config = {
+    "dbname": os.environ.get("DB_NAME"),
+    "user": os.environ.get("DB_USER"),
+    "password": os.environ.get("DB_PASS"),
+    "host": os.environ.get("DB_HOST"),
+    "port": os.environ.get("DB_PORT"),
+    "options": "-c statement_timeout=5000",
+}
+
+if (os.environ.get("DB_SSL") or "false").lower() in true_set:
+    db_config["sslmode"] = "require"
+
+if os.environ.get("DB_SSL_MODE") == "verify-full":
+    db_config["sslmode"] = "verify-full"
+    db_config["sslrootcert"] = os.environ.get("DB_SSL_ROOT_CERT_PATH")
+
+spice_config = {
+    "spice_url": os.environ.get("SPICE_URL"),
+    "bearer_token": os.environ.get("SPICEDB_GRPC_PRESHARED_KEY"),  # pyright: ignore
+    "use_tls": False,
+}
+
+if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
+    spice_config["use_tls"] = True
+    spice_config["SPICEDB_CERT_PATH"] = (
+        os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
+    )
+
+
+cache_config = {
+    "CACHE_TYPE": "RedisCache",
+    "CACHE_DEFAULT_TIMEOUT": 300,
+    "CACHE_REDIS_HOST": cache_redis,
+}
+
+
+s3_config = Config(
+    signature_version="s3",  # s3v4 is the standard, s3 is an older version
+    s3={
+        "payload_signing_enabled": True,
+        "addressing_style": "path",
+        "request_checksum_calculation": "when_required",
+        "response_checksum_validation": "when_required",
+    },
+)
+
+transfer_config = TransferConfig(use_threads=True, multipart_threshold=5 * 1024**3)

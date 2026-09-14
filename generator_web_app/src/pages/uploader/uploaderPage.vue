@@ -1,205 +1,168 @@
-<script lang="ts">
-import { defineComponent, defineAsyncComponent, ref } from 'vue';
-import { useProjectStore } from '@/modules/stores/projectStore';
-import { Project, HerdUnit } from '@/types/generatorobjects';
-import { mapState } from 'pinia';
-import ProcessBreadCrumb  from '@/components/templates/ProcessBreadCrumb.vue';
-import SelectorList from '@/components/templates/SelectorList.vue';
+<script lang="ts" setup>
+import { ref, computed, watch, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useProjectStore } from "@/modules/stores/projectStore";
+import { Project, HerdUnit } from "@/types/generatorobjects";
 
-export default defineComponent({
-	name: "Uploader-Utility",
-	components: {
-		Upload: defineAsyncComponent(() => import('@/pages/uploader/uploader.vue')),
-		BreadCrumb: ProcessBreadCrumb,
-		SelectList: SelectorList
-	},
-	setup() {
-		const pStore = useProjectStore();
-		if (pStore.projects.length == 0) pStore.get_projects();
-		return { pStore };
-	},
-	mounted() {
-		if(this.pStore.CurrentProject) {
-			this.$router.push({name: 'upload', params: { projects: 'projects', uuid: this.pStore.CurrentProject.uuid }})
-		}
-	},
-	data() {
-		return {
-			currentStep: 0,
-			steps: ['Project', 'Herd Unit', 'Survey', 'Upload'],
-			newHerdUnitName: '',
-			newSurvey: false,
-			newSurveyName: '',
-			newSurveyDate: '',
-			newSurveyAdditionalInfo: '',
-		};
-	},
-	computed: {
-		...mapState(useProjectStore, {
-				CurrentProject: 'CurrentProject',
-				CurrentHerdUnit: 'CurrentHerdUnit',
-				CurrentSurvey: 'CurrentSurvey',
-			}
-		),
-		canProceed() {
-			switch(this.currentStep) {
-				case 0:
-					return this.CurrentProject !== undefined;
-					break;
-				case 1:
-					return this.CurrentHerdUnit !== undefined;
-					break;
-				case 2:
-					return this.CurrentSurvey !== undefined;
-					break;
-				default:
-					return false;
-			};
-		}
-	},
-	watch: {
-		CurrentProject(newValue: Project, oldValue: Project) {
-			const currentQuery = {...this.$route.query};
-			this.pStore.clear_state();
-			if (newValue !=oldValue && newValue != undefined) {
-				this.pStore.get_project_herd_units();
-				const newQuery = {
-					...currentQuery,
-					project: newValue.uuid,
-					model: undefined,
-					herd_unit: undefined,
-					survey: undefined,
-					labels: undefined,
+import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
+import SelectorList from "@/components/templates/SelectorList.vue";
+import CreateHerdUnit from "@/components/templates/createHerdUnit.vue";
+import Upload from "@/pages/uploader/uploader.vue";
 
-				};
-				this.$router.push({query: newQuery});
-			} else {
-				const newQuery = {
-					...currentQuery,
-					project: undefined,
-					model: undefined,
-					herd_unit: undefined,
-					survey: undefined,
-					labels: undefined,
-				};
-				this.$router.push({query: newQuery});
-			}
-		},
-		CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
-			const currentQuery = {...this.$route.query };
-			this.pStore.clear_surveys();
-			if (newValue != oldValue && newValue != undefined) {
-				this.pStore.get_herd_unit_surveys();
-				const newQuery = {
-					...currentQuery,
-					herd_unit: newValue.uuid,
-					survey: undefined
-				};
-				this.$router.push({query: newQuery})
-			} else {
-				const newQuery = {
-					...currentQuery,
-					herd_unit: undefined,
-					survey: undefined
-				};
-				this.$router.push({query: newQuery});
-			}
-		},
-	},
-	methods: {
-		toggleNewSurvey() {
-			if (this.CurrentSurvey) this.pStore.set_current_survey(this.CurrentSurvey);
-			this.newSurvey = !this.newSurvey;
-		},
-		async submitNewHerdUnit() {
-			if (this.CurrentProject) {
-				await this.pStore.create_herd_unit(this.CurrentProject?.project_id, this.newHerdUnitName);
-				this.newHerdUnitName = '';
-				this.currentStep++;
-			}
-		},
-		async submitNewSurvey() {
-			if (this.CurrentProject && this.CurrentHerdUnit) {
-				await this.pStore.create_survey(this.CurrentProject.project_id, this.CurrentHerdUnit.herd_unit_id,
-					this.newSurveyName, new Date(this.newSurveyDate).toISOString(), this.newSurveyAdditionalInfo
-				);
-				this.newSurveyName, this.newSurveyDate, this.newSurveyAdditionalInfo = '', '', '';
-				this.currentStep++;
-			}
-		}
-	}
+defineOptions({
+  name: "Uploader-Utility",
 });
-</script> 
-<template>	
-	<BreadCrumb 
-		v-model="currentStep"
-		:steps="steps"
-		:showButtons="true"
-		:canContinue="canProceed"
-	>
-		<div v-if="currentStep === 0" class="d-flex flex-column">
-			<div class="flex-grow-1 overflow-y-auto">
-				<SelectList 
-					:items="pStore.projects"
-					:active-item="CurrentProject"
-					:select-action="pStore.set_current_project"
-					list-name="Project"
-				/>
-			</div>
-		</div>
-		<div v-if="currentStep === 1" class="d-flex flex-column h-100">
-			<div class="flex-grow-1 overflow-y-auto">
-				<SelectList list-name="Herd Unit Selection" :select-action="pStore.set_current_herd_unit"
-					:items="pStore.herd_units" :active-item="CurrentHerdUnit"
-					allow-create :createAction="submitNewHerdUnit"
-				>
-					<label class="visually-hidden" for="herd-unit-name">Name</label>
-					<BFormInput
-						id="herd-unit-name"
-						placeholder="Name"
-						class="w-auto me-2"
-						required
-						v-model="newHerdUnitName"
-					></BFormInput>
-					<span class="text-info">A new herd unit will be created and
-						associated with the project: <strong>{{ CurrentProject?.name }}</strong>.
-					</span>
-				</SelectList>
-			</div>
-		</div>
-		<div v-if="currentStep === 2" class="d-flex flex-column h-100">
-			<div class="flex-grow-1 overflow-y-auto">
-				<SelectList list-name="Survey Selection" :select-action="pStore.set_current_survey"
-					:items="pStore.surveys" :active-item="CurrentSurvey"
-					allow-create :create-action="submitNewSurvey"
-				>
-					<label class="visually-hidden" for="survey-name">Name</label>
-							<BFormInput
-								id="survey-name"
-								placeholder="name"
-								class="w-auto me-2"
-								required
-								v-model="newSurveyName"
-							/>
-							<label class="visually-hidden" for="survey-date">Survey Date</label>
-							<BFormInput
-								type="date"
-								id="survey-date"
-								v-model="newSurveyDate"
-								required
-								class="w-auto m-2"
-							/>
-							<label class="visually-hidden" for="additional-info">Additional Info</label>
-							<BFormTextarea
-								id="additional-info"
-								placeholder="Additional Info"
-								v-model="newSurveyAdditionalInfo"
-								class="w-50 m-2"
-							/>
-				</SelectList>
 
-			</div>
-		</div>
-		<Upload v-if="currentStep === 3 " />
-	</BreadCrumb>
+const router = useRouter();
+const route = useRoute();
+const pStore = useProjectStore();
+
+if (pStore.projects.length === 0) {
+  pStore.get_projects();
+}
+
+const currentStep = ref(0);
+const steps = ref(["Project", "Herd Unit", "Survey", "Upload"]);
+
+onMounted(() => {
+  if (pStore.CurrentProject) {
+    router.push({
+      name: "upload",
+      params: { projects: "projects", uuid: pStore.CurrentProject.uuid },
+    });
+  }
+});
+
+const canProceed = computed(() => {
+  switch (currentStep.value) {
+    case 0:
+      return pStore.CurrentProject !== undefined;
+    case 1:
+      return pStore.CurrentHerdUnit !== undefined;
+    case 2:
+      return pStore.CurrentSurvey !== undefined;
+    default:
+      return false;
+  }
+});
+
+watch(
+  () => pStore.CurrentProject,
+  (newValue, oldValue) => {
+    const currentQuery = { ...route.query };
+
+    if (newValue !== oldValue && newValue !== undefined) {
+      pStore.get_project_herd_units();
+      router.push({
+        query: {
+          ...currentQuery,
+          project: newValue.uuid,
+          model: undefined,
+          herd_unit: undefined,
+          survey: undefined,
+          labels: undefined,
+        },
+      });
+    } else {
+      router.push({
+        query: {
+          ...currentQuery,
+          project: undefined,
+          model: undefined,
+          herd_unit: undefined,
+          survey: undefined,
+          labels: undefined,
+        },
+      });
+    }
+  },
+);
+
+watch(
+  () => pStore.CurrentHerdUnit,
+  (newValue, oldValue) => {
+    const currentQuery = { ...route.query };
+    pStore.clear_surveys();
+
+    if (newValue !== oldValue && newValue !== undefined) {
+      pStore.get_herd_unit_surveys();
+      router.push({
+        query: {
+          ...currentQuery,
+          herd_unit: newValue.uuid,
+          survey: undefined,
+        },
+      });
+    } else {
+      router.push({
+        query: {
+          ...currentQuery,
+          herd_unit: undefined,
+          survey: undefined,
+        },
+      });
+    }
+  },
+);
+</script>
+<template>
+  <ProcessBreadCrumb
+    v-model="currentStep"
+    :steps="steps"
+    :showButtons="true"
+    :canContinue="canProceed"
+  />
+  <BRow v-if="currentStep === 0">
+    <BCol>
+      <SelectorList
+        :items="pStore.projects"
+        icon="ix:projects"
+        :active-item="pStore.CurrentProject"
+        :select-action="pStore.set_current_project"
+        list-name="Project"
+      />
+    </BCol>
+  </BRow>
+  <BRow v-if="currentStep === 1">
+    <BCol>
+      <SelectorList
+        list-name="Herd Unit Selection"
+        icon="token:area"
+        :select-action="pStore.set_current_herd_unit"
+        :items="pStore.herd_units"
+        :active-item="pStore.CurrentHerdUnit"
+        allow-create
+      >
+        <template #create="{ Finished }">
+          <CreateHerdUnit
+            :project="pStore.CurrentProject as Project"
+            :submit-action="pStore.create_herd_unit"
+            @creation-successful="Finished"
+          />
+        </template>
+      </SelectorList>
+    </BCol>
+  </BRow>
+  <BRow v-if="currentStep === 2">
+    <BCol>
+      <SelectorList
+        list-name="Survey Selection"
+        icon="roentgen:survey-point"
+        :select-action="pStore.set_current_survey"
+        :items="pStore.surveys"
+        :active-item="pStore.CurrentSurvey"
+        allow-create
+      >
+        <template #create="{ Finished }">
+          <CreateSurvey
+            :project="pStore.CurrentProject as Project"
+            :herd_unit="pStore.CurrentHerdUnit as HerdUnit"
+            :submitAction="pStore.create_survey"
+            @creation-successful="Finished"
+          />
+        </template>
+      </SelectorList>
+    </BCol>
+  </BRow>
+  <Upload v-if="currentStep === 3" />
 </template>
