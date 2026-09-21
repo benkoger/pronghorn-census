@@ -114,7 +114,7 @@ If you need to initialize a fresh environment from scratch:
 podman compose -f bootstrap-dev.compose.yml up -d
 ```
 
-This runs `local_db/bootstrap.sh` with `local_db/db_definitions.sql`, writes the fresh SpiceDB schema from `schema.zed`, and allows you to run through the initial bootstrap wizard at `http://localhost:5173/setup`.
+This runs `local_db/bootstrap.sh` with `docs/database/schemas/airial1-1.sql`, writes the fresh SpiceDB schema from `schema.zed`, and allows you to run through the initial bootstrap wizard at `http://localhost:5173/setup`.
 
 ---
 

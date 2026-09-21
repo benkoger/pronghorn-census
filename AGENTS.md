@@ -34,7 +34,7 @@ This document is the primary onboarding and operational guide for AI coding assi
              |                            |       |                            |
              v                            v       v                            v
 +------------------------+   +--------------+   +---------------+   +------------------------+
-|     PostgreSQL 18      |   |  Valkey 8.1  |   |    SpiceDB    |   |     S3 / Ceph API      |
+| PostgreSQL 17+PostGIS  |   |  Valkey 8.1  |   |    SpiceDB    |   |     S3 / Ceph API      |
 |  (Custom Psycopg3 DB)  |   | (Cache/Sess) |   |    (ReBAC)    |   |    (Images/Crops)      |
 +------------------------+   +--------------+   +---------------+   +------------------------+
 ```
@@ -45,13 +45,13 @@ This document is the primary onboarding and operational guide for AI coding assi
 | :--- | :--- | :--- | :--- |
 | **Frontend** | Vue 3, TypeScript 5.8, Vite 6, Pinia, Bootstrap 5, Vue-Konva | `generator_web_app/` | SPA for labeling, verification, and data administration |
 | **Backend API** | Python 3.13+, Flask 3.1, Werkzeug, uv | `airial_api/` | RESTful API, custom database layer, image processing |
-| **Database** | PostgreSQL 18 | `docs/database/schemas/airial1-0.sql`, `migrations/` | Schemas: `core`, `projectmanagement`, `usermanagement` (Canonical DDL in `docs/database/schemas/airial1-0.sql`) |
+| **Database** | PostgreSQL 17 + PostGIS 3.5 | `docs/database/schemas/airial1-1.sql`, `local_db/migrations/` | Schemas: `core`, `projectmanagement`, `usermanagement` (Canonical DDL in `docs/database/schemas/airial1-1.sql`) |
 | **Database Abstraction**| Psycopg 3 (`psycopg[binary]`, `psycopg-pool`) | `airial_api/database/` | **STRICTLY NO ORM**. Custom high-performance abstraction |
 | **Authorization** | SpiceDB (Authzed client, gRPC) | `airial_api/database/spicedb_schema/` | Fine-grained Relationship-Based Access Control (ReBAC) |
 | **Cache & Sessions** | Valkey 8.1 (open-source Redis fork) | Port 6379 | DB 0: Flask-Session, DB 1: Flask-Caching |
 | **Object Storage** | S3 API (Ceph Object Gateway or AWS S3) | Boto3 client | Aerial survey imagery, crops, artifacts |
 | **CV / Labeling Tool** | OpenCV, NumPy, Scikit-Learn (KMeans) | `airial_api/crop_generator.py` | Spatial clustering & subcrop generation |
-| **Migrations** | Atlas | `migrations/` | Managed declarative/versioned SQL migrations |
+| **Migrations** | Atlas | `local_db/migrations/` | Managed declarative/versioned SQL migrations |
 
 ---
 
@@ -144,7 +144,7 @@ High-resolution aerial survey frames can be hundreds of megapixels. Annotators c
 | File | Primary Use Case | Database Source |
 | :--- | :--- | :--- |
 | `development.compose.yml` | Normal local dev | Restores sample DB from `local_db/pct_b` & SpiceDB from `local_db/backup.zed` |
-| `bootstrap-dev.compose.yml` | Clean dev environment | Initializes fresh schema from `local_db/db_definitions.sql` & `schema.zed` |
+| `bootstrap-dev.compose.yml` | Clean dev environment | Initializes fresh schema from `docs/database/schemas/airial1-1.sql` & `schema.zed` |
 | `production.compose.yml` | Production deployment | Hardened setup with TLS certificates, Gunicorn WSGI, and Nginx |
 
 ### Common Commands
