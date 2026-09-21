@@ -1,13 +1,13 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useProjectStore } from "@/stores/projectStore";
 import type { Project, HerdUnit } from "@/models";
 
-import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
-import SelectorList from "@/components/templates/SelectorList.vue";
-import CreateHerdUnit from "@/components/templates/createHerdUnit.vue";
-import Upload from "@/pages/uploader/uploader.vue";
+import ProcessBreadCrumb from "@/components/common/ProcessBreadCrumb.vue";
+import SelectorList from "@/components/common/SelectorList.vue";
+import CreateHerdUnit from "@/components/modals/createHerdUnit.vue";
+import Upload from "@/components/uploader/Uploader.vue";
 
 defineOptions({
   name: "Uploader-Utility",

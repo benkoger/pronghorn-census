@@ -3,8 +3,8 @@ import { onErrorCaptured, computed, ref, onMounted } from "vue";
 import Header from "./AppHeader.vue";
 import Nav from "./PrimaryNav.vue";
 import { RouterView, useRoute } from "vue-router";
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { useToast } from "bootstrap-vue-next";
 import type { Project, HerdUnit, Survey } from "@/models";
 

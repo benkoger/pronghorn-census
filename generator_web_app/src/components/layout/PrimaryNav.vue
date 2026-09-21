@@ -1,6 +1,6 @@
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useSystemStore } from "@/modules/stores/systemStore";
+import { useSystemStore } from "@/stores/systemStore";
 
 export default defineComponent({
   name: "Nav",

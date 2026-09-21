@@ -2,7 +2,7 @@
 import { ref, computed } from "vue";
 import { useToast } from "bootstrap-vue-next";
 import type { Schema, createLabelOptions } from "@/models";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useProjectStore } from "@/stores/projectStore";
 
 const { create } = useToast();
 const pStore = useProjectStore();

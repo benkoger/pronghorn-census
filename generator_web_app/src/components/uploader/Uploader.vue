@@ -10,8 +10,8 @@ import type {
   Schema,
   Image,
 } from "@/models";
-import api from "@/modules/api";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import api from "@/api";
+import { useProjectStore } from "@/stores/projectStore";
 import { Md5 } from "ts-md5";
 import { filesize } from "filesize";
 import { useToast, type BvTriggerableEvent } from "bootstrap-vue-next";

@@ -7,8 +7,8 @@ import {
   onBeforeUnmount,
   type ComponentPublicInstance,
 } from "vue";
-import { useAutoCropperStore } from "@/modules/stores/cropperStore";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useAutoCropperStore } from "@/stores/cropperStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { boxWidth, boxHeight, type PredictionCrop } from "@/models";
 
 defineOptions({

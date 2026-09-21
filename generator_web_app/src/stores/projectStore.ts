@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { api } from "@/modules/api";
+import { api } from "@/api";
 import type {
   Project,
   Schema,

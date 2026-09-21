@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { useSystemStore } from "./modules/stores/systemStore";
-import MainLayout from "./components/MainLayout.vue";
+import { useSystemStore } from "@/stores/systemStore";
+import MainLayout from "@/components/layout/MainLayout.vue";
 const sStore = useSystemStore();
 
 if (sStore.first_login) {

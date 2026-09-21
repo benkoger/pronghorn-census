@@ -1,16 +1,16 @@
 <script lang="ts">
 import { defineComponent, defineAsyncComponent } from "vue";
-import { useProjectStore } from "@/modules/stores/projectStore";
-import { useAutoCropperStore } from "@/modules/stores/cropperStore";
+import { useProjectStore } from "@/stores/projectStore";
+import { useAutoCropperStore } from "@/stores/cropperStore";
 import type { Project, Survey, HerdUnit, Model } from "@/models";
 import { mapState } from "pinia";
-import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
-import SelectorList from "@/components/templates/SelectorList.vue";
+import ProcessBreadCrumb from "@/components/common/ProcessBreadCrumb.vue";
+import SelectorList from "@/components/common/SelectorList.vue";
 
 export default defineComponent({
   name: "autoCropper",
   components: {
-    Crop: defineAsyncComponent(() => import("./autoCropper.vue")),
+    Crop: defineAsyncComponent(() => import("@/components/autocropper/AutoCropper.vue")),
     BreadCrumb: ProcessBreadCrumb,
     SelectList: SelectorList,
   },

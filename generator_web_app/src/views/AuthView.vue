@@ -1,9 +1,9 @@
 <script lang="ts" setup>
 import { ref, onMounted } from "vue";
-import { useSystemStore } from "@/modules/stores/systemStore.ts";
+import { useSystemStore } from "@/stores/systemStore";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "bootstrap-vue-next";
-import { API_BASE } from "@/modules/api";
+import { API_BASE } from "@/api";
 
 const sStore = useSystemStore();
 const router = useRouter();

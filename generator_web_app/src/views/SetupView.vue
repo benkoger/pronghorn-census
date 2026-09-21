@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { useProjectStore } from "@/modules/stores/projectStore";
-import CreateUser from "@/components/templates/createUser.vue";
-import CreateOrganization from "@/components/templates/createOrganization.vue";
-import CreateProject from "@/components/templates/createProject.vue";
+import { useSystemStore } from "@/stores/systemStore";
+import { useProjectStore } from "@/stores/projectStore";
+import CreateUser from "@/components/modals/createUser.vue";
+import CreateOrganization from "@/components/modals/createOrganization.vue";
+import CreateProject from "@/components/modals/createProject.vue";
 import type { Organization, User } from "@/models";
-import { api } from "@/modules/api";
+import { api } from "@/api";
 import { useRouter } from "vue-router";
 
 const sStore = useSystemStore();

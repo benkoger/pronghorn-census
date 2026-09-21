@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { useProjectStore } from "@/modules/stores/projectStore";
-import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
+import { useSystemStore } from "@/stores/systemStore";
+import { useProjectStore } from "@/stores/projectStore";
+import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import type { Survey } from "@/models";
 
 const router = useRouter();

@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { useOrgStore } from "@/modules/stores/organizationStore";
+import { useSystemStore } from "@/stores/systemStore";
+import { useOrgStore } from "@/stores/organizationStore";
 
 const sStore = useSystemStore();
 const oStore = useOrgStore();

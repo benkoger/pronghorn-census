@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, type PropType, computed } from "vue";
 import { useToast } from "bootstrap-vue-next";
-import { useSystemStore } from "@/modules/stores/systemStore";
+import { useSystemStore } from "@/stores/systemStore";
 import type { Organization, Role, createUserOptions } from "@/models";
 
 const sStore = useSystemStore();

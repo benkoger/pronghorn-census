@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
 import type { Organization } from "@/models";
-import { useSystemStore } from "@/modules/stores/systemStore";
+import { useSystemStore } from "@/stores/systemStore";
 import { BButton } from "bootstrap-vue-next";
 import { useToast } from "bootstrap-vue-next";
 

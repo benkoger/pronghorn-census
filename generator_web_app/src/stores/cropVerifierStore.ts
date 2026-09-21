@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useProjectStore } from "@/stores/projectStore";
 import {
   boxWidth,
   boxHeight,
@@ -20,7 +20,7 @@ import {
   type updateAnnotationOptions,
   type createAnnotationOptions,
 } from "@/models";
-import { api } from "@/modules/api";
+import { api } from "@/api";
 import { useImage } from "vue-konva";
 
 // ---------------------------------------------------------------------------------------------------------------------------

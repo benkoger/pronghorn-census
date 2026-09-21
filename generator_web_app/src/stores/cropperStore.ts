@@ -3,9 +3,9 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useProjectStore } from "@/stores/projectStore";
 import type { Image, Prediction, PredictionCrop, autoCropperBatch } from "@/models";
-import { api, API_BASE } from "@/modules/api";
+import { api, API_BASE } from "@/api";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 

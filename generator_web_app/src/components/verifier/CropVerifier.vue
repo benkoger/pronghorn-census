@@ -3,9 +3,9 @@
 // TS ignores because Konva has bad TS support, it works though.
 import { defineComponent, type Ref } from "vue";
 import type { konvaBoxConf, tempRect, Label } from "@/models";
-import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
+import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import Konva from "konva";
-import { useProjectStore } from "@/modules/stores/projectStore";
+import { useProjectStore } from "@/stores/projectStore";
 
 export default defineComponent({
   name: 'crop-verifier',

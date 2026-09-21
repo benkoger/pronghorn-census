@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Authenticate from "@/pages/authenticate.vue";
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { api } from "@/modules/api";
+import Authenticate from "@/views/AuthView.vue";
+import { useSystemStore } from "@/stores/systemStore";
+import { api } from "@/api";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -9,7 +9,7 @@ const router = createRouter({
     {
       path: "/setup",
       name: "setup",
-      component: () => import("@/pages/initialSetup.vue"),
+      component: () => import("@/views/SetupView.vue"),
       meta: {
         requiresAuth: false,
         requiresNoLayout: true,
@@ -24,7 +24,7 @@ const router = createRouter({
     {
       path: "/",
       name: "dashboard",
-      component: () => import("@/pages/dashboard.vue"),
+      component: () => import("@/views/DashboardView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -33,7 +33,7 @@ const router = createRouter({
     // {
     //   path: "/users/:uuid?",
     //   name: "users",
-    //   component: () => import("@/pages/users.vue"),
+    //   component: () => import("@/views/UsersView.vue"),
     //   meta: {
     //     requiresAuth: true,
     //     requiresNoLayout: false,
@@ -42,7 +42,7 @@ const router = createRouter({
     {
       path: "/auto-cropper/",
       name: "auto-cropper",
-      component: () => import("@/pages/autoCropper/autoCropperPage.vue"),
+      component: () => import("@/views/AutoCropperView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -51,7 +51,7 @@ const router = createRouter({
     {
       path: "/crop-verifier/",
       name: "crop-verifier",
-      component: () => import("@/pages/cropVerifier/cropVerifierPage.vue"),
+      component: () => import("@/views/CropVerifierView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -60,7 +60,7 @@ const router = createRouter({
     {
       path: "/settings",
       name: "settings",
-      component: () => import("@/pages/settings.vue"),
+      component: () => import("@/views/SettingsView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
@@ -69,7 +69,7 @@ const router = createRouter({
     {
       path: "/upload/",
       name: "upload",
-      component: () => import("@/pages/uploader/uploaderPage.vue"),
+      component: () => import("@/views/UploaderView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,

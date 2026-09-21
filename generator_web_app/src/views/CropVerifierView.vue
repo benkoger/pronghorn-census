@@ -1,17 +1,17 @@
 <script lang="ts">
 import { defineComponent, defineAsyncComponent } from "vue";
-import { useProjectStore } from "@/modules/stores/projectStore";
-import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
+import { useProjectStore } from "@/stores/projectStore";
+import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import type { Project, Model, HerdUnit, Survey } from "@/models";
 import { mapState, mapWritableState } from "pinia";
-import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
-import SelectorList from "@/components/templates/SelectorList.vue";
+import ProcessBreadCrumb from "@/components/common/ProcessBreadCrumb.vue";
+import SelectorList from "@/components/common/SelectorList.vue";
 
 export default defineComponent({
   name: "Crop-Verification",
   components: {
     Validate: defineAsyncComponent(
-      () => import("@/pages/cropVerifier/verify.vue"),
+      () => import("@/components/verifier/CropVerifier.vue"),
     ),
     BreadCrumb: ProcessBreadCrumb,
     SelectList: SelectorList,
