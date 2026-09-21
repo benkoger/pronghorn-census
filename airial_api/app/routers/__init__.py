@@ -25,6 +25,8 @@ from .roles import roleBp
 from .labels import labelBp
 from .active_measurements import activeMeasBp
 from .am_units import amUnitBp
+from .image_metadata import imageMetadataBp
+from .image_footprints import imageFootprintBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -32,6 +34,8 @@ bp = Blueprint("app", __name__)
 
 bp.register_blueprint(herdunitBp)
 bp.register_blueprint(imageBp)
+bp.register_blueprint(imageMetadataBp)
+bp.register_blueprint(imageFootprintBp)
 
 bp.register_blueprint(modelBp)
 bp.register_blueprint(projectBp)
