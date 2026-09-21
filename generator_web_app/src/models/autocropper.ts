@@ -1,10 +1,9 @@
-// AutoCropper models mirroring airial_api/database/object_models/autocropper.py
+// AutoCropper domain models
 // Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import type { PrimaryKey } from "./base";
-import type { Image, PredictionCrop } from "./core/images";
-import type { Prediction } from "./core/predictions";
+import type { PrimaryKey } from "./common";
+import type { Image, PredictionCrop, Prediction } from "./image";
 
 export interface autoCropperBatch {
   images: Image[];
@@ -23,6 +22,21 @@ export interface AutoCropperBatchQuery {
 
 export interface AutoCropReq {
   image_id: string;
+  predictions: Prediction[];
+  label_ids: PrimaryKey[];
+}
+
+export interface AutoCropBatchOptions {
+  survey_id: PrimaryKey;
+  herd_unit_id: PrimaryKey;
+  model_id: PrimaryKey;
+  label?: number[];
+  batch_size?: number;
+  min_confidence?: number;
+}
+
+export interface AutoCropOptions {
+  image_id: PrimaryKey;
   predictions: Prediction[];
   label_ids: PrimaryKey[];
 }

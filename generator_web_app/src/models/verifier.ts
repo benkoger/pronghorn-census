@@ -1,11 +1,10 @@
-// Verifier models mirroring airial_api/database/object_models/verifier.py
+// Verifier domain models
 // Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import type { Ref } from "vue";
-import type { konvaBoxConf } from "./base";
-import type { ReviewedArea } from "./core/images";
-import type { Annotation } from "./core/annotations";
+import type { konvaBoxConf, PrimaryKey } from "./common";
+import type { ReviewedArea, Annotation } from "./image";
 
 export interface cropVerifierBatch {
   crops: {
@@ -30,4 +29,19 @@ export interface ApproveAnnotationsReq {
   image_id: string;
   annotations: Record<string, any>[];
   deleted_annotations: Record<string, any>[];
+}
+
+export interface getReviewedAreaOptions {
+  survey_id: PrimaryKey;
+  herd_unit_id: PrimaryKey;
+  model_id: PrimaryKey;
+  label: number[];
+  batch_size: number;
+}
+
+export interface submitOptions {
+  reviewed_area_id: PrimaryKey;
+  image_id: PrimaryKey;
+  annotations: Annotation[];
+  deleted_annotations: Annotation[];
 }

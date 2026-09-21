@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
-import type { Organization } from "@/types/generatorobjects";
+import type { Organization } from "@/models";
 import { useSystemStore } from "@/modules/stores/systemStore";
 import { BButton } from "bootstrap-vue-next";
-import type { apiError } from "@/modules/api/errors";
 import { useToast } from "bootstrap-vue-next";
 
 defineOptions({
@@ -21,10 +20,10 @@ const logout = async () => {
 };
 
 const set_org = async (org: Organization) => {
-  await sStore.set_organization(org).catch((e: apiError) => {
+  await sStore.set_organization(org).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Organization Error",
+      body: e.message || "Failed to switch organization",
       variant: "danger",
       position: "bottom-start",
     });

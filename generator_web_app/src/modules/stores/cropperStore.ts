@@ -1,13 +1,11 @@
-// cross component state management for autocropper functionality
-// Author: Michael B. Lance
+// Cross component state management for autocropper functionality
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
 import { useProjectStore } from "@/modules/stores/projectStore";
-import { Image, Prediction, PredictionCrop } from "@/types/generatorobjects";
-import type { autoCropperBatch } from "@/types/generatorobjects";
-import { fetchAutoCropperBatch, autoCrop } from "../api/autoCropper";
-import { closeUserImages, createPredCrops } from "@/modules/api/images";
+import type { Image, Prediction, PredictionCrop, autoCropperBatch } from "@/models";
+import { api, API_BASE } from "@/modules/api";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -58,24 +56,26 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
     },
     NextPredictionCrops(state): boolean {
       return (
-        this.currentBatch?.predictionCrops[state.imageIdx + 1] !== undefined
+        state.batches[state.batchIdx]?.predictionCrops[state.imageIdx + 1] !==
+        undefined
       );
     },
     LastPredictionCrops(state): boolean {
       return (
-        this.currentBatch?.predictionCrops[state.imageIdx - 1] !== undefined
+        state.batches[state.batchIdx]?.predictionCrops[state.imageIdx - 1] !==
+        undefined
       );
     },
-    currentImage(state): Image | undefined {
-      return this.currentImages[state.imageIdx];
+    currentImage(): Image | undefined {
+      return this.currentImages[this.imageIdx];
     },
-    imageNum: (state) => state.imageIdx + 1,
+    currentPrediction(): Prediction | undefined {
+      return this.CurrentPredictions[this.activePredIdx];
+    },
     approvedPredictions(): Prediction[] {
-      const newPredictions: Prediction[] = [];
       const crops = this.CurrentPredictionCrops;
       const predictions = this.CurrentPredictions;
-
-      if (!crops || !predictions) return newPredictions;
+      const newPredictions: Prediction[] = [];
 
       for (const crop of crops) {
         if (crop.approved) {
@@ -107,15 +107,23 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
         return;
       }
 
-      const resp = await fetchAutoCropperBatch({
+      const resp = await api.get<any[]>("autocropper/batch", {
         survey_id: pStore.CurrentSurvey.uuid,
         herd_unit_id: pStore.CurrentHerdUnit.uuid,
         batch_size: this.batch_size,
+        size: this.batch_size,
         min_confidence: this.minConfidence,
         label: pStore.CurrentLabelValues,
         model_id: pStore.CurrentModel.uuid,
       });
-      if (!resp) return;
+      if (!resp || !Array.isArray(resp)) return;
+
+      const images: Image[] = [];
+      const predictions: Prediction[][] = [];
+      for (const img of resp) {
+        images.push(img);
+        predictions.push(img.predictions || []);
+      }
 
       if (!this.batches[batchIndex]) {
         this.batches[batchIndex] = {
@@ -124,8 +132,8 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
           predictionCrops: [],
         };
       }
-      this.batches[batchIndex].images = resp[0];
-      this.batches[batchIndex].predictions = resp[1];
+      this.batches[batchIndex].images = images;
+      this.batches[batchIndex].predictions = predictions;
     },
     async nextBatch() {
       if (this.batches.length > 3) {
@@ -143,17 +151,21 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
       const batch = this.batches[batch_index];
       if (!batch || !batch.images[image_index]) return;
 
-      const predCrops = await createPredCrops({
+      const predCrops = await api.post<PredictionCrop[]>("images/prediction_crops", {
         image_id: batch.images[image_index].uuid,
         prediction_id: this.get_predictions_ids(batch_index, image_index),
       });
       if (predCrops) {
-        batch.predictionCrops[image_index] = predCrops;
+        batch.predictionCrops[image_index] = predCrops.map((crop) => ({
+          ...crop,
+          url: crop.url || `${API_BASE}/images/prediction_crops/${crop.uuid}`,
+          drawBox: false,
+        }));
       }
     },
     async bootstrap() {
       this.loading = true;
-      await closeUserImages();
+      await api.patch("images/close-user-images");
       await this.getbatch(0);
       await this.getPredCrops(this.batchIdx, this.imageIdx);
       this.loading = false;
@@ -237,7 +249,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
           this.loading = false;
           throw new Error("HerdUnit, Survey, current image, or labels are undefined!");
         }
-        await autoCrop({
+        await api.post("autocropper/autocrop", {
           image_id: this.currentImage.uuid,
           predictions: this.approvedPredictions,
           label_ids: pStore.LabelIds,
@@ -250,7 +262,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
     async endSession() {
       this.$reset();
       this.bootStrapped = false;
-      await closeUserImages();
+      await api.patch("images/close-user-images");
     },
   },
 });

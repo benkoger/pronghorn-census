@@ -3,8 +3,7 @@ import { ref, onMounted } from "vue";
 import { useSystemStore } from "@/modules/stores/systemStore.ts";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "bootstrap-vue-next";
-import { api_url } from "@/modules/api/apiV1Methods.ts";
-import type { apiError } from "@/modules/api/errors";
+import { API_BASE } from "@/modules/api";
 
 const sStore = useSystemStore();
 const router = useRouter();
@@ -16,27 +15,27 @@ const { create } = useToast();
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
-const google_auth = `${api_url}/authorize/google`;
+const google_auth = `${API_BASE}/authorize/google`;
 
 onMounted(() => {
-  if (sStore.logged_in == true) {
-    router.push("/");
-  }
-  create({
-    title: "Authentication is required",
-    body: "You must be authenticated to access this resource",
-    variant: "warning",
-    position: "bottom-start",
+  sStore.check_auth().then(() => {
+    if (sStore.logged_in) {
+      if (redirection_path) {
+        router.push(redirection_path);
+      } else {
+        router.push("/");
+      }
+    }
   });
 });
 
 const submitAuthRequest = async () => {
   await sStore
     .authenticate(email.value, password.value)
-    .catch((e: apiError) => {
+    .catch((e: any) => {
       create({
-        title: `${e.error}`,
-        body: `${e.code}: ${e.message}`,
+        title: "Authentication Failed",
+        body: e.message || "Failed to authenticate",
         variant: "danger",
         position: "bottom-start",
       });

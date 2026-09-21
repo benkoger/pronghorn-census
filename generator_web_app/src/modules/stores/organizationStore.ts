@@ -5,8 +5,8 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from 'pinia';
-import { getAllUsers } from '@/modules/api/users.ts';
-import { User, Organization } from '@/types/generatorobjects.ts';
+import api from '@/modules/api';
+import type { User } from '@/models';
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -26,7 +26,7 @@ export const useOrgStore = defineStore('orgStore', {
 			this.bootstrapped = true;
 		},
 		async get_users() {
-			this.users = await getAllUsers();
+			this.users = await api.get<User[]>("users");
 		},
 		select_user(user: User) {
 			const idx = this.users.indexOf(user);

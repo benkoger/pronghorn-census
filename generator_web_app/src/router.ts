@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Authenticate from "@/pages/authenticate.vue";
 import { useSystemStore } from "@/modules/stores/systemStore";
-import { checkApiBootstrapped } from "./modules/api/apiV1Methods";
+import { api } from "@/modules/api";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -75,15 +75,6 @@ const router = createRouter({
         requiresNoLayout: false,
       },
     },
-    // {
-    //   path: "/data",
-    //   name: "data-manager",
-    //   component: () => import("@/pages/dataManager.vue"),
-    //   meta: {
-    //     requiresAuth: true,
-    //     requiresNoLayout: false,
-    //   },
-    // },
   ],
 });
 
@@ -91,7 +82,8 @@ router.beforeEach(async (to) => {
   const sStore = useSystemStore();
 
   if (sStore.bootstrapped === undefined) {
-    sStore.bootstrapped = await checkApiBootstrapped();
+    const data = await api.get<{ result: boolean }>("bootstrapped").catch(() => undefined);
+    sStore.bootstrapped = Boolean(data?.result);
   }
 
   if (!sStore.bootstrapped) {

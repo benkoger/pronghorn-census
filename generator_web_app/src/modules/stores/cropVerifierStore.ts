@@ -5,34 +5,22 @@
 import { defineStore } from "pinia";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import {
-  Annotation,
-  Box,
-  Label,
-  ReviewedArea,
+  boxWidth,
+  boxHeight,
+  ActivityType,
+  type Annotation,
+  type Label,
+  type ReviewedArea,
   type cropVerifierBatch,
   type tempRect,
   type konvaBoxConf,
-} from "@/types/generatorobjects";
-import { closeUserImages } from "@/modules/api/images";
-import {
-  getReviewedArea,
-  getCountNeedingReviewed,
-} from "@/modules/api/cropVerifier";
-import {
-  getRAPresignedUrl,
-  getReviewedAreaAnnotations,
-  setAsReviewed,
-} from "@/modules/api/reviewedarea";
-import {
-  bulkUpdateAnnotations,
   type bulkUpdateAnnotationOptions,
-  bulkCreateAnnotations,
   type bulkCreateAnnotationsOptions,
-  bulkDeleteAnnotations,
   type bulkDeleteAnnotationsOptions,
   type updateAnnotationOptions,
   type createAnnotationOptions,
-} from "@/modules/api/annotations";
+} from "@/models";
+import { api } from "@/modules/api";
 import { useImage } from "vue-konva";
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -150,7 +138,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         this.pStore.CurrentSurvey === undefined
       )
         return;
-      const resp = await getReviewedArea({
+      const resp = await api.get<ReviewedArea | undefined>("verifier/area-needing-reviewed", {
         herd_unit_id: [this.pStore.CurrentHerdUnit.uuid],
         survey_id: [this.pStore.CurrentSurvey.uuid],
         include_reviewed: this.alreadyReviewed,
@@ -189,21 +177,23 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         this.needingReviewed = 0;
         return;
       }
-      const resp = await getCountNeedingReviewed({
+      const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
         herd_unit_id: [this.pStore.CurrentHerdUnit.uuid],
         survey_id: [this.pStore.CurrentSurvey.uuid],
         include_reviewed: Boolean(this.alreadyReviewed),
         include_opened: true,
       });
 
-      this.needingReviewed = resp ?? 0;
+      this.needingReviewed = resp?.count ?? 0;
     },
 
     // --------------------------------------------------------------------------------------
 
     async getReviewedAreaImage(crop: ReviewedArea | undefined) {
       if (crop == undefined) return;
-      const resp = await getRAPresignedUrl(crop.uuid);
+      const resp = await api.post<string>("reviewed-area/presigned-get-url", {
+        reviewed_area_id: crop.uuid,
+      });
       if (resp == undefined) return;
       crop.url = resp;
       return useImage(resp);
@@ -213,7 +203,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
     async bootStrap() {
       this.loading = true;
-      await closeUserImages();
+      await api.patch("images/close-user-images");
       await this.getReviewedArea();
       await this.getAnnotations(this.activeCropId);
       this.bootStrapped = true;
@@ -223,21 +213,19 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
     // --------------------------------------------------------------------------------------
 
     async getAnnotations(crop_id: string) {
-      const resp = await getReviewedAreaAnnotations(
-        this.batch.crops[crop_id].crop.uuid,
+      const resp = await api.get<Annotation[]>(
+        `reviewed-area/${this.batch.crops[crop_id].crop.uuid}/annotations`,
       );
       if (resp == undefined) return;
       for (const annot of resp) {
         this.batch["crops"][crop_id]["annotations"][annot.uuid] = annot;
+        const box = annot.dimensions;
+        const cropBox = this.batch.crops[crop_id].crop.dimensions;
         this.batch.crops[crop_id].annotationBoxes[annot.uuid] = {
-          x:
-            annot.dimensions.top_left.x -
-            this.batch.crops[crop_id].crop.dimensions.top_left.x,
-          y:
-            annot.dimensions.top_left.y -
-            this.batch.crops[crop_id].crop.dimensions.top_left.y,
-          width: annot.dimensions.getWidth(),
-          height: annot.dimensions.getHeight(),
+          x: box.top_left.x - cropBox.top_left.x,
+          y: box.top_left.y - cropBox.top_left.y,
+          width: boxWidth(box),
+          height: boxHeight(box),
           scaleX: 1,
           scaleY: 1,
           rotation: 0,
@@ -274,7 +262,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
         kind: "create",
         req: {
           label_id: label.label_id,
-          image_id: this.currentCrop.image_id,
+          image_ids: { pkey: this.currentCrop.image_id, uuid: "" },
           herd_unit_id: this.pStore.CurrentHerdUnit?.herd_unit_id as number,
           box_tx: Math.round(box.x + this.currentCrop.dimensions.top_left.x),
           box_ty: Math.round(box.y + this.currentCrop.dimensions.top_left.y),
@@ -285,32 +273,36 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
             box.y + box.height + this.currentCrop.dimensions.top_left.y,
           ),
           uuid: uuid,
-          reviewed_area_id: this.currentCrop.uuid,
+          reviewed_area_ids: {
+            pkey: this.currentCrop.reviewed_area_id,
+            uuid: this.currentCrop.uuid,
+          },
+          type: ActivityType.AUTO_CROPPER,
         },
         id: uuid,
         boxConf: box,
       };
 
-      this.batch.crops[this.currentCrop.uuid].annotations[uuid] =
-        new Annotation({
-          annotation_id: 0,
-          herd_unit_id: act.req.herd_unit_id,
-          label_id: act.req.label_id,
-          image_id: act.req.image_id,
-          dimensions: new Box({
-            top_left: {
-              x: act.req.box_tx,
-              y: act.req.box_ty,
-            },
-            bottom_right: {
-              x: act.req.box_bx,
-              y: act.req.box_by,
-            },
-          }),
-          created: new Date(),
-          modified: new Date(),
-          uuid: uuid,
-        });
+      this.batch.crops[this.currentCrop.uuid].annotations[uuid] = {
+        annotation_id: 0,
+        herd_unit_id: act.req.herd_unit_id,
+        label_id: act.req.label_id,
+        image_id: act.req.image_ids.pkey,
+        type: ActivityType.AUTO_CROPPER,
+        dimensions: {
+          top_left: {
+            x: act.req.box_tx,
+            y: act.req.box_ty,
+          },
+          bottom_right: {
+            x: act.req.box_bx,
+            y: act.req.box_by,
+          },
+        },
+        created: new Date(),
+        modified: new Date(),
+        uuid: uuid,
+      };
 
       this.actionStack.push(act);
     },
@@ -516,17 +508,17 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
       let updated_annots: Annotation[] = [];
 
       if (createAnnotReq.requests.length > 0) {
-        created_annots = await bulkCreateAnnotations(createAnnotReq);
+        created_annots = await api.post<Annotation[]>("annotations/bulk-import", createAnnotReq);
         console.log(`created: ${created_annots}`);
       }
 
       if (updateAnnotReq.requests.length > 0) {
-        updated_annots = await bulkUpdateAnnotations(updateAnnotReq);
+        updated_annots = await api.patch<Annotation[]>("annotations/bulk-update", updateAnnotReq);
         console.log(`updated: ${updated_annots}`);
       }
 
       if (deleteAnnotationReq.requests.length > 0) {
-        await bulkDeleteAnnotations(deleteAnnotationReq);
+        await api.delete("annotations/bulk-delete", deleteAnnotationReq);
       }
 
       for (const annot of created_annots.concat(updated_annots)) {
@@ -537,7 +529,10 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
 
       // Update the reviewed area (set reviewed by user)
       // reviewed by user is handled by the current user object in the session
-      await setAsReviewed(this.currentCrop.uuid);
+      await api.patch("reviewed-area", {
+        reviewed_area_id: this.currentCrop.uuid,
+        type: ActivityType.AUTO_CROPPER,
+      });
 
       if (this.needingReviewed > 0) {
         this.needingReviewed--;
@@ -612,7 +607,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
     async closeImages() {
       if (this.loading) return;
       this.loading = true;
-      await closeUserImages();
+      await api.patch("images/close-user-images");
       await this.getReviewCount();
       this.loading = false;
     }

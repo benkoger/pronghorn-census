@@ -5,8 +5,8 @@ import { useProjectStore } from "@/modules/stores/projectStore";
 import CreateUser from "@/components/templates/createUser.vue";
 import CreateOrganization from "@/components/templates/createOrganization.vue";
 import CreateProject from "@/components/templates/createProject.vue";
-import type { Organization, User } from "@/types/generatorobjects";
-import { finishBootstrap } from "@/modules/api/apiV1Methods";
+import type { Organization, User } from "@/models";
+import { api } from "@/modules/api";
 import { useRouter } from "vue-router";
 
 const sStore = useSystemStore();
@@ -63,7 +63,8 @@ const UserCreationFinished = async () => {
 };
 
 const projectCreationFinished = async () => {
-  sStore.bootstrapped = await finishBootstrap();
+  await api.post("bootstrapped");
+  sStore.bootstrapped = true;
 
   router.push({ name: "dashboard" });
 };

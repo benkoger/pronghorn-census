@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useProjectStore } from "@/modules/stores/projectStore";
-import { Project, HerdUnit } from "@/types/generatorobjects";
+import type { Project, HerdUnit } from "@/models";
 
 import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/templates/SelectorList.vue";

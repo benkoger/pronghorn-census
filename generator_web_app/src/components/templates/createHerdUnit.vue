@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { type createHerdUnitOptions } from "@/modules/api/herdunits";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { Project } from "@/types/generatorobjects";
+import type { Project, createHerdUnitOptions } from "@/models";
 
 const { create } = useToast();
 
@@ -26,10 +24,10 @@ const options = ref<createHerdUnitOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Creation Error",
+      body: e.message || "Failed to create herd unit",
       variant: "danger",
       position: "bottom-start",
     });

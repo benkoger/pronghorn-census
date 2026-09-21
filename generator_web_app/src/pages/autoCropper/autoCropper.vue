@@ -9,7 +9,7 @@ import {
 } from "vue";
 import { useAutoCropperStore } from "@/modules/stores/cropperStore";
 import { useProjectStore } from "@/modules/stores/projectStore";
-import type { PredictionCrop } from "@/types/generatorobjects";
+import { boxWidth, boxHeight, type PredictionCrop } from "@/models";
 
 defineOptions({
   name: "cropper",
@@ -42,8 +42,8 @@ const drawBoundingBox = (
 ) => {
   if (!canvas || predCrop == undefined) return;
   const box = predCrop.boundingBox;
-  canvas.width = predCrop.dimensions.getWidth();
-  canvas.height = predCrop.dimensions.getHeight();
+  canvas.width = boxWidth(predCrop.dimensions);
+  canvas.height = boxHeight(predCrop.dimensions);
   const ctx = canvas.getContext("2d");
   if (ctx == null) return;
   ctx.beginPath();
@@ -54,7 +54,7 @@ const drawBoundingBox = (
   ctx.strokeStyle = label_color_hex != undefined ? label_color_hex : "white";
   ctx.fillStyle =
     label_color_hex != undefined ? label_color_hex + "54" : "#ffffff54";
-  ctx.rect(box.top_left.x, box.top_left.y, box.getWidth(), box.getHeight());
+  ctx.rect(box.top_left.x, box.top_left.y, boxWidth(box), boxHeight(box));
   ctx.stroke();
   ctx.closePath();
 };
@@ -296,11 +296,7 @@ onBeforeUnmount(async () => {
               </label>
               <BFormSelect
                 :id="`label-select-${predCrop.uuid}`"
-                v-model="
-                  cStore.CurrentPredictionCrops[
-                    cStore.CurrentPredictionCrops.indexOf(predCrop)
-                  ].label
-                "
+                v-model="predCrop.label"
                 @change="drawBoundingBox(predCropRefs[predCrop.uuid], predCrop)"
               >
                 <option

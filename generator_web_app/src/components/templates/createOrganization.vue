@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, type PropType } from "vue";
-import { type createOrganizationOptions } from "@/modules/api/organizations";
+import type { createOrganizationOptions } from "@/models";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
 
 const { create } = useToast();
 
@@ -22,10 +21,10 @@ const options = ref<createOrganizationOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Error creating organization",
+      body: e.message || "Failed to create organization",
       variant: "danger",
       position: "bottom-start",
     });

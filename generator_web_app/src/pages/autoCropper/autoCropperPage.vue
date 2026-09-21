@@ -2,7 +2,7 @@
 import { defineComponent, defineAsyncComponent } from "vue";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { useAutoCropperStore } from "@/modules/stores/cropperStore";
-import { Project, Survey, HerdUnit, Model } from "@/types/generatorobjects";
+import type { Project, Survey, HerdUnit, Model } from "@/models";
 import { mapState } from "pinia";
 import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/templates/SelectorList.vue";

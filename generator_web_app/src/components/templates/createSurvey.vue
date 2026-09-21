@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { HerdUnit, Project } from "@/types/generatorobjects";
-import type { createSurveyOptions } from "@/modules/api/surveys";
+import type { HerdUnit, Project, createSurveyOptions } from "@/models";
 
 const { create } = useToast();
 
@@ -27,10 +25,10 @@ const options = ref<createSurveyOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Creation Error",
+      body: e.message || "Failed to create survey",
       variant: "danger",
       position: "bottom-start",
     });

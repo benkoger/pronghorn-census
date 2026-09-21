@@ -1,28 +1,18 @@
-// user state store
-// Author: Michael B. Lance
+// User and session state store
+// Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import {
-  authUser,
-  checkAuth,
-  getCurrentUser,
-  deauthUser,
-  getUserHasRole,
-  getUserOrganizations,
-  setActiveOrg,
-  createUser,
-  createSuperUser,
-  type createUserOptions,
-} from "@/modules/api/users";
-import {
-  createOrganization,
-  type createOrganizationOptions,
-} from "@/modules/api/organizations";
-import { Organization, Role, User } from "@/types/generatorobjects.ts";
+import { api } from "@/modules/api";
+import type {
+  Organization,
+  Role,
+  User,
+  createUserOptions,
+  createOrganizationOptions,
+} from "@/models";
 import { getActivePinia, type Pinia, type Store } from "pinia";
 import { useRouter } from "vue-router";
-import { getRoles } from "../api/roles";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -54,9 +44,9 @@ export const useSystemStore = defineStore("systemStore", {
   },
   actions: {
     async authenticate(email: string, password: string) {
-      this.logged_in = await authUser(email, password);
+      await api.post("authenticate", { email, password });
+      this.logged_in = true;
       await this.get_current_user();
-      // await this.get_roles();
       if (this.user != undefined) {
         await this.get_organizations();
         this.organization_idx = +Object.keys(this.organizations)[0];
@@ -66,13 +56,12 @@ export const useSystemStore = defineStore("systemStore", {
       options: createUserOptions,
       login: boolean = false,
     ): Promise<boolean> {
-      const user = await createUser(options);
-
+      const user = await api.post<User>("users", options);
       if (user == undefined) return false;
 
       if (login) {
         await this.deuathenticate();
-        await this.authenticate(options.email, options.password);
+        await this.authenticate(options.email, options.password!);
       }
       return true;
     },
@@ -80,73 +69,73 @@ export const useSystemStore = defineStore("systemStore", {
       options: createUserOptions,
       login: boolean = false,
     ): Promise<boolean> {
-      const user = await createSuperUser(options);
-
+      const user = await api.post<User>("users/super-user", options);
       if (user == undefined) return false;
 
       if (login) {
         if (this.logged_in) await this.deuathenticate();
-        await this.authenticate(options.email, options.password);
+        await this.authenticate(options.email, options.password!);
       }
-      await this.authenticate(options.email, options.password);
+      await this.authenticate(options.email, options.password!);
       return true;
     },
     async create_organization(
       options: createOrganizationOptions,
     ): Promise<boolean> {
-      const organization = await createOrganization(options);
-
+      const organization = await api.post<Organization>("organizations", options);
       if (this.organizations == undefined) return false;
-
-      this.organizations[2] = organization;
-
+      this.organizations[organization.organization_id] = organization;
       return true;
     },
     async deuathenticate() {
-      await deauthUser();
+      await api.post("deauthenticate").catch(() => {});
       this.organizations = {};
       this.clear_state();
     },
     async get_current_user() {
-      this.user = (await getCurrentUser()) as User;
+      this.user = await api.get<User>("users/current-user");
       if (this.user != undefined) this.logged_in = true;
     },
     async get_organizations() {
       if (this.user) {
-        const orgs = await getUserOrganizations(this.user.uuid);
-
+        const orgs = await api.get<Organization[]>(`users/${this.user.uuid}/organizations`);
         orgs.forEach((org: Organization) => {
           this.organizations[org.organization_id] = org;
         });
       }
     },
     async get_roles() {
-      this.roles = await getRoles({});
+      this.roles = await api.get<Role[]>("roles");
     },
     async check_auth() {
-      this.logged_in = (await checkAuth()) ? true : false;
+      const res = await api.get<boolean>("users/check-auth").catch(() => false);
+      this.logged_in = Boolean(res);
     },
     async check_admin() {
-      this.is_admin = await getUserHasRole("admin");
+      const res = await api
+        .get<boolean>("users/role-check", { role_name: "admin" })
+        .catch(() => false);
+      this.is_admin = Boolean(res);
     },
     async set_organization(org: Organization | undefined) {
       if (org != undefined) {
         const idx = org.organization_id;
         if (idx != undefined) {
-          await setActiveOrg(org.uuid);
+          await api.patch("users/set-active-organization", { org_id: org.uuid });
           this.organization_idx = idx;
           await this.check_admin();
 
           // Reset state of pinia stores
-          interface ExtendedPina extends Pinia {
+          interface ExtendedPinia extends Pinia {
             _s: Map<string, Store>;
           }
 
-          const pinia = getActivePinia() as ExtendedPina;
-
-          pinia._s.forEach((store: Store, name: string) => {
-            if (name != "systemStore") store.$reset();
-          });
+          const pinia = getActivePinia() as ExtendedPinia;
+          if (pinia && pinia._s) {
+            pinia._s.forEach((store: Store, name: string) => {
+              if (name != "systemStore") store.$reset();
+            });
+          }
 
           this.router.go(0);
         }

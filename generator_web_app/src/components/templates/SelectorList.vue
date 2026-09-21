@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import type { CGObject } from "@/types/generatorobjects";
+import type { CGObject } from "@/models";
 import { Icon } from "@iconify/vue/dist/iconify.js";
 
 const props = withDefaults(

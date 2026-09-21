@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { Schema } from "@/types/generatorobjects";
-import type { createLabelOptions } from "@/modules/api/labels";
+import type { Schema, createLabelOptions } from "@/models";
 import { useProjectStore } from "@/modules/stores/projectStore";
 
 const { create } = useToast();
@@ -35,17 +33,20 @@ const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createLabelOptions>({
   name: "",
-  schema_id: props.schema.uuid,
+  schema_ids: {
+    pkey: props.schema.schema_id,
+    uuid: props.schema.uuid,
+  },
   label: minLabelValue.value,
   image_link: " ",
   color: "#ffffff",
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Creation Error",
+      body: e.message || "Failed to create label",
       variant: "danger",
       position: "bottom-start",
     });

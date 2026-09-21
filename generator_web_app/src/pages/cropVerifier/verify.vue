@@ -2,7 +2,7 @@
 // Heavily adapted from several excellent Konva demos https://konvajs.org/
 // TS ignores because Konva has bad TS support, it works though.
 import { defineComponent, type Ref } from "vue";
-import { type konvaBoxConf, type tempRect, Label } from "@/types/generatorobjects";
+import type { konvaBoxConf, tempRect, Label } from "@/models";
 import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
 import Konva from "konva";
 import { useProjectStore } from "@/modules/stores/projectStore";

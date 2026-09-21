@@ -1,8 +1,8 @@
 <script lang="ts">
 import { defineComponent, defineAsyncComponent } from "vue";
-import { useProjectStore } from "@/modules/stores/projectStore.ts";
-import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore.ts";
-import { Project, Model, HerdUnit, Survey } from "@/types/generatorobjects.ts";
+import { useProjectStore } from "@/modules/stores/projectStore";
+import { useCropVerifierStore } from "@/modules/stores/cropVerifierStore";
+import type { Project, Model, HerdUnit, Survey } from "@/models";
 import { mapState, mapWritableState } from "pinia";
 import ProcessBreadCrumb from "@/components/templates/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/templates/SelectorList.vue";

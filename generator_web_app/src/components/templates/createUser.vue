@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref, type PropType, computed } from "vue";
-import { type createUserOptions } from "@/modules/api/users";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
 import { useSystemStore } from "@/modules/stores/systemStore";
-import { Organization, Role } from "@/types/generatorobjects";
+import type { Organization, Role, createUserOptions } from "@/models";
 
 const sStore = useSystemStore();
 const { create } = useToast();
@@ -25,11 +23,11 @@ const props = defineProps({
     default: false,
   },
   organization: {
-    type: Organization,
+    type: Object as PropType<Organization>,
     default: undefined,
   },
   role: {
-    type: Role,
+    type: Object as PropType<Role>,
     default: undefined,
   },
 });

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { Model, Project } from "@/types/generatorobjects";
-import type { createSchemaOptions } from "@/modules/api/schemas";
+import type { Model, Project, createSchemaOptions } from "@/models";
 
 const { create } = useToast();
 
@@ -23,15 +21,21 @@ const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createSchemaOptions>({
   name: "",
-  project_id: props.project.uuid,
-  model_id: props.model.uuid,
+  project_ids: {
+    pkey: props.project.project_id,
+    uuid: props.project.uuid,
+  },
+  model_ids: {
+    pkey: props.model.model_id,
+    uuid: props.model.uuid,
+  },
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Error creating schema",
+      body: e.message || "Failed to create schema",
       variant: "danger",
       position: "bottom-start",
     });
@@ -67,15 +71,7 @@ const submitReq = async () => {
     <BInputGroup>
       <template #prepend>
         <BInputGroupText>
-<<<<<<< HEAD
-          <Icon
-            icon="fluent:rename-16-regular"
-            fluent:rename-16-regular
-            width="24"
-          />
-=======
           <Icon icon="fluent:rename-16-regular" width="24" />
->>>>>>> 2f5c112b260d890ee9375bc2e3e048da9aaad6c9
         </BInputGroupText>
       </template>
       <BFormFloatingLabel label="Name" label-for="name">

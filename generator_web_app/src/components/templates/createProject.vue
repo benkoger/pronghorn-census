@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, type PropType } from "vue";
-import { type createProjectOptions } from "@/modules/api/projects";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { Organization, User } from "@/types/generatorobjects";
+import type { Organization, User, createProjectOptions } from "@/models";
 
 const { create } = useToast();
 
@@ -15,11 +13,11 @@ const props = defineProps({
     required: true,
   },
   user: {
-    type: User,
+    type: Object as PropType<User>,
     required: true,
   },
   organization: {
-    type: Organization,
+    type: Object as PropType<Organization>,
     required: true,
   },
   showSummary: {
@@ -32,14 +30,17 @@ const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createProjectOptions>({
   name: "",
-  organization_id: props.organization.uuid,
+  organization_ids: {
+    pkey: props.organization.organization_id,
+    uuid: props.organization.uuid,
+  },
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  await props.submitAction(options.value).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Error creating project",
+      body: e.message || "Failed to create project",
       variant: "danger",
       position: "bottom-start",
     });

@@ -1,30 +1,20 @@
 <script lang="ts">
 // https://serversideup.net/blog/file-uploads-using-fetch-api-and-vuejs/
 // https://blog.logrocket.com/customizing-drag-drop-file-uploading-vue/#creating-advanced-dropzone
-import { defineComponent } from "vue";
-import { ref } from "vue";
-import {
+import { defineComponent, ref } from "vue";
+import type {
   HerdUnit,
   Project,
   Survey,
   Model,
   Schema,
   Image,
-} from "@/types/generatorobjects";
-import {
-  createImagePresignedPut,
-  createImage,
-  abortMultipartUpload,
-  delete_image,
-  createMultiPartUpload,
-  completeMultiPartUpload,
-} from "@/modules/api/images";
+} from "@/models";
+import api from "@/modules/api";
 import { useProjectStore } from "@/modules/stores/projectStore";
 import { Md5 } from "ts-md5";
 import { filesize } from "filesize";
-import { ApiError } from "@/modules/api/errors";
-import { useToast } from "bootstrap-vue-next";
-import { BvTriggerableEvent } from "bootstrap-vue-next";
+import { useToast, type BvTriggerableEvent } from "bootstrap-vue-next";
 
 export default defineComponent({
   name: "Upload-Utility",
@@ -160,25 +150,23 @@ export default defineComponent({
         let image: Image;
 
         try {
-          image = await createImage({
-            survey_id: survey.survey_id,
-            herd_unit_id: herdUnit.herd_unit_id,
+          image = await api.post<Image>("images", {
+            survey_ids: { pkey: survey.survey_id, uuid: survey.uuid },
+            herd_unit_ids: { pkey: herdUnit.herd_unit_id, uuid: herdUnit.uuid },
             name: file.name,
             img_key: image_key,
             image_length_px: imageBitmap.height,
             image_width_px: imageBitmap.width,
           });
         } catch (err: any) {
-          if (err instanceof ApiError) {
-            if (err.code == 409) {
-              this.upload_info_text = err.message;
-              this.has_info = true;
-              this.current_file_num++;
-              // Non-fatal error -- move to next image
-              continue;
-            }
+          if (err.message?.includes("409") || err.code == 409) {
+            this.upload_info_text = err.message;
+            this.has_info = true;
+            this.current_file_num++;
+            // Non-fatal error -- move to next image
+            continue;
           }
-          console.error("Unkown error, panicking!");
+          console.error("Unknown error, panicking!");
           this.is_uploading = false;
           this.create({
             title: "Error",
@@ -196,7 +184,9 @@ export default defineComponent({
         // Initiate Mulitpart upload
         let uploadId: string;
         try {
-          uploadId = await createMultiPartUpload(image_key);
+          uploadId = await api.post<string>("images/create-multipart-upload", {
+            image_key,
+          });
         } catch (error: any) {
           console.error(error);
           return;
@@ -228,7 +218,7 @@ export default defineComponent({
           // Request pre-signed url for chuck
           let presignedUrl: string;
           try {
-            presignedUrl = await createImagePresignedPut({
+            presignedUrl = await api.post<string>("images/presigned-put-url", {
               upload_id: uploadId,
               part_number: partNumber,
               image_id: image.image_id,
@@ -252,7 +242,10 @@ export default defineComponent({
           });
 
           if (!response.ok) {
-            abortMultipartUpload(image.img_key, uploadId);
+            api.post("images/abort-multipart-upload", {
+              image_key: image.img_key,
+              upload_id: uploadId,
+            });
             this.create({
               title: "Upload failed",
               body: `The upload has failed with a status of ${response.status}`,
@@ -273,7 +266,11 @@ export default defineComponent({
         this.current_file_num++;
         this.current_file_part = 0;
         try {
-          await completeMultiPartUpload(image_key, partArray, uploadId);
+          await api.post("images/complete-multipart-upload", {
+            image_key,
+            parts: partArray,
+            upload_id: uploadId,
+          });
         } catch (error: any) {
           console.error(error);
           this.create({
@@ -331,7 +328,7 @@ export default defineComponent({
     },
     async delete_uploaded_images() {
       for (const uuid of this.uploaded_ids) {
-        await delete_image(uuid);
+        await api.delete(`images/${uuid}`);
       }
     },
   },

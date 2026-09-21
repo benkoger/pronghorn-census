@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useToast } from "bootstrap-vue-next";
-import { type apiError } from "@/modules/api/errors";
-import { Project, Schema } from "@/types/generatorobjects";
-import { type createModelOptions } from "@/modules/api/models";
+import { ModelType, type Project, type Schema, type createModelOptions } from "@/models";
 
 const { create } = useToast();
 
@@ -21,17 +19,39 @@ const props = withDefaults(
 
 const emit = defineEmits(["creationSuccessful"]);
 
-const options = ref<createModelOptions>({
-  name: "",
-  project_id: props.project.uuid,
-  schema_id: "",
-});
+const name = ref("");
+const selectedSchemaUuid = ref(props.schemas.length > 0 ? props.schemas[0].uuid : "");
+const modelType = ref<ModelType>(ModelType.DETECTION);
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: apiError) => {
+  const selectedSchema = props.schemas.find((s) => s.uuid === selectedSchemaUuid.value);
+  if (!selectedSchema) {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: "Schema Required",
+      body: "Please select a schema for this model.",
+      variant: "danger",
+      position: "bottom-start",
+    });
+    return;
+  }
+
+  const payload: createModelOptions = {
+    name: name.value,
+    model_type: modelType.value,
+    project_ids: {
+      pkey: props.project.project_id,
+      uuid: props.project.uuid,
+    },
+    schema_ids: {
+      pkey: selectedSchema.schema_id,
+      uuid: selectedSchema.uuid,
+    },
+  };
+
+  await props.submitAction(payload).catch((e: any) => {
+    create({
+      title: "Error creating model",
+      body: e.message || "Failed to create model",
       variant: "danger",
       position: "bottom-start",
     });
@@ -39,22 +59,23 @@ const submitReq = async () => {
   });
 
   create({
-    title: `Herd Unit ${options.value.name} created successfully`,
-    body: `The Herd Unit was created successfully.`,
+    title: `Model ${name.value} created successfully`,
+    body: `The Model was created successfully.`,
     variant: "success",
     position: "bottom-start",
   });
 
   emit("creationSuccessful");
-  options.value.name = "";
+  name.value = "";
 };
 </script>
 <template>
   <div class="d-flex mb-3" v-if="props.showSummary">
     <Icon icon="octicon:ai-model-16" width="15%" height="100%" />
     <div class="d-flex flex-column">
-      <span>Name: {{ options.name }}</span>
+      <span>Name: {{ name }}</span>
       <span>Project: {{ props.project?.name }}</span>
+      <span>Type: {{ modelType }}</span>
     </div>
   </div>
   <BForm
@@ -76,15 +97,14 @@ const submitReq = async () => {
           required
           trim
           data-bwignore="true"
-          v-model="options.name"
+          v-model="name"
           placeholder=" "
         />
       </BFormFloatingLabel>
     </BInputGroup>
     <BInputGroup>
       <BInputGroupText>Select Schema</BInputGroupText>
-
-      <BFormSelect id="schema-selection" v-model="options.schema_id">
+      <BFormSelect id="schema-selection" v-model="selectedSchemaUuid" required>
         <option
           v-for="schema in props.schemas"
           :value="schema.uuid"
@@ -92,6 +112,14 @@ const submitReq = async () => {
         >
           {{ schema.name }}
         </option>
+      </BFormSelect>
+    </BInputGroup>
+    <BInputGroup>
+      <BInputGroupText>Model Type</BInputGroupText>
+      <BFormSelect id="model-type-selection" v-model="modelType" required>
+        <option :value="ModelType.DETECTION">Detection</option>
+        <option :value="ModelType.REGRESSION">Regression</option>
+        <option :value="ModelType.DEPTH_ESTIMATION">Depth Estimation</option>
       </BFormSelect>
     </BInputGroup>
     <BButton type="submit" variant="primary" class="mt-auto">Submit</BButton>
