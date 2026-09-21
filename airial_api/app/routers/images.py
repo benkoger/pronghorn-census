@@ -17,6 +17,8 @@ from database.errors import ObjectNotFound
 from database.object_models.base import BulkRequest
 from database.object_models.core import (
     Image,
+    ImageMetadata,
+    ImageFootprint,
     Prediction,
     Annotation,
     ReviewedArea,
@@ -141,6 +143,70 @@ def get_predictions(image_id: int | UUID):
     predictions = base.get_children(Prediction, Image, image_id)
 
     return [pred.serialize() for pred in predictions], 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@imageBp.get("/<int:image_id>/metadata")
+@imageBp.get("/<uuid:image_id>/metadata")
+@login_required
+@permission_required("access")
+def get_metadata(image_id: int | UUID):
+    """
+    Retrieve metadata associated with a specific image.
+    ---
+    parameters:
+      - name: image_id
+        in: path
+        required: true
+        description: Primary key of the image (integer ID or UUID).
+    responses:
+      200:
+        description: List of metadata records.
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this image.
+      404:
+        description: Image not found.
+      500:
+        description: Database error.
+    """
+    metadata = base.get_children(ImageMetadata, Image, image_id)
+    return [m.serialize() for m in metadata], 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@imageBp.get("/<int:image_id>/footprints")
+@imageBp.get("/<uuid:image_id>/footprints")
+@login_required
+@permission_required("access")
+def get_footprints(image_id: int | UUID):
+    """
+    Retrieve footprints associated with a specific image.
+    ---
+    parameters:
+      - name: image_id
+        in: path
+        required: true
+        description: Primary key of the image (integer ID or UUID).
+    responses:
+      200:
+        description: List of footprint records.
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this image.
+      404:
+        description: Image not found.
+      500:
+        description: Database error.
+    """
+    footprints = base.get_children(ImageFootprint, Image, image_id)
+    return [fp.serialize() for fp in footprints], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

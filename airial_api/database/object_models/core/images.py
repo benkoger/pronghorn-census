@@ -77,11 +77,6 @@ class CreateImageReq(BaseModel):
     img_key: str
     image_length_px: int
     image_width_px: int
-    area: Optional[int] = None
-    viewshed_polygon: Optional[list[list[float]]] = None
-    has_detection: bool = False
-    dem_name: Optional[str] = None
-    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -135,12 +130,7 @@ class UpdateImageReq(BaseModel):
     img_key: Optional[str] = None
     image_length_px: Optional[int] = None
     image_width_px: Optional[int] = None
-    area: Optional[int] = None
     opened_by_user_id: Optional[int] = None
-    viewshed_polygon: Optional[list[list[float]]] = None
-    has_detection: bool = False
-    dem_name: Optional[str] = None
-    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -242,11 +232,6 @@ class Image(DBbase, ImageMixin):
     modified: datetime
     image_length_px: int
     image_width_px: int
-    area: float
-    viewshed_polygon: list[list[float]]
-    has_detection: bool
-    dem_name: str
-    bbox_wsen: Optional[list[int]]
     uuid: UUID
 
     image: Optional[np.ndarray] = field(default=None, init=False)
@@ -283,15 +268,13 @@ class Image(DBbase, ImageMixin):
         query = sql.SQL("""
             INSERT INTO core.images (
                 herd_unit_id, survey_id, name, img_key, image_length_px,
-                image_width_px, area, viewshed_polygon, has_detection,
-                dem_name, bbox_wsen
+                image_width_px
             )
             VALUES (
                 %(herd_unit_id)s, %(survey_id)s, %(name)s,
                 %(img_key)s, %(image_length_px)s,
-                %(image_width_px)s, %(area)s, %(viewshed_polygon)s,
-                %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
-                )
+                %(image_width_px)s
+            )
             RETURNING *;
         """)
 
