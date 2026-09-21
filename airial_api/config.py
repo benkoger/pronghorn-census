@@ -105,5 +105,3 @@ s3_config = Config(
         "response_checksum_validation": "when_required",
     },
 )
-
-transfer_config = TransferConfig(use_threads=True, multipart_threshold=5 * 1024**3)
