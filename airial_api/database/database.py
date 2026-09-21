@@ -58,8 +58,8 @@ from database.object_models.core.images import (
 )
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.models import Model, ModelType
-from database.object_models.project_management.surveys import Survey
-from database.object_models.user_management.users import User
+from database.object_models.project_management.surveys import Survey, SurveyStatus
+from database.object_models.user_management.users import User, UserStatus
 from database.query_builder import (
     filter_by_object_ids,
     resolve_identifier,
@@ -80,6 +80,8 @@ def configure_connection(conn: Connection):
     for enum_name, enum_cls in [
         ("projectmanagement.model_type", ModelType),
         ("core.activity_type", ActivityType),
+        ("projectmanagement.survey_status", SurveyStatus),
+        ("usermanagement.user_status", UserStatus),
     ]:
         try:
             info = EnumInfo.fetch(conn, enum_name)

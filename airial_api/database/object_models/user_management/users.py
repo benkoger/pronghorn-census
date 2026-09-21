@@ -7,11 +7,21 @@ from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
 
+from enum import StrEnum
 from flask_login import UserMixin
 from msgpack import packb
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase, Keyring
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class UserStatus(StrEnum):
+    ACTIVE = "active"
+    INVITED = "invited"
+    DISABLED = "disabled"
+
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -23,7 +33,7 @@ class User(UserMixin, DBbase):
     email: str
     external_auth_id: str
     external_auth_provider: str
-    status: str
+    status: UserStatus
     created: datetime
     modified: datetime
     last_login: datetime
@@ -46,7 +56,7 @@ class User(UserMixin, DBbase):
         user_id: int
         username: str
         email: str
-        status: str
+        status: UserStatus
         created: datetime
         modified: datetime
         last_login: datetime
@@ -104,7 +114,7 @@ class CreateUserReq(BaseModel):
     password: str
     external_auth_id: Optional[str] = None
     external_auth_provider: Optional[str] = None
-    status: Optional[str] = "invited"
+    status: Optional[UserStatus] = UserStatus.INVITED
     locale: Optional[str] = "en/us"
     organization_id: Optional[UUID] = None
     role_ids: Optional[List[UUID]] = None
@@ -116,7 +126,7 @@ class CreateUserReq(BaseModel):
 class UpdateUserReq(BaseModel):
     username: Optional[str] = None
     last_login: Optional[datetime] = None
-    status: Optional[str] = None
+    status: Optional[UserStatus] = None
     external_auth_provider: Optional[str] = None
     external_auth_id: Optional[str] = None
 

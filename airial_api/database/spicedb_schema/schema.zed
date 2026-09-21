@@ -93,3 +93,18 @@ definition annotation {
   permission is_root = parent->is_root
   permission access = parent->access + is_root
 }
+
+definition image_metadata {
+  relation parent: image
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
+definition image_footprint {
+  relation parent: image
+
+  permission is_root = parent->is_root
+  permission access = parent->access + is_root
+}
+
