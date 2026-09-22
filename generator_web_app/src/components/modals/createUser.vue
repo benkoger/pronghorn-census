@@ -48,12 +48,12 @@ const usernameState = computed(() => {
 });
 
 const emailState = computed(() => {
-  if (options.value.email.length === 0) return null;
+  if (!options.value.email || options.value.email.length === 0) return null;
   return /^\S+@\S+\.\S+$/.test(options.value.email);
 });
 
 const passwordState = computed(() => {
-  if (options.value.password.length === 0 || matchWord.value.length === 0)
+  if (!options.value.password || options.value.password.length === 0 || matchWord.value.length === 0)
     return undefined;
   else if (options.value.password === matchWord.value) {
     invalidPassword.value = false;
@@ -77,10 +77,10 @@ const submitReq = async () => {
   if (passwordState.value === false) {
     return;
   }
-  await props.submitAction(options.value, props.login).catch((e: apiError) => {
+  await props.submitAction(options.value, props.login).catch((e: any) => {
     create({
-      title: `${e.error}`,
-      body: `${e.code}: ${e.message}`,
+      title: `${e?.name || "Error"}`,
+      body: `${e?.message || e}`,
       variant: "danger",
       position: "bottom-start",
     });

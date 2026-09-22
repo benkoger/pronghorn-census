@@ -2,13 +2,12 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
-import { useProjectStore } from "@/stores/projectStore";
 import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import type { Survey } from "@/models";
 
 const router = useRouter();
 const sStore = useSystemStore();
-const pStore = useProjectStore();
+const pStore = sStore;
 const cvStore = useCropVerifierStore();
 
 const loadingTelemetry = ref(false);

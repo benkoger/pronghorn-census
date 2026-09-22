@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import {
   boxWidth,
   boxHeight,
@@ -76,8 +76,8 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
     done: false,
   }),
   getters: {
-    pStore(): ReturnType<typeof useProjectStore> {
-      return useProjectStore();
+    pStore(): ReturnType<typeof useSystemStore> {
+      return useSystemStore();
     },
     currentImage: (state) =>
       state.batch["crops"]?.[state.activeCropId]?.["image"],
@@ -457,7 +457,7 @@ export const useCropVerifierStore = defineStore("cropVerifierStore", {
     async endSession() {
       this.$reset();
       this.bootStrapped = false;
-      await closeUserImages();
+      await api.patch("images/close-user-images").catch(() => {});
     },
 
     // --------------------------------------------------------------------------------------

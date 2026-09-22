@@ -51,8 +51,8 @@ const submitAuthRequest = async () => {
 };
 </script>
 <template>
-  <BRow align-v="center" align-h="center" class="flex-grow-1">
-    <BCol cols="4">
+  <BRow align-v="center" align-h="center" class="h-100 flex-grow-1 m-0">
+    <BCol cols="11" sm="8" md="6" lg="4">
       <div class="shadow-sm rounded-3">
         <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 m-0">
           Authenticate

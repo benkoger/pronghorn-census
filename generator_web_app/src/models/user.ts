@@ -28,6 +28,8 @@ export interface createUserOptions {
   status?: string;
   default_org_id?: PrimaryKey;
   locale?: string;
+  organization_id?: string;
+  role_ids?: string[];
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
 import { useSystemStore } from "@/stores/systemStore";
-import { useProjectStore } from "@/stores/projectStore";
 import CreateUser from "@/components/modals/createUser.vue";
 import CreateOrganization from "@/components/modals/createOrganization.vue";
 import CreateProject from "@/components/modals/createProject.vue";
@@ -10,7 +9,7 @@ import { api } from "@/api";
 import { useRouter } from "vue-router";
 
 const sStore = useSystemStore();
-const pStore = useProjectStore();
+const pStore = sStore;
 
 const superUserCreated = ref(false);
 const organizationCreated = ref(false);

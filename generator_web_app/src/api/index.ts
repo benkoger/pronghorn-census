@@ -24,11 +24,28 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || `HTTP ${res.status} ${res.statusText}`);
+    const text = await res.text().catch(() => "");
+    let errMsg = `HTTP ${res.status} ${res.statusText}`;
+    if (text) {
+      try {
+        const body = JSON.parse(text);
+        errMsg = body.message || body.error || errMsg;
+      } catch {
+        errMsg = text;
+      }
+    }
+    throw new Error(errMsg);
   }
 
-  return res.status === 204 ? (undefined as T) : res.json();
+  const text = await res.text();
+  if (!text || text.trim() === "") {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

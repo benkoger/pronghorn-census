@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import type { Image, Prediction, PredictionCrop, autoCropperBatch } from "@/models";
 import { api, API_BASE } from "@/api";
 
@@ -98,7 +98,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
       return targetBatch.predictions[image_index].map((pred) => pred.uuid);
     },
     async getbatch(batchIndex: number) {
-      const pStore = useProjectStore();
+      const pStore = useSystemStore();
       if (
         !pStore.CurrentSurvey ||
         !pStore.CurrentHerdUnit ||
@@ -237,7 +237,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
     async submit() {
       if (this.loading) return;
       this.loading = true;
-      const pStore = useProjectStore();
+      const pStore = useSystemStore();
 
       if (this.approvedPredictions.length > 0) {
         if (

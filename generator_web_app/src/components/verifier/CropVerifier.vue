@@ -5,13 +5,13 @@ import { defineComponent, type Ref } from "vue";
 import type { konvaBoxConf, tempRect, Label } from "@/models";
 import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import Konva from "konva";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 
 export default defineComponent({
   name: 'crop-verifier',
   setup() {
     const cvs = useCropVerifierStore();
-    const pStore = useProjectStore();
+    const pStore = useSystemStore();
     return { cvs, pStore };
   },
   data() {

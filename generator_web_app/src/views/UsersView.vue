@@ -1,12 +1,10 @@
 <script lang="ts" setup>
 import { useSystemStore } from "@/stores/systemStore";
-import { useOrgStore } from "@/stores/organizationStore";
 
 const sStore = useSystemStore();
-const oStore = useOrgStore();
 
-if (!oStore.bootstrapped) {
-  oStore.bootstrap();
+if (sStore.users.length === 0) {
+  sStore.get_users();
 }
 </script>
 <template>

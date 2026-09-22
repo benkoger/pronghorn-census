@@ -1,6 +1,6 @@
 <script lang="ts">
 import { defineComponent, defineAsyncComponent } from "vue";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import { useAutoCropperStore } from "@/stores/cropperStore";
 import type { Project, Survey, HerdUnit, Model } from "@/models";
 import { mapState } from "pinia";
@@ -15,7 +15,7 @@ export default defineComponent({
     SelectList: SelectorList,
   },
   setup() {
-    const pStore = useProjectStore();
+    const pStore = useSystemStore();
     if (pStore.projects.length == 0) pStore.get_projects();
     const cStore = useAutoCropperStore();
     return { pStore, cStore };
@@ -41,7 +41,7 @@ export default defineComponent({
     };
   },
   computed: {
-    ...mapState(useProjectStore, {
+    ...mapState(useSystemStore, {
       CurrentProject: "CurrentProject",
       CurrentSchema: "CurrentSchema",
       CurrentSurvey: "CurrentSurvey",

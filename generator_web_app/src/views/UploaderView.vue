@@ -1,12 +1,13 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import type { Project, HerdUnit } from "@/models";
 
 import ProcessBreadCrumb from "@/components/common/ProcessBreadCrumb.vue";
 import SelectorList from "@/components/common/SelectorList.vue";
 import CreateHerdUnit from "@/components/modals/createHerdUnit.vue";
+import CreateSurvey from "@/components/modals/createSurvey.vue";
 import Upload from "@/components/uploader/Uploader.vue";
 
 defineOptions({
@@ -15,7 +16,7 @@ defineOptions({
 
 const router = useRouter();
 const route = useRoute();
-const pStore = useProjectStore();
+const pStore = useSystemStore();
 
 if (pStore.projects.length === 0) {
   pStore.get_projects();

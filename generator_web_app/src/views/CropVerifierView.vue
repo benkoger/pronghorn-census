@@ -1,6 +1,6 @@
 <script lang="ts">
 import { defineComponent, defineAsyncComponent } from "vue";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import { useCropVerifierStore } from "@/stores/cropVerifierStore";
 import type { Project, Model, HerdUnit, Survey } from "@/models";
 import { mapState, mapWritableState } from "pinia";
@@ -17,9 +17,9 @@ export default defineComponent({
     SelectList: SelectorList,
   },
   setup() {
-    const pStore = useProjectStore();
-    const cvStore = useCropVerifierStore();
+    const pStore = useSystemStore();
     if (pStore.projects.length == 0) pStore.get_projects();
+    const cvStore = useCropVerifierStore();
     return { pStore, cvStore };
   },
   async mounted() {
@@ -40,7 +40,7 @@ export default defineComponent({
     };
   },
   computed: {
-    ...mapState(useProjectStore, {
+    ...mapState(useSystemStore, {
       CurrentProject: "CurrentProject",
       CurrentModel: "CurrentModel",
       CurrentSurvey: "CurrentSurvey",

@@ -2,10 +2,10 @@
 import { ref, computed } from "vue";
 import { useToast } from "bootstrap-vue-next";
 import type { Schema, createLabelOptions } from "@/models";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 
 const { create } = useToast();
-const pStore = useProjectStore();
+const pStore = useSystemStore();
 
 const props = withDefaults(
   defineProps<{

@@ -4,14 +4,13 @@ import Header from "./AppHeader.vue";
 import Nav from "./PrimaryNav.vue";
 import { RouterView, useRoute } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
-import { useProjectStore } from "@/stores/projectStore";
 import { useToast } from "bootstrap-vue-next";
 import type { Project, HerdUnit, Survey } from "@/models";
 
 const { create } = useToast();
 const route = useRoute();
 const sStore = useSystemStore();
-const pStore = useProjectStore();
+const pStore = sStore;
 
 const loadingContext = ref(false);
 
@@ -149,10 +148,10 @@ onErrorCaptured((err) => {
   <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
   <main
     :style="{
-      marginLeft: sStore.nav_toggled ? '12rem' : '4.5rem',
+      marginLeft: $route.meta.requiresNoLayout ? '0' : (sStore.nav_toggled ? '12rem' : '4.5rem'),
       transition: 'margin-left 0.2s',
     }"
-    class="flex-grow-1 d-flex flex-column overflow-hidden"
+    class="flex-grow-1 d-flex flex-column overflow-hidden h-100"
   >
     <div
       id="Router-View-Content"
@@ -281,7 +280,7 @@ onErrorCaptured((err) => {
 
       <!-- Router View Container -->
       <div
-        class="router-view-container flex-grow-1 overflow-hidden p-3 w-100"
+        class="router-view-container flex-grow-1 d-flex flex-column overflow-hidden p-3 w-100"
         style="min-height: 0;"
       >
         <RouterView />

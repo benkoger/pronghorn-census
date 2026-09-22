@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Authenticate from "@/views/AuthView.vue";
-import { useSystemStore } from "@/stores/systemStore";
+import { useSystemStore, setSystemStoreRouter } from "@/stores/systemStore";
 import { api } from "@/api";
 
 const router = createRouter({
@@ -109,6 +109,13 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+setSystemStoreRouter(router);
+
+router.afterEach((to) => {
+  const sStore = useSystemStore();
+  sStore.syncFromRoute(to);
 });
 
 export default router;

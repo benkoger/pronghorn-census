@@ -11,7 +11,7 @@ import type {
   Image,
 } from "@/models";
 import api from "@/api";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import { Md5 } from "ts-md5";
 import { filesize } from "filesize";
 import { useToast, type BvTriggerableEvent } from "bootstrap-vue-next";
@@ -19,7 +19,7 @@ import { useToast, type BvTriggerableEvent } from "bootstrap-vue-next";
 export default defineComponent({
   name: "Upload-Utility",
   setup() {
-    const pStore = useProjectStore();
+    const pStore = useSystemStore();
     if (pStore.CurrentProject && pStore.surveys == undefined)
       pStore.get_herd_unit_surveys();
     const project = ref<Project | undefined>(pStore.CurrentProject);

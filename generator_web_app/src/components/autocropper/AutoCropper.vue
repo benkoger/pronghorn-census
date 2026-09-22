@@ -8,7 +8,7 @@ import {
   type ComponentPublicInstance,
 } from "vue";
 import { useAutoCropperStore } from "@/stores/cropperStore";
-import { useProjectStore } from "@/stores/projectStore";
+import { useSystemStore } from "@/stores/systemStore";
 import { boxWidth, boxHeight, type PredictionCrop } from "@/models";
 
 defineOptions({
@@ -16,7 +16,7 @@ defineOptions({
 });
 
 const cStore = useAutoCropperStore();
-const pStore = useProjectStore();
+const pStore = useSystemStore();
 
 const predCropRefs = ref<Record<string, HTMLCanvasElement>>({});
 const predictionRefs = ref<Record<string, ComponentPublicInstance>>({});
