@@ -40,17 +40,20 @@ export function setSystemStoreRouter(router: Router) {
 export const setRouter = setSystemStoreRouter;
 
 // ---------------------------------------------------------------------------------------------------------------------------
+// Store Definition
+// ---------------------------------------------------------------------------------------------------------------------------
 
 export const useSystemStore = defineStore("systemStore", {
   state: () => ({
-    // Session & User
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Session & User State
+
     first_login: true,
     theme: "dark",
     logged_in: false,
     bootstrapped: undefined as undefined | boolean,
     organizations: {} as Record<number, Organization>,
     organization_idx: undefined as number | undefined,
-    activeOrganizationId: undefined as string | undefined,
     user: undefined as User | undefined,
     users: [] as User[],
     selected_user_idx: undefined as number | undefined,
@@ -58,35 +61,38 @@ export const useSystemStore = defineStore("systemStore", {
     nav_toggled: false,
     roles: [] as Role[],
 
-    // Project Context Hierarchy
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Project Context Hierarchy State
+
     projects: [] as Project[],
     project_idx: undefined as number | undefined,
-    activeProjectId: undefined as string | undefined,
 
     schemas: [] as Schema[],
     schema_idx: undefined as number | undefined,
-    activeSchemaId: undefined as string | undefined,
 
     labels: [] as Label[],
     label_idxs: [] as number[],
 
     models: [] as Model[],
     model_idx: undefined as number | undefined,
-    activeModelId: undefined as string | undefined,
 
     herd_units: [] as HerdUnit[],
     herd_unit_idx: undefined as number | undefined,
-    activeHerdUnitId: undefined as string | undefined,
 
     surveys: [] as Survey[],
     survey_idx: undefined as number | undefined,
-    activeSurveyId: undefined as string | undefined,
 
-    // Imagery & Telemetry
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Imagery & Telemetry State
+
     imageRecords: {} as imageRecords,
     active_image: undefined as string | undefined,
     active_prediction: undefined as string | undefined,
   }),
+
+  // ---------------------------------------------------------------------------------------------------------------------------
+  // Persistence Configuration
+  // ---------------------------------------------------------------------------------------------------------------------------
 
   persist: {
     storage: localStorage,
@@ -95,18 +101,23 @@ export const useSystemStore = defineStore("systemStore", {
       "theme",
       "first_login",
       "organization_idx",
-      "activeOrganizationId",
-      "activeProjectId",
-      "activeHerdUnitId",
-      "activeSurveyId",
-      "activeModelId",
-      "activeSchemaId",
+      "project_idx",
+      "herd_unit_idx",
+      "survey_idx",
+      "model_idx",
+      "schema_idx",
       "label_idxs",
     ],
   },
 
+  // ---------------------------------------------------------------------------------------------------------------------------
+  // Getters
+  // ---------------------------------------------------------------------------------------------------------------------------
+
   getters: {
-    // Auth & Users
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Auth & User Getters
+
     CurrentUser: (state) => state.user,
     CurrentOrganization: (state) =>
       state.organization_idx !== undefined
@@ -117,53 +128,28 @@ export const useSystemStore = defineStore("systemStore", {
         ? state.users[state.selected_user_idx]
         : undefined,
 
-    // Project Hierarchy
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Project Hierarchy Getters
+
     Bootstrapped: (state) => state.projects.length !== 0,
 
-    CurrentProject: (state): Project | undefined => {
-      if (state.activeProjectId) {
-        return state.projects.find((p) => p.uuid === state.activeProjectId);
-      }
-      return state.project_idx !== undefined
-        ? state.projects[state.project_idx]
-        : undefined;
-    },
+    CurrentProject: (state): Project | undefined =>
+      state.project_idx !== undefined ? state.projects[state.project_idx] : undefined,
 
-    CurrentHerdUnit: (state): HerdUnit | undefined => {
-      if (state.activeHerdUnitId) {
-        return state.herd_units.find((hu) => hu.uuid === state.activeHerdUnitId);
-      }
-      return state.herd_unit_idx !== undefined
-        ? state.herd_units[state.herd_unit_idx]
-        : undefined;
-    },
+    CurrentHerdUnit: (state): HerdUnit | undefined =>
+      state.herd_unit_idx !== undefined ? state.herd_units[state.herd_unit_idx] : undefined,
 
-    CurrentSurvey: (state): Survey | undefined => {
-      if (state.activeSurveyId) {
-        return state.surveys.find((s) => s.uuid === state.activeSurveyId);
-      }
-      return state.survey_idx !== undefined
-        ? state.surveys[state.survey_idx]
-        : undefined;
-    },
+    CurrentSurvey: (state): Survey | undefined =>
+      state.survey_idx !== undefined ? state.surveys[state.survey_idx] : undefined,
 
-    CurrentModel: (state): Model | undefined => {
-      if (state.activeModelId) {
-        return state.models.find((m) => m.uuid === state.activeModelId);
-      }
-      return state.model_idx !== undefined
-        ? state.models[state.model_idx]
-        : undefined;
-    },
+    CurrentModel: (state): Model | undefined =>
+      state.model_idx !== undefined ? state.models[state.model_idx] : undefined,
 
-    CurrentSchema: (state): Schema | undefined => {
-      if (state.activeSchemaId) {
-        return state.schemas.find((s) => s.uuid === state.activeSchemaId);
-      }
-      return state.schema_idx !== undefined
-        ? state.schemas[state.schema_idx]
-        : undefined;
-    },
+    CurrentSchema: (state): Schema | undefined =>
+      state.schema_idx !== undefined ? state.schemas[state.schema_idx] : undefined,
+
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Taxonomy & Label Getters
 
     CurrentLabelValues(state): number[] {
       if (state.label_idxs == undefined) return [];
@@ -196,7 +182,9 @@ export const useSystemStore = defineStore("systemStore", {
       return [...state.labels].sort((a, b) => a.label - b.label);
     },
 
-    // Imagery & Telemetry
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Imagery & Telemetry Getters
+
     CurrentImage: (state) =>
       state.active_image !== undefined
         ? state.imageRecords.images?.[state.active_image]
@@ -226,6 +214,10 @@ export const useSystemStore = defineStore("systemStore", {
     },
   },
 
+  // ---------------------------------------------------------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------------------------------------------------------
+
   actions: {
     // -------------------------------------------------------------------------------------------------------------------------
     // URL <-> State Translation Interface
@@ -233,18 +225,17 @@ export const useSystemStore = defineStore("systemStore", {
     async syncFromRoute(route: RouteLocationNormalized) {
       const q = route.query as Record<string, string | undefined>;
 
-      if (q.org && q.org !== this.activeOrganizationId) {
+      if (q.org && q.org !== this.CurrentOrganization?.uuid) {
         const found = Object.values(this.organizations).find((o) => o.uuid === q.org);
         if (found) this.organization_idx = found.organization_id;
-        this.activeOrganizationId = q.org;
       }
 
-      if (q.project && q.project !== this.activeProjectId) {
-        this.activeProjectId = q.project;
+      if (q.project && q.project !== this.CurrentProject?.uuid) {
         if (this.projects.length === 0) {
           await this.get_projects();
         }
-        this.project_idx = this.projects.findIndex((p) => p.uuid === q.project);
+        const idx = this.projects.findIndex((p) => p.uuid === q.project);
+        this.project_idx = idx !== -1 ? idx : undefined;
         await Promise.all([
           this.get_project_herd_units(),
           this.get_project_schemas(),
@@ -252,26 +243,26 @@ export const useSystemStore = defineStore("systemStore", {
         ]);
       }
 
-      if (q.herd_unit && q.herd_unit !== this.activeHerdUnitId) {
-        this.activeHerdUnitId = q.herd_unit;
-        this.herd_unit_idx = this.herd_units.findIndex((h) => h.uuid === q.herd_unit);
+      if (q.herd_unit && q.herd_unit !== this.CurrentHerdUnit?.uuid) {
+        const idx = this.herd_units.findIndex((h) => h.uuid === q.herd_unit);
+        this.herd_unit_idx = idx !== -1 ? idx : undefined;
         await this.get_herd_unit_surveys();
       }
 
-      if (q.survey && q.survey !== this.activeSurveyId) {
-        this.activeSurveyId = q.survey;
-        this.survey_idx = this.surveys.findIndex((s) => s.uuid === q.survey);
+      if (q.survey && q.survey !== this.CurrentSurvey?.uuid) {
+        const idx = this.surveys.findIndex((s) => s.uuid === q.survey);
+        this.survey_idx = idx !== -1 ? idx : undefined;
       }
 
-      if (q.model && q.model !== this.activeModelId) {
-        this.activeModelId = q.model;
-        this.model_idx = this.models.findIndex((m) => m.uuid === q.model);
+      if (q.model && q.model !== this.CurrentModel?.uuid) {
+        const idx = this.models.findIndex((m) => m.uuid === q.model);
+        this.model_idx = idx !== -1 ? idx : undefined;
         await this.get_model_schema();
       }
 
-      if (q.schema && q.schema !== this.activeSchemaId) {
-        this.activeSchemaId = q.schema;
-        this.schema_idx = this.schemas.findIndex((s) => s.uuid === q.schema);
+      if (q.schema && q.schema !== this.CurrentSchema?.uuid) {
+        const idx = this.schemas.findIndex((s) => s.uuid === q.schema);
+        this.schema_idx = idx !== -1 ? idx : undefined;
         await this.get_schema_labels();
       }
 
@@ -305,12 +296,12 @@ export const useSystemStore = defineStore("systemStore", {
         }
       };
 
-      setOrDelete("org", this.activeOrganizationId);
-      setOrDelete("project", this.activeProjectId);
-      setOrDelete("herd_unit", this.activeHerdUnitId);
-      setOrDelete("survey", this.activeSurveyId);
-      setOrDelete("model", this.activeModelId);
-      setOrDelete("schema", this.activeSchemaId);
+      setOrDelete("org", this.CurrentOrganization?.uuid);
+      setOrDelete("project", this.CurrentProject?.uuid);
+      setOrDelete("herd_unit", this.CurrentHerdUnit?.uuid);
+      setOrDelete("survey", this.CurrentSurvey?.uuid);
+      setOrDelete("model", this.CurrentModel?.uuid);
+      setOrDelete("schema", this.CurrentSchema?.uuid);
       setOrDelete(
         "labels",
         this.CurrentLabelIds.length > 0 ? this.CurrentLabelIds.join(",") : undefined,
@@ -408,13 +399,11 @@ export const useSystemStore = defineStore("systemStore", {
         if (idx !== undefined) {
           await api.patch("users/set-active-organization", { org_id: org.uuid });
           this.organization_idx = idx;
-          this.activeOrganizationId = org.uuid;
           await this.check_admin();
 
           // Reset workflow / project state on org switch
           this.clear_project_children();
           this.projects = [];
-          this.activeProjectId = undefined;
           this.project_idx = undefined;
           await this.get_projects();
           this.syncToRoute();
@@ -444,9 +433,11 @@ export const useSystemStore = defineStore("systemStore", {
       this.user = undefined;
       this.clear_project_children();
       this.projects = [];
-      this.activeProjectId = undefined;
       this.project_idx = undefined;
     },
+
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Theme & UI Actions
 
     initializeTheme() {
       const savedTheme = this.theme || (this.getBrowserPreference() ? "dark" : "light");
@@ -497,25 +488,35 @@ export const useSystemStore = defineStore("systemStore", {
       const index = this.projects.findIndex((p) => p.uuid === id);
       if (index === -1) return;
       await api.delete(`projects/${id}`);
+      const wasActive = this.project_idx === index;
       this.projects.splice(index, 1);
-      if (this.activeProjectId === id) {
-        this.activeProjectId = undefined;
+      if (wasActive) {
         this.project_idx = undefined;
         this.clear_project_children();
         this.syncToRoute();
+      } else if (this.project_idx !== undefined && this.project_idx > index) {
+        this.project_idx--;
       }
     },
 
-    set_current_project(project: Project | undefined) {
-      if (!project || this.activeProjectId === project.uuid) {
-        this.activeProjectId = undefined;
+    set_current_project(project: Project | number | undefined) {
+      if (project === undefined) {
         this.project_idx = undefined;
         this.clear_project_children();
         this.syncToRoute();
         return;
       }
-      this.activeProjectId = project.uuid;
-      this.project_idx = this.projects.indexOf(project);
+      const idx =
+        typeof project === "number"
+          ? project
+          : this.projects.findIndex((p) => p.uuid === project.uuid);
+      if (idx === -1 || this.project_idx === idx) {
+        this.project_idx = undefined;
+        this.clear_project_children();
+        this.syncToRoute();
+        return;
+      }
+      this.project_idx = idx;
       this.clear_project_children();
       this.get_project_herd_units();
       this.get_project_schemas();
@@ -523,7 +524,9 @@ export const useSystemStore = defineStore("systemStore", {
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Herd Unit Actions
+
     async get_project_herd_units() {
       if (this.CurrentProject) {
         this.herd_units = await api.get<HerdUnit[]>(`projects/${this.CurrentProject.uuid}/herd-units`);
@@ -534,8 +537,7 @@ export const useSystemStore = defineStore("systemStore", {
       const herd_unit = await api.post<HerdUnit>("herd-units", options);
       if (herd_unit) {
         this.herd_units.push(herd_unit);
-        this.herd_unit_idx = this.herd_units.indexOf(herd_unit);
-        this.activeHerdUnitId = herd_unit.uuid;
+        this.herd_unit_idx = this.herd_units.length - 1;
         this.syncToRoute();
       }
     },
@@ -544,31 +546,43 @@ export const useSystemStore = defineStore("systemStore", {
       const index = this.herd_units.findIndex((hu) => hu.uuid === id);
       if (index === -1) return;
       await api.delete(`herd-units/${id}`);
+      const wasActive = this.herd_unit_idx === index;
       this.herd_units.splice(index, 1);
-      if (this.activeHerdUnitId === id) {
-        this.activeHerdUnitId = undefined;
+      if (wasActive) {
         this.herd_unit_idx = undefined;
         this.clear_surveys();
         this.syncToRoute();
+      } else if (this.herd_unit_idx !== undefined && this.herd_unit_idx > index) {
+        this.herd_unit_idx--;
       }
     },
 
-    set_current_herd_unit(herdunit: HerdUnit | undefined) {
-      if (!herdunit || this.activeHerdUnitId === herdunit.uuid) {
-        this.activeHerdUnitId = undefined;
+    set_current_herd_unit(herdunit: HerdUnit | number | undefined) {
+      if (herdunit === undefined) {
         this.herd_unit_idx = undefined;
         this.clear_surveys();
         this.syncToRoute();
         return;
       }
-      this.activeHerdUnitId = herdunit.uuid;
-      this.herd_unit_idx = this.herd_units.indexOf(herdunit);
+      const idx =
+        typeof herdunit === "number"
+          ? herdunit
+          : this.herd_units.findIndex((h) => h.uuid === herdunit.uuid);
+      if (idx === -1 || this.herd_unit_idx === idx) {
+        this.herd_unit_idx = undefined;
+        this.clear_surveys();
+        this.syncToRoute();
+        return;
+      }
+      this.herd_unit_idx = idx;
       this.clear_surveys();
       this.get_herd_unit_surveys();
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Survey Actions
+
     async get_herd_unit_surveys() {
       if (this.CurrentHerdUnit) {
         this.surveys = await api.get<Survey[]>(`herd-units/${this.CurrentHerdUnit.uuid}/surveys`);
@@ -579,8 +593,7 @@ export const useSystemStore = defineStore("systemStore", {
       const survey = await api.post<Survey>("surveys", options);
       if (survey) {
         this.surveys.push(survey);
-        this.survey_idx = this.surveys.indexOf(survey);
-        this.activeSurveyId = survey.uuid;
+        this.survey_idx = this.surveys.length - 1;
         this.syncToRoute();
       }
     },
@@ -589,27 +602,38 @@ export const useSystemStore = defineStore("systemStore", {
       const index = this.surveys.findIndex((s) => s.uuid === id);
       if (index === -1) return;
       await api.delete(`surveys/${id}`);
+      const wasActive = this.survey_idx === index;
       this.surveys.splice(index, 1);
-      if (this.activeSurveyId === id) {
-        this.activeSurveyId = undefined;
+      if (wasActive) {
         this.survey_idx = undefined;
         this.syncToRoute();
+      } else if (this.survey_idx !== undefined && this.survey_idx > index) {
+        this.survey_idx--;
       }
     },
 
-    set_current_survey(survey: Survey | undefined) {
-      if (!survey || this.activeSurveyId === survey.uuid) {
-        this.activeSurveyId = undefined;
+    set_current_survey(survey: Survey | number | undefined) {
+      if (survey === undefined) {
         this.survey_idx = undefined;
         this.syncToRoute();
         return;
       }
-      this.activeSurveyId = survey.uuid;
-      this.survey_idx = this.surveys.indexOf(survey);
+      const idx =
+        typeof survey === "number"
+          ? survey
+          : this.surveys.findIndex((s) => s.uuid === survey.uuid);
+      if (idx === -1 || this.survey_idx === idx) {
+        this.survey_idx = undefined;
+        this.syncToRoute();
+        return;
+      }
+      this.survey_idx = idx;
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Model Actions
+
     async get_project_models() {
       if (this.CurrentProject) {
         this.models = await api.get<Model[]>(`projects/${this.CurrentProject.uuid}/models`);
@@ -630,8 +654,7 @@ export const useSystemStore = defineStore("systemStore", {
       const model = await api.post<Model>("models", options);
       if (model) {
         this.models.push(model);
-        this.model_idx = this.models.indexOf(model);
-        this.activeModelId = model.uuid;
+        this.model_idx = this.models.length - 1;
         this.syncToRoute();
       }
     },
@@ -640,38 +663,51 @@ export const useSystemStore = defineStore("systemStore", {
       const index = this.models.findIndex((m) => m.uuid === id);
       if (index === -1) return;
       await api.delete(`models/${id}`);
+      const wasActive = this.model_idx === index;
       this.models.splice(index, 1);
-      if (this.activeModelId === id) {
-        this.activeModelId = undefined;
+      if (wasActive) {
         this.model_idx = undefined;
         this.syncToRoute();
+      } else if (this.model_idx !== undefined && this.model_idx > index) {
+        this.model_idx--;
       }
     },
 
-    set_current_model(model: Model | undefined) {
-      if (!model) {
-        this.activeModelId = undefined;
+    set_current_model(model: Model | number | undefined) {
+      if (model === undefined) {
         this.model_idx = undefined;
         this.clear_schemas();
         this.clear_labels();
         this.syncToRoute();
         return;
       }
-      if (this.activeModelId === model.uuid) {
+      const idx =
+        typeof model === "number"
+          ? model
+          : this.models.findIndex((m) => m.uuid === model.uuid);
+      if (idx === -1) {
+        this.model_idx = undefined;
+        this.clear_schemas();
+        this.clear_labels();
+        this.syncToRoute();
+        return;
+      }
+      if (this.model_idx === idx) {
         if (this.labels.length === 0) {
           this.get_model_schema();
         }
         return;
       }
-      this.activeModelId = model.uuid;
-      this.model_idx = this.models.findIndex((m) => m.uuid === model.uuid);
+      this.model_idx = idx;
       this.clear_schemas();
       this.clear_labels();
       this.get_model_schema();
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Schema Actions
+
     async get_project_schemas() {
       if (this.CurrentProject) {
         this.schemas = await api.get<Schema[]>(`projects/${this.CurrentProject.uuid}/schemas`);
@@ -691,35 +727,47 @@ export const useSystemStore = defineStore("systemStore", {
       const index = this.schemas.findIndex((s) => s.uuid === id);
       if (index === -1) return;
       await api.delete(`schemas/${id}`);
+      const wasActive = this.schema_idx === index;
       this.schemas.splice(index, 1);
-      if (this.activeSchemaId === id) {
-        this.activeSchemaId = undefined;
+      if (wasActive) {
         this.schema_idx = undefined;
+      } else if (this.schema_idx !== undefined && this.schema_idx > index) {
+        this.schema_idx--;
       }
     },
 
-    set_current_schema(schema: Schema | undefined) {
-      if (!schema) {
-        this.activeSchemaId = undefined;
+    set_current_schema(schema: Schema | number | undefined) {
+      if (schema === undefined) {
         this.schema_idx = undefined;
         this.clear_labels();
         this.syncToRoute();
         return;
       }
-      if (this.activeSchemaId === schema.uuid) {
+      const idx =
+        typeof schema === "number"
+          ? schema
+          : this.schemas.findIndex((s) => s.uuid === schema.uuid);
+      if (idx === -1) {
+        this.schema_idx = undefined;
+        this.clear_labels();
+        this.syncToRoute();
+        return;
+      }
+      if (this.schema_idx === idx) {
         if (this.labels.length === 0) {
           this.get_schema_labels();
         }
         return;
       }
-      this.activeSchemaId = schema.uuid;
-      this.schema_idx = this.schemas.findIndex((s) => s.uuid === schema.uuid);
+      this.schema_idx = idx;
       this.clear_labels();
       this.get_schema_labels();
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Label Actions
+
     async get_schema_labels() {
       if (this.CurrentSchema) {
         this.labels = await api.get<Label[]>(`schemas/${this.CurrentSchema.uuid}/labels`);
@@ -772,7 +820,9 @@ export const useSystemStore = defineStore("systemStore", {
       this.syncToRoute();
     },
 
+    // -------------------------------------------------------------------------------------------------------------------------
     // Image Telemetry & Management Actions
+
     async get_survey_images(page: number, per_page: number) {
       if (!this.CurrentSurvey) return;
       const resp = await api.get<{ total: number; images: Image[] }>(
@@ -847,29 +897,27 @@ export const useSystemStore = defineStore("systemStore", {
       }
     },
 
-    // Resetting
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Selection Clearing & Reset Actions
+
     clear_herd_units() {
       this.herd_units = [];
       this.herd_unit_idx = undefined;
-      this.activeHerdUnitId = undefined;
     },
 
     clear_models() {
       this.models = [];
       this.model_idx = undefined;
-      this.activeModelId = undefined;
     },
 
     clear_surveys() {
       this.surveys = [];
       this.survey_idx = undefined;
-      this.activeSurveyId = undefined;
     },
 
     clear_schemas() {
       this.schemas = [];
       this.schema_idx = undefined;
-      this.activeSchemaId = undefined;
     },
 
     clear_labels() {
