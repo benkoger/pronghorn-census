@@ -116,7 +116,7 @@ onMounted(() => {
                 variant="secondary"
                 class="fw-normal extra-small"
               >
-                No Survey Active
+                No Survey Selected
               </BBadge>
               <BBadge
                 v-else-if="cvStore.needingReviewed > 0"
@@ -222,22 +222,22 @@ onMounted(() => {
         </BCard>
       </div>
 
-      <!-- Right Column: Active Flight & Survey Roster -->
+      <!-- Right Column: Herd Unit & Surveys -->
       <div class="col-12 col-lg-7 d-flex flex-column h-100 overflow-hidden" style="min-height: 0;">
         <BCard
           class="border-0 bg-body-tertiary shadow-none p-3 h-100 d-flex flex-column overflow-hidden"
           style="min-height: 0;"
         >
-          <!-- Active Flight Header -->
+          <!-- Herd Unit Header -->
           <div
             class="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom border-secondary border-opacity-25 flex-shrink-0"
           >
             <div>
               <div class="text-secondary extra-small text-uppercase fw-semibold">
-                Active Flight
+                Herd Unit
               </div>
               <div class="fs-6 fw-bold text-body">
-                {{ pStore.CurrentSurvey?.name || "No Survey Selected" }}
+                {{ pStore.CurrentHerdUnit?.name || "No Herd Unit Selected" }}
               </div>
             </div>
             <span
@@ -250,6 +250,14 @@ onMounted(() => {
 
           <!-- Stats Strip -->
           <div class="row g-2 mb-3 text-center flex-shrink-0">
+            <div class="col-4">
+              <div class="p-2 bg-body-secondary rounded border-0">
+                <div class="text-secondary extra-small">Selected Survey</div>
+                <div class="fw-bold text-body text-truncate">
+                  {{ pStore.CurrentSurvey?.name || "—" }}
+                </div>
+              </div>
+            </div>
             <div class="col-4">
               <div class="p-2 bg-body-secondary rounded border-0">
                 <div class="text-secondary extra-small">Survey Images</div>
@@ -278,20 +286,12 @@ onMounted(() => {
                 </div>
               </div>
             </div>
-            <div class="col-4">
-              <div class="p-2 bg-body-secondary rounded border-0">
-                <div class="text-secondary extra-small">Herd Unit</div>
-                <div class="fw-bold text-body text-truncate">
-                  {{ pStore.CurrentHerdUnit?.name || "—" }}
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- Survey Roster Header -->
           <div class="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
             <span class="text-secondary small fw-medium">
-              Surveys in {{ pStore.CurrentHerdUnit?.name || "Unit" }}
+              Surveys over {{ pStore.CurrentHerdUnit?.name || "Unit" }}
             </span>
             <span class="text-secondary extra-small">
               {{ pStore.surveys.length }} total
@@ -337,10 +337,10 @@ onMounted(() => {
 
               <div class="d-flex align-items-center gap-2 flex-shrink-0">
                 <span
-                  v-if="pStore.CurrentSurvey?.uuid === survey.uuid"
-                  class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle extra-small"
+                  v-if="survey.status"
+                  class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle extra-small text-capitalize"
                 >
-                  Active
+                  {{ survey.status }}
                 </span>
                 <BButton
                   size="sm"

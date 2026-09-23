@@ -54,6 +54,8 @@ export interface Survey {
   survey_date: Date;
   name: string;
   additional_info: string;
+  status?: string;
+  survey_area?: number;
   created: Date;
   modified: Date;
   uuid: string;
