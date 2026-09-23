@@ -2,15 +2,15 @@
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
-import { useCropVerifierStore } from "@/stores/cropVerifierStore";
+import { api } from "@/api";
 import type { Survey } from "@/models";
 
 const router = useRouter();
 const sStore = useSystemStore();
 const pStore = sStore;
-const cvStore = useCropVerifierStore();
 
 const loadingTelemetry = ref(false);
+const pendingReviewsCount = ref(0);
 
 const totalImagesCount = computed(() => {
   return pStore.imageRecords?.total_images ?? 0;
@@ -40,13 +40,27 @@ const formatDate = (dateVal: string | Date | undefined) => {
       });
 };
 
+async function fetchPendingReviewCount() {
+  if (!pStore.CurrentHerdUnit || !pStore.CurrentSurvey) {
+    pendingReviewsCount.value = 0;
+    return;
+  }
+  const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
+    herd_unit_id: [pStore.CurrentHerdUnit.uuid],
+    survey_id: [pStore.CurrentSurvey.uuid],
+    include_reviewed: false,
+    include_opened: true,
+  });
+  pendingReviewsCount.value = resp?.count ?? 0;
+}
+
 async function updateTelemetry() {
   if (!pStore.CurrentSurvey) return;
   loadingTelemetry.value = true;
   try {
     await Promise.allSettled([
       pStore.get_survey_images(1, 1),
-      cvStore.getReviewCount(),
+      fetchPendingReviewCount(),
     ]);
   } finally {
     loadingTelemetry.value = false;
@@ -119,11 +133,11 @@ onMounted(() => {
                 No Survey Selected
               </BBadge>
               <BBadge
-                v-else-if="cvStore.needingReviewed > 0"
+                v-else-if="pendingReviewsCount > 0"
                 variant="warning"
                 class="fw-normal extra-small"
               >
-                {{ cvStore.needingReviewed }} pending
+                {{ pendingReviewsCount }} pending
               </BBadge>
               <BBadge v-else variant="success" class="fw-normal extra-small">
                 Queue Clear
@@ -280,7 +294,7 @@ onMounted(() => {
                     <BSpinner small variant="secondary" />
                   </span>
                   <span v-else-if="pStore.CurrentSurvey">
-                    {{ cvStore.needingReviewed.toLocaleString() }}
+                    {{ pendingReviewsCount.toLocaleString() }}
                   </span>
                   <span v-else class="text-secondary opacity-50">—</span>
                 </div>
