@@ -317,7 +317,7 @@ def create(body: createProjectReq):
       500:
         description: Database error.
     """
-    role = base.where(Role, {"name": "admin"})
+    role = base.where(Role, {"name": "admin"})[0]
 
     return base.insert(Project, body, cast(User, current_user), role).serialize(), 201
 
