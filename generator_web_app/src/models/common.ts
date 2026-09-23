@@ -29,6 +29,7 @@ export interface konvaBoxConf {
   scaleX: number;
   scaleY: number;
   rotation: number;
+  fill?: string;
   stroke: string;
 }
 
