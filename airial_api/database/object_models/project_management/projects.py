@@ -90,7 +90,7 @@ class Project(DBbase):
                 INSERT INTO projectmanagement.projects_users (
                     project_id, user_id, role_id
                 )
-                SELECT project_id, %(user_id)s, %(role_id)s FROM new_project;
+                SELECT project_id, %(user_id)s, %(role_id)s FROM new_project
             )
             SELECT * FROM new_project;
         """)
