@@ -82,9 +82,9 @@ class Project(DBbase):
             ),
             org_link AS (
                 INSERT INTO usermanagement.organizations_projects (
-                project_id, organization_id
+                    project_id, organization_id
                 )
-                SELECT %(organization_id)s, project_id FROM new_project
+                SELECT project_id, %(organization_id)s FROM new_project
             ),
             user_link AS (
                 INSERT INTO projectmanagement.projects_users (
