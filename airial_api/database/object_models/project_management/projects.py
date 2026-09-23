@@ -95,7 +95,7 @@ class Project(DBbase):
                 **req.model_dump(),
                 "organization_id": req.organization_ids.pkey,
                 "user_id": user.user_id,
-                "role": role.role_id,
+                "role_id": role.role_id,
             },
         )
 
