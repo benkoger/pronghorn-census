@@ -100,6 +100,7 @@ export const useSystemStore = defineStore("systemStore", {
     pick: [
       "theme",
       "first_login",
+      "nav_toggled",
       "organization_idx",
       "project_idx",
       "herd_unit_idx",
@@ -424,8 +425,8 @@ export const useSystemStore = defineStore("systemStore", {
       this.selected_user_idx = idx;
     },
 
-    toggle_nav(value: boolean) {
-      this.nav_toggled = value;
+    toggle_nav(value?: boolean) {
+      this.nav_toggled = value !== undefined ? value : !this.nav_toggled;
     },
 
     clear_state() {

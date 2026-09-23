@@ -58,6 +58,15 @@ const router = createRouter({
       },
     },
     {
+      path: "/active-measurement/",
+      name: "active-measurement",
+      component: () => import("@/views/ActiveMeasurementView.vue"),
+      meta: {
+        requiresAuth: true,
+        requiresNoLayout: false,
+      }
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("@/views/SettingsView.vue"),

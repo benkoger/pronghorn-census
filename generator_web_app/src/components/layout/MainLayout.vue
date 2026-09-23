@@ -5,7 +5,10 @@ import Nav from "./PrimaryNav.vue";
 import { RouterView, useRoute } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
 import { useToast } from "bootstrap-vue-next";
-import type { Project, HerdUnit, Survey } from "@/models";
+import type { Project, HerdUnit, Survey, User, Organization } from "@/models";
+import CreateProject from "@/components/modals/createProject.vue";
+import CreateHerdUnit from "@/components/modals/createHerdUnit.vue";
+import CreateSurvey from "@/components/modals/createSurvey.vue";
 
 const { create } = useToast();
 const route = useRoute();
@@ -13,6 +16,9 @@ const sStore = useSystemStore();
 const pStore = sStore;
 
 const loadingContext = ref(false);
+const showCreateProjectModal = ref(false);
+const showCreateHerdUnitModal = ref(false);
+const showCreateSurveyModal = ref(false);
 
 const routeName = computed(() => {
   const name = route.name as string;
@@ -85,6 +91,27 @@ function onSelectSurvey(survey: Survey) {
   pStore.set_current_survey(survey);
 }
 
+async function onProjectCreated() {
+  showCreateProjectModal.value = false;
+  if (pStore.projects.length > 0) {
+    const newProject = pStore.projects[pStore.projects.length - 1];
+    await onSelectProject(newProject);
+  }
+}
+
+async function onHerdUnitCreated() {
+  showCreateHerdUnitModal.value = false;
+  pStore.clear_surveys();
+  await pStore.get_herd_unit_surveys();
+  if (pStore.surveys.length > 0) {
+    pStore.set_current_survey(pStore.surveys[0]);
+  }
+}
+
+function onSurveyCreated() {
+  showCreateSurveyModal.value = false;
+}
+
 async function refreshContext() {
   loadingContext.value = true;
   try {
@@ -148,7 +175,7 @@ onErrorCaptured((err) => {
   <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
   <main
     :style="{
-      marginLeft: $route.meta.requiresNoLayout ? '0' : (sStore.nav_toggled ? '12rem' : '4.5rem'),
+      marginLeft: $route.meta.requiresNoLayout ? '0' : (sStore.nav_toggled ? '15.5rem' : '4.5rem'),
       transition: 'margin-left 0.2s',
     }"
     class="flex-grow-1 d-flex flex-column overflow-hidden h-100"
@@ -164,7 +191,7 @@ onErrorCaptured((err) => {
         class="global-title-bar px-3 py-1 bg-body-tertiary border-bottom border-secondary-subtle flex-shrink-0"
       >
         <!-- Left: Integrated Context Breadcrumbs -->
-        <div class="d-flex align-items-center gap-2 overflow-hidden" style="min-width: 0;">
+        <div class="d-flex align-items-center gap-2" style="min-width: 0;">
           <!-- Organization Badge -->
           <span
             v-if="sStore.CurrentOrganization"
@@ -182,11 +209,15 @@ onErrorCaptured((err) => {
             size="sm"
             variant="outline-secondary"
             class="context-dropdown"
-            :disabled="loadingContext || pStore.projects.length <= 1"
+            menu-class="context-dropdown-menu"
+            strategy="fixed"
+            teleport-to="body"
+            no-size
+            :disabled="loadingContext"
           >
             <template #button-content>
               <span class="fw-medium text-truncate d-inline-block align-bottom" style="max-width: 130px;">
-                {{ pStore.CurrentProject?.name || "Select Project" }}
+                {{ pStore.CurrentProject?.name || (pStore.projects.length === 0 ? "No Projects" : "Select Project") }}
               </span>
             </template>
             <BDropdownItemButton
@@ -197,6 +228,21 @@ onErrorCaptured((err) => {
             >
               {{ proj.name }}
             </BDropdownItemButton>
+            <BDropdownText v-if="pStore.projects.length === 0" class="text-secondary small fst-italic px-3 py-2 text-center">
+              <span class="d-flex flex-column align-items-center gap-1">
+                <Icon icon="fluent:box-20-regular" width="18" class="opacity-50" />
+                <span>No projects found</span>
+              </span>
+            </BDropdownText>
+            <BDropdownDivider />
+            <BDropdownItemButton
+              @click="showCreateProjectModal = true"
+              class="d-flex align-items-center"
+              :disabled="!sStore.CurrentUser || !sStore.CurrentOrganization"
+            >
+              <Icon icon="material-symbols:add-rounded" class="me-1 text-primary" width="16" />
+              <span class="text-primary fw-medium small">New Project</span>
+            </BDropdownItemButton>
           </BDropdown>
 
           <span class="text-secondary opacity-50">/</span>
@@ -206,11 +252,16 @@ onErrorCaptured((err) => {
             size="sm"
             variant="outline-secondary"
             class="context-dropdown"
-            :disabled="loadingContext || pStore.herd_units.length === 0"
+            menu-class="context-dropdown-menu"
+            strategy="fixed"
+            teleport-to="body"
+            no-size
+            :disabled="loadingContext || !pStore.CurrentProject"
+            :title="!pStore.CurrentProject ? 'Select a project first' : undefined"
           >
             <template #button-content>
               <span class="text-truncate d-inline-block align-bottom" style="max-width: 130px;">
-                {{ pStore.CurrentHerdUnit?.name || "Herd Unit" }}
+                {{ pStore.CurrentHerdUnit?.name || (!pStore.CurrentProject ? "Herd Unit" : pStore.herd_units.length === 0 ? "No Herd Units" : "Select Herd Unit") }}
               </span>
             </template>
             <BDropdownItemButton
@@ -221,6 +272,21 @@ onErrorCaptured((err) => {
             >
               {{ hu.name }}
             </BDropdownItemButton>
+            <BDropdownText v-if="pStore.herd_units.length === 0" class="text-secondary small fst-italic px-3 py-2 text-center">
+              <span class="d-flex flex-column align-items-center gap-1">
+                <Icon icon="fluent:box-20-regular" width="18" class="opacity-50" />
+                <span>No herd units in this project</span>
+              </span>
+            </BDropdownText>
+            <BDropdownDivider />
+            <BDropdownItemButton
+              @click="showCreateHerdUnitModal = true"
+              class="d-flex align-items-center"
+              :disabled="!pStore.CurrentProject"
+            >
+              <Icon icon="material-symbols:add-rounded" class="me-1 text-primary" width="16" />
+              <span class="text-primary fw-medium small">New Herd Unit</span>
+            </BDropdownItemButton>
           </BDropdown>
 
           <span class="text-secondary opacity-50">/</span>
@@ -230,11 +296,16 @@ onErrorCaptured((err) => {
             size="sm"
             variant="outline-secondary"
             class="context-dropdown"
-            :disabled="loadingContext || pStore.surveys.length === 0"
+            menu-class="context-dropdown-menu"
+            strategy="fixed"
+            teleport-to="body"
+            no-size
+            :disabled="loadingContext || !pStore.CurrentHerdUnit"
+            :title="!pStore.CurrentHerdUnit ? 'Select a herd unit first' : undefined"
           >
             <template #button-content>
               <span class="text-truncate d-inline-block align-bottom" style="max-width: 150px;">
-                {{ pStore.CurrentSurvey?.name || "Survey" }}
+                {{ pStore.CurrentSurvey?.name || (!pStore.CurrentHerdUnit ? "Survey" : pStore.surveys.length === 0 ? "No Surveys" : "Select Survey") }}
               </span>
             </template>
             <BDropdownItemButton
@@ -244,6 +315,21 @@ onErrorCaptured((err) => {
               @click="onSelectSurvey(surv)"
             >
               {{ surv.name }}
+            </BDropdownItemButton>
+            <BDropdownText v-if="pStore.surveys.length === 0" class="text-secondary small fst-italic px-3 py-2 text-center">
+              <span class="d-flex flex-column align-items-center gap-1">
+                <Icon icon="fluent:box-20-regular" width="18" class="opacity-50" />
+                <span>No surveys in this herd unit</span>
+              </span>
+            </BDropdownText>
+            <BDropdownDivider />
+            <BDropdownItemButton
+              @click="showCreateSurveyModal = true"
+              class="d-flex align-items-center"
+              :disabled="!pStore.CurrentHerdUnit"
+            >
+              <Icon icon="material-symbols:add-rounded" class="me-1 text-primary" width="16" />
+              <span class="text-primary fw-medium small">New Survey</span>
             </BDropdownItemButton>
           </BDropdown>
         </div>
@@ -286,6 +372,56 @@ onErrorCaptured((err) => {
         <RouterView />
       </div>
     </div>
+
+    <!-- Create Project Modal -->
+    <BModal
+      v-model="showCreateProjectModal"
+      title="Create Project"
+      centered
+      no-footer
+      lazy
+    >
+      <CreateProject
+        v-if="showCreateProjectModal && sStore.CurrentUser && sStore.CurrentOrganization"
+        :submit-action="pStore.create_project"
+        :user="sStore.CurrentUser as User"
+        :organization="sStore.CurrentOrganization as Organization"
+        @creation-successful="onProjectCreated"
+      />
+    </BModal>
+
+    <!-- Create Herd Unit Modal -->
+    <BModal
+      v-model="showCreateHerdUnitModal"
+      title="Create Herd Unit"
+      centered
+      no-footer
+      lazy
+    >
+      <CreateHerdUnit
+        v-if="showCreateHerdUnitModal && pStore.CurrentProject"
+        :project="pStore.CurrentProject as Project"
+        :submit-action="pStore.create_herd_unit"
+        @creation-successful="onHerdUnitCreated"
+      />
+    </BModal>
+
+    <!-- Create Survey Modal -->
+    <BModal
+      v-model="showCreateSurveyModal"
+      title="Create Survey"
+      centered
+      no-footer
+      lazy
+    >
+      <CreateSurvey
+        v-if="showCreateSurveyModal && pStore.CurrentProject && pStore.CurrentHerdUnit"
+        :project="pStore.CurrentProject as Project"
+        :herd_unit="pStore.CurrentHerdUnit as HerdUnit"
+        :submit-action="pStore.create_survey"
+        @creation-successful="onSurveyCreated"
+      />
+    </BModal>
   </main>
 </template>
 
@@ -309,6 +445,13 @@ onErrorCaptured((err) => {
 .context-dropdown :deep(.btn) {
   font-size: 0.8125rem;
   padding: 0.15rem 0.45rem;
+}
+
+:global(.context-dropdown-menu) {
+  max-height: 320px;
+  overflow-y: auto;
+  min-width: 180px;
+  z-index: 1060;
 }
 
 .spin-icon {
