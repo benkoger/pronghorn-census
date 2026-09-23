@@ -31,21 +31,7 @@ const routeName = computed(() => {
 });
 
 const currentRouteIcon = computed(() => {
-  const name = (route.name as string) || "";
-  switch (name) {
-    case "dashboard":
-      return "material-symbols:dashboard-rounded";
-    case "auto-cropper":
-      return "fluent:crop-sparkle-24-filled";
-    case "crop-verifier":
-      return "mynaui:bounding-box-solid";
-    case "upload":
-      return "material-symbols:upload";
-    case "settings":
-      return "material-symbols:settings-rounded";
-    default:
-      return "material-symbols:folder-outline";
-  }
+  return (route.meta.icon as string) || "material-symbols:folder-outline";
 });
 
 async function onSelectProject(project: Project) {

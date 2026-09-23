@@ -1,11 +1,17 @@
 <script setup lang="ts">
+import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
 
 defineOptions({
   name: "Nav",
 });
 
+const router = useRouter();
 const sStore = useSystemStore();
+
+function getRouteIcon(target: RouteLocationRaw) {
+  return (router.resolve(target).meta?.icon as string) || "";
+}
 </script>
 <template>
   <nav
@@ -20,7 +26,7 @@ const sStore = useSystemStore();
     <BNav vertical pills class="w-100 gap-1 overflow-x-hidden">
       <BNavItem to="/" :active="$route.path === '/'" class="text-nowrap">
         <Icon
-          icon="material-symbols:dashboard-rounded"
+          :icon="getRouteIcon('/')"
           width="24"
           height="24"
         />
@@ -31,7 +37,7 @@ const sStore = useSystemStore();
         :active="$route.path.startsWith('/auto-cropper')"
         class="text-nowrap"
       >
-        <Icon icon="fluent:crop-sparkle-24-filled" width="24" height="24" />
+        <Icon :icon="getRouteIcon('/auto-cropper/')" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Auto Crop</span>
       </BNavItem>
       <BNavItem
@@ -39,7 +45,7 @@ const sStore = useSystemStore();
         :active="$route.path.startsWith('/crop-verifier')"
         class="text-nowrap"
       >
-        <Icon icon="mynaui:bounding-box-solid" width="24" height="24" />
+        <Icon :icon="getRouteIcon('/crop-verifier')" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Verify</span>
       </BNavItem>
       <BNavItem
@@ -47,7 +53,7 @@ const sStore = useSystemStore();
         :active="$route.path.startsWith('/active-measurement')"
         class="text-nowrap"
       >
-        <Icon icon="gis:measure-area" width="24" height="24" />
+        <Icon :icon="getRouteIcon('/active-measurement')" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Active Measurement</span>
       </BNavItem>
       <BNavItem
@@ -56,11 +62,11 @@ const sStore = useSystemStore();
         :active="$route.path.startsWith('/upload')"
         class="text-nowrap"
       >
-        <Icon icon="material-symbols:upload" width="24" height="24" />
+        <Icon :icon="getRouteIcon('/upload')" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Upload</span>
       </BNavItem>
       <BNavItem to="/settings" :active="$route.path.startsWith('/settings')" class="text-nowrap">
-        <Icon icon="material-symbols:settings-rounded" width="24" height="24" />
+        <Icon :icon="getRouteIcon('/settings')" width="24" height="24" />
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Settings</span>
       </BNavItem>
     </BNav>

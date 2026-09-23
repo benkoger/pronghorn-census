@@ -18,6 +18,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:dashboard-rounded",
       },
     },
     // {
@@ -36,6 +37,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "fluent:crop-sparkle-24-filled",
       },
     },
     {
@@ -45,6 +47,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "mynaui:bounding-box-solid",
       },
     },
     {
@@ -54,6 +57,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "gis:measure-area",
       }
     },
     {
@@ -63,6 +67,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:settings-rounded",
       },
     },
     {
@@ -72,6 +77,7 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:upload",
       },
     },
     {
