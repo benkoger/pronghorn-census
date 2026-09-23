@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { defineStore } from "pinia";
-import { api } from "@/api";
+import { api, API_BASE } from "@/api";
 import type { Router, RouteLocationNormalized } from "vue-router";
 import type {
   Organization,
@@ -51,6 +51,7 @@ export const useSystemStore = defineStore("systemStore", {
     first_login: true,
     theme: "dark",
     logged_in: false,
+    api_available: null as null | boolean,
     bootstrapped: undefined as undefined | boolean,
     organizations: {} as Record<number, Organization>,
     organization_idx: undefined as number | undefined,
@@ -382,6 +383,16 @@ export const useSystemStore = defineStore("systemStore", {
 
     async get_roles() {
       this.roles = await api.get<Role[]>("roles");
+    },
+
+    async check_api(): Promise<boolean> {
+      try {
+        const res = await fetch(`${API_BASE}/healthcheck`);
+        this.api_available = res.ok;
+      } catch {
+        this.api_available = false;
+      }
+      return Boolean(this.api_available);
     },
 
     async check_auth() {

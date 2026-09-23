@@ -1,20 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Authenticate from "@/views/AuthView.vue";
 import { useSystemStore, setSystemStoreRouter } from "@/stores/systemStore";
-import { api } from "@/api";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: "/setup",
-      name: "setup",
-      component: () => import("@/views/SetupView.vue"),
-      meta: {
-        requiresAuth: false,
-        requiresNoLayout: true,
-      },
-    },
     {
       path: "/authenticate",
       name: "authenticate",
@@ -84,23 +74,25 @@ const router = createRouter({
         requiresNoLayout: false,
       },
     },
+    {
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("@/views/NotFoundView.vue"),
+      meta: {
+        requiresAuth: false,
+        requiresNoTitle: true,
+        requiresNoLayout: true,
+      },
+    },
   ],
 });
 
 router.beforeEach(async (to) => {
   const sStore = useSystemStore();
 
-  if (sStore.bootstrapped === undefined) {
-    const data = await api.get<{ result: boolean }>("bootstrapped").catch(() => undefined);
-    sStore.bootstrapped = Boolean(data?.result);
-  }
-
-  if (!sStore.bootstrapped) {
-    return to.name === "setup" ? true : { name: "setup" };
-  }
-
-  if (sStore.bootstrapped && to.name === "setup") {
-    return { name: "authenticate" };
+  const isHealthy = await sStore.check_api();
+  if (!isHealthy) {
+    return false;
   }
 
   if (to.meta.requiresAuth) {

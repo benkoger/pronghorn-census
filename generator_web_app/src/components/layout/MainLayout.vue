@@ -172,10 +172,10 @@ onErrorCaptured((err) => {
 
 <template>
   <Header />
-  <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout" />
+  <Nav class="position-fixed" v-if="!$route.meta.requiresNoLayout && sStore.logged_in" />
   <main
     :style="{
-      marginLeft: $route.meta.requiresNoLayout ? '0' : (sStore.nav_toggled ? '15.5rem' : '4.5rem'),
+      marginLeft: ($route.meta.requiresNoLayout || !sStore.logged_in) ? '0' : (sStore.nav_toggled ? '15.5rem' : '4.5rem'),
       transition: 'margin-left 0.2s',
     }"
     class="flex-grow-1 d-flex flex-column overflow-hidden h-100"
