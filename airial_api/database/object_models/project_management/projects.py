@@ -79,13 +79,19 @@ class Project(DBbase):
                 INSERT INTO projectmanagement.projects (name)
                 VALUES (%(name)s)
                 RETURNING *
+            ),
+            org_link AS (
+                INSERT INTO usermanagement.organizations_projects (
+                project_id, organization_id
+                )
+                SELECT %(organization_id)s, project_id FROM new_project
+            ),
+            user_link AS (
+                INSERT INTO projectmanagement.projects_users (
+                    project_id, user_id, role_id
+                )
+                SELECT project_id, %(user_id)s, %(role_id)s FROM new_project;
             )
-            INSERT INTO usermanagement.organizations_projects (project_id, organization_id)
-            VALUES ((SELECT project_id FROM new_project), %(organization_id)s);
-
-            INSERT INTO projectmanagement.projects_users (project_id, user_id, role_id)
-            VALUES ((SELECT project_id FROM new_project), %(user_id)s, %(role_id)s);
-
             SELECT * FROM new_project;
         """)
 
