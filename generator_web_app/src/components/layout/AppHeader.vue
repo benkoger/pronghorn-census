@@ -20,21 +20,22 @@ const logout = async () => {
 };
 
 const set_org = async (org: Organization) => {
-  await sStore.set_organization(org).catch((e: any) => {
+  try {
+    await sStore.set_organization(org);
+    create({
+      title: "Changing Organization",
+      body: `Active organization changed to: ${sStore.CurrentOrganization?.name}`,
+      variant: "success",
+      position: "bottom-start",
+    });
+  } catch (e: any) {
     create({
       title: "Organization Error",
       body: e.message || "Failed to switch organization",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-  create({
-    title: "Changing Organization",
-    body: `Active organization changed to: ${sStore.CurrentOrganization?.name}`,
-    variant: "success",
-    position: "bottom-start",
-  });
+  }
 };
 </script>
 <template>

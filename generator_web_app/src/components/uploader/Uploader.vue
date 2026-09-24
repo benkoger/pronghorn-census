@@ -19,27 +19,19 @@ import { useToast, type BvTriggerableEvent } from "bootstrap-vue-next";
 export default defineComponent({
   name: "Upload-Utility",
   setup() {
-    const pStore = useSystemStore();
-    if (pStore.CurrentProject && pStore.surveys == undefined)
-      pStore.get_herd_unit_surveys();
-    const project = ref<Project | undefined>(pStore.CurrentProject);
-    const herdunit = ref<HerdUnit | undefined>(pStore.CurrentHerdUnit);
-    const model = ref<Model | undefined>(pStore.CurrentModel);
-    const survey = ref<Survey | undefined>(pStore.CurrentSurvey);
-    const schema = ref<Schema | undefined>(pStore.CurrentSchema);
-    if (!pStore.projects) pStore.get_projects();
+    const sStore = useSystemStore();
+    if (sStore.CurrentProject && sStore.surveys == undefined)
+      sStore.get_herd_unit_surveys();
+    const project = ref<Project | undefined>(sStore.CurrentProject);
+    const herdunit = ref<HerdUnit | undefined>(sStore.CurrentHerdUnit);
+    const model = ref<Model | undefined>(sStore.CurrentModel);
+    const survey = ref<Survey | undefined>(sStore.CurrentSurvey);
+    const schema = ref<Schema | undefined>(sStore.CurrentSchema);
+    if (!sStore.projects) sStore.get_projects();
 
     const { create } = useToast();
 
-    return { pStore, project, herdunit, model, survey, schema, create };
-  },
-  mounted() {
-    if (this.pStore.CurrentProject) {
-      this.$router.push({
-        name: "upload",
-        params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
-      });
-    }
+    return { sStore, project, herdunit, model, survey, schema, create };
   },
   data() {
     return {
@@ -123,8 +115,8 @@ export default defineComponent({
       this.abortController = new AbortController();
 
       // Cache relevant Ids from store (Current objects are computed getters in the store)
-      const survey = this.pStore.CurrentSurvey;
-      const herdUnit = this.pStore.CurrentHerdUnit;
+      const survey = this.sStore.CurrentSurvey;
+      const herdUnit = this.sStore.CurrentHerdUnit;
 
       if (survey == undefined || herdUnit == undefined)
         throw new Error("No survey or herd unit id");
@@ -419,13 +411,13 @@ export default defineComponent({
         <h4>Destination</h4>
         <BListGroup>
           <BListGroupItem>
-            <strong>Project:</strong> {{ pStore.CurrentProject?.name }}
+            <strong>Project:</strong> {{ sStore.CurrentProject?.name }}
           </BListGroupItem>
           <BListGroupItem>
-            <strong>Herd Unit:</strong> {{ pStore.CurrentHerdUnit?.name }}
+            <strong>Herd Unit:</strong> {{ sStore.CurrentHerdUnit?.name }}
           </BListGroupItem>
           <BListGroupItem>
-            <strong>Survey:</strong> {{ pStore.CurrentSurvey?.name }}
+            <strong>Survey:</strong> {{ sStore.CurrentSurvey?.name }}
           </BListGroupItem>
         </BListGroup>
         <h4 class="mt-2">Upload Info</h4>

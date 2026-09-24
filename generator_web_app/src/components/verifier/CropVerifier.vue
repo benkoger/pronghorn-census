@@ -11,8 +11,20 @@ defineProps<{
   adapter: VerifierAdapter;
   labels?: Label[];
 }>();
+
+const emit = defineEmits<{
+  (e: "done"): void;
+  (e: "cropChanged", item: any): void;
+  (e: "update:activeCrop", item: any): void;
+}>();
 </script>
 
 <template>
-  <Verifier :adapter="adapter" :labels="labels" />
+  <Verifier
+    :adapter="adapter"
+    :labels="labels"
+    @done="emit('done')"
+    @crop-changed="(item) => emit('cropChanged', item)"
+    @update:active-crop="(item) => emit('update:activeCrop', item)"
+  />
 </template>

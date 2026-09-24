@@ -25,25 +25,24 @@ const options = ref<createSurveyOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Survey ${options.value.name} created successfully`,
+      body: `The Survey was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Creation Error",
       body: e.message || "Failed to create survey",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Survey ${options.value.name} created successfully`,
-    body: `The Survey was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  options.value.name = "";
+  }
 };
 </script>
 <template>

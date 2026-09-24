@@ -37,25 +37,24 @@ const options = ref<createProjectOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Project ${options.value.name} created successfully`,
+      body: `The project was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Error creating project",
       body: e.message || "Failed to create project",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Project ${options.value.name} created successfully`,
-    body: `The project was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  options.value.name = "";
+  }
 };
 </script>
 <template>

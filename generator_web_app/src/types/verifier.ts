@@ -50,6 +50,11 @@ export interface VerifierAdapter {
    * Optional cleanup when the verifier unmounts or finishes.
    */
   closeSession?(): Promise<void>;
+
+  /**
+   * Optional helper to fetch/load a specific item by its identifier.
+   */
+  fetchItem?(id: string): Promise<VerifierItem | null>;
 }
 
 export type ActionKind = "create" | "update" | "delete";

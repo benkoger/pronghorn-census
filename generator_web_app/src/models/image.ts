@@ -75,6 +75,7 @@ export interface ReviewedArea {
   modified: Date;
   reviewed_area_length_px: number;
   reviewed_area_width_px: number;
+  reviewed_by_user_id: number;
   ra_key: string;
   uuid: string;
   url?: string;

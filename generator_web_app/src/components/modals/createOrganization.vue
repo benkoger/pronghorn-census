@@ -21,24 +21,24 @@ const options = ref<createOrganizationOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Organization ${options.value.name} created successfully`,
+      body: "Organization created successfully",
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Error creating organization",
       body: e.message || "Failed to create organization",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Organization ${options.value.name} created successfully`,
-    body: "Organization created successfully",
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
+  }
 };
 </script>
 <template>

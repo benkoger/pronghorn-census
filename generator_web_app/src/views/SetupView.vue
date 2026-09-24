@@ -9,7 +9,6 @@ import { api } from "@/api";
 import { useRouter } from "vue-router";
 
 const sStore = useSystemStore();
-const pStore = sStore;
 
 const superUserCreated = ref(false);
 const organizationCreated = ref(false);
@@ -170,7 +169,7 @@ const projectCreationFinished = async () => {
                   shared between organizations too.
                 </BCardText>
                 <CreateProject
-                  :submit-action="pStore.create_project"
+                  :submit-action="sStore.create_project"
                   :user="sStore.user as User"
                   :organization="sStore.CurrentOrganization as Organization"
                   @creation-successful="projectCreationFinished"

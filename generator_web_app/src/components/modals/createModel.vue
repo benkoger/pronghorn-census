@@ -48,25 +48,24 @@ const submitReq = async () => {
     },
   };
 
-  await props.submitAction(payload).catch((e: any) => {
+  try {
+    await props.submitAction(payload);
+    create({
+      title: `Model ${name.value} created successfully`,
+      body: `The Model was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    name.value = "";
+  } catch (e: any) {
     create({
       title: "Error creating model",
       body: e.message || "Failed to create model",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Model ${name.value} created successfully`,
-    body: `The Model was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  name.value = "";
+  }
 };
 </script>
 <template>

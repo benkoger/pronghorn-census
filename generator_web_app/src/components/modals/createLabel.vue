@@ -5,7 +5,7 @@ import type { Schema, createLabelOptions } from "@/models";
 import { useSystemStore } from "@/stores/systemStore";
 
 const { create } = useToast();
-const pStore = useSystemStore();
+const sStore = useSystemStore();
 
 const props = withDefaults(
   defineProps<{
@@ -19,10 +19,9 @@ const props = withDefaults(
 );
 
 const minLabelValue = computed(() => {
-  const labels = pStore.SortedLabels;
+  const labels = sStore.SortedLabels;
 
   if (!labels || labels.length === 0) {
-    console.log("here");
     return 1;
   }
 
@@ -43,25 +42,24 @@ const options = ref<createLabelOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Label ${options.value.name} created successfully`,
+      body: `The Label was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Creation Error",
       body: e.message || "Failed to create label",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Label ${options.value.name} created successfully`,
-    body: `The Label was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  options.value.name = "";
+  }
 };
 </script>
 <template>

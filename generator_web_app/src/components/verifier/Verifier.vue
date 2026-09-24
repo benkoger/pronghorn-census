@@ -4,7 +4,6 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
-import Konva from "konva";
 import { useImage } from "vue-konva";
 import {
   boxWidth,
@@ -26,11 +25,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "done"): void;
+  (e: "cropChanged", item: VerifierItem): void;
+  (e: "update:activeCrop", item: VerifierItem): void;
 }>();
 
-const pStore = useSystemStore();
+const sStore = useSystemStore();
 const sortedLabels = computed(() => {
-  const lbls = props.labels ?? pStore.SortedLabels;
+  const lbls = props.labels ?? sStore.SortedLabels;
   return [...lbls].sort((a, b) => a.label - b.label);
 });
 
@@ -371,6 +372,9 @@ function setupItem(item: VerifierItem) {
   }
   currentBoxConfs.value = boxConfs;
   currentImageUrl.value = item.imageUrl;
+
+  emit("cropChanged", item);
+  emit("update:activeCrop", item);
 
   nextTick(() => {
     updateSize();
@@ -1020,9 +1024,7 @@ onMounted(async () => {
   updateSize();
   fitImageToStage();
 
-  window.addEventListener("resize", () => {
-    updateSize();
-  });
+  window.addEventListener("resize", updateSize);
 
   if (stagewrapper.value) {
     resizeObserver = new ResizeObserver(() => {
@@ -1053,10 +1055,23 @@ onBeforeUnmount(async () => {
         <!-- Reviewed Area Details Card -->
         <div class="crop-details-card bg-body-tertiary rounded-3 p-2 mb-2 border border-secondary-subtle shadow-sm flex-shrink-0">
           <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.72rem; letter-spacing: 0.5px;">
-              <Icon icon="fluent:crop-24-regular" class="me-1 align-text-bottom" />
-              Reviewed Area
-            </span>
+            <div class="d-flex align-items-center gap-1">
+              <BButton
+                size="sm"
+                variant="outline-secondary"
+                class="py-0 px-1 d-flex align-items-center me-1"
+                style="font-size: 0.7rem; height: 22px;"
+                @click="requestNavigation('done')"
+                title="Exit to configuration"
+              >
+                <Icon icon="material-symbols:arrow-back" width="13" class="me-1" />
+                Exit
+              </BButton>
+              <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                <Icon icon="fluent:crop-24-regular" class="me-1 align-text-bottom" />
+                Reviewed Area
+              </span>
+            </div>
             <!-- Pending Changes Badge -->
             <span
               v-if="hasPendingChanges"

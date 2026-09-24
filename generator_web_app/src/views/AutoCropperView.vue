@@ -15,18 +15,10 @@ export default defineComponent({
     SelectList: SelectorList,
   },
   setup() {
-    const pStore = useSystemStore();
-    if (pStore.projects.length == 0) pStore.get_projects();
+    const sStore = useSystemStore();
+    if (sStore.projects.length == 0) sStore.get_projects();
     const cStore = useAutoCropperStore();
-    return { pStore, cStore };
-  },
-  mounted() {
-    if (this.pStore.CurrentProject) {
-      this.$router.push({
-        name: "auto-cropper",
-        params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
-      });
-    }
+    return { sStore, cStore };
   },
   data() {
     return {
@@ -73,10 +65,10 @@ export default defineComponent({
   watch: {
     CurrentProject(newValue: Project, oldValue: Project) {
       const currentQuery = { ...this.$route.query };
-      this.pStore.clear_models();
+      this.sStore.clear_models();
       if (newValue != oldValue && newValue != undefined) {
-        this.pStore.get_project_models();
-        this.pStore.get_project_herd_units();
+        this.sStore.get_project_models();
+        this.sStore.get_project_herd_units();
         const newQuery = {
           ...currentQuery,
           project: newValue.uuid,
@@ -99,12 +91,12 @@ export default defineComponent({
       }
     },
     async CurrentModel(newValue: Model, oldValue: Model) {
-      this.pStore.clear_schemas();
-      this.pStore.clear_labels();
+      this.sStore.clear_schemas();
+      this.sStore.clear_labels();
       const currentQuery = { ...this.$route.query };
       if (newValue != oldValue && newValue != undefined) {
-        await this.pStore.get_model_schema();
-        this.pStore.get_schema_labels();
+        await this.sStore.get_model_schema();
+        this.sStore.get_schema_labels();
         const newQuery = {
           ...currentQuery,
           model: newValue.uuid,
@@ -122,9 +114,9 @@ export default defineComponent({
     },
     CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
       const currentQuery = { ...this.$route.query };
-      this.pStore.clear_surveys();
+      this.sStore.clear_surveys();
       if (newValue != oldValue && newValue != undefined) {
-        this.pStore.get_herd_unit_surveys();
+        this.sStore.get_herd_unit_surveys();
         const newQuery = {
           ...currentQuery,
           herd_unit: newValue.uuid,
@@ -170,10 +162,10 @@ export default defineComponent({
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
         <SelectList
-          :items="pStore.projects"
+          :items="sStore.projects"
           icon="ix:projects"
           :active-item="CurrentProject"
-          :select-action="pStore.set_current_project"
+          :select-action="sStore.set_current_project"
           list-name="Project"
         />
       </div>
@@ -181,10 +173,10 @@ export default defineComponent({
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
         <SelectList
-          :items="pStore.models"
+          :items="sStore.models"
           icon="octicon:ai-model-16"
           :active-item="CurrentModel"
-          :select-action="pStore.set_current_model"
+          :select-action="sStore.set_current_model"
           listName="Model"
         />
       </div>
@@ -194,10 +186,10 @@ export default defineComponent({
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
         <SelectList
-          :items="pStore.herd_units"
+          :items="sStore.herd_units"
           icon="token:area"
           :active-item="CurrentHerdUnit"
-          :select-action="pStore.set_current_herd_unit"
+          :select-action="sStore.set_current_herd_unit"
           listName="Herd Unit"
         />
       </div>
@@ -205,10 +197,10 @@ export default defineComponent({
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
         <SelectList
-          :items="pStore.surveys"
+          :items="sStore.surveys"
           icon="roentgen:survey-point"
           :active-item="CurrentSurvey"
-          :select-action="pStore.set_current_survey"
+          :select-action="sStore.set_current_survey"
           listName="Survey"
         />
       </div>
@@ -216,10 +208,10 @@ export default defineComponent({
   </BRow>
   <BRow v-if="currentStep === 2">
     <SelectList
-      :items="pStore.labels"
+      :items="sStore.labels"
       icon="bx:label"
       :active-item="CurrentLabels"
-      :select-action="pStore.set_current_labels"
+      :select-action="sStore.set_current_labels"
       listName="Label"
     />
   </BRow>

@@ -24,25 +24,24 @@ const options = ref<createHerdUnitOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Herd Unit ${options.value.name} created successfully`,
+      body: `The Herd Unit was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Creation Error",
       body: e.message || "Failed to create herd unit",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Herd Unit ${options.value.name} created successfully`,
-    body: `The Herd Unit was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  options.value.name = "";
+  }
 };
 </script>
 <template>

@@ -16,7 +16,7 @@ defineOptions({
 });
 
 const cStore = useAutoCropperStore();
-const pStore = useSystemStore();
+const sStore = useSystemStore();
 
 const predCropRefs = ref<Record<string, HTMLCanvasElement>>({});
 const predictionRefs = ref<Record<string, ComponentPublicInstance>>({});
@@ -48,7 +48,7 @@ const drawBoundingBox = (
   if (ctx == null) return;
   ctx.beginPath();
   ctx.lineWidth = 1;
-  const label_color_hex = pStore.labels?.find(
+  const label_color_hex = sStore.labels?.find(
     (label) => label.label == predCrop.label,
   )?.color;
   ctx.strokeStyle = label_color_hex != undefined ? label_color_hex : "white";
@@ -146,7 +146,7 @@ const decodeDigit = (event: KeyboardEvent) => {
   const label_num = +event.key;
   if (cStore.CurrentPredictionCrop) {
     cStore.CurrentPredictionCrop.label =
-      pStore.labels?.find((label) => label.label == label_num) != undefined
+      sStore.labels?.find((label) => label.label == label_num) != undefined
         ? label_num
         : cStore.CurrentPredictionCrop.label;
     drawBoundingBox(
@@ -201,7 +201,6 @@ const handleKeyPress = (event: KeyboardEvent) => {
       break;
     }
     default: {
-      console.log("none matched");
       break;
     }
   }
@@ -300,7 +299,7 @@ onBeforeUnmount(async () => {
                 @change="drawBoundingBox(predCropRefs[predCrop.uuid], predCrop)"
               >
                 <option
-                  v-for="label in pStore.labels"
+                  v-for="label in sStore.labels"
                   :value="label.label"
                   :key="label.label"
                 >
@@ -422,7 +421,7 @@ onBeforeUnmount(async () => {
         <h4><Icon icon="bx:label" /> Label Legend:</h4>
         <BListGroup class="ms-2 me-2 w-25">
           <BListGroupItem
-            v-for="label in pStore.SortedLabels"
+            v-for="label in sStore.SortedLabels"
             class="p-1 m-0 d-flex justify-content-center w-100"
           >
             <div>

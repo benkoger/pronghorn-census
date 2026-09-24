@@ -32,25 +32,24 @@ const options = ref<createSchemaOptions>({
 });
 
 const submitReq = async () => {
-  await props.submitAction(options.value).catch((e: any) => {
+  try {
+    await props.submitAction(options.value);
+    create({
+      title: `Schema ${options.value.name} created successfully`,
+      body: `The Schema was created successfully.`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+    options.value.name = "";
+  } catch (e: any) {
     create({
       title: "Error creating schema",
       body: e.message || "Failed to create schema",
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `Schema ${options.value.name} created successfully`,
-    body: `The Schema was created successfully.`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
-  options.value.name = "";
+  }
 };
 </script>
 <template>

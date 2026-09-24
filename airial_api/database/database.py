@@ -955,10 +955,7 @@ FROM (
 			) as images
 		""")
 
-        try:
-            cursor.execute(query.format(image_args=image_params), placeholders)
-        except Exception as e:
-            print(e)
+        cursor.execute(query.format(image_args=image_params), placeholders)
         results = cursor.fetchall()
         return results
 

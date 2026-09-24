@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
 import type { Project, HerdUnit } from "@/models";
@@ -16,44 +16,35 @@ defineOptions({
 
 const router = useRouter();
 const route = useRoute();
-const pStore = useSystemStore();
+const sStore = useSystemStore();
 
-if (pStore.projects.length === 0) {
-  pStore.get_projects();
+if (sStore.projects.length === 0) {
+  sStore.get_projects();
 }
 
 const currentStep = ref(0);
 const steps = ref(["Project", "Herd Unit", "Survey", "Upload"]);
 
-onMounted(() => {
-  if (pStore.CurrentProject) {
-    router.push({
-      name: "upload",
-      params: { projects: "projects", uuid: pStore.CurrentProject.uuid },
-    });
-  }
-});
-
 const canProceed = computed(() => {
   switch (currentStep.value) {
     case 0:
-      return pStore.CurrentProject !== undefined;
+      return sStore.CurrentProject !== undefined;
     case 1:
-      return pStore.CurrentHerdUnit !== undefined;
+      return sStore.CurrentHerdUnit !== undefined;
     case 2:
-      return pStore.CurrentSurvey !== undefined;
+      return sStore.CurrentSurvey !== undefined;
     default:
       return false;
   }
 });
 
 watch(
-  () => pStore.CurrentProject,
+  () => sStore.CurrentProject,
   (newValue, oldValue) => {
     const currentQuery = { ...route.query };
 
     if (newValue !== oldValue && newValue !== undefined) {
-      pStore.get_project_herd_units();
+      sStore.get_project_herd_units();
       router.push({
         query: {
           ...currentQuery,
@@ -80,13 +71,13 @@ watch(
 );
 
 watch(
-  () => pStore.CurrentHerdUnit,
+  () => sStore.CurrentHerdUnit,
   (newValue, oldValue) => {
     const currentQuery = { ...route.query };
-    pStore.clear_surveys();
+    sStore.clear_surveys();
 
     if (newValue !== oldValue && newValue !== undefined) {
-      pStore.get_herd_unit_surveys();
+      sStore.get_herd_unit_surveys();
       router.push({
         query: {
           ...currentQuery,
@@ -116,10 +107,10 @@ watch(
   <BRow v-if="currentStep === 0">
     <BCol>
       <SelectorList
-        :items="pStore.projects"
+        :items="sStore.projects"
         icon="ix:projects"
-        :active-item="pStore.CurrentProject"
-        :select-action="pStore.set_current_project"
+        :active-item="sStore.CurrentProject"
+        :select-action="sStore.set_current_project"
         list-name="Project"
       />
     </BCol>
@@ -129,15 +120,15 @@ watch(
       <SelectorList
         list-name="Herd Unit Selection"
         icon="token:area"
-        :select-action="pStore.set_current_herd_unit"
-        :items="pStore.herd_units"
-        :active-item="pStore.CurrentHerdUnit"
+        :select-action="sStore.set_current_herd_unit"
+        :items="sStore.herd_units"
+        :active-item="sStore.CurrentHerdUnit"
         allow-create
       >
         <template #create="{ Finished }">
           <CreateHerdUnit
-            :project="pStore.CurrentProject as Project"
-            :submit-action="pStore.create_herd_unit"
+            :project="sStore.CurrentProject as Project"
+            :submit-action="sStore.create_herd_unit"
             @creation-successful="Finished"
           />
         </template>
@@ -149,16 +140,16 @@ watch(
       <SelectorList
         list-name="Survey Selection"
         icon="roentgen:survey-point"
-        :select-action="pStore.set_current_survey"
-        :items="pStore.surveys"
-        :active-item="pStore.CurrentSurvey"
+        :select-action="sStore.set_current_survey"
+        :items="sStore.surveys"
+        :active-item="sStore.CurrentSurvey"
         allow-create
       >
         <template #create="{ Finished }">
           <CreateSurvey
-            :project="pStore.CurrentProject as Project"
-            :herd_unit="pStore.CurrentHerdUnit as HerdUnit"
-            :submitAction="pStore.create_survey"
+            :project="sStore.CurrentProject as Project"
+            :herd_unit="sStore.CurrentHerdUnit as HerdUnit"
+            :submitAction="sStore.create_survey"
             @creation-successful="Finished"
           />
         </template>

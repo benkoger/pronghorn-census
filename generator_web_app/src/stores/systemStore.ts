@@ -359,10 +359,14 @@ export const useSystemStore = defineStore("systemStore", {
       return true;
     },
 
-    async deuathenticate() {
+    async deauthenticate() {
       await api.post("deauthenticate").catch(() => {});
       this.organizations = {};
       this.clear_state();
+    },
+
+    async deuathenticate() {
+      await this.deauthenticate();
     },
 
     async get_current_user() {

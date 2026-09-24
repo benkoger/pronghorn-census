@@ -15,16 +15,17 @@ import {
 import type { VerifierAdapter, VerifierItem, VerifierChanges } from "@/types/verifier";
 
 export interface CropVerifierAdapterOptions {
-  herdUnitUuid: string;
-  herdUnitId: number;
-  surveyUuid: string;
+  herdUnitUuid?: string;
+  herdUnitId?: number;
+  surveyUuid?: string;
   alreadyReviewed?: boolean;
+  initialCropUuid?: string;
 }
 
 export class CropVerifierAdapter implements VerifierAdapter {
-  private herdUnitUuid: string;
-  private herdUnitId: number;
-  private surveyUuid: string;
+  private herdUnitUuid?: string;
+  private herdUnitId?: number;
+  private surveyUuid?: string;
   private alreadyReviewed: boolean;
 
   // Ordered collection of reviewed area UUIDs visited in this session
@@ -41,6 +42,16 @@ export class CropVerifierAdapter implements VerifierAdapter {
     this.herdUnitId = options.herdUnitId;
     this.surveyUuid = options.surveyUuid;
     this.alreadyReviewed = options.alreadyReviewed ?? false;
+
+    if (options.initialCropUuid) {
+      this.historyUuids.push(options.initialCropUuid);
+    }
+  }
+
+  public setContext(options: { herdUnitUuid: string; herdUnitId: number; surveyUuid: string }) {
+    this.herdUnitUuid = options.herdUnitUuid;
+    this.herdUnitId = options.herdUnitId;
+    this.surveyUuid = options.surveyUuid;
   }
 
   public get visitedAreaIds(): string[] {
@@ -113,6 +124,11 @@ export class CropVerifierAdapter implements VerifierAdapter {
       return null;
     }
 
+    if (!this.surveyUuid || !this.herdUnitUuid) {
+      this.isDone = true;
+      return null;
+    }
+
     if (this.historyUuids.length === 0) {
       await api.patch("images/close-user-images").catch(() => {});
     }
@@ -135,6 +151,23 @@ export class CropVerifierAdapter implements VerifierAdapter {
     }
 
     return this.loadArea(resp.uuid);
+  }
+
+  /**
+   * Fetches/loads a specific crop by UUID, updating session history position.
+   */
+  async fetchItem(uuid: string): Promise<VerifierItem | null> {
+    const item = await this.loadArea(uuid);
+    if (item) {
+      const existingIdx = this.historyUuids.indexOf(uuid);
+      if (existingIdx !== -1) {
+        this.currentIndex = existingIdx;
+      } else {
+        this.historyUuids.push(uuid);
+        this.currentIndex = this.historyUuids.length - 1;
+      }
+    }
+    return item;
   }
 
   /**
@@ -172,7 +205,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
       requests: changes.created.map((a): createAnnotationOptions => ({
         label_id: a.label_id,
         image_ids: { pkey: crop.image_id, uuid: imageUuid || "" },
-        herd_unit_id: a.herd_unit_id || this.herdUnitId,
+        herd_unit_id: a.herd_unit_id || this.herdUnitId || 0,
         box_tx: a.dimensions.top_left.x,
         box_ty: a.dimensions.top_left.y,
         box_bx: a.dimensions.bottom_right.x,
@@ -215,6 +248,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
    * Queries the number of crops in this survey needing review.
    */
   async getRemainingCount(): Promise<number> {
+    if (!this.herdUnitUuid || !this.surveyUuid) return 0;
     const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
       herd_unit_id: [this.herdUnitUuid],
       survey_id: [this.surveyUuid],

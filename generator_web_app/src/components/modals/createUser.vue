@@ -77,24 +77,23 @@ const submitReq = async () => {
   if (passwordState.value === false) {
     return;
   }
-  await props.submitAction(options.value, props.login).catch((e: any) => {
+  try {
+    await props.submitAction(options.value, props.login);
+    create({
+      title: `User ${options.value.username} created successfully`,
+      body: `The user was created successfully`,
+      variant: "success",
+      position: "bottom-start",
+    });
+    emit("creationSuccessful");
+  } catch (e: any) {
     create({
       title: `${e?.name || "Error"}`,
       body: `${e?.message || e}`,
       variant: "danger",
       position: "bottom-start",
     });
-    return;
-  });
-
-  create({
-    title: `User ${options.value.username} created successfully`,
-    body: `The user was created successfully`,
-    variant: "success",
-    position: "bottom-start",
-  });
-
-  emit("creationSuccessful");
+  }
 };
 </script>
 <template>

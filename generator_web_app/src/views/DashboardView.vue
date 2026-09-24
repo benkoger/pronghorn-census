@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
 import { api } from "@/api";
@@ -7,18 +7,17 @@ import type { Survey } from "@/models";
 
 const router = useRouter();
 const sStore = useSystemStore();
-const pStore = sStore;
 
 const loadingTelemetry = ref(false);
 const pendingReviewsCount = ref(0);
 
 const totalImagesCount = computed(() => {
-  return pStore.imageRecords?.total_images ?? 0;
+  return sStore.imageRecords?.total_images ?? 0;
 });
 
 const formattedSurveyDate = computed(() => {
-  if (!pStore.CurrentSurvey?.survey_date) return "—";
-  const d = new Date(pStore.CurrentSurvey.survey_date);
+  if (!sStore.CurrentSurvey?.survey_date) return "—";
+  const d = new Date(sStore.CurrentSurvey.survey_date);
   return isNaN(d.getTime())
     ? "—"
     : d.toLocaleDateString(undefined, {
@@ -41,13 +40,13 @@ const formatDate = (dateVal: string | Date | undefined) => {
 };
 
 async function fetchPendingReviewCount() {
-  if (!pStore.CurrentHerdUnit || !pStore.CurrentSurvey) {
+  if (!sStore.CurrentHerdUnit || !sStore.CurrentSurvey) {
     pendingReviewsCount.value = 0;
     return;
   }
   const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
-    herd_unit_id: [pStore.CurrentHerdUnit.uuid],
-    survey_id: [pStore.CurrentSurvey.uuid],
+    herd_unit_id: [sStore.CurrentHerdUnit.uuid],
+    survey_id: [sStore.CurrentSurvey.uuid],
     include_reviewed: false,
     include_opened: true,
   });
@@ -55,11 +54,11 @@ async function fetchPendingReviewCount() {
 }
 
 async function updateTelemetry() {
-  if (!pStore.CurrentSurvey) return;
+  if (!sStore.CurrentSurvey) return;
   loadingTelemetry.value = true;
   try {
     await Promise.allSettled([
-      pStore.get_survey_images(1, 1),
+      sStore.get_survey_images(1, 1),
       fetchPendingReviewCount(),
     ]);
   } finally {
@@ -68,7 +67,7 @@ async function updateTelemetry() {
 }
 
 watch(
-  () => pStore.CurrentSurvey,
+  () => sStore.CurrentSurvey,
   (newSurvey) => {
     if (newSurvey) {
       updateTelemetry();
@@ -78,13 +77,13 @@ watch(
 );
 
 function onSelectSurvey(survey: Survey) {
-  if (pStore.CurrentSurvey?.uuid === survey.uuid) return;
-  pStore.set_current_survey(survey);
+  if (sStore.CurrentSurvey?.uuid === survey.uuid) return;
+  sStore.set_current_survey(survey);
 }
 
 function goToVerifier(survey?: Survey) {
-  if (survey && pStore.CurrentSurvey?.uuid !== survey.uuid) {
-    pStore.set_current_survey(survey);
+  if (survey && sStore.CurrentSurvey?.uuid !== survey.uuid) {
+    sStore.set_current_survey(survey);
   }
   router.push({ name: "crop-verifier" });
 }
@@ -96,12 +95,6 @@ function goToAutoCropper() {
 function goToUpload() {
   router.push({ name: "upload" });
 }
-
-onMounted(() => {
-  if (pStore.CurrentSurvey) {
-    updateTelemetry();
-  }
-});
 </script>
 
 <template>
@@ -126,7 +119,7 @@ onMounted(() => {
                 <h6 class="m-0 fw-semibold text-body">Crop Verifier</h6>
               </div>
               <BBadge
-                v-if="!pStore.CurrentSurvey"
+                v-if="!sStore.CurrentSurvey"
                 variant="secondary"
                 class="fw-normal extra-small"
               >
@@ -151,8 +144,8 @@ onMounted(() => {
 
           <div class="pt-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-shrink-0">
             <div class="text-secondary extra-small text-truncate me-2">
-              <span v-if="pStore.CurrentSurvey">
-                Target: <strong>{{ pStore.CurrentSurvey.name }}</strong>
+              <span v-if="sStore.CurrentSurvey">
+                Target: <strong>{{ sStore.CurrentSurvey.name }}</strong>
               </span>
               <span v-else class="fst-italic opacity-75">
                 Select a survey to begin
@@ -163,7 +156,7 @@ onMounted(() => {
               size="sm"
               class="text-nowrap"
               @click="goToVerifier()"
-              :disabled="!pStore.CurrentSurvey"
+              :disabled="!sStore.CurrentSurvey"
             >
               Start Review
               <Icon
@@ -251,11 +244,11 @@ onMounted(() => {
                 Herd Unit
               </div>
               <div class="fs-6 fw-bold text-body">
-                {{ pStore.CurrentHerdUnit?.name || "No Herd Unit Selected" }}
+                {{ sStore.CurrentHerdUnit?.name || "No Herd Unit Selected" }}
               </div>
             </div>
             <span
-              v-if="pStore.CurrentSurvey"
+              v-if="sStore.CurrentSurvey"
               class="badge bg-body-secondary text-secondary font-monospace extra-small"
             >
               {{ formattedSurveyDate }}
@@ -268,7 +261,7 @@ onMounted(() => {
               <div class="p-2 bg-body-secondary rounded border-0">
                 <div class="text-secondary extra-small">Selected Survey</div>
                 <div class="fw-bold text-body text-truncate">
-                  {{ pStore.CurrentSurvey?.name || "—" }}
+                  {{ sStore.CurrentSurvey?.name || "—" }}
                 </div>
               </div>
             </div>
@@ -279,7 +272,7 @@ onMounted(() => {
                   <span v-if="loadingTelemetry">
                     <BSpinner small variant="secondary" />
                   </span>
-                  <span v-else-if="pStore.CurrentSurvey">
+                  <span v-else-if="sStore.CurrentSurvey">
                     {{ totalImagesCount.toLocaleString() }}
                   </span>
                   <span v-else class="text-secondary opacity-50">—</span>
@@ -293,7 +286,7 @@ onMounted(() => {
                   <span v-if="loadingTelemetry">
                     <BSpinner small variant="secondary" />
                   </span>
-                  <span v-else-if="pStore.CurrentSurvey">
+                  <span v-else-if="sStore.CurrentSurvey">
                     {{ pendingReviewsCount.toLocaleString() }}
                   </span>
                   <span v-else class="text-secondary opacity-50">—</span>
@@ -305,30 +298,30 @@ onMounted(() => {
           <!-- Survey Roster Header -->
           <div class="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
             <span class="text-secondary small fw-medium">
-              Surveys over {{ pStore.CurrentHerdUnit?.name || "Unit" }}
+              Surveys over {{ sStore.CurrentHerdUnit?.name || "Unit" }}
             </span>
             <span class="text-secondary extra-small">
-              {{ pStore.surveys.length }} total
+              {{ sStore.surveys.length }} total
             </span>
           </div>
 
           <!-- Internal Scroll List (Scrolls independently, page never scrolls) -->
           <div class="survey-scroll-list flex-grow-1 overflow-y-auto pe-1" style="min-height: 0;">
             <div
-              v-if="pStore.surveys.length === 0"
+              v-if="sStore.surveys.length === 0"
               class="p-4 text-center text-secondary small fst-italic"
             >
               No surveys found in this herd unit.
             </div>
 
             <div
-              v-for="survey in pStore.surveys"
+              v-for="survey in sStore.surveys"
               :key="survey.uuid"
               class="survey-item d-flex align-items-center justify-content-between p-2 rounded mb-1 cursor-pointer"
               :class="{
                 'bg-body-secondary':
-                  pStore.CurrentSurvey?.uuid === survey.uuid,
-                'hover-bg': pStore.CurrentSurvey?.uuid !== survey.uuid,
+                  sStore.CurrentSurvey?.uuid === survey.uuid,
+                'hover-bg': sStore.CurrentSurvey?.uuid !== survey.uuid,
               }"
               @click="onSelectSurvey(survey)"
             >
@@ -336,7 +329,7 @@ onMounted(() => {
                 <span
                   class="active-indicator rounded-circle"
                   :class="
-                    pStore.CurrentSurvey?.uuid === survey.uuid
+                    sStore.CurrentSurvey?.uuid === survey.uuid
                       ? 'bg-primary'
                       : 'bg-secondary opacity-25'
                   "

@@ -98,23 +98,23 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
       return targetBatch.predictions[image_index].map((pred) => pred.uuid);
     },
     async getbatch(batchIndex: number) {
-      const pStore = useSystemStore();
+      const sStore = useSystemStore();
       if (
-        !pStore.CurrentSurvey ||
-        !pStore.CurrentHerdUnit ||
-        !pStore.CurrentModel
+        !sStore.CurrentSurvey ||
+        !sStore.CurrentHerdUnit ||
+        !sStore.CurrentModel
       ) {
         return;
       }
 
       const resp = await api.get<any[]>("autocropper/batch", {
-        survey_id: pStore.CurrentSurvey.uuid,
-        herd_unit_id: pStore.CurrentHerdUnit.uuid,
+        survey_id: sStore.CurrentSurvey.uuid,
+        herd_unit_id: sStore.CurrentHerdUnit.uuid,
         batch_size: this.batch_size,
         size: this.batch_size,
         min_confidence: this.minConfidence,
-        label: pStore.CurrentLabelValues,
-        model_id: pStore.CurrentModel.uuid,
+        label: sStore.CurrentLabelValues,
+        model_id: sStore.CurrentModel.uuid,
       });
       if (!resp || !Array.isArray(resp)) return;
 
@@ -237,13 +237,13 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
     async submit() {
       if (this.loading) return;
       this.loading = true;
-      const pStore = useSystemStore();
+      const sStore = useSystemStore();
 
       if (this.approvedPredictions.length > 0) {
         if (
-          !pStore.CurrentHerdUnit ||
-          !pStore.CurrentSurvey ||
-          pStore.labels.length === 0 ||
+          !sStore.CurrentHerdUnit ||
+          !sStore.CurrentSurvey ||
+          sStore.labels.length === 0 ||
           !this.currentImage
         ) {
           this.loading = false;
@@ -252,7 +252,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
         await api.post("autocropper/autocrop", {
           image_id: this.currentImage.uuid,
           predictions: this.approvedPredictions,
-          label_ids: pStore.LabelIds,
+          label_ids: sStore.LabelIds,
         });
       }
 
