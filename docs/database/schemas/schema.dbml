@@ -1,0 +1,546 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+// -------------------------------------------------------- //
+// Types
+
+Enum core.activity_type {
+  "auto cropper"
+  "active measurement"
+}
+
+Enum projectmanagement.model_type {
+  "detection"
+  "regression"
+  "depth estimation"
+}
+
+Enum projectmanagement.survey_status {
+  "uploaded"
+  "preparing"
+  "ready for measurement"
+  "measuring"
+  "finished"
+}
+
+Enum usermanagement.user_status {
+  "active"
+  "invited"
+  "disabled"
+}
+
+// -------------------------------------------------------- //
+// Core Tables
+Table core.images {
+  image_id integer [pk, increment]
+  survey_id integer [not null, default: 0]
+  herd_unit_id integer [not null, default: 0]
+  name varchar(75) [not null]
+  img_key varchar(200) [not null, unique]
+  in_training boolean [default: false]
+  crops_generated smallint [default: 0]
+  opened_by_user_id integer [not null, default: 0]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  image_length_px integer [not null]
+  image_width_px integer [not null]
+  uuid uuid [not null, unique, default: `gen_random_uuid()`]
+  Indexes {
+    (herd_unit_id, name) [unique]
+    created
+    uuid
+    survey_id
+  }
+}
+
+Table core.image_metadata {
+  metadata_id integer [pk, increment]
+  image_id integer [not null, default: 0]
+  captured_at timestamptz [not null]
+  gps_lon "double precision" [not null]
+  gps_lat "double precision" [not null]
+  gps_alt_msl_m "double precision" [not null] 
+  yaw_deg "double precision" [not null]
+  pitch_deg "double precision" [not null]
+  fov_deg "double precision" [not null]
+  terrain_elev_m "double precision" [not null]
+  agl_m "double precision" [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, unique, default: `gen_random_uuid()`]
+  Indexes {
+    image_id
+    uuid
+  }
+}
+
+Table core.image_footprints {
+  footprint_id integer [pk, increment]
+  image_id integer [not null, default: 0]
+  
+  footprint "geometry(Polygon, 4326)"
+  has_detection boolean [not null, default: false]
+  footprint_metadata "geometry(Polygon, 4326)"
+  bbox_wsen float8[4] [not null]
+  footprint_partial boolean [not null]
+  area_m2 float8 [not null]
+  area_geodesic_m2 float8 [not null]
+  area_sigma_m2 float8 [not null]
+  area_q05_m2 float8 [not null]
+  area_q95_m2 float8 [not null]
+  dem_name varchar(36) [not null]
+  georef_status varchar(12) [not null]
+  n_ties integer [not null]
+  tie_residual_before_m float8 [not null]
+  rmse_h_m float8 [not null]           
+  rmse_p50_m float8 [not null]
+  rmse_p90_m float8 [not null]
+  n_checkpoints integer [not null]
+  pose_delta float8[7] [not null]
+  pose_sigma float8[7] [not null]
+  pose_free text[] [not null]
+  pose_cond float8 [not null]
+  prior_source varchar(16) [not null]
+  gcps jsonb [not null]
+  overlay_uri varchar(200) [not null]
+  georef_modified timestamptz [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, unique, default: `gen_random_uuid()`]
+  Indexes {
+    image_id
+    uuid
+  }
+}
+
+Table core.predictions {
+  pred_id bigint [pk, increment]
+  image_id integer [not null, default: 0]
+  model_id integer [not null, default: 0]
+  reviewed_by_user_id integer [not null, default: 0]
+  label integer [not null]
+  score "double precision" [not null]
+  box_tx integer [not null]
+  box_ty integer [not null]
+  box_bx integer [not null]
+  box_by integer [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, unique, default: `gen_random_uuid()`]
+  Indexes {
+    label
+    score
+    model_id
+    reviewed_by_user_id
+    image_id
+    created
+    uuid
+  }
+}
+
+Table core.reviewed_area {
+  reviewed_area_id integer [pk, increment]
+  image_id integer [not null]
+  type core.activity_type [not null, default: 'auto cropper']
+  name varchar(100) [not null]
+  ra_key varchar(200) [not null, unique]
+  area_tx integer [not null]
+  area_ty integer [not null]
+  area_bx integer [not null]
+  area_by integer [not null]
+  reviewed_area_length_px integer [not null, default: 2100] 
+  reviewed_area_width_px integer [not null, default: 2100] 
+  reviewed_by_user_id integer [not null, default: 0]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    image_id
+    created
+    (reviewed_area_length_px, reviewed_area_width_px)
+    uuid
+  }
+}
+
+Table core.annotations {
+  annotation_id integer [pk, increment]
+  label_id integer [not null, default: 0]
+  image_id integer [not null, default: 0]
+  type core.activity_type [not null, default: 'auto cropper']
+  pred_id integer [not null]
+  herd_unit_id integer [not null, default: 0]
+  box_tx integer [not null]
+  box_ty integer [not null]
+  box_bx integer [not null]
+  box_by integer [not null]
+  created_by_user_id integer [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    label_id
+    image_id
+    uuid
+    created
+  }
+}
+
+Table core.am_units {
+  am_unit_id integer [pk, increment]
+  next_unit_id integer [unique]
+  previous_unit_id integer [unique]
+  relative_position integer
+  active_measurement_id integer [not null, default: 0]
+  reviewed_area_id integer [not null, default: 0]
+  reg_model_id integer [unique, not null, default: 0]
+  dect_model_id integer [unique, not null, default: 0]
+  created_by_user_id integer [not null, default: 0]
+  model_count "double precision"
+  human_count integer
+  current_count "double precision"
+  current_ci_lower "double precision"
+  current_ci_upper "double precision"
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+}
+
+// -------------------------------------------------------- //
+// User Management Tables
+
+Table usermanagement.initialization {
+  init_id integer [pk, increment]
+  first_run boolean [not null, default: true]
+}
+
+Table usermanagement.users {
+  user_id integer [pk, increment]
+  default_org_id integer [not null, default: 0]
+  username varchar(20) [not null]
+  email varchar(320) [unique]
+  password_hash varchar(255)
+  external_auth_id varchar(255)
+  external_auth_provider varchar(50) 
+  status usermanagement.user_status
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  last_login timestamptz 
+  locale varchar(10)
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    status
+    modified
+    last_login
+    locale
+    uuid
+  }
+}
+
+Table usermanagement.roles {
+  role_id integer [pk, increment]
+  name varchar(25) [not null, unique]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    uuid
+    created
+  }
+}
+
+Table usermanagement.organizations {
+  organization_id integer [pk, increment]
+  name varchar(50) [not null, unique]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  logo_url varchar(1000)
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    uuid 
+    created 
+  }
+}
+
+// -------------------------------------------------------- //
+// Project Management Tables
+
+Table projectmanagement.projects {
+  project_id integer [pk, increment]
+  name varchar(50) [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    created
+    uuid
+  }
+}
+
+Table projectmanagement.schemas {
+  schema_id integer [pk, increment]
+  name varchar(30) [not null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    created
+    uuid
+  }
+}
+
+Table projectmanagement.labels {
+  label_id integer [pk, increment]
+  schema_id integer [not null, default: 0]
+  label smallint [not null]
+  name varchar(50) [not null]
+  image_link varchar(1000) [null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  color varchar(7) [not null, default: '#FFFFFF']
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    (schema_id, label) [unique]
+    uuid
+    created
+  }
+}
+
+Table projectmanagement.herd_units {
+  herd_unit_id integer [pk, increment]
+  name varchar(30) [not null]
+  habitable_area "double precision"
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    uuid
+    created
+  }
+}
+
+Table projectmanagement.models {
+  model_id integer [pk, increment]
+  schema_id integer [not null, default: 0]
+  name varchar(30) [not null]
+  model_type projectmanagement.model_type [not null, default: 'detection']
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    schema_id
+    uuid
+    created
+  }
+}
+
+Table projectmanagement.surveys {
+  survey_id integer [pk, increment]
+  survey_date timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  name varchar(50)
+  status projectmanagement.survey_status [not null, default: 'uploaded']
+  survey_area "double precision"
+  additional_info text [default: null]
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`]
+  Indexes {
+    name
+    uuid
+    created
+  }
+}
+
+Table projectmanagement.active_measurements {
+  active_measurement_id integer [pk, increment]
+  survey_id integer [not null, default: 0]
+  label_id integer [not null, default: 0]
+  random_seed integer [not null]
+  retraining_cadence integer [not null, default: 0]
+  target_percentage "double precision"
+  final_count "double precision"
+  final_ci_upper "double precision"
+  final_ci_lower "double precision"
+  created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  uuid uuid [not null, default: `gen_random_uuid()`] 
+}
+
+// -------------------------------------------------------- //
+// Many to Many Relationship Tables
+
+Table core.training {
+  reviewed_area_id integer
+  model_id integer
+  Indexes {
+    (reviewed_area_id, model_id) [pk]
+  }
+}
+
+Table core.annotations_reviewed_area {
+  annotation_id integer
+  reviewed_area_id integer
+  Indexes {
+    (annotation_id, reviewed_area_id) [pk]
+  }
+}
+
+Table usermanagement.organizations_projects {
+  project_id integer
+  organization_id integer
+  Indexes {
+    (project_id, organization_id) [pk]
+  }
+}
+
+Table usermanagement.organizations_users {
+  user_id integer
+  organization_id integer
+  role_id integer [not null, default: 0]
+  Indexes {
+    (user_id, organization_id, role_id) [pk]
+  }
+}
+
+Table projectmanagement.projects_users {
+  project_id integer
+  user_id integer
+  role_id integer [not null, default: 0]
+  Indexes {
+    (project_id, user_id, role_id) [pk]
+  }
+}
+
+Table projectmanagement.projects_schemas {
+  project_id integer
+  schema_id integer
+  Indexes {
+    (project_id, schema_id) [pk]
+  }
+}
+
+Table projectmanagement.projects_herd_units {
+  project_id integer
+  herd_unit_id integer
+  Indexes {
+    (project_id, herd_unit_id) [pk]
+  }
+}
+
+Table projectmanagement.projects_models {
+  project_id integer
+  model_id integer
+  Indexes {
+    (project_id, model_id) [pk]
+  }
+}
+
+Table projectmanagement.surveys_models {
+  survey_id integer
+  model_id integer
+  Indexes {
+    (survey_id, model_id) [pk]
+  }
+}
+
+Table projectmanagement.herd_units_models {
+  herd_unit_id integer
+  model_id integer
+  Indexes {
+    (herd_unit_id, model_id) [pk]
+  }
+}
+
+Table projectmanagement.projects_surveys {
+  survey_id integer
+  project_id integer
+  Indexes {
+    (survey_id, project_id) [pk]
+  }
+}
+
+Table projectmanagement.surveys_herd_units {
+  survey_id integer
+  herd_unit_id integer
+  Indexes {
+    (survey_id, herd_unit_id) [pk]
+  }
+}
+
+// -------------------------------------------------------- //
+// Relationships
+
+Ref: "core"."images"."herd_unit_id" > "projectmanagement"."herd_units"."herd_unit_id" [delete: set default, update: cascade]
+Ref: "core"."images"."opened_by_user_id" > "usermanagement"."users"."user_id" [delete: set default, update: cascade]
+Ref: "core"."images"."survey_id" > "projectmanagement"."surveys"."survey_id" [delete: set default, update: cascade]
+
+Ref: "core"."predictions"."image_id" > "core"."images"."image_id" [delete: cascade, update: cascade]
+Ref: "core"."predictions"."model_id" > "projectmanagement"."models"."model_id" [delete: set default, update: cascade]
+Ref: "core"."predictions"."reviewed_by_user_id" > "usermanagement"."users"."user_id" [delete: set default, update: cascade]
+
+Ref: "core"."reviewed_area"."image_id" > "core"."images"."image_id" [delete: set default, update: cascade]
+Ref: "core"."reviewed_area"."reviewed_by_user_id" > "usermanagement"."users"."user_id" [delete: set default, update: cascade]
+
+Ref: "core"."annotations"."image_id" > "core"."images"."image_id" [delete: set default, update: cascade]
+Ref: "core"."annotations"."label_id" > "projectmanagement"."labels"."label_id" [delete: set default, update: cascade]
+Ref: "core"."annotations"."pred_id" > "core"."predictions"."pred_id" [delete: set default, update: cascade]
+
+Ref: "projectmanagement"."labels"."schema_id" > "projectmanagement"."schemas"."schema_id" [delete: set default, update: cascade]
+Ref: "projectmanagement"."models"."schema_id" > "projectmanagement"."schemas"."schema_id" [delete: set default, update: cascade]
+
+Ref: "core"."training"."model_id" > "projectmanagement"."models"."model_id" [delete: cascade, update: cascade]
+Ref: "core"."training"."reviewed_area_id" > "core"."reviewed_area"."reviewed_area_id" [delete: cascade, update: cascade]
+
+Ref: "core"."annotations_reviewed_area"."annotation_id" > "core"."annotations"."annotation_id" [delete: cascade, update: cascade]
+Ref: "core"."annotations_reviewed_area"."reviewed_area_id" > "core"."reviewed_area"."reviewed_area_id" [delete: cascade, update: cascade]
+
+Ref: "usermanagement"."organizations_projects"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+Ref: "usermanagement"."organizations_projects"."organization_id" > "usermanagement"."organizations"."organization_id" [delete: cascade, update: cascade]
+
+Ref: "usermanagement"."organizations_users"."user_id" > "usermanagement"."users"."user_id" [delete: cascade, update: cascade]
+Ref: "usermanagement"."organizations_users"."organization_id" > "usermanagement"."organizations"."organization_id" [delete: cascade, update: cascade]
+Ref: "usermanagement"."organizations_users"."role_id" > "usermanagement"."roles"."role_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."projects_users"."user_id" > "usermanagement"."users"."user_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."projects_users"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."projects_users"."role_id" > "usermanagement"."roles"."role_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."projects_schemas"."schema_id" > "projectmanagement"."schemas"."schema_id" [delete: set null, update: cascade]
+Ref: "projectmanagement"."projects_schemas"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."projects_herd_units"."herd_unit_id" > "projectmanagement"."herd_units"."herd_unit_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."projects_herd_units"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."projects_models"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."projects_models"."model_id" > "projectmanagement"."models"."model_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."surveys_models"."survey_id" > "projectmanagement"."surveys"."survey_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."surveys_models"."model_id" > "projectmanagement"."models"."model_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."herd_units_models"."herd_unit_id" > "projectmanagement"."herd_units"."herd_unit_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."herd_units_models"."model_id" > "projectmanagement"."models"."model_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."projects_surveys"."survey_id" > "projectmanagement"."surveys"."survey_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."projects_surveys"."project_id" > "projectmanagement"."projects"."project_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."surveys_herd_units"."survey_id" > "projectmanagement"."surveys"."survey_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."surveys_herd_units"."herd_unit_id" > "projectmanagement"."herd_units"."herd_unit_id" [delete: cascade, update: cascade]
+
+Ref: "projectmanagement"."active_measurements"."survey_id" > "projectmanagement"."surveys"."survey_id" [delete: cascade, update: cascade]
+Ref: "projectmanagement"."active_measurements"."label_id" > "projectmanagement"."labels"."label_id" [delete: cascade, update: cascade]
+
+Ref: "core"."am_units"."active_measurement_id" > "projectmanagement"."active_measurements"."active_measurement_id" [delete: cascade, update: cascade]
+Ref: "core"."am_units"."created_by_user_id" > "usermanagement"."users"."user_id" [delete: set default, update: cascade]
+
+Ref: "core"."am_units"."previous_unit_id" - "core"."am_units"."am_unit_id"
+Ref: "core"."am_units"."next_unit_id" - "core"."am_units"."am_unit_id"
+
+Ref: "core"."am_units"."reviewed_area_id" > "core"."reviewed_area"."reviewed_area_id"
+
+Ref: "core"."image_footprints"."image_id" > "core"."images"."image_id" [delete: cascade, update: cascade]
+
+Ref: "core"."image_metadata"."image_id" > "core"."images"."image_id" [delete: cascade, update: cascade]

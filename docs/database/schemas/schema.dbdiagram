@@ -1,0 +1,917 @@
+{
+  "version": "3.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "relationshipMode": "All",
+    "tablePositions": [
+      {
+        "name": "images",
+        "schemaName": "core",
+        "x": 1028.150390625,
+        "y": 543
+      },
+      {
+        "name": "image_metadata",
+        "schemaName": "core",
+        "x": -345.04116482661743,
+        "y": 10
+      },
+      {
+        "name": "image_footprints",
+        "schemaName": "core",
+        "x": -4.644157650974535,
+        "y": 10
+      },
+      {
+        "name": "predictions",
+        "schemaName": "core",
+        "x": 1684.0966796875,
+        "y": 579
+      },
+      {
+        "name": "reviewed_area",
+        "schemaName": "core",
+        "x": 1684.0966796875,
+        "y": 53
+      },
+      {
+        "name": "annotations",
+        "schemaName": "core",
+        "x": 2399.177734375,
+        "y": 53
+      },
+      {
+        "name": "am_units",
+        "schemaName": "core",
+        "x": 2399.177734375,
+        "y": 599
+      },
+      {
+        "name": "initialization",
+        "schemaName": "usermanagement",
+        "x": 2403.280582222337,
+        "y": 2059.321227013718
+      },
+      {
+        "name": "users",
+        "schemaName": "usermanagement",
+        "x": 369.23974609375,
+        "y": 12
+      },
+      {
+        "name": "roles",
+        "schemaName": "usermanagement",
+        "x": 369.23974609375,
+        "y": 506
+      },
+      {
+        "name": "organizations",
+        "schemaName": "usermanagement",
+        "x": 369.23974609375,
+        "y": 744
+      },
+      {
+        "name": "projects",
+        "schemaName": "projectmanagement",
+        "x": 369.23974609375,
+        "y": 1014
+      },
+      {
+        "name": "schemas",
+        "schemaName": "projectmanagement",
+        "x": 369.23974609375,
+        "y": 1252
+      },
+      {
+        "name": "labels",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 1340
+      },
+      {
+        "name": "herd_units",
+        "schemaName": "projectmanagement",
+        "x": 369.23974609375,
+        "y": 1490
+      },
+      {
+        "name": "models",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 1706
+      },
+      {
+        "name": "surveys",
+        "schemaName": "projectmanagement",
+        "x": 369.23974609375,
+        "y": 1728
+      },
+      {
+        "name": "active_measurements",
+        "schemaName": "projectmanagement",
+        "x": 1684.0966796875,
+        "y": 1185
+      },
+      {
+        "name": "training",
+        "schemaName": "core",
+        "x": 2399.177734375,
+        "y": 1189
+      },
+      {
+        "name": "annotations_reviewed_area",
+        "schemaName": "core",
+        "x": 2971.3037109375,
+        "y": 12
+      },
+      {
+        "name": "organizations_projects",
+        "schemaName": "usermanagement",
+        "x": 1028.150390625,
+        "y": 401
+      },
+      {
+        "name": "organizations_users",
+        "schemaName": "usermanagement",
+        "x": 1028.150390625,
+        "y": 53
+      },
+      {
+        "name": "projects_users",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 227
+      },
+      {
+        "name": "projects_schemas",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 1198
+      },
+      {
+        "name": "projects_herd_units",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 2008
+      },
+      {
+        "name": "projects_models",
+        "schemaName": "projectmanagement",
+        "x": 1684.0966796875,
+        "y": 1042
+      },
+      {
+        "name": "surveys_models",
+        "schemaName": "projectmanagement",
+        "x": 1684.0966796875,
+        "y": 1630
+      },
+      {
+        "name": "herd_units_models",
+        "schemaName": "projectmanagement",
+        "x": 1674.587890625,
+        "y": 1520.488289377377
+      },
+      {
+        "name": "projects_surveys",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 2150
+      },
+      {
+        "name": "surveys_herd_units",
+        "schemaName": "projectmanagement",
+        "x": 1028.150390625,
+        "y": 2293
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": [
+      {
+        "firstFieldNames": [
+          "herd_unit_id"
+        ],
+        "firstTableName": "images",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "herd_unit_id"
+        ],
+        "secondTableName": "herd_units",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "opened_by_user_id"
+        ],
+        "firstTableName": "images",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "survey_id"
+        ],
+        "firstTableName": "images",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "survey_id"
+        ],
+        "secondTableName": "surveys",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "image_id"
+        ],
+        "firstTableName": "predictions",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "images",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "model_id"
+        ],
+        "firstTableName": "predictions",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "model_id"
+        ],
+        "secondTableName": "models",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "reviewed_by_user_id"
+        ],
+        "firstTableName": "predictions",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "image_id"
+        ],
+        "firstTableName": "reviewed_area",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "images",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "reviewed_by_user_id"
+        ],
+        "firstTableName": "reviewed_area",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "image_id"
+        ],
+        "firstTableName": "annotations",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "images",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "label_id"
+        ],
+        "firstTableName": "annotations",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "label_id"
+        ],
+        "secondTableName": "labels",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "pred_id"
+        ],
+        "firstTableName": "annotations",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "pred_id"
+        ],
+        "secondTableName": "predictions",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "schema_id"
+        ],
+        "firstTableName": "labels",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "schema_id"
+        ],
+        "secondTableName": "schemas",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "schema_id"
+        ],
+        "firstTableName": "models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "schema_id"
+        ],
+        "secondTableName": "schemas",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "model_id"
+        ],
+        "firstTableName": "training",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "model_id"
+        ],
+        "secondTableName": "models",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "reviewed_area_id"
+        ],
+        "firstTableName": "training",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "reviewed_area_id"
+        ],
+        "secondTableName": "reviewed_area",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "annotation_id"
+        ],
+        "firstTableName": "annotations_reviewed_area",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "annotation_id"
+        ],
+        "secondTableName": "annotations",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "reviewed_area_id"
+        ],
+        "firstTableName": "annotations_reviewed_area",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "reviewed_area_id"
+        ],
+        "secondTableName": "reviewed_area",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "organizations_projects",
+        "firstSchemaName": "usermanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "organization_id"
+        ],
+        "firstTableName": "organizations_projects",
+        "firstSchemaName": "usermanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "organization_id"
+        ],
+        "secondTableName": "organizations",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "user_id"
+        ],
+        "firstTableName": "organizations_users",
+        "firstSchemaName": "usermanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "organization_id"
+        ],
+        "firstTableName": "organizations_users",
+        "firstSchemaName": "usermanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "organization_id"
+        ],
+        "secondTableName": "organizations",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "organizations_users",
+        "firstSchemaName": "usermanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "role_id"
+        ],
+        "secondTableName": "roles",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "user_id"
+        ],
+        "firstTableName": "projects_users",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "projects_users",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "role_id"
+        ],
+        "firstTableName": "projects_users",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "role_id"
+        ],
+        "secondTableName": "roles",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "schema_id"
+        ],
+        "firstTableName": "projects_schemas",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "schema_id"
+        ],
+        "secondTableName": "schemas",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "projects_schemas",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "herd_unit_id"
+        ],
+        "firstTableName": "projects_herd_units",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "herd_unit_id"
+        ],
+        "secondTableName": "herd_units",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "projects_herd_units",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "projects_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "model_id"
+        ],
+        "firstTableName": "projects_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "model_id"
+        ],
+        "secondTableName": "models",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "survey_id"
+        ],
+        "firstTableName": "surveys_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "survey_id"
+        ],
+        "secondTableName": "surveys",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "model_id"
+        ],
+        "firstTableName": "surveys_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "model_id"
+        ],
+        "secondTableName": "models",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "herd_unit_id"
+        ],
+        "firstTableName": "herd_units_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "herd_unit_id"
+        ],
+        "secondTableName": "herd_units",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "model_id"
+        ],
+        "firstTableName": "herd_units_models",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "model_id"
+        ],
+        "secondTableName": "models",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "survey_id"
+        ],
+        "firstTableName": "projects_surveys",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "survey_id"
+        ],
+        "secondTableName": "surveys",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "project_id"
+        ],
+        "firstTableName": "projects_surveys",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "project_id"
+        ],
+        "secondTableName": "projects",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "survey_id"
+        ],
+        "firstTableName": "surveys_herd_units",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "survey_id"
+        ],
+        "secondTableName": "surveys",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "herd_unit_id"
+        ],
+        "firstTableName": "surveys_herd_units",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "herd_unit_id"
+        ],
+        "secondTableName": "herd_units",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "survey_id"
+        ],
+        "firstTableName": "active_measurements",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "survey_id"
+        ],
+        "secondTableName": "surveys",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "label_id"
+        ],
+        "firstTableName": "active_measurements",
+        "firstSchemaName": "projectmanagement",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "label_id"
+        ],
+        "secondTableName": "labels",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "active_measurement_id"
+        ],
+        "firstTableName": "am_units",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "active_measurement_id"
+        ],
+        "secondTableName": "active_measurements",
+        "secondSchemaName": "projectmanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "created_by_user_id"
+        ],
+        "firstTableName": "am_units",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "user_id"
+        ],
+        "secondTableName": "users",
+        "secondSchemaName": "usermanagement",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "previous_unit_id"
+        ],
+        "firstTableName": "am_units",
+        "firstSchemaName": "core",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "am_unit_id"
+        ],
+        "secondTableName": "am_units",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "next_unit_id"
+        ],
+        "firstTableName": "am_units",
+        "firstSchemaName": "core",
+        "firstRelation": "1",
+        "secondFieldNames": [
+          "am_unit_id"
+        ],
+        "secondTableName": "am_units",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "reviewed_area_id"
+        ],
+        "firstTableName": "am_units",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "reviewed_area_id"
+        ],
+        "secondTableName": "reviewed_area",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "image_id"
+        ],
+        "firstTableName": "image_footprints",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "images",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      },
+      {
+        "firstFieldNames": [
+          "image_id"
+        ],
+        "firstTableName": "image_metadata",
+        "firstSchemaName": "core",
+        "firstRelation": "*",
+        "secondFieldNames": [
+          "image_id"
+        ],
+        "secondTableName": "images",
+        "secondSchemaName": "core",
+        "secondRelation": "1",
+        "checkPoints": []
+      }
+    ]
+  },
+  "views": {}
+}
