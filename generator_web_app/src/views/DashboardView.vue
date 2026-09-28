@@ -100,9 +100,9 @@ function goToUpload() {
 <template>
   <div class="dashboard-viewport h-100 w-100 d-flex flex-column overflow-hidden">
     <!-- Main Content: Two Balanced Columns Filling Viewport Exactly -->
-    <div class="row g-3 mx-0 flex-grow-1 overflow-hidden" style="min-height: 0;">
+    <BRow g="3" class="mx-0 flex-grow-1 overflow-hidden" style="min-height: 0;">
       <!-- Left Column: Primary Workflows -->
-      <div class="col-12 col-lg-5 d-flex flex-column gap-3 h-100 overflow-hidden" style="min-height: 0;">
+      <BCol cols="12" lg="5" class="d-flex flex-column gap-3 h-100 overflow-hidden" style="min-height: 0;">
         <!-- Verification Card (Primary Focus) -->
         <BCard
           class="border-0 bg-body-tertiary shadow-none p-3 flex-grow-1 d-flex flex-column justify-content-between overflow-hidden"
@@ -227,10 +227,10 @@ function goToUpload() {
             </div>
           </div>
         </BCard>
-      </div>
+      </BCol>
 
       <!-- Right Column: Herd Unit & Surveys -->
-      <div class="col-12 col-lg-7 d-flex flex-column h-100 overflow-hidden" style="min-height: 0;">
+      <BCol cols="12" lg="7" class="d-flex flex-column h-100 overflow-hidden" style="min-height: 0;">
         <BCard
           class="border-0 bg-body-tertiary shadow-none p-3 h-100 d-flex flex-column overflow-hidden"
           style="min-height: 0;"
@@ -247,25 +247,26 @@ function goToUpload() {
                 {{ sStore.CurrentHerdUnit?.name || "No Herd Unit Selected" }}
               </div>
             </div>
-            <span
+            <BBadge
               v-if="sStore.CurrentSurvey"
-              class="badge bg-body-secondary text-secondary font-monospace extra-small"
+              variant="secondary"
+              class="bg-body-secondary text-secondary font-monospace extra-small"
             >
               {{ formattedSurveyDate }}
-            </span>
+            </BBadge>
           </div>
 
           <!-- Stats Strip -->
-          <div class="row g-2 mb-3 text-center flex-shrink-0">
-            <div class="col-4">
+          <BRow g="2" class="mb-3 text-center flex-shrink-0">
+            <BCol cols="4">
               <div class="p-2 bg-body-secondary rounded border-0">
                 <div class="text-secondary extra-small">Selected Survey</div>
                 <div class="fw-bold text-body text-truncate">
                   {{ sStore.CurrentSurvey?.name || "—" }}
                 </div>
               </div>
-            </div>
-            <div class="col-4">
+            </BCol>
+            <BCol cols="4">
               <div class="p-2 bg-body-secondary rounded border-0">
                 <div class="text-secondary extra-small">Survey Images</div>
                 <div class="fw-bold text-body">
@@ -278,8 +279,8 @@ function goToUpload() {
                   <span v-else class="text-secondary opacity-50">—</span>
                 </div>
               </div>
-            </div>
-            <div class="col-4">
+            </BCol>
+            <BCol cols="4">
               <div class="p-2 bg-body-secondary rounded border-0">
                 <div class="text-secondary extra-small">Pending Crops</div>
                 <div class="fw-bold text-body">
@@ -292,8 +293,8 @@ function goToUpload() {
                   <span v-else class="text-secondary opacity-50">—</span>
                 </div>
               </div>
-            </div>
-          </div>
+            </BCol>
+          </BRow>
 
           <!-- Survey Roster Header -->
           <div class="d-flex align-items-center justify-content-between mb-2 flex-shrink-0">
@@ -343,12 +344,13 @@ function goToUpload() {
               </div>
 
               <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                <span
+                <BBadge
                   v-if="survey.status"
-                  class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle extra-small text-capitalize"
+                  variant="secondary"
+                  class="bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle extra-small text-capitalize"
                 >
                   {{ survey.status }}
-                </span>
+                </BBadge>
                 <BButton
                   size="sm"
                   variant="outline-secondary"
@@ -362,8 +364,8 @@ function goToUpload() {
             </div>
           </div>
         </BCard>
-      </div>
-    </div>
+      </BCol>
+    </BRow>
   </div>
 </template>
 

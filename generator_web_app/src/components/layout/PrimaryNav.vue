@@ -73,9 +73,10 @@ function getRouteIcon(target: RouteLocationRaw) {
 
     <!-- Bottom Lock/Toggle Button -->
     <div class="pt-2 border-top border-secondary border-opacity-25 w-100 flex-shrink-0">
-      <button
-        type="button"
-        class="btn btn-sm text-secondary w-100 d-flex align-items-center py-2 px-2 rounded nav-toggle-btn border-0"
+      <BButton
+        variant="link"
+        size="sm"
+        class="text-secondary w-100 d-flex align-items-center py-2 px-2 rounded nav-toggle-btn border-0 text-decoration-none shadow-none"
         :class="{
           'justify-content-center': !sStore.nav_toggled,
           'justify-content-start': sStore.nav_toggled,
@@ -93,7 +94,7 @@ function getRouteIcon(target: RouteLocationRaw) {
           height="24"
         />
         <span v-if="sStore.nav_toggled" class="ms-3 small fw-medium text-nowrap">Collapse</span>
-      </button>
+      </BButton>
     </div>
   </nav>
 </template>

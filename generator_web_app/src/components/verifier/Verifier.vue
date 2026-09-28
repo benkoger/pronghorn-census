@@ -67,6 +67,7 @@ watch(isImageLoaded, (loaded) => {
 
 // Local Box & Annotation State
 const currentAnnotations = ref<Record<string, Annotation>>({});
+const baselineAnnotations = ref<Record<string, Annotation>>({});
 const currentBoxConfs = ref<Record<string, konvaBoxConf>>({});
 const actionStack = ref<VerifierAction[]>([]);
 const redoStack = ref<VerifierAction[]>([]);
@@ -87,13 +88,75 @@ const drawingLabel = ref<Label | undefined>(undefined);
 // -------------------------------------------------------------------------------------------
 // Helpers
 
+function getLabelForAnnotation(annot?: Annotation | null): Label | null {
+  if (!annot) return null;
+  const anyAnnot = annot as any;
+  const labelId = anyAnnot.label_id ?? anyAnnot.label;
+  return (
+    sortedLabels.value.find(
+      (l) =>
+        l.label_id === labelId ||
+        l.label === labelId ||
+        (anyAnnot.label_uuid && l.uuid === anyAnnot.label_uuid)
+    ) ?? null
+  );
+}
+
 function annotationsByLabelId(labelId: number): Annotation[] {
-  return Object.values(currentAnnotations.value).filter((a) => a.label_id === labelId);
+  return Object.values(currentAnnotations.value).filter((a) => {
+    const anyA = a as any;
+    return a.label_id === labelId || anyA.label === labelId;
+  });
+}
+
+function formatColor(color?: string): string {
+  if (!color) return "#0d6efd";
+  return color.startsWith("#") ? color : `#${color}`;
+}
+
+function getContrastColor(hexColor?: string): string {
+  if (!hexColor) return "#ffffff";
+  const hex = hexColor.replace("#", "");
+  if (hex.length !== 6) return "#ffffff";
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 140 ? "#000000" : "#ffffff";
 }
 
 const totalAnnotationsCount = computed(() => Object.keys(currentAnnotations.value).length);
-const hasPendingChanges = computed(() => actionStack.value.length > 0);
-const pendingChangesCount = computed(() => actionStack.value.length);
+
+const hasPendingChanges = computed(() => {
+  if (!activeItem.value) return false;
+  const current = currentAnnotations.value;
+  const baseline = baselineAnnotations.value;
+
+  const currentKeys = Object.keys(current);
+  const baselineKeys = Object.keys(baseline);
+
+  if (currentKeys.length !== baselineKeys.length) return true;
+
+  for (const uuid of currentKeys) {
+    if (!baseline[uuid]) return true;
+  }
+
+  for (const uuid of currentKeys) {
+    const c = current[uuid];
+    const b = baseline[uuid];
+    if (c.label_id !== b.label_id) return true;
+    if (
+      c.dimensions.top_left.x !== b.dimensions.top_left.x ||
+      c.dimensions.top_left.y !== b.dimensions.top_left.y ||
+      c.dimensions.bottom_right.x !== b.dimensions.bottom_right.x ||
+      c.dimensions.bottom_right.y !== b.dimensions.bottom_right.y
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+});
 
 const areaDetails = computed(() => {
   if (!activeItem.value) return null;
@@ -141,8 +204,11 @@ const selectedAnnotation = computed(() => {
 });
 
 const selectedAnnotationLabel = computed(() => {
-  if (!selectedAnnotation.value) return null;
-  return sortedLabels.value.find((l) => l.label_id === selectedAnnotation.value?.label_id) ?? null;
+  return getLabelForAnnotation(selectedAnnotation.value);
+});
+
+const selectedAnnotationColor = computed(() => {
+  return selectedAnnotationLabel.value?.color || "#0d6efd";
 });
 
 const selectedBoxPopupPosition = computed(() => {
@@ -346,6 +412,7 @@ function handleWheel(e: any) {
 
 function setupItem(item: VerifierItem) {
   activeItem.value = item;
+  baselineAnnotations.value = JSON.parse(JSON.stringify(item.annotations || {}));
   currentAnnotations.value = { ...item.annotations };
   actionStack.value = [];
   redoStack.value = [];
@@ -864,19 +931,45 @@ async function executeNavigation(target: "next" | "previous" | "done") {
 }
 
 function collectChanges() {
-  const created = Object.values(currentAnnotations.value).filter((a) => a.annotation_id === 0);
+  const baseline = baselineAnnotations.value;
+  const current = currentAnnotations.value;
 
+  const created: Annotation[] = [];
   const deletedIds: string[] = [];
-  for (const act of actionStack.value) {
-    if (act.kind === "delete" && !act.ignore && !deletedIds.includes(act.id)) {
-      deletedIds.push(act.id);
+  const latestUpdates: updateAnnotationOptions[] = [];
+
+  for (const [uuid, annot] of Object.entries(current)) {
+    if (!baseline[uuid] || annot.annotation_id === 0) {
+      created.push(annot);
     }
   }
 
-  const latestUpdates: updateAnnotationOptions[] = [];
-  for (const [uuid, annotUpdates] of Object.entries(updates.value)) {
-    if (currentAnnotations.value[uuid]?.annotation_id !== 0 && annotUpdates.length > 0) {
-      latestUpdates.push(annotUpdates[annotUpdates.length - 1]);
+  for (const [uuid, annot] of Object.entries(baseline)) {
+    if (!current[uuid] && annot.annotation_id !== 0) {
+      deletedIds.push(uuid);
+    }
+  }
+
+  for (const [uuid, annot] of Object.entries(current)) {
+    const orig = baseline[uuid];
+    if (orig && orig.annotation_id !== 0) {
+      const labelChanged = annot.label_id !== orig.label_id;
+      const dimsChanged =
+        annot.dimensions.top_left.x !== orig.dimensions.top_left.x ||
+        annot.dimensions.top_left.y !== orig.dimensions.top_left.y ||
+        annot.dimensions.bottom_right.x !== orig.dimensions.bottom_right.x ||
+        annot.dimensions.bottom_right.y !== orig.dimensions.bottom_right.y;
+
+      if (labelChanged || dimsChanged) {
+        latestUpdates.push({
+          annotation_id: uuid,
+          label_id: annot.label_id,
+          box_tx: annot.dimensions.top_left.x,
+          box_ty: annot.dimensions.top_left.y,
+          box_bx: annot.dimensions.bottom_right.x,
+          box_by: annot.dimensions.bottom_right.y,
+        });
+      }
     }
   }
 
@@ -900,6 +993,7 @@ async function handleConfirmSubmit() {
       deletedIds,
     });
 
+    baselineAnnotations.value = JSON.parse(JSON.stringify(currentAnnotations.value));
     actionStack.value = [];
     redoStack.value = [];
     updates.value = {};
@@ -917,6 +1011,7 @@ async function handleConfirmDiscard() {
   const target = pendingNavigationTarget.value;
   pendingNavigationTarget.value = null;
 
+  currentAnnotations.value = JSON.parse(JSON.stringify(baselineAnnotations.value));
   actionStack.value = [];
   redoStack.value = [];
   updates.value = {};
@@ -949,6 +1044,7 @@ async function handleEnter() {
       deletedIds,
     });
 
+    baselineAnnotations.value = JSON.parse(JSON.stringify(currentAnnotations.value));
     actionStack.value = [];
     redoStack.value = [];
     updates.value = {};
@@ -1076,70 +1172,48 @@ onBeforeUnmount(async () => {
                 <Icon icon="material-symbols:arrow-back" width="13" class="me-1" />
                 Exit
               </BButton>
-              <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+              <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                 <Icon icon="fluent:crop-24-regular" class="me-1 align-text-bottom" />
                 Reviewed Area
               </span>
-              <span
-                v-if="props.adapter.activeIndex !== undefined && props.adapter.activeIndex >= 0"
-                class="badge bg-secondary-subtle text-secondary font-monospace ms-1"
-                style="font-size: 0.68rem;"
-              >
-                Crop {{ (props.adapter.activeIndex ?? 0) + 1 }}
-              </span>
             </div>
             <!-- Pending Changes Badge -->
-            <span
+            <BBadge
               v-if="hasPendingChanges"
-              class="badge bg-warning text-dark font-monospace"
+              variant="warning"
+              class="text-dark"
               style="font-size: 0.68rem;"
               title="Unsubmitted local changes"
             >
               <Icon icon="material-symbols:edit-outline" class="me-1" />
-              {{ pendingChangesCount }} pending
-            </span>
-            <span
+              Pending
+            </BBadge>
+            <BBadge
               v-else
-              class="badge bg-success-subtle text-success border border-success-subtle"
+              variant="success"
+              class="bg-success-subtle text-success border border-success-subtle"
               style="font-size: 0.68rem;"
             >
               <Icon icon="material-symbols:check" class="me-1" />
               Saved
-            </span>
+            </BBadge>
           </div>
 
-          <!-- UUID & Frame Info -->
-          <div class="d-flex align-items-center justify-content-between small text-secondary">
-            <span class="font-monospace text-truncate me-1" :title="areaDetails?.uuid">
-              {{ areaDetails?.shortUuid || 'Loading...' }}
+          <!-- Detections Count & Reset View -->
+          <div class="d-flex align-items-center justify-content-between small text-secondary mt-1">
+            <span class="text-secondary fw-semibold" style="font-size: 0.75rem;">
+              {{ totalAnnotationsCount }} detection{{ totalAnnotationsCount === 1 ? '' : 's' }}
             </span>
-            <div class="d-flex align-items-center gap-1 flex-shrink-0">
-              <BButton
-                size="sm"
-                variant="link"
-                class="p-0 text-secondary"
-                @click="copyAreaUuid"
-                :title="copiedUuid ? 'Copied!' : 'Copy full UUID'"
-              >
-                <Icon :icon="copiedUuid ? 'material-symbols:check' : 'material-symbols:content-copy-outline'" width="14" />
-              </BButton>
-              <BButton
-                size="sm"
-                variant="link"
-                class="p-0 text-secondary"
-                @click="fitImageToStage"
-                title="Reset zoom & center crop"
-              >
-                <Icon icon="material-symbols:center-focus-strong" width="14" />
-              </BButton>
-            </div>
-          </div>
-
-          <!-- Metadata row -->
-          <div class="d-flex justify-content-between small text-muted mt-1" style="font-size: 0.75rem;">
-            <span v-if="areaDetails?.imageId">Frame #{{ areaDetails.imageId }}</span>
-            <span v-if="areaDetails?.width">{{ areaDetails.width }} × {{ areaDetails.height }} px</span>
-            <span>{{ totalAnnotationsCount }} detections</span>
+            <BButton
+              size="sm"
+              variant="link"
+              class="p-0 text-secondary d-flex align-items-center gap-1 text-decoration-none"
+              @click="fitImageToStage"
+              title="Reset zoom & center crop"
+            >
+              <Icon icon="material-symbols:center-focus-strong" width="14" />
+              <span style="font-size: 0.72rem;">Reset View</span>
+            </BButton>
           </div>
         </div>
 
@@ -1154,7 +1228,10 @@ onBeforeUnmount(async () => {
               <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-2 text-truncate">
                   <h4
-                    :style="{ color: label.color, borderColor: label.color }"
+                    :style="{
+                      color: formatColor(label.color) + ' !important',
+                      borderColor: formatColor(label.color) + ' !important'
+                    }"
                     class="label mb-0 flex-shrink-0"
                     style="font-size: 0.85rem;"
                   >
@@ -1164,12 +1241,13 @@ onBeforeUnmount(async () => {
                 </div>
 
                 <div class="d-flex align-items-center gap-1 flex-shrink-0">
-                  <span
-                    class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"
+                  <BBadge
+                    variant="secondary"
+                    class="bg-secondary-subtle text-secondary border border-secondary-subtle small"
                     style="font-size: 0.7rem;"
                   >
                     {{ annotationsByLabelId(label.label_id).length }}
-                  </span>
+                  </BBadge>
                   <BButton
                     @click="startDrawing(label)"
                     variant="outline-success"
@@ -1189,7 +1267,7 @@ onBeforeUnmount(async () => {
                 class="mt-2 d-flex flex-column gap-1"
               >
                 <div
-                  v-for="annot in annotationsByLabelId(label.label_id)"
+                  v-for="(annot, idx) in annotationsByLabelId(label.label_id)"
                   :key="annot.uuid"
                   class="annotation-card p-1 px-2 rounded-2 border d-flex align-items-center justify-content-between"
                   :class="{
@@ -1202,16 +1280,20 @@ onBeforeUnmount(async () => {
                   @mouseenter="hoverAnnotation(annot.uuid)"
                   @mouseleave="unhoverAnnotation(annot.uuid)"
                 >
-                  <div class="d-flex flex-column text-truncate me-1" style="min-width: 0;">
-                    <div class="d-flex align-items-center gap-1">
-                      <span class="badge p-0 me-1" :style="{ backgroundColor: label.color, width: '6px', height: '6px', borderRadius: '50%' }"></span>
-                      <small class="font-monospace text-truncate text-secondary" style="font-size: 0.72rem;">
-                        {{ annot.uuid.slice(0, 8) }}
-                      </small>
-                    </div>
-                    <small class="text-muted" style="font-size: 0.68rem;">
-                      {{ boxWidth(annot.dimensions) }} × {{ boxHeight(annot.dimensions) }} px
-                    </small>
+                  <div class="d-flex align-items-center gap-2 text-truncate me-1" style="min-width: 0;">
+                    <span
+                      class="flex-shrink-0"
+                      :style="{
+                        backgroundColor: formatColor(label.color) + ' !important',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        display: 'inline-block'
+                      }"
+                    />
+                    <span class="small fw-medium text-body text-truncate">
+                      {{ label.name }} #{{ idx + 1 }}
+                    </span>
                   </div>
 
                   <div class="d-flex align-items-center gap-1 flex-shrink-0">
@@ -1272,8 +1354,7 @@ onBeforeUnmount(async () => {
                   draggable: !isDrawing,
                   stroke:
                     conf.stroke ||
-                    sortedLabels.find((l) => l.label_id === currentAnnotations[uuid]?.label_id)
-                      ?.color ||
+                    getLabelForAnnotation(currentAnnotations[uuid])?.color ||
                     '#ff0000',
                   strokeWidth: 2,
                   strokeScaleEnabled: false,
@@ -1281,7 +1362,7 @@ onBeforeUnmount(async () => {
                   fill:
                     conf.fill ||
                     (hoveredUuid === uuid
-                      ? (conf.stroke || sortedLabels.find((l) => l.label_id === currentAnnotations[uuid]?.label_id)?.color || '#ff0000') + '44'
+                      ? (conf.stroke || getLabelForAnnotation(currentAnnotations[uuid])?.color || '#ff0000') + '44'
                       : ''),
                 }"
                 @transform="onStageChange"
@@ -1349,7 +1430,7 @@ onBeforeUnmount(async () => {
           <!-- Floating Annotation Popup Card under selected box -->
           <div
             v-if="selectedBoxPopupPosition && selectedAnnotation && !isDrawing"
-            class="annotation-popup bg-dark text-white rounded-3 shadow border border-secondary px-2 py-1 d-flex align-items-center gap-2"
+            class="annotation-popup bg-dark text-white rounded-3 shadow border border-secondary p-1 d-flex align-items-center gap-1"
             :style="{
               position: 'absolute',
               left: selectedBoxPopupPosition.left,
@@ -1359,27 +1440,28 @@ onBeforeUnmount(async () => {
               pointerEvents: 'auto',
             }"
           >
-            <!-- Current Species Badge -->
-            <span
-              class="badge border d-flex align-items-center gap-1 font-monospace"
-              :style="{
-                backgroundColor: (selectedAnnotationLabel?.color || '#0d6efd') + '33',
-                borderColor: selectedAnnotationLabel?.color || '#0d6efd',
-                color: selectedAnnotationLabel?.color || '#ffffff',
-              }"
+            <!-- Label Dropdown for Changing Species -->
+            <BDropdown
+              size="sm"
+              no-caret
+              class="border-0 p-0"
+              toggle-class="p-0 border-0 bg-transparent shadow-none"
+              menu-class="dropdown-species-menu"
+              title="Click to change species"
             >
-              <span>{{ selectedAnnotationLabel?.label }}</span>
-              <span>{{ selectedAnnotationLabel?.name || 'Detection' }}</span>
-            </span>
-
-            <small class="text-secondary font-monospace" style="font-size: 0.72rem;">
-              {{ currentBoxConfs[selectedAnnotation.uuid] ? Math.round(currentBoxConfs[selectedAnnotation.uuid].width) + ' × ' + Math.round(currentBoxConfs[selectedAnnotation.uuid].height) + ' px' : '' }}
-            </small>
-
-            <!-- Quick Change Species Dropdown -->
-            <BDropdown size="sm" variant="dark" class="border-0 p-0" no-caret title="Change species">
               <template #button-content>
-                <Icon icon="material-symbols:swap-horiz" width="14" class="text-light" />
+                <span
+                  class="badge d-flex align-items-center gap-1 font-monospace px-2 py-1"
+                  style="cursor: pointer;"
+                  :style="{
+                    backgroundColor: formatColor(selectedAnnotationColor) + ' !important',
+                    color: getContrastColor(selectedAnnotationColor) + ' !important',
+                  }"
+                >
+                  <span class="fw-bold">{{ selectedAnnotationLabel?.label }}</span>
+                  <span>{{ selectedAnnotationLabel?.name || 'Detection' }}</span>
+                  <Icon icon="material-symbols:arrow-drop-down" width="16" />
+                </span>
               </template>
               <BDropdownItemButton
                 v-for="lbl in sortedLabels"
@@ -1387,8 +1469,16 @@ onBeforeUnmount(async () => {
                 :active="lbl.label_id === selectedAnnotation.label_id"
                 @click="updateLabel(selectedAnnotation.uuid, lbl)"
               >
-                <span class="badge me-1" :style="{ backgroundColor: lbl.color, color: '#000' }">{{ lbl.label }}</span>
-                {{ lbl.name }}
+                <span
+                  class="badge me-2 font-monospace"
+                  :style="{
+                    backgroundColor: formatColor(lbl.color) + ' !important',
+                    color: getContrastColor(lbl.color) + ' !important',
+                  }"
+                >
+                  {{ lbl.label }}
+                </span>
+                <span>{{ lbl.name }}</span>
               </BDropdownItemButton>
             </BDropdown>
 
@@ -1440,11 +1530,10 @@ onBeforeUnmount(async () => {
           class="explorerButton"
           @click="handleEnter()"
           :variant="hasPendingChanges ? 'warning' : 'success'"
-          :title="hasPendingChanges ? 'Submit ' + pendingChangesCount + ' changes and proceed' : 'Submit crop and proceed'"
+          :title="hasPendingChanges ? 'Submit changes and proceed' : 'Submit crop and proceed'"
         >
           <Icon icon="vaadin:enter-arrow" class="me-1" />
           Submit
-          <span v-if="hasPendingChanges" class="badge bg-dark ms-1 font-monospace">{{ pendingChangesCount }}</span>
         </BButton>
       </BButtonGroup>
 
@@ -1484,7 +1573,7 @@ onBeforeUnmount(async () => {
         <div>
           <h5 class="mb-1">You have unsaved changes</h5>
           <p class="text-secondary small mb-0">
-            There {{ pendingChangesCount === 1 ? 'is' : 'are' }} <strong>{{ pendingChangesCount }} pending modification{{ pendingChangesCount === 1 ? '' : 's' }}</strong> for this crop. Would you like to submit your changes before continuing, or discard them?
+            You have unsubmitted changes for this crop. Would you like to submit your changes before continuing, or discard them?
           </p>
         </div>
       </div>
@@ -1535,5 +1624,16 @@ onBeforeUnmount(async () => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
   user-select: none;
   white-space: nowrap;
+}
+
+.annotation-popup :deep(.dropdown-toggle) {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.annotation-popup :deep(.dropdown-species-menu) {
+  min-width: 170px !important;
 }
 </style>

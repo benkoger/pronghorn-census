@@ -165,14 +165,15 @@ onErrorCaptured((err) => {
         <!-- Left: Integrated Context Breadcrumbs -->
         <div class="d-flex align-items-center gap-2" style="min-width: 0;">
           <!-- Organization Badge -->
-          <span
+          <BBadge
             v-if="sStore.CurrentOrganization"
-            class="badge bg-body-secondary text-secondary border border-secondary-subtle font-monospace extra-small d-none d-md-inline text-truncate"
+            variant="secondary"
+            class="bg-body-secondary text-secondary border border-secondary-subtle font-monospace extra-small d-none d-md-inline text-truncate"
             style="max-width: 130px;"
           >
             <Icon icon="octicon:organization-16" class="me-1" />
             {{ sStore.CurrentOrganization.name }}
-          </span>
+          </BBadge>
 
           <span class="text-secondary opacity-50 d-none d-md-inline">/</span>
 
@@ -314,11 +315,12 @@ onErrorCaptured((err) => {
 
         <!-- Right: Admin Status & Refresh Button -->
         <div class="d-flex align-items-center justify-content-end gap-2 flex-shrink-0">
-          <span
-            class="badge bg-body-secondary text-secondary border border-secondary-subtle font-monospace extra-small d-none d-lg-inline"
+          <BBadge
+            variant="secondary"
+            class="bg-body-secondary text-secondary border border-secondary-subtle font-monospace extra-small d-none d-lg-inline"
           >
             {{ sStore.is_admin ? "Admin" : "Annotator" }}
-          </span>
+          </BBadge>
           <BButton
             size="sm"
             variant="outline-secondary"

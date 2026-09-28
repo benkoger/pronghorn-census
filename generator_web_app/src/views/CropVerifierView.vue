@@ -44,6 +44,17 @@ const sortedLabels = computed(() => {
   return [...pStore.labels].sort((a, b) => a.label - b.label);
 });
 
+const selectedModelUuid = computed({
+  get: () => pStore.CurrentModel?.uuid || null,
+  set: (uuid: string | null) => {
+    if (!uuid) return;
+    const model = pStore.models.find((m) => m.uuid === uuid);
+    if (model) {
+      pStore.set_current_model(model);
+    }
+  },
+});
+
 // ---------------------------------------------------------------------------------------------------------------------------
 
 function initAdapter(initialCropUuid?: string) {
@@ -312,46 +323,32 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Annotation Model Selection Dropdown -->
+      <!-- Annotation Model Selection -->
       <div class="flex-shrink-0">
-        <label class="form-label small fw-semibold text-secondary mb-1 d-flex align-items-center gap-1">
+        <label
+          for="annotation-model-select"
+          class="form-label small fw-semibold text-secondary mb-1 d-flex align-items-center gap-1"
+        >
           <Icon icon="octicon:ai-model-16" class="text-primary" />
           Annotation Model
         </label>
-        <BDropdown
-          size="sm"
-          variant="outline-secondary"
-          class="w-100 text-start context-dropdown"
-          menu-class="shadow-sm context-dropdown-menu"
-          strategy="fixed"
-          teleport-to="body"
+        <BFormSelect
+          id="annotation-model-select"
+          v-model="selectedModelUuid"
+          class="bg-body-tertiary border-secondary-subtle"
           :disabled="pStore.models.length === 0"
         >
-          <template #button-content>
-            <div class="d-flex align-items-center justify-content-between w-100 overflow-hidden text-truncate pe-1">
-              <span class="text-truncate">
-                {{ pStore.CurrentModel?.name || (pStore.models.length === 0 ? "No models in project" : "Select Model...") }}
-              </span>
-            </div>
-          </template>
-          <BDropdownItemButton
+          <option :value="null" disabled>
+            {{ pStore.models.length === 0 ? "No models in project" : "Select Model..." }}
+          </option>
+          <option
             v-for="model in pStore.models"
             :key="model.uuid"
-            :active="pStore.CurrentModel?.uuid === model.uuid"
-            @click="pStore.set_current_model(model)"
+            :value="model.uuid"
           >
-            <div class="d-flex align-items-center gap-2">
-              <Icon icon="octicon:ai-model-16" class="text-primary" />
-              <span>{{ model.name }}</span>
-            </div>
-          </BDropdownItemButton>
-          <BDropdownText
-            v-if="pStore.models.length === 0"
-            class="text-secondary small fst-italic px-3 py-2 text-center"
-          >
-            No models found in this project
-          </BDropdownText>
-        </BDropdown>
+            {{ model.name }}
+          </option>
+        </BFormSelect>
         <small class="text-muted extra-small mt-1 d-block" style="font-size: 0.72rem;">
           Model that generated draft bounding boxes
         </small>
@@ -366,7 +363,7 @@ onMounted(async () => {
           <small class="text-muted" style="font-size: 0.72rem;">Crops in current survey</small>
         </div>
         <div class="fs-4 fw-bold font-monospace text-primary">
-          <span v-if="loadingCount" class="spinner-border spinner-border-sm" />
+          <BSpinner v-if="loadingCount" small variant="primary" />
           <span v-else>{{ pStore.CurrentSurvey ? needingReviewed : '—' }}</span>
         </div>
       </div>
@@ -437,162 +434,130 @@ onMounted(async () => {
 
           <div class="flex-grow-1 overflow-y-auto p-4 pb-5 d-flex flex-column gap-4" style="min-height: 0;">
             <!-- Tool Overview Card -->
-            <div class="card border-secondary-subtle shadow-sm bg-body">
-              <div class="card-body p-4">
+            <BCard class="border-secondary-subtle shadow-sm bg-body" no-body>
+              <BCardBody class="p-4">
                 <div class="d-flex align-items-center gap-2 mb-3">
                   <Icon icon="mynaui:bounding-box-solid" class="text-primary fs-3" />
-                  <h5 class="card-title mb-0 fw-bold">About Crop Verifier</h5>
+                  <BCardTitle class="mb-0 fw-bold" title-tag="h5">About Crop Verifier</BCardTitle>
                 </div>
-                <p class="card-text text-secondary mb-3">
+                <BCardText class="text-secondary mb-0">
                   The <strong>Crop Verifier</strong> is the rapid human-in-the-loop review tool in the AIrial census pipeline.
                   High-resolution aerial survey frames contain clustered machine-learning predictions. The Crop Verifier loads these
                   clustered subcrops (typically 2100×2100 px) for rapid verification: confirm detections, adjust bounding box
                   coordinates, correct misclassified species, remove false positives, and draw new boxes for missed wildlife.
-                </p>
-                <div class="row g-3 mt-1">
-                  <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
-                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
-                        <span class="badge bg-primary text-white rounded-circle me-1">1</span> Context Setup
-                      </div>
-                      <small class="text-muted">Choose your Project, Herd Unit, Survey, and Model in the sidebar.</small>
-                    </div>
-                  </div>
-                  <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
-                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
-                        <span class="badge bg-primary text-white rounded-circle me-1">2</span> Review Mode
-                      </div>
-                      <small class="text-muted">Click <strong>Start Reviewing</strong> to verify pending crops sequentially, or pick individual crops in the <em>Reviewed Areas</em> tab.</small>
-                    </div>
-                  </div>
-                  <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
-                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
-                        <span class="badge bg-primary text-white rounded-circle me-1">3</span> Verify & Label
-                      </div>
-                      <small class="text-muted">Pan, zoom, drag boxes, or press digit keys <kbd class="guide-kbd">0</kbd>–<kbd class="guide-kbd">9</kbd> to assign labels or draw boxes.</small>
-                    </div>
-                  </div>
-                  <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
-                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
-                        <span class="badge bg-primary text-white rounded-circle me-1">4</span> Commit & Advance
-                      </div>
-                      <small class="text-muted">Press <kbd class="guide-kbd">Enter</kbd> to commit verified annotations to the database and automatically advance to the next crop.</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                </BCardText>
+              </BCardBody>
+            </BCard>
 
             <!-- Key Legend & Shortcuts Card -->
-            <div class="card border-secondary-subtle shadow-sm bg-body">
-              <div class="card-body p-4">
+            <BCard class="border-secondary-subtle shadow-sm bg-body" no-body>
+              <BCardBody class="p-4">
                 <div class="d-flex align-items-center gap-2 mb-3">
                   <Icon icon="fluent:keyboard-layout-float-24-regular" class="text-primary fs-3" />
-                  <h5 class="card-title mb-0 fw-bold">Keyboard & Controls Legend</h5>
+                  <BCardTitle class="mb-0 fw-bold" title-tag="h5">Keyboard & Controls Legend</BCardTitle>
                 </div>
-                <div class="row g-4">
+                <BRow g="4">
                   <!-- Navigation & Submit -->
-                  <div class="col-12 col-lg-6 col-xl-4">
+                  <BCol cols="12" lg="6" xl="4">
                     <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Navigation & Submit</h6>
-                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                    <BListGroup flush class="border border-secondary-subtle rounded-2 overflow-hidden">
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Submit & Next Crop</span>
                         <kbd class="guide-kbd">Enter</kbd>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Next Crop</span>
                         <kbd class="guide-kbd">→</kbd>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Previous Crop</span>
                         <kbd class="guide-kbd">←</kbd>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Cancel / Deselect</span>
                         <kbd class="guide-kbd">Esc</kbd>
-                      </div>
-                    </div>
-                  </div>
+                      </BListGroupItem>
+                    </BListGroup>
+                  </BCol>
 
                   <!-- Annotation & Editing -->
-                  <div class="col-12 col-lg-6 col-xl-4">
+                  <BCol cols="12" lg="6" xl="4">
                     <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Annotation & Editing</h6>
-                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                    <BListGroup flush class="border border-secondary-subtle rounded-2 overflow-hidden">
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Assign Label / Draw</span>
                         <div class="d-flex gap-1">
                           <kbd class="guide-kbd">0</kbd>–<kbd class="guide-kbd">9</kbd>
                         </div>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Delete Selected Box</span>
                         <kbd class="guide-kbd">Delete</kbd>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Undo Action</span>
                         <kbd class="guide-kbd">Ctrl+Z</kbd>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Redo Action</span>
                         <kbd class="guide-kbd">Ctrl+Y</kbd>
-                      </div>
-                    </div>
-                  </div>
+                      </BListGroupItem>
+                    </BListGroup>
+                  </BCol>
 
                   <!-- Mouse & Canvas -->
-                  <div class="col-12 col-lg-6 col-xl-4">
+                  <BCol cols="12" lg="6" xl="4">
                     <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Mouse & Canvas</h6>
-                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                    <BListGroup flush class="border border-secondary-subtle rounded-2 overflow-hidden">
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Zoom In / Out</span>
                         <span class="small text-muted font-monospace">Mouse Wheel</span>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Pan Image</span>
                         <span class="small text-muted font-monospace">Click & Drag</span>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Select Box</span>
                         <span class="small text-muted font-monospace">Left Click</span>
-                      </div>
-                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                      </BListGroupItem>
+                      <BListGroupItem class="d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
                         <span class="small fw-semibold">Move / Resize</span>
                         <span class="small text-muted font-monospace">Drag Box / Handles</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                      </BListGroupItem>
+                    </BListGroup>
+                  </BCol>
+                </BRow>
+              </BCardBody>
+            </BCard>
 
             <!-- Active Model Taxonomy Card -->
-            <div class="card border-secondary-subtle shadow-sm bg-body">
-              <div class="card-body p-4">
+            <BCard class="border-secondary-subtle shadow-sm bg-body" no-body>
+              <BCardBody class="p-4">
                 <div class="d-flex align-items-center justify-content-between mb-3">
                   <div class="d-flex align-items-center gap-2">
                     <Icon icon="octicon:tag-16" class="text-primary fs-3" />
-                    <h5 class="card-title mb-0 fw-bold">Active Species Taxonomy & Hotkeys</h5>
+                    <BCardTitle class="mb-0 fw-bold" title-tag="h5">Active Species Taxonomy & Hotkeys</BCardTitle>
                   </div>
-                  <span v-if="pStore.CurrentModel" class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                  <BBadge v-if="pStore.CurrentModel" variant="primary" class="bg-primary-subtle text-primary border border-primary-subtle">
                     Model: {{ pStore.CurrentModel.name }}
-                  </span>
+                  </BBadge>
                 </div>
 
                 <div v-if="sortedLabels.length > 0" class="d-flex flex-wrap gap-2">
                   <div
                     v-for="l in sortedLabels"
                     :key="l.uuid"
-                    class="p-2 px-3 rounded-2 border border-secondary-subtle bg-body-tertiary d-flex align-items-center gap-2"
+                    class="p-1 px-2.5 rounded-2 border border-secondary-subtle bg-body-tertiary d-flex align-items-center gap-2"
+                    style="width: 140px;"
+                    :title="`${l.name} (Hotkey: ${l.label})`"
                   >
-                    <kbd class="guide-kbd font-monospace">{{ l.label }}</kbd>
+                    <kbd class="guide-kbd font-monospace flex-shrink-0 text-center" style="min-width: 20px; font-size: 0.72rem; padding: 0.1rem 0.35rem;">{{ l.label }}</kbd>
                     <span
-                      class="rounded-circle d-inline-block"
-                      :style="{ backgroundColor: l.color || '#3b82f6', width: '12px', height: '12px' }"
+                      class="rounded-circle d-inline-block flex-shrink-0"
+                      :style="{ backgroundColor: l.color || '#3b82f6', width: '8px', height: '8px' }"
                     />
-                    <span class="fw-semibold small">{{ l.name }}</span>
+                    <span class="fw-semibold text-truncate" style="font-size: 0.8125rem;">{{ l.name }}</span>
                   </div>
                 </div>
 
@@ -600,8 +565,8 @@ onMounted(async () => {
                   <Icon icon="material-symbols:info-outline" class="me-1" />
                   {{ pStore.CurrentModel ? "No taxonomy labels found for the active model schema." : "Select an Annotation Model in the left menu to view its hotkey bindings." }}
                 </div>
-              </div>
-            </div>
+              </BCardBody>
+            </BCard>
           </div>
         </BTab>
 
@@ -611,13 +576,14 @@ onMounted(async () => {
             <div class="d-flex align-items-center gap-2 py-1">
               <Icon icon="fluent:crop-24-regular" class="fs-5 text-primary" />
               <span class="fw-semibold">Reviewed Areas</span>
-              <span
+              <BBadge
                 v-if="pStore.CurrentSurvey"
-                class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
+                variant="secondary"
+                class="bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
                 style="font-size: 0.72rem;"
               >
                 {{ totalCrops }}
-              </span>
+              </BBadge>
             </div>
           </template>
 
@@ -631,12 +597,13 @@ onMounted(async () => {
                   <Icon icon="fluent:crop-24-regular" class="text-primary" />
                   Reviewed Areas
                 </h6>
-                <span
+                <BBadge
                   v-if="pStore.CurrentSurvey"
-                  class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
+                  variant="secondary"
+                  class="bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
                 >
                   {{ totalCrops }} crops
-                </span>
+                </BBadge>
               </div>
 
               <div v-if="pStore.CurrentSurvey" class="d-flex align-items-center gap-2" style="max-width: 300px;">
@@ -689,69 +656,69 @@ onMounted(async () => {
               </div>
 
               <!-- Crops Grid / Table -->
-              <div v-else class="table-responsive h-100">
-                <table class="table table-hover align-middle mb-0">
-                  <thead class="sticky-top">
-                    <tr class="small text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.72rem;">
-                      <th class="bg-body-secondary text-secondary">Crop Name</th>
-                      <th class="bg-body-secondary text-secondary">Dimensions</th>
-                      <th class="bg-body-secondary text-secondary">UUID</th>
-                      <th class="bg-body-secondary text-secondary">Status</th>
-                      <th class="text-end pe-3 bg-body-secondary text-secondary">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="area in reviewedAreas"
-                      :key="area.uuid"
-                      style="cursor: pointer;"
-                      @click="selectCropToReview(area)"
-                    >
-                      <td>
-                        <div class="fw-semibold small d-flex align-items-center gap-2">
-                          <Icon icon="fluent:crop-24-regular" class="text-secondary" />
-                          {{ area.name || 'Reviewed Area' }}
-                        </div>
-                      </td>
-                      <td class="small text-muted">
-                        {{ area.reviewed_area_width_px || 2100 }} × {{ area.reviewed_area_length_px || 2100 }} px
-                      </td>
-                      <td>
-                        <small class="font-monospace text-secondary" style="font-size: 0.72rem;">
-                          {{ area.uuid.slice(0, 8) }}...
-                        </small>
-                      </td>
-                      <td>
-                        <span
-                          v-if="area.reviewed_by_user_id && area.reviewed_by_user_id > 0"
-                          class="badge bg-success-subtle text-success border border-success-subtle small"
-                        >
-                          <Icon icon="material-symbols:check" class="me-1" />
-                          Reviewed
-                        </span>
-                        <span
-                          v-else
-                          class="badge bg-warning-subtle text-warning border border-warning-subtle small"
-                        >
-                          Pending
-                        </span>
-                      </td>
-                      <td class="text-end pe-3">
-                        <BButton
-                          size="sm"
-                          variant="outline-primary"
-                          class="py-0 px-2 small"
-                          @click.stop="selectCropToReview(area)"
-                          title="Open crop directly in Verifier"
-                        >
-                          Verify
-                          <Icon icon="material-symbols:arrow-forward" class="ms-1" width="14" />
-                        </BButton>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <BTableSimple hover responsive class="align-middle mb-0 h-100" v-else>
+                <BThead class="sticky-top">
+                  <BTr class="small text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.72rem;">
+                    <BTh class="bg-body-secondary text-secondary">Crop Name</BTh>
+                    <BTh class="bg-body-secondary text-secondary">Dimensions</BTh>
+                    <BTh class="bg-body-secondary text-secondary">UUID</BTh>
+                    <BTh class="bg-body-secondary text-secondary">Status</BTh>
+                    <BTh class="text-end pe-3 bg-body-secondary text-secondary">Action</BTh>
+                  </BTr>
+                </BThead>
+                <BTbody>
+                  <BTr
+                    v-for="area in reviewedAreas"
+                    :key="area.uuid"
+                    style="cursor: pointer;"
+                    @click="selectCropToReview(area)"
+                  >
+                    <BTd>
+                      <div class="fw-semibold small d-flex align-items-center gap-2">
+                        <Icon icon="fluent:crop-24-regular" class="text-secondary" />
+                        {{ area.name || 'Reviewed Area' }}
+                      </div>
+                    </BTd>
+                    <BTd class="small text-muted">
+                      {{ area.reviewed_area_width_px || 2100 }} × {{ area.reviewed_area_length_px || 2100 }} px
+                    </BTd>
+                    <BTd>
+                      <small class="font-monospace text-secondary" style="font-size: 0.72rem;">
+                        {{ area.uuid.slice(0, 8) }}...
+                      </small>
+                    </BTd>
+                    <BTd>
+                      <BBadge
+                        v-if="area.reviewed_by_user_id && area.reviewed_by_user_id > 0"
+                        variant="success"
+                        class="bg-success-subtle text-success border border-success-subtle small"
+                      >
+                        <Icon icon="material-symbols:check" class="me-1" />
+                        Reviewed
+                      </BBadge>
+                      <BBadge
+                        v-else
+                        variant="warning"
+                        class="bg-warning-subtle text-warning border border-warning-subtle small"
+                      >
+                        Pending
+                      </BBadge>
+                    </BTd>
+                    <BTd class="text-end pe-3">
+                      <BButton
+                        size="sm"
+                        variant="outline-primary"
+                        class="py-0 px-2 small"
+                        @click.stop="selectCropToReview(area)"
+                        title="Open crop directly in Verifier"
+                      >
+                        Verify
+                        <Icon icon="material-symbols:arrow-forward" class="ms-1" width="14" />
+                      </BButton>
+                    </BTd>
+                  </BTr>
+                </BTbody>
+              </BTableSimple>
             </div>
 
             <!-- Pagination Footer -->
