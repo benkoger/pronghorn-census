@@ -36,8 +36,13 @@ const searchQuery = ref("");
 const currentPage = ref(1);
 const perPage = ref(15);
 
-// Active Adapter instance
+// Active Tab & Adapter State
+const activeTab = ref(0);
 const adapter = ref<CropVerifierAdapter | null>(null);
+
+const sortedLabels = computed(() => {
+  return [...pStore.labels].sort((a, b) => a.label - b.label);
+});
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
@@ -411,174 +416,379 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- RIGHT MAIN: Full-Height Paginated List for Reviewed Areas -->
+    <!-- RIGHT MAIN: Tabbed Interface (Default: Guide & Key Legend; Non-Default: Reviewed Areas) -->
     <div
       class="right-content-panel d-flex flex-column overflow-hidden bg-body-tertiary rounded-3 border border-secondary-subtle shadow-sm"
     >
-      <!-- List Header & Search Bar -->
-      <div
-        class="p-3 border-bottom border-secondary-subtle d-flex align-items-center justify-content-between flex-shrink-0 gap-3"
+      <BTabs
+        v-model:index="activeTab"
+        class="h-100 d-flex flex-column overflow-hidden"
+        content-class="flex-grow-1 overflow-hidden d-flex flex-column"
+        nav-class="px-3 pt-2 border-bottom border-secondary-subtle bg-body-secondary"
       >
-        <div class="d-flex align-items-center gap-2">
-          <h5 class="mb-0 fw-bold d-flex align-items-center gap-2">
-            <Icon icon="fluent:crop-24-regular" class="text-primary" />
-            Reviewed Areas
-          </h5>
-          <span
-            v-if="pStore.CurrentSurvey"
-            class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
-          >
-            {{ totalCrops }} crops
-          </span>
-        </div>
+        <!-- Tab 1 (Default): Tool Description & Key Legend -->
+        <BTab active>
+          <template #title>
+            <div class="d-flex align-items-center gap-2 py-1">
+              <Icon icon="material-symbols:info-outline" class="fs-5 text-primary" />
+              <span class="fw-semibold">Guide & Shortcuts</span>
+            </div>
+          </template>
 
-        <div v-if="pStore.CurrentSurvey" class="d-flex align-items-center gap-2" style="max-width: 300px;">
-          <BFormInput
-            size="sm"
-            v-model="searchQuery"
-            placeholder="Search crops by name..."
-            class="form-control-sm"
-          />
-        </div>
-      </div>
-
-      <!-- List Body -->
-      <div class="flex-grow-1 overflow-y-auto p-0 position-relative" style="min-height: 0;">
-        <!-- Loading State -->
-        <div
-          v-if="loadingAreas"
-          class="d-flex flex-column align-items-center justify-content-center h-100 p-4 gap-2 text-secondary"
-        >
-          <Icon icon="line-md:loading-twotone-loop" width="40" height="40" class="text-primary" />
-          <small>Loading reviewed areas for this survey...</small>
-        </div>
-
-        <!-- No Survey Selected State -->
-        <div
-          v-else-if="!pStore.CurrentSurvey"
-          class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-center text-secondary gap-2"
-        >
-          <Icon icon="roentgen:survey-point" width="56" height="56" class="opacity-25" />
-          <h5 class="fw-semibold mb-1">No Survey Selected</h5>
-          <p class="small text-muted mb-0" style="max-width: 360px;">
-            Select a Project, Herd Unit, and Survey from the global header above to browse its detection crops.
-          </p>
-        </div>
-
-        <!-- Empty Crops State -->
-        <div
-          v-else-if="reviewedAreas.length === 0"
-          class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-center text-secondary gap-2"
-        >
-          <Icon icon="fluent:box-20-regular" width="56" height="56" class="opacity-25" />
-          <h5 class="fw-semibold mb-1">No Reviewed Areas Found</h5>
-          <p class="small text-muted mb-0" style="max-width: 360px;">
-            {{
-              searchQuery
-                ? 'No crops match your search query.'
-                : 'There are no crops in this survey. Toggle "Include approved crops" or generate crops using the Auto-Cropper.'
-            }}
-          </p>
-        </div>
-
-        <!-- Crops Grid / Table -->
-        <div v-else class="table-responsive h-100">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="sticky-top">
-              <tr class="small text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.72rem;">
-                <th class="bg-body-secondary text-secondary">Crop Name</th>
-                <th class="bg-body-secondary text-secondary">Dimensions</th>
-                <th class="bg-body-secondary text-secondary">UUID</th>
-                <th class="bg-body-secondary text-secondary">Status</th>
-                <th class="text-end pe-3 bg-body-secondary text-secondary">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="area in reviewedAreas"
-                :key="area.uuid"
-                style="cursor: pointer;"
-                @click="selectCropToReview(area)"
-              >
-                <td>
-                  <div class="fw-semibold small d-flex align-items-center gap-2">
-                    <Icon icon="fluent:crop-24-regular" class="text-secondary" />
-                    {{ area.name || 'Reviewed Area' }}
+          <div class="flex-grow-1 overflow-y-auto p-4 pb-5 d-flex flex-column gap-4" style="min-height: 0;">
+            <!-- Tool Overview Card -->
+            <div class="card border-secondary-subtle shadow-sm bg-body">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <Icon icon="mynaui:bounding-box-solid" class="text-primary fs-3" />
+                  <h5 class="card-title mb-0 fw-bold">About Crop Verifier</h5>
+                </div>
+                <p class="card-text text-secondary mb-3">
+                  The <strong>Crop Verifier</strong> is the rapid human-in-the-loop review tool in the AIrial census pipeline.
+                  High-resolution aerial survey frames contain clustered machine-learning predictions. The Crop Verifier loads these
+                  clustered subcrops (typically 2100×2100 px) for rapid verification: confirm detections, adjust bounding box
+                  coordinates, correct misclassified species, remove false positives, and draw new boxes for missed wildlife.
+                </p>
+                <div class="row g-3 mt-1">
+                  <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
+                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
+                        <span class="badge bg-primary text-white rounded-circle me-1">1</span> Context Setup
+                      </div>
+                      <small class="text-muted">Choose your Project, Herd Unit, Survey, and Model in the sidebar.</small>
+                    </div>
                   </div>
-                </td>
-                <td class="small text-muted">
-                  {{ area.reviewed_area_width_px || 2100 }} × {{ area.reviewed_area_length_px || 2100 }} px
-                </td>
-                <td>
-                  <small class="font-monospace text-secondary" style="font-size: 0.72rem;">
-                    {{ area.uuid.slice(0, 8) }}...
-                  </small>
-                </td>
-                <td>
-                  <span
-                    v-if="area.reviewed_by_user_id && area.reviewed_by_user_id > 0"
-                    class="badge bg-success-subtle text-success border border-success-subtle small"
-                  >
-                    <Icon icon="material-symbols:check" class="me-1" />
-                    Reviewed
-                  </span>
-                  <span
-                    v-else
-                    class="badge bg-warning-subtle text-warning border border-warning-subtle small"
-                  >
-                    Pending
-                  </span>
-                </td>
-                <td class="text-end pe-3">
-                  <BButton
-                    size="sm"
-                    variant="outline-primary"
-                    class="py-0 px-2 small"
-                    @click.stop="selectCropToReview(area)"
-                    title="Open crop directly in Verifier"
-                  >
-                    Verify
-                    <Icon icon="material-symbols:arrow-forward" class="ms-1" width="14" />
-                  </BButton>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
+                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
+                        <span class="badge bg-primary text-white rounded-circle me-1">2</span> Review Mode
+                      </div>
+                      <small class="text-muted">Click <strong>Start Reviewing</strong> to verify pending crops sequentially, or pick individual crops in the <em>Reviewed Areas</em> tab.</small>
+                    </div>
+                  </div>
+                  <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
+                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
+                        <span class="badge bg-primary text-white rounded-circle me-1">3</span> Verify & Label
+                      </div>
+                      <small class="text-muted">Pan, zoom, drag boxes, or press digit keys <kbd class="guide-kbd">0</kbd>–<kbd class="guide-kbd">9</kbd> to assign labels or draw boxes.</small>
+                    </div>
+                  </div>
+                  <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="p-3 rounded-2 bg-body-secondary border border-secondary-subtle h-100">
+                      <div class="fw-bold small text-primary mb-1 d-flex align-items-center gap-1">
+                        <span class="badge bg-primary text-white rounded-circle me-1">4</span> Commit & Advance
+                      </div>
+                      <small class="text-muted">Press <kbd class="guide-kbd">Enter</kbd> to commit verified annotations to the database and automatically advance to the next crop.</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      <!-- Pagination Footer -->
-      <div
-        v-if="pStore.CurrentSurvey && totalPages > 1"
-        class="p-2 px-3 border-top border-secondary-subtle d-flex align-items-center justify-content-between flex-shrink-0 bg-body-secondary small mt-auto"
-      >
-        <span class="text-muted">
-          Showing {{ totalCrops === 0 ? 0 : (currentPage - 1) * perPage + 1 }} -
-          {{ Math.min(currentPage * perPage, totalCrops) }} of
-          {{ totalCrops }} crops
-        </span>
-        <div class="d-flex align-items-center gap-1">
-          <BButton
-            size="sm"
-            variant="outline-secondary"
-            class="py-0 px-2"
-            :disabled="currentPage <= 1"
-            @click="currentPage--"
-          >
-            Previous
-          </BButton>
-          <span class="px-2 font-monospace">{{ currentPage }} / {{ totalPages }}</span>
-          <BButton
-            size="sm"
-            variant="outline-secondary"
-            class="py-0 px-2"
-            :disabled="currentPage >= totalPages"
-            @click="currentPage++"
-          >
-            Next
-          </BButton>
-        </div>
-      </div>
+            <!-- Key Legend & Shortcuts Card -->
+            <div class="card border-secondary-subtle shadow-sm bg-body">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <Icon icon="fluent:keyboard-layout-float-24-regular" class="text-primary fs-3" />
+                  <h5 class="card-title mb-0 fw-bold">Keyboard & Controls Legend</h5>
+                </div>
+                <div class="row g-4">
+                  <!-- Navigation & Submit -->
+                  <div class="col-12 col-lg-6 col-xl-4">
+                    <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Navigation & Submit</h6>
+                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Submit & Next Crop</span>
+                        <kbd class="guide-kbd">Enter</kbd>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Next Crop</span>
+                        <kbd class="guide-kbd">→</kbd>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Previous Crop</span>
+                        <kbd class="guide-kbd">←</kbd>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Cancel / Deselect</span>
+                        <kbd class="guide-kbd">Esc</kbd>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Annotation & Editing -->
+                  <div class="col-12 col-lg-6 col-xl-4">
+                    <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Annotation & Editing</h6>
+                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Assign Label / Draw</span>
+                        <div class="d-flex gap-1">
+                          <kbd class="guide-kbd">0</kbd>–<kbd class="guide-kbd">9</kbd>
+                        </div>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Delete Selected Box</span>
+                        <kbd class="guide-kbd">Delete</kbd>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Undo Action</span>
+                        <kbd class="guide-kbd">Ctrl+Z</kbd>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Redo Action</span>
+                        <kbd class="guide-kbd">Ctrl+Y</kbd>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Mouse & Canvas -->
+                  <div class="col-12 col-lg-6 col-xl-4">
+                    <h6 class="fw-semibold text-secondary mb-2 small text-uppercase" style="letter-spacing: 0.5px;">Mouse & Canvas</h6>
+                    <div class="list-group list-group-flush border border-secondary-subtle rounded-2 overflow-hidden">
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Zoom In / Out</span>
+                        <span class="small text-muted font-monospace">Mouse Wheel</span>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Pan Image</span>
+                        <span class="small text-muted font-monospace">Click & Drag</span>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Select Box</span>
+                        <span class="small text-muted font-monospace">Left Click</span>
+                      </div>
+                      <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 bg-body-tertiary">
+                        <span class="small fw-semibold">Move / Resize</span>
+                        <span class="small text-muted font-monospace">Drag Box / Handles</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Model Taxonomy Card -->
+            <div class="card border-secondary-subtle shadow-sm bg-body">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <Icon icon="octicon:tag-16" class="text-primary fs-3" />
+                    <h5 class="card-title mb-0 fw-bold">Active Species Taxonomy & Hotkeys</h5>
+                  </div>
+                  <span v-if="pStore.CurrentModel" class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                    Model: {{ pStore.CurrentModel.name }}
+                  </span>
+                </div>
+
+                <div v-if="sortedLabels.length > 0" class="d-flex flex-wrap gap-2">
+                  <div
+                    v-for="l in sortedLabels"
+                    :key="l.uuid"
+                    class="p-2 px-3 rounded-2 border border-secondary-subtle bg-body-tertiary d-flex align-items-center gap-2"
+                  >
+                    <kbd class="guide-kbd font-monospace">{{ l.label }}</kbd>
+                    <span
+                      class="rounded-circle d-inline-block"
+                      :style="{ backgroundColor: l.color || '#3b82f6', width: '12px', height: '12px' }"
+                    />
+                    <span class="fw-semibold small">{{ l.name }}</span>
+                  </div>
+                </div>
+
+                <div v-else class="text-secondary small fst-italic p-3 bg-body-tertiary rounded-2 border border-secondary-subtle text-center">
+                  <Icon icon="material-symbols:info-outline" class="me-1" />
+                  {{ pStore.CurrentModel ? "No taxonomy labels found for the active model schema." : "Select an Annotation Model in the left menu to view its hotkey bindings." }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </BTab>
+
+        <!-- Tab 2 (Non-Default): Reviewed Areas Paginated List -->
+        <BTab>
+          <template #title>
+            <div class="d-flex align-items-center gap-2 py-1">
+              <Icon icon="fluent:crop-24-regular" class="fs-5 text-primary" />
+              <span class="fw-semibold">Reviewed Areas</span>
+              <span
+                v-if="pStore.CurrentSurvey"
+                class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
+                style="font-size: 0.72rem;"
+              >
+                {{ totalCrops }}
+              </span>
+            </div>
+          </template>
+
+          <div class="h-100 d-flex flex-column overflow-hidden">
+            <!-- List Header & Search Bar -->
+            <div
+              class="p-3 border-bottom border-secondary-subtle d-flex align-items-center justify-content-between flex-shrink-0 gap-3 bg-body-tertiary"
+            >
+              <div class="d-flex align-items-center gap-2">
+                <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                  <Icon icon="fluent:crop-24-regular" class="text-primary" />
+                  Reviewed Areas
+                </h6>
+                <span
+                  v-if="pStore.CurrentSurvey"
+                  class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
+                >
+                  {{ totalCrops }} crops
+                </span>
+              </div>
+
+              <div v-if="pStore.CurrentSurvey" class="d-flex align-items-center gap-2" style="max-width: 300px;">
+                <BFormInput
+                  size="sm"
+                  v-model="searchQuery"
+                  placeholder="Search crops by name..."
+                  class="form-control-sm"
+                />
+              </div>
+            </div>
+
+            <!-- List Body -->
+            <div class="flex-grow-1 overflow-y-auto p-0 position-relative" style="min-height: 0;">
+              <!-- Loading State -->
+              <div
+                v-if="loadingAreas"
+                class="d-flex flex-column align-items-center justify-content-center h-100 p-4 gap-2 text-secondary"
+              >
+                <Icon icon="line-md:loading-twotone-loop" width="40" height="40" class="text-primary" />
+                <small>Loading reviewed areas for this survey...</small>
+              </div>
+
+              <!-- No Survey Selected State -->
+              <div
+                v-else-if="!pStore.CurrentSurvey"
+                class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-center text-secondary gap-2"
+              >
+                <Icon icon="roentgen:survey-point" width="56" height="56" class="opacity-25" />
+                <h5 class="fw-semibold mb-1">No Survey Selected</h5>
+                <p class="small text-muted mb-0" style="max-width: 360px;">
+                  Select a Project, Herd Unit, and Survey from the global header above to browse its detection crops.
+                </p>
+              </div>
+
+              <!-- Empty Crops State -->
+              <div
+                v-else-if="reviewedAreas.length === 0"
+                class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-center text-secondary gap-2"
+              >
+                <Icon icon="fluent:box-20-regular" width="56" height="56" class="opacity-25" />
+                <h5 class="fw-semibold mb-1">No Reviewed Areas Found</h5>
+                <p class="small text-muted mb-0" style="max-width: 360px;">
+                  {{
+                    searchQuery
+                      ? 'No crops match your search query.'
+                      : 'There are no crops in this survey. Toggle "Include approved crops" or generate crops using the Auto-Cropper.'
+                  }}
+                </p>
+              </div>
+
+              <!-- Crops Grid / Table -->
+              <div v-else class="table-responsive h-100">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="sticky-top">
+                    <tr class="small text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.72rem;">
+                      <th class="bg-body-secondary text-secondary">Crop Name</th>
+                      <th class="bg-body-secondary text-secondary">Dimensions</th>
+                      <th class="bg-body-secondary text-secondary">UUID</th>
+                      <th class="bg-body-secondary text-secondary">Status</th>
+                      <th class="text-end pe-3 bg-body-secondary text-secondary">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="area in reviewedAreas"
+                      :key="area.uuid"
+                      style="cursor: pointer;"
+                      @click="selectCropToReview(area)"
+                    >
+                      <td>
+                        <div class="fw-semibold small d-flex align-items-center gap-2">
+                          <Icon icon="fluent:crop-24-regular" class="text-secondary" />
+                          {{ area.name || 'Reviewed Area' }}
+                        </div>
+                      </td>
+                      <td class="small text-muted">
+                        {{ area.reviewed_area_width_px || 2100 }} × {{ area.reviewed_area_length_px || 2100 }} px
+                      </td>
+                      <td>
+                        <small class="font-monospace text-secondary" style="font-size: 0.72rem;">
+                          {{ area.uuid.slice(0, 8) }}...
+                        </small>
+                      </td>
+                      <td>
+                        <span
+                          v-if="area.reviewed_by_user_id && area.reviewed_by_user_id > 0"
+                          class="badge bg-success-subtle text-success border border-success-subtle small"
+                        >
+                          <Icon icon="material-symbols:check" class="me-1" />
+                          Reviewed
+                        </span>
+                        <span
+                          v-else
+                          class="badge bg-warning-subtle text-warning border border-warning-subtle small"
+                        >
+                          Pending
+                        </span>
+                      </td>
+                      <td class="text-end pe-3">
+                        <BButton
+                          size="sm"
+                          variant="outline-primary"
+                          class="py-0 px-2 small"
+                          @click.stop="selectCropToReview(area)"
+                          title="Open crop directly in Verifier"
+                        >
+                          Verify
+                          <Icon icon="material-symbols:arrow-forward" class="ms-1" width="14" />
+                        </BButton>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pagination Footer -->
+            <div
+              v-if="pStore.CurrentSurvey && totalPages > 1"
+              class="p-2 px-3 border-top border-secondary-subtle d-flex align-items-center justify-content-between flex-shrink-0 bg-body-secondary small mt-auto"
+            >
+              <span class="text-muted">
+                Showing {{ totalCrops === 0 ? 0 : (currentPage - 1) * perPage + 1 }} -
+                {{ Math.min(currentPage * perPage, totalCrops) }} of
+                {{ totalCrops }} crops
+              </span>
+              <div class="d-flex align-items-center gap-1">
+                <BButton
+                  size="sm"
+                  variant="outline-secondary"
+                  class="py-0 px-2"
+                  :disabled="currentPage <= 1"
+                  @click="currentPage--"
+                >
+                  Previous
+                </BButton>
+                <span class="px-2 font-monospace">{{ currentPage }} / {{ totalPages }}</span>
+                <BButton
+                  size="sm"
+                  variant="outline-secondary"
+                  class="py-0 px-2"
+                  :disabled="currentPage >= totalPages"
+                  @click="currentPage++"
+                >
+                  Next
+                </BButton>
+              </div>
+            </div>
+          </div>
+        </BTab>
+      </BTabs>
     </div>
   </div>
 </template>
@@ -605,5 +815,36 @@ onMounted(async () => {
   min-width: 0;
   height: 100%;
   min-height: 0;
+}
+
+.right-content-panel :deep(.tab-content) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-content-panel :deep(.tab-pane) {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.right-content-panel :deep(.tab-pane.active) {
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-kbd {
+  background-color: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 </style>
