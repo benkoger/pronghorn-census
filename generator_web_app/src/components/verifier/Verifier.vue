@@ -1050,8 +1050,8 @@ onBeforeUnmount(async () => {
   resizeObserver?.disconnect();
   document.removeEventListener("keydown", handleKeyPress);
   cancelDraw();
-  if (props.adapter.closeSession) {
-    await props.adapter.closeSession();
+  if (sStore.logged_in && props.adapter.closeSession) {
+    await props.adapter.closeSession().catch(() => {});
   }
 });
 </script>

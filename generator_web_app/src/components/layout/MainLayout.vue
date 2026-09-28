@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onErrorCaptured, computed, ref, onMounted } from "vue";
+import { onErrorCaptured, computed, ref, onMounted, watch } from "vue";
 import Header from "./AppHeader.vue";
 import Nav from "./PrimaryNav.vue";
 import { RouterView, useRoute } from "vue-router";
+import { api } from "@/api";
 import { useSystemStore } from "@/stores/systemStore";
 import { useToast } from "bootstrap-vue-next";
 import type { Project, HerdUnit, Survey, User, Organization } from "@/models";
@@ -39,7 +40,7 @@ async function onSelectProject(project: Project) {
   try {
     sStore.clear_project_children();
     sStore.set_current_project(project);
-    await Promise.allSettled([
+    await api.allSettled([
       sStore.get_project_herd_units(),
       sStore.get_project_models(),
       sStore.get_project_schemas(),
@@ -102,7 +103,7 @@ async function refreshContext() {
   try {
     await sStore.get_projects();
     if (sStore.CurrentProject) {
-      await Promise.allSettled([
+      await api.allSettled([
         sStore.get_project_herd_units(),
         sStore.get_project_models(),
         sStore.get_project_schemas(),
@@ -118,32 +119,18 @@ async function refreshContext() {
 
 onMounted(async () => {
   if (sStore.logged_in) {
-    if (sStore.projects.length === 0) {
-      await sStore.get_projects();
-    }
-    if (sStore.projects.length > 0 && !sStore.CurrentProject) {
-      sStore.set_current_project(sStore.projects[0]);
-    }
-    if (sStore.CurrentProject) {
-      if (sStore.herd_units.length === 0) {
-        await Promise.allSettled([
-          sStore.get_project_herd_units(),
-          sStore.get_project_models(),
-          sStore.get_project_schemas(),
-        ]);
-      }
-      if (sStore.herd_units.length > 0 && !sStore.CurrentHerdUnit) {
-        sStore.set_current_herd_unit(sStore.herd_units[0]);
-      }
-      if (sStore.CurrentHerdUnit && sStore.surveys.length === 0) {
-        await sStore.get_herd_unit_surveys();
-      }
-      if (sStore.surveys.length > 0 && !sStore.CurrentSurvey) {
-        sStore.set_current_survey(sStore.surveys[0]);
-      }
-    }
+    await sStore.initialize_context();
   }
 });
+
+watch(
+  () => sStore.logged_in,
+  async (isLoggedIn) => {
+    if (isLoggedIn) {
+      await sStore.initialize_context();
+    }
+  },
+);
 
 onErrorCaptured((err) => {
   create?.({

@@ -262,7 +262,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
     async endSession() {
       this.$reset();
       this.bootStrapped = false;
-      await api.patch("images/close-user-images");
+      await api.patch("images/close-user-images").catch(() => {});
     },
   },
 });

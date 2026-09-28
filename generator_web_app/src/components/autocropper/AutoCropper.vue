@@ -224,7 +224,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(async () => {
-  await cStore.endSession();
+  if (sStore.logged_in) {
+    await cStore.endSession().catch(() => {});
+  }
   document.removeEventListener("keydown", handleKeyPress);
 });
 </script>

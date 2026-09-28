@@ -238,7 +238,7 @@ export const useSystemStore = defineStore("systemStore", {
         }
         const idx = this.projects.findIndex((p) => p.uuid === q.project);
         this.project_idx = idx !== -1 ? idx : undefined;
-        await Promise.all([
+        await api.all([
           this.get_project_herd_units(),
           this.get_project_schemas(),
           this.get_project_models(),
@@ -326,7 +326,7 @@ export const useSystemStore = defineStore("systemStore", {
         if (this.organization_idx === undefined && Object.keys(this.organizations).length > 0) {
           this.organization_idx = +Object.keys(this.organizations)[0];
         }
-        await this.get_projects();
+        await this.initialize_context();
       }
     },
 
@@ -360,6 +360,7 @@ export const useSystemStore = defineStore("systemStore", {
     },
 
     async deauthenticate() {
+      await this.close_user_images().catch(() => {});
       await api.post("deauthenticate").catch(() => {});
       this.organizations = {};
       this.clear_state();
@@ -421,8 +422,7 @@ export const useSystemStore = defineStore("systemStore", {
           this.clear_project_children();
           this.projects = [];
           this.project_idx = undefined;
-          await this.get_projects();
-          this.syncToRoute();
+          await this.initialize_context();
         }
       }
     },
@@ -476,6 +476,45 @@ export const useSystemStore = defineStore("systemStore", {
 
     // -------------------------------------------------------------------------------------------------------------------------
     // Project Hierarchy Actions
+
+    async initialize_context() {
+      if (!this.logged_in) return;
+      if (this.projects.length === 0) {
+        await this.get_projects();
+      }
+      if (this.projects.length > 0) {
+        if (this.project_idx === undefined || !this.projects[this.project_idx]) {
+          this.project_idx = 0;
+        }
+
+        await api.allSettled([
+          this.get_project_herd_units(),
+          this.get_project_models(),
+          this.get_project_schemas(),
+        ]);
+
+        if (this.herd_units.length > 0) {
+          if (this.herd_unit_idx === undefined || !this.herd_units[this.herd_unit_idx]) {
+            this.herd_unit_idx = 0;
+          }
+          await this.get_herd_unit_surveys();
+          if (this.surveys.length > 0) {
+            if (this.survey_idx === undefined || !this.surveys[this.survey_idx]) {
+              this.survey_idx = 0;
+            }
+          }
+        }
+
+        if (this.models.length > 0) {
+          if (this.model_idx === undefined || !this.models[this.model_idx]) {
+            this.model_idx = 0;
+          }
+          await this.get_model_schema();
+        }
+
+        this.syncToRoute();
+      }
+    },
 
     async bootstrap() {
       await this.get_projects();

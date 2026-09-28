@@ -98,6 +98,15 @@ export const api = {
     });
     return true;
   },
+
+  all: Promise.all.bind(Promise),
+  allSettled: Promise.allSettled.bind(Promise),
 };
+
+// Ergonomic helper: enable fetch.all() globally
+if (typeof window !== "undefined" && window.fetch) {
+  (window.fetch as any).all = Promise.all.bind(Promise);
+  (window.fetch as any).allSettled = Promise.allSettled.bind(Promise);
+}
 
 export default api;

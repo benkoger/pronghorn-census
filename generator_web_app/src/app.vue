@@ -22,6 +22,7 @@ async function verifyAndLoad() {
     if (sStore.logged_in) {
       await sStore.get_current_user();
       await sStore.get_organizations();
+      await sStore.initialize_context();
     }
   }
   isChecking.value = false;
