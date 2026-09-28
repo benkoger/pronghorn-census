@@ -9,6 +9,7 @@ from flask import Blueprint, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 
+import psycopg.sql as sql
 from app.decorators import permission_required
 from app.extensions import base, s3
 from database.object_models.base import PrimaryKey
@@ -20,6 +21,8 @@ from database.object_models.core.images import (
     RAQuery,
     ReviewedArea,
 )
+from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.surveys import Survey
 
 raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 
@@ -27,34 +30,49 @@ raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 # GET
 
 
-# TODO: Replace with composable generics
 @raBp.get("")
 @login_required
 @permission_required("access")
 @validate()
 def get(query: RAQuery):
     """
-    Retrieve all reviewed areas filtered by query criteria.
+    Retrieve reviewed areas filtered by query criteria with optional pagination.
     ---
     parameters:
       - name: herd_unit_id
         in: query
         required: false
-        type: integer
+        type: array
+        items:
+          type: string
+          format: uuid
         description: Herd unit ID filter.
       - name: survey_id
         in: query
         required: false
-        type: integer
+        type: array
+        items:
+          type: string
+          format: uuid
         description: Survey ID filter.
-      - name: image_id
+      - name: page
         in: query
         required: false
         type: integer
-        description: Image ID filter.
+        description: Page number for pagination.
+      - name: per_page
+        in: query
+        required: false
+        type: integer
+        description: Number of items per page.
+      - name: search
+        in: query
+        required: false
+        type: string
+        description: Search term for reviewed area name.
     responses:
       200:
-        description: List of reviewed areas.
+        description: List of reviewed areas or paginated reviewed areas object.
       400:
         description: Invalid query parameters.
       401:
@@ -62,10 +80,51 @@ def get(query: RAQuery):
       500:
         description: Database error.
     """
+    parent_cls = None
+    parent_pk = None
+    if query.survey_id:
+        parent_cls = Survey
+        parent_pk = query.survey_id[0]
+    elif query.herd_unit_id:
+        parent_cls = HerdUnit
+        parent_pk = query.herd_unit_id[0]
 
-    reviewed_areas = base.get_reviewed_areas(query)
+    scope = None if query.include_reviewed else {"reviewed_by_user_id": 0}
 
-    return [ra.serialize() for ra in reviewed_areas]
+    where_clauses = []
+    placeholders = {}
+    if query.search:
+        where_clauses.append(
+            sql.SQL("{table}.name ILIKE {ph}").format(
+                table=ReviewedArea.__table__,
+                ph=sql.Placeholder("search_term"),
+            )
+        )
+        placeholders["search_term"] = f"%{query.search}%"
+
+    crops, total = base.get_paginated(
+        ReviewedArea,
+        page=query.page,
+        per_page=query.per_page or 20,
+        limit=query.num,
+        parent_cls=parent_cls,
+        parent_pk=parent_pk,
+        scope=scope,
+        where_clauses=where_clauses if where_clauses else None,
+        placeholders=placeholders if placeholders else None,
+    )
+
+    if query.page is not None:
+        page = max(1, query.page)
+        per_page = max(1, query.per_page or 20)
+        return {
+            "crops": [c.serialize() for c in crops],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }, 200
+
+    return [c.serialize() for c in crops], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

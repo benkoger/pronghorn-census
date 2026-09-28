@@ -4,8 +4,10 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import ClassVar, List, Optional, Union
 from uuid import UUID
+
+import psycopg.sql as sql
 
 from enum import StrEnum
 from flask_login import UserMixin
@@ -44,9 +46,8 @@ class User(UserMixin, DBbase):
     locale: Optional[str] = None
     id: str = field(init=False)
 
-    __tablename__: str = "users"
-    __schema__: str = "usermanagement"
-    __pk_name__: str = "user_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("usermanagement", "users")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("user_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

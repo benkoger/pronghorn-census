@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -53,8 +53,8 @@ class UpdateSurveyReq(BaseModel):
 
 
 class SurveyImageQuery(BaseModel):
-    page: int = 1
-    per_page: int = 50
+    page: Optional[int] = None
+    per_page: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -74,9 +74,8 @@ class Survey(DBbase):
     status: Optional[SurveyStatus] = None
     survey_area: Optional[float] = None
 
-    __tablename__: str = "surveys"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "survey_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "surveys")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("survey_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

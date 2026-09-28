@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Self
+from typing import Any, ClassVar, List, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -112,9 +112,10 @@ class Annotation(DBbase):
     uuid: UUID
     dimensions: "Box" = field(init=False)
 
-    __schema__: str = "core"
-    __tablename__: str = "annotations"
-    __pk_name__: str = "annotation_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "annotations")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("annotation_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

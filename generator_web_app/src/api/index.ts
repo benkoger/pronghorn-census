@@ -8,12 +8,31 @@ export const API_BASE: string =
 // ---------------------------------------------------------------------------------------------------------------------------
 // Core Request Dispatcher
 
+function buildQueryString(params?: Record<string, any>): string {
+  if (!params) return "";
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== "") {
+          sp.append(key, String(item));
+        }
+      }
+    } else {
+      sp.append(key, String(value));
+    }
+  }
+  const str = sp.toString();
+  return str ? `?${str}` : "";
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
   params?: Record<string, any>,
 ): Promise<T> {
-  const query = params ? `?${new URLSearchParams(params)}` : "";
+  const query = buildQueryString(params);
   const res = await fetch(`${API_BASE}/${path}${query}`, {
     credentials: "include",
     headers: {

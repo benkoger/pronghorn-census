@@ -3,6 +3,10 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
+from typing import ClassVar
+
+import psycopg.sql as sql
+
 from ..base import Relationbase
 
 
@@ -15,8 +19,7 @@ class OrganizationUser(Relationbase):
     organization_id: int
     role_id: int
 
-    __tablename__ = "organizations_users"
-    __schema__ = "usermanagement"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("usermanagement", "organizations_users")
     __key__ = ("user_id", "organization_id", "role_id")
 
 
@@ -28,6 +31,5 @@ class OrganizationProject(Relationbase):
     project_id: int
     organization_id: int
 
-    __tablename__ = "organizations_projects"
-    __schema__ = "usermanagement"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("usermanagement", "organizations_projects")
     __key__ = ("project_id", "organization_id")

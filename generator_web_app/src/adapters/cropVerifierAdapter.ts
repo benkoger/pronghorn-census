@@ -28,7 +28,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
   private surveyUuid?: string;
   private alreadyReviewed: boolean;
 
-  // Ordered collection of reviewed area UUIDs visited in this session
+  // Ordered collection of reviewed area UUIDs visited or queued in this session
   private historyUuids: string[] = [];
   private currentIndex: number = -1;
   private isDone: boolean = false;
@@ -48,7 +48,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
     }
   }
 
-  public setContext(options: { herdUnitUuid: string; herdUnitId: number; surveyUuid: string }) {
+  public setContext(options: { herdUnitUuid?: string; herdUnitId?: number; surveyUuid: string }) {
     this.herdUnitUuid = options.herdUnitUuid;
     this.herdUnitId = options.herdUnitId;
     this.surveyUuid = options.surveyUuid;
@@ -60,6 +60,10 @@ export class CropVerifierAdapter implements VerifierAdapter {
 
   public get activeIndex(): number {
     return this.currentIndex;
+  }
+
+  public get queueLength(): number {
+    return this.historyUuids.length;
   }
 
   public get hasNext(): boolean {
@@ -111,20 +115,18 @@ export class CropVerifierAdapter implements VerifierAdapter {
 
   /**
    * Fetches the next crop in the session.
+   * If there are crops ahead in historyUuids, advances to the next one.
+   * If at the end of the queue, queries the backend for the next image's crops.
    */
   async fetchNext(increment: boolean = true): Promise<VerifierItem | null> {
-    // If we already have the next item in our history queue, move forward and refetch annotations
+    // 1. Advance within already buffered history
     if (this.currentIndex + 1 < this.historyUuids.length) {
       if (increment) this.currentIndex++;
       const uuid = this.historyUuids[this.currentIndex];
       return this.loadArea(uuid);
     }
 
-    if (this.isDone) {
-      return null;
-    }
-
-    if (!this.surveyUuid || !this.herdUnitUuid) {
+    if (this.isDone || !this.surveyUuid) {
       this.isDone = true;
       return null;
     }
@@ -133,24 +135,41 @@ export class CropVerifierAdapter implements VerifierAdapter {
       await api.patch("images/close-user-images").catch(() => {});
     }
 
-    // Query backend for next crop needing review
-    const resp = await api.get<ReviewedArea | undefined>("verifier/area-needing-reviewed", {
-      herd_unit_id: [this.herdUnitUuid],
+    // 2. Fetch next batch from server (crops for an available locked image)
+    const resp = await api.get<ReviewedArea[] | undefined>("verifier/area-needing-reviewed", {
       survey_id: [this.surveyUuid],
       include_reviewed: this.alreadyReviewed,
     });
 
-    if (!resp) {
+    if (!resp || !Array.isArray(resp) || resp.length === 0) {
       this.isDone = true;
       return null;
     }
 
-    this.historyUuids.push(resp.uuid);
+    // Append new crop UUIDs to queue, skipping duplicates
+    let addedCount = 0;
+    for (const crop of resp) {
+      if (!this.historyUuids.includes(crop.uuid)) {
+        this.historyUuids.push(crop.uuid);
+        addedCount++;
+      }
+    }
+
+    if (addedCount === 0) {
+      this.isDone = true;
+      return null;
+    }
+
     if (increment) {
+      this.currentIndex++;
+    }
+
+    if (this.currentIndex >= this.historyUuids.length) {
       this.currentIndex = this.historyUuids.length - 1;
     }
 
-    return this.loadArea(resp.uuid);
+    const nextUuid = this.historyUuids[this.currentIndex];
+    return this.loadArea(nextUuid);
   }
 
   /**
@@ -248,12 +267,11 @@ export class CropVerifierAdapter implements VerifierAdapter {
    * Queries the number of crops in this survey needing review.
    */
   async getRemainingCount(): Promise<number> {
-    if (!this.herdUnitUuid || !this.surveyUuid) return 0;
+    if (!this.surveyUuid) return 0;
     const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
-      herd_unit_id: [this.herdUnitUuid],
       survey_id: [this.surveyUuid],
       include_reviewed: this.alreadyReviewed,
-      include_opened: true,
+      include_opened: false,
     });
     return resp?.count ?? 0;
   }

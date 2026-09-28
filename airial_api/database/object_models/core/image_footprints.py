@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 import json
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -122,9 +122,10 @@ class ImageFootprint(DBbase):
     footprint: Optional[Any] = None
     footprint_metadata: Optional[Any] = None
 
-    __schema__: str = "core"
-    __tablename__: str = "image_footprints"
-    __pk_name__: str = "footprint_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "image_footprints")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("footprint_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 

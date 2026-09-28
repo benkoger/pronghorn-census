@@ -5,7 +5,7 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 import cv2
@@ -156,13 +156,17 @@ class CreatePredictionCropReq(BaseModel):
 
 
 class RAQuery(BaseModel):
-    herd_unit_id: Optional[list[UUID]]
-    survey_id: Optional[list[UUID]]
+    herd_unit_id: Optional[list[UUID]] = None
+    survey_id: Optional[list[UUID]] = None
     include_reviewed: Optional[bool] = False
     include_opened: Optional[bool] = False
     num: Optional[int] = None
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+    search: Optional[str] = None
+    exclude_ids: Optional[list[UUID]] = None
 
-    @field_validator("herd_unit_id", "survey_id", mode="before")
+    @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")
     @classmethod
     def ensure_list(cls, value):
         if isinstance(value, list):
@@ -236,9 +240,8 @@ class Image(DBbase, ImageMixin):
 
     image: Optional[np.ndarray] = field(default=None, init=False)
 
-    __tablename__: str = "images"
-    __schema__: str = "core"
-    __pk_name__: str = "image_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -330,9 +333,10 @@ class ReviewedArea(DBbase, ImageMixin):
     ra_key: Optional[str] = None
     dimensions: "Box" = field(init=False)
 
-    __tablename__: str = "reviewed_area"
-    __schema__: str = "core"
-    __pk_name__: str = "reviewed_area_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "reviewed_area")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("reviewed_area_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

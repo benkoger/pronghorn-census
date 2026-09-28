@@ -893,6 +893,11 @@ export const useSystemStore = defineStore("systemStore", {
       }
     },
 
+    async close_user_images(): Promise<number> {
+      const resp = await api.patch<{ rows_affected: number }>("images/close-user-images");
+      return resp?.rows_affected ?? 0;
+    },
+
     set_current_image(image: Image) {
       if (
         this.imageRecords.images?.[image.uuid] !== undefined &&

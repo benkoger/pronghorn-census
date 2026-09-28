@@ -79,23 +79,12 @@ class BulkRequestModel(BaseModel):
 
 
 class DBbase(ABC):
-    __tablename__: str
-    __schema__: str
-    __pk_name__: str
+    __table__: ClassVar[sql.Identifier]
+    __pk__: ClassVar[sql.Identifier]
+    __parent_table__: ClassVar[Optional[sql.Identifier]] = None
+    __parent_fk__: ClassVar[Optional[sql.Identifier]] = None
 
     Response: ClassVar[Type[BaseModel]]
-
-    @classmethod
-    def get_table_identifier(cls) -> sql.Identifier:
-        """Returns fully qualified schema.tablename SQL identifier."""
-        if cls.__schema__:
-            return sql.Identifier(cls.__schema__, cls.__tablename__)
-        return sql.Identifier(cls.__tablename__)
-
-    @classmethod
-    def get_pk_identifier(cls) -> sql.Identifier:
-        """Returns primary key column SQL identifier."""
-        return sql.Identifier(cls.__pk_name__)
 
     @abstractmethod
     def serialize(self) -> dict: ...
@@ -118,18 +107,9 @@ class DBbase(ABC):
 
 
 class Relationbase(ABC):
-    __tablename__: str
-    __schema__: str
+    __table__: ClassVar[sql.Identifier]
     __key__: tuple[str, ...]
     """Pure interface for junction models"""
-
-    @classmethod
-    @abstractmethod
-    def get_table_identifier(cls) -> sql.Identifier:
-        """Return the qualified table identifier."""
-        if cls.__schema__:
-            return sql.Identifier(cls.__schema__, cls.__tablename__)
-        return sql.Identifier(cls.__tablename__)
 
     def to_lookup_dict(self) -> dict[str, Any]:
         """Convert key attributes into query params for base.where()."""

@@ -959,7 +959,18 @@ async function handleEnter() {
   await nextImage();
 }
 
+const canGoPrevious = computed(() => {
+  if (typeof props.adapter.hasPrevious === "boolean") {
+    return props.adapter.hasPrevious;
+  }
+  if (typeof props.adapter.activeIndex === "number") {
+    return props.adapter.activeIndex > 0;
+  }
+  return false;
+});
+
 async function handleLeftArrow() {
+  if (!canGoPrevious.value) return;
   if (outOfCrops.value) {
     outOfCrops.value = false;
   }
@@ -981,7 +992,6 @@ async function nextImage() {
     const next = await props.adapter.fetchNext();
     if (!next) {
       outOfCrops.value = true;
-      emit("done");
       return;
     }
     setupItem(next);
@@ -1014,7 +1024,6 @@ onMounted(async () => {
       setupItem(initialItem);
     } else {
       outOfCrops.value = true;
-      emit("done");
     }
   } finally {
     loading.value = false;
@@ -1070,6 +1079,13 @@ onBeforeUnmount(async () => {
               <span class="small fw-bold text-uppercase text-secondary" style="font-size: 0.72rem; letter-spacing: 0.5px;">
                 <Icon icon="fluent:crop-24-regular" class="me-1 align-text-bottom" />
                 Reviewed Area
+              </span>
+              <span
+                v-if="props.adapter.activeIndex !== undefined && props.adapter.activeIndex >= 0"
+                class="badge bg-secondary-subtle text-secondary font-monospace ms-1"
+                style="font-size: 0.68rem;"
+              >
+                Crop {{ (props.adapter.activeIndex ?? 0) + 1 }}
               </span>
             </div>
             <!-- Pending Changes Badge -->
@@ -1400,7 +1416,12 @@ onBeforeUnmount(async () => {
     <!-- Bottom Controls Toolbar -->
     <BButtonToolbar justify aria-label="Crop Explorer Controls" class="bg-body-secondary mt-2 flex-shrink-0">
       <BButtonGroup>
-        <BButton class="w-100" @click="handleLeftArrow()" variant="primary">
+        <BButton
+          class="w-100"
+          @click="handleLeftArrow()"
+          variant="primary"
+          :disabled="!canGoPrevious"
+        >
           <Icon icon="ooui:next-rtl" />
           Previous Crop
         </BButton>
@@ -1436,11 +1457,18 @@ onBeforeUnmount(async () => {
     </BButtonToolbar>
 
     <!-- Out of Crops Modal -->
-    <BModal centered no-footer v-model="outOfCrops" title="No more crops to verify" size="md">
+    <BModal centered v-model="outOfCrops" title="No more crops to verify" size="md">
       <BContainer class="d-flex flex-row align-items-center justify-content-center py-2">
         <Icon icon="line-md:confirm-circle-filled" color="green" width="4em" class="m-1" />
-        <h3 class="ms-3 mb-0">All crops have been verified</h3>
+        <div class="ms-3">
+          <h4 class="mb-1">All crops have been verified</h4>
+          <p class="text-secondary small mb-0">No more crops remaining in this queue.</p>
+        </div>
       </BContainer>
+      <template #footer>
+        <BButton variant="secondary" @click="outOfCrops = false">Stay on Current Crop</BButton>
+        <BButton variant="primary" @click="emit('done')">Exit to Menu</BButton>
+      </template>
     </BModal>
 
     <!-- Pending Changes Confirmation Modal -->

@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -73,9 +73,8 @@ class AmUnit(DBbase):
     previous_unit_id: Optional[int] = None
     relative_position: Optional[int] = None
 
-    __schema__: str = "core"
-    __tablename__: str = "am_units"
-    __pk_name__: str = "am_unit_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "am_units")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("am_unit_id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 

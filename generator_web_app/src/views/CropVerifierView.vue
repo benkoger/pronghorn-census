@@ -21,8 +21,16 @@ const alreadyReviewed = ref(false);
 const needingReviewed = ref(0);
 const loadingCount = ref(false);
 
+interface PaginatedReviewedAreas {
+  crops: ReviewedArea[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
 // Reviewed Areas Paginated List State
 const reviewedAreas = ref<ReviewedArea[]>([]);
+const totalCrops = ref(0);
 const loadingAreas = ref(false);
 const searchQuery = ref("");
 const currentPage = ref(1);
@@ -55,14 +63,16 @@ async function refreshReviewCount() {
     needingReviewed.value = 0;
     return;
   }
-  if (!adapter.value) {
-    initAdapter();
-  }
-  if (!adapter.value) return;
 
   loadingCount.value = true;
   try {
-    needingReviewed.value = await adapter.value.getRemainingCount();
+    const resp = await api.get<{ count: number }>("verifier/needing-reviewed", {
+      herd_unit_id: [pStore.CurrentHerdUnit.uuid],
+      survey_id: [pStore.CurrentSurvey.uuid],
+      include_reviewed: alreadyReviewed.value,
+      include_opened: false,
+    });
+    needingReviewed.value = resp?.count ?? 0;
   } finally {
     loadingCount.value = false;
   }
@@ -73,20 +83,36 @@ async function refreshReviewCount() {
 async function fetchReviewedAreas() {
   if (!pStore.CurrentSurvey) {
     reviewedAreas.value = [];
+    totalCrops.value = 0;
     return;
   }
 
   loadingAreas.value = true;
   try {
-    const res = await api.get<ReviewedArea[]>("reviewed-area", {
+    const params: Record<string, any> = {
       survey_id: pStore.CurrentSurvey.uuid,
       include_reviewed: alreadyReviewed.value,
-    });
-    reviewedAreas.value = Array.isArray(res) ? res : [];
-    currentPage.value = 1;
+      page: currentPage.value,
+      per_page: perPage.value,
+    };
+    if (searchQuery.value.trim()) {
+      params.search = searchQuery.value.trim();
+    }
+    const res = await api.get<PaginatedReviewedAreas>("reviewed-area", params);
+    if (res && "crops" in res && Array.isArray(res.crops)) {
+      reviewedAreas.value = res.crops;
+      totalCrops.value = res.total ?? 0;
+    } else if (Array.isArray(res)) {
+      reviewedAreas.value = res;
+      totalCrops.value = (res as ReviewedArea[]).length;
+    } else {
+      reviewedAreas.value = [];
+      totalCrops.value = 0;
+    }
   } catch (err) {
     console.error("Failed to load reviewed areas:", err);
     reviewedAreas.value = [];
+    totalCrops.value = 0;
   } finally {
     loadingAreas.value = false;
   }
@@ -142,27 +168,24 @@ const proceedDisabledReason = computed(() => {
   return "";
 });
 
-// Filtered and paginated reviewed areas for the right-hand panel
-const filteredReviewedAreas = computed(() => {
-  if (!searchQuery.value.trim()) return reviewedAreas.value;
-  const q = searchQuery.value.toLowerCase().trim();
-  return reviewedAreas.value.filter(
-    (a) =>
-      a.name.toLowerCase().includes(q) ||
-      a.uuid.toLowerCase().includes(q),
-  );
-});
-
-const paginatedReviewedAreas = computed(() => {
-  const start = (currentPage.value - 1) * perPage.value;
-  return filteredReviewedAreas.value.slice(start, start + perPage.value);
-});
-
 const totalPages = computed(() => {
-  return Math.ceil(filteredReviewedAreas.value.length / perPage.value) || 1;
+  return Math.ceil(totalCrops.value / perPage.value) || 1;
 });
 
 // Reactivity Watchers
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(searchQuery, () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    fetchReviewedAreas();
+  }, 300);
+});
+
+watch(currentPage, () => {
+  fetchReviewedAreas();
+});
+
 watch(
   () => pStore.CurrentProject,
   async (newProj) => {
@@ -193,17 +216,20 @@ watch(
 watch(
   () => pStore.CurrentSurvey,
   async (newSurvey) => {
+    currentPage.value = 1;
     if (newSurvey) {
       await Promise.all([refreshReviewCount(), fetchReviewedAreas()]);
     } else {
       needingReviewed.value = 0;
       reviewedAreas.value = [];
+      totalCrops.value = 0;
     }
   },
   { immediate: true },
 );
 
 watch(alreadyReviewed, async () => {
+  currentPage.value = 1;
   await Promise.all([refreshReviewCount(), fetchReviewedAreas()]);
 });
 
@@ -228,8 +254,6 @@ onMounted(async () => {
     :labels="pStore.labels"
     @done="onVerifierDone"
   />
-
-  
 
   <div
     v-else
@@ -352,6 +376,19 @@ onMounted(async () => {
         </small>
       </div>
 
+      <!-- Close Open Images -->
+      <div class="flex-shrink-0">
+        <BButton
+          variant="outline-warning"
+          size="sm"
+          class="w-100"
+          @click="pStore.close_user_images().then(() => refreshReviewCount())"
+        >
+          <Icon icon="material-symbols:lock-open-outline" class="me-1" />
+          Close Open Images
+        </BButton>
+      </div>
+
       <!-- Action Button -->
       <div class="mt-auto pt-2 flex-shrink-0">
         <BButton
@@ -391,7 +428,7 @@ onMounted(async () => {
             v-if="pStore.CurrentSurvey"
             class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace ms-1"
           >
-            {{ filteredReviewedAreas.length }} crops
+            {{ totalCrops }} crops
           </span>
         </div>
 
@@ -430,7 +467,7 @@ onMounted(async () => {
 
         <!-- Empty Crops State -->
         <div
-          v-else-if="filteredReviewedAreas.length === 0"
+          v-else-if="reviewedAreas.length === 0"
           class="d-flex flex-column align-items-center justify-content-center h-100 p-5 text-center text-secondary gap-2"
         >
           <Icon icon="fluent:box-20-regular" width="56" height="56" class="opacity-25" />
@@ -447,18 +484,18 @@ onMounted(async () => {
         <!-- Crops Grid / Table -->
         <div v-else class="table-responsive h-100">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light sticky-top">
-              <tr class="small text-uppercase text-secondary" style="font-size: 0.72rem;">
-                <th>Crop Name</th>
-                <th>Dimensions</th>
-                <th>UUID</th>
-                <th>Status</th>
-                <th class="text-end pe-3">Action</th>
+            <thead class="sticky-top">
+              <tr class="small text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.72rem;">
+                <th class="bg-body-secondary text-secondary">Crop Name</th>
+                <th class="bg-body-secondary text-secondary">Dimensions</th>
+                <th class="bg-body-secondary text-secondary">UUID</th>
+                <th class="bg-body-secondary text-secondary">Status</th>
+                <th class="text-end pe-3 bg-body-secondary text-secondary">Action</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="area in paginatedReviewedAreas"
+                v-for="area in reviewedAreas"
                 :key="area.uuid"
                 style="cursor: pointer;"
                 @click="selectCropToReview(area)"
@@ -516,9 +553,9 @@ onMounted(async () => {
         class="p-2 px-3 border-top border-secondary-subtle d-flex align-items-center justify-content-between flex-shrink-0 bg-body-secondary small mt-auto"
       >
         <span class="text-muted">
-          Showing {{ (currentPage - 1) * perPage + 1 }} -
-          {{ Math.min(currentPage * perPage, filteredReviewedAreas.length) }} of
-          {{ filteredReviewedAreas.length }} crops
+          Showing {{ totalCrops === 0 ? 0 : (currentPage - 1) * perPage + 1 }} -
+          {{ Math.min(currentPage * perPage, totalCrops) }} of
+          {{ totalCrops }} crops
         </span>
         <div class="d-flex align-items-center gap-1">
           <BButton

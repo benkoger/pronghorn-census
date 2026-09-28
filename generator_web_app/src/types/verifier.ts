@@ -55,6 +55,12 @@ export interface VerifierAdapter {
    * Optional helper to fetch/load a specific item by its identifier.
    */
   fetchItem?(id: string): Promise<VerifierItem | null>;
+
+  // Navigation tracking getters
+  readonly hasPrevious?: boolean;
+  readonly hasNext?: boolean;
+  readonly activeIndex?: number;
+  readonly queueLength?: number;
 }
 
 export type ActionKind = "create" | "update" | "delete";

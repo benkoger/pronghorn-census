@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -68,9 +68,10 @@ class ImageMetadata(DBbase):
     modified: datetime
     uuid: UUID
 
-    __schema__: str = "core"
-    __tablename__: str = "image_metadata"
-    __pk_name__: str = "metadata_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "image_metadata")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("metadata_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -62,9 +62,8 @@ class ActiveMeasurement(DBbase):
     final_ci_upper: Optional[float] = None
     final_ci_lower: Optional[float] = None
 
-    __schema__: str = "projectmanagement"
-    __tablename__: str = "active_measurements"
-    __pk_name__: str = "active_measurement_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "active_measurements")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("active_measurement_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
