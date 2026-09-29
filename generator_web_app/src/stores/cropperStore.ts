@@ -249,7 +249,7 @@ export const useAutoCropperStore = defineStore("autoCropperStore", {
           this.loading = false;
           throw new Error("HerdUnit, Survey, current image, or labels are undefined!");
         }
-        await api.post("autocropper/autocrop", {
+        await api.post("autocropper", {
           image_id: this.currentImage.uuid,
           predictions: this.approvedPredictions,
           label_ids: sStore.LabelIds,
