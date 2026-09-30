@@ -165,6 +165,7 @@ class RAQuery(BaseModel):
     per_page: Optional[int] = None
     search: Optional[str] = None
     exclude_ids: Optional[list[UUID]] = None
+    type: Optional[ActivityType] = None
 
     @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")
     @classmethod

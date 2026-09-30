@@ -95,13 +95,15 @@ def resolve_parent_filter(
 
     # 2. Condition depends on whether parent_pk is UUID or int
     if isinstance(parent_pk, UUID):
-        joins.append(
-            sql.SQL("JOIN {parent_table} ON {parent_table}.{pk} = {target_table}.{pk}").format(
-                parent_table=parent_cls.__table__,
-                pk=parent_cls.__pk__,
-                target_table=target_table,
+        # The parent is already joined when it is the table the child reaches its parents through
+        if target_table != parent_cls.__table__:
+            joins.append(
+                sql.SQL("JOIN {parent_table} ON {parent_table}.{pk} = {target_table}.{pk}").format(
+                    parent_table=parent_cls.__table__,
+                    pk=parent_cls.__pk__,
+                    target_table=target_table,
+                )
             )
-        )
         condition = sql.SQL("{parent_table}.uuid").format(parent_table=parent_cls.__table__)
     else:
         condition = sql.SQL("{target_table}.{pk}").format(

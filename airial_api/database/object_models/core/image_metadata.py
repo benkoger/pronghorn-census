@@ -17,6 +17,10 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
+NO_TRANSECT = -1  # transect_id of an image that is on no flight line
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
 
 class CreateImageMetadataReq(BaseModel):
     image_ids: Keyring
@@ -29,6 +33,7 @@ class CreateImageMetadataReq(BaseModel):
     fov_deg: float
     terrain_elev_m: float
     agl_m: float
+    transect_id: int = NO_TRANSECT
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -46,6 +51,7 @@ class UpdateImageMetadataReq(BaseModel):
     fov_deg: Optional[float] = None
     terrain_elev_m: Optional[float] = None
     agl_m: Optional[float] = None
+    transect_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -64,6 +70,7 @@ class ImageMetadata(DBbase):
     fov_deg: float
     terrain_elev_m: float
     agl_m: float
+    transect_id: int
     created: datetime
     modified: datetime
     uuid: UUID
@@ -89,6 +96,7 @@ class ImageMetadata(DBbase):
         fov_deg: float
         terrain_elev_m: float
         agl_m: float
+        transect_id: int
         created: datetime
         modified: datetime
         uuid: UUID
@@ -103,11 +111,12 @@ class ImageMetadata(DBbase):
         query = sql.SQL("""
             INSERT INTO core.image_metadata (
                 image_id, captured_at, gps_lon, gps_lat, gps_alt_msl_m,
-                yaw_deg, pitch_deg, fov_deg, terrain_elev_m, agl_m
+                yaw_deg, pitch_deg, fov_deg, terrain_elev_m, agl_m, transect_id
             )
             VALUES (
                 %(image_id)s, %(captured_at)s, %(gps_lon)s, %(gps_lat)s, %(gps_alt_msl_m)s,
-                %(yaw_deg)s, %(pitch_deg)s, %(fov_deg)s, %(terrain_elev_m)s, %(agl_m)s
+                %(yaw_deg)s, %(pitch_deg)s, %(fov_deg)s, %(terrain_elev_m)s, %(agl_m)s,
+                %(transect_id)s
             )
             RETURNING *;
         """)

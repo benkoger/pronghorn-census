@@ -21,6 +21,8 @@ import type { VerifierAdapter, VerifierItem, VerifierAction } from "@/types/veri
 const props = defineProps<{
   adapter: VerifierAdapter;
   labels?: Label[];
+  // How an image is sized when it opens: whole image in view (default) or filling the height
+  fit?: "contain" | "height";
 }>();
 
 const emit = defineEmits<{
@@ -37,6 +39,12 @@ const sortedLabels = computed(() => {
 
 // Template Refs
 const stagewrapper = ref<HTMLDivElement | null>(null);
+const stageArea = ref<HTMLDivElement | null>(null);
+const belowStage = ref<HTMLDivElement | null>(null);
+const toolbar = ref<HTMLDivElement | null>(null);
+const MIN_STAGE_HEIGHT = 320;
+const STAGE_SHARE = 0.5; // of the viewport height, at most
+const STAGE_GAP = 24; // margins between the stage, the note below it and the toolbar
 const stageRef = ref<any>(null);
 const transformerRef = ref<any>(null);
 
@@ -328,6 +336,14 @@ function getClientRect(element: konvaBoxConf) {
 
 function updateSize() {
   if (!stagewrapper.value) return;
+  // The stage takes up to half the viewport, and never more than is left under its top edge,
+  // so that it does not depend on how the browser resolves the height of the columns around it
+  if (stageArea.value) {
+    const top = stageArea.value.getBoundingClientRect().top;
+    const below = (belowStage.value?.offsetHeight ?? 0) + (toolbar.value?.offsetHeight ?? 0) + STAGE_GAP;
+    const room = Math.min(window.innerHeight * STAGE_SHARE, window.innerHeight - top - below);
+    stageArea.value.style.height = `${Math.max(MIN_STAGE_HEIGHT, room)}px`;
+  }
   const h = stagewrapper.value.clientHeight || stagewrapper.value.offsetHeight;
   const w = stagewrapper.value.clientWidth || stagewrapper.value.offsetWidth;
   if (h > 0) sceneHeight.value = h;
@@ -365,8 +381,12 @@ function fitImageToStage() {
 
     if (!imgWidth || !imgHeight) return;
 
-    const scale = Math.min(sWidth / imgWidth, sHeight / imgHeight);
-    const x = (sWidth - imgWidth * scale) / 2;
+    // "height" fills the stage's height; an image wider than the stage then starts at its left edge
+    const scale =
+      props.fit === "height"
+        ? sHeight / imgHeight
+        : Math.min(sWidth / imgWidth, sHeight / imgHeight);
+    const x = Math.max(0, (sWidth - imgWidth * scale) / 2);
     const y = (sHeight - imgHeight * scale) / 2;
 
     stage.scale({ x: scale, y: scale });
@@ -1317,11 +1337,12 @@ onBeforeUnmount(async () => {
 
       <!-- Main Konva Stage -->
       <BCol cols="9" cols-xxl="10" class="h-100 d-flex flex-column overflow-hidden flex-grow-1" style="min-height: 0;">
+        <!-- The stage's height is set in updateSize; the box inside fills it -->
+        <div ref="stageArea" class="position-relative flex-shrink-0" :style="{ minHeight: MIN_STAGE_HEIGHT + 'px' }">
         <div
           id="stagewrapper"
           ref="stagewrapper"
-          class="h-100 w-100 bg-body-tertiary rounded-3 shadow position-relative overflow-hidden flex-grow-1"
-          style="min-height: 0;"
+          class="position-absolute top-0 start-0 w-100 h-100 bg-body-tertiary rounded-3 shadow overflow-hidden"
         >
           <v-stage
             :config="{
@@ -1495,6 +1516,10 @@ onBeforeUnmount(async () => {
             </BButton>
           </div>
         </div>
+        </div>
+
+        <!-- Optional note below the image, supplied by the view -->
+        <div ref="belowStage"><slot name="below-stage" /></div>
       </BCol>
     </BRow>
 
@@ -1504,6 +1529,7 @@ onBeforeUnmount(async () => {
     </BRow>
 
     <!-- Bottom Controls Toolbar -->
+    <div ref="toolbar" class="flex-shrink-0">
     <BButtonToolbar justify aria-label="Crop Explorer Controls" class="bg-body-secondary mt-2 flex-shrink-0">
       <BButtonGroup>
         <BButton
@@ -1544,6 +1570,7 @@ onBeforeUnmount(async () => {
         </BButton>
       </BButtonGroup>
     </BButtonToolbar>
+    </div>
 
     <!-- Out of Crops Modal -->
     <BModal centered v-model="outOfCrops" title="No more crops to verify" size="md">

@@ -70,3 +70,14 @@ class AuthorizationFailure(AirialError):
     def __init__(self, user_id: str, permission: str, object_type: str, object_id: str):
         self.message = f"User: {user_id} does not have permission {permission} for {object_type}: {object_id}"
         super().__init__("Unauthorized", 401, self.message)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class MeasurementBlocked(AirialError):
+    """Raised when an active measurement cannot serve its next unit yet"""
+
+    def __init__(self, reason: str):
+        self.message = reason
+        super().__init__("Conflict", 409, self.message)

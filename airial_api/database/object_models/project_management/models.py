@@ -83,17 +83,25 @@ class Model(DBbase):
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_model AS (
-                INSERT INTO projectmanagement.models (name, model_type)
-                VALUES (%(name)s, %(model_type)s)
+                INSERT INTO projectmanagement.models (name, model_type, schema_id)
+                VALUES (%(name)s, %(model_type)s, %(schema_id)s)
                 RETURNING *
+            ),
+            inserted_link AS (
+                INSERT INTO projectmanagement.projects_models (project_id, model_id)
+                SELECT %(project_id)s, model_id FROM new_model
             )
-            INSERT INTO projectmanagement.projects_models (project_id, model_id)
-            VALUES (%(project_id)s, (SELECT model_id FROM new_model));
-
             SELECT * FROM new_model;
         """)
 
-        cursor.execute(query, {**req.model_dump(), "project_id": req.project_ids.pkey})
+        cursor.execute(
+            query,
+            {
+                **req.model_dump(),
+                "project_id": req.project_ids.pkey,
+                "schema_id": req.schema_ids.pkey,
+            },
+        )
 
         if not (model := cursor.fetchone()):
             return None

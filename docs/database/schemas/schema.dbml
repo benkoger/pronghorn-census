@@ -65,11 +65,13 @@ Table core.image_metadata {
   fov_deg "double precision" [not null]
   terrain_elev_m "double precision" [not null]
   agl_m "double precision" [not null]
+  transect_id integer [not null, default: -1, note: 'flight line within the survey, from 0; -1 for none']
   created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   uuid uuid [not null, unique, default: `gen_random_uuid()`]
   Indexes {
     image_id
+    transect_id
     uuid
   }
 }
@@ -191,8 +193,8 @@ Table core.am_units {
   relative_position integer
   active_measurement_id integer [not null, default: 0]
   reviewed_area_id integer [not null, default: 0]
-  reg_model_id integer [unique, not null, default: 0]
-  dect_model_id integer [unique, not null, default: 0]
+  reg_model_id integer [not null, default: 0]
+  dect_model_id integer [not null, default: 0]
   created_by_user_id integer [not null, default: 0]
   model_count "double precision"
   human_count integer
@@ -536,8 +538,8 @@ Ref: "projectmanagement"."active_measurements"."label_id" > "projectmanagement".
 Ref: "core"."am_units"."active_measurement_id" > "projectmanagement"."active_measurements"."active_measurement_id" [delete: cascade, update: cascade]
 Ref: "core"."am_units"."created_by_user_id" > "usermanagement"."users"."user_id" [delete: set default, update: cascade]
 
-Ref: "core"."am_units"."previous_unit_id" - "core"."am_units"."am_unit_id"
-Ref: "core"."am_units"."next_unit_id" - "core"."am_units"."am_unit_id"
+Ref: "core"."am_units"."previous_unit_id" - "core"."am_units"."am_unit_id" [delete: set null, update: cascade]
+Ref: "core"."am_units"."next_unit_id" - "core"."am_units"."am_unit_id" [delete: set null, update: cascade]
 
 Ref: "core"."am_units"."reviewed_area_id" > "core"."reviewed_area"."reviewed_area_id"
 

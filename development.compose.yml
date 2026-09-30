@@ -69,6 +69,9 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       VALKEY_HOST: ${VALKEY_HOST}
       SESSION_REDIS: ${SESSION_REDIS}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE}
+      SESSION_PERMANENT: ${SESSION_PERMANENT}
       CACHE_REDIS: ${CACHE_REDIS}
       AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
       DB_HOST: ${DB_HOST}
@@ -115,6 +118,8 @@ services:
       dockerfile: development.prongwebapp.containerfile  
     environment:
       VITE_API_URL: ${VITE_API_URL}
+      # file events do not cross the container mount on macOS: set to true there
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-false}
     volumes:
     - ./generator_web_app/src:/app/src:Z
     develop:

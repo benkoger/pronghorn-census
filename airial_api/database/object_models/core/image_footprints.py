@@ -190,15 +190,15 @@ class ImageFootprint(DBbase):
             )
             VALUES (
                 %(image_id)s,
-                CASE WHEN %(footprint_json)s IS NOT NULL THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_json)s), 4326) ELSE NULL END,
+                CASE WHEN %(footprint_json)s::text IS NOT NULL THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_json)s::text), 4326) ELSE NULL END,
                 %(has_detection)s,
-                CASE WHEN %(footprint_metadata_json)s IS NOT NULL THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_metadata_json)s), 4326) ELSE NULL END,
+                CASE WHEN %(footprint_metadata_json)s::text IS NOT NULL THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_metadata_json)s::text), 4326) ELSE NULL END,
                 %(bbox_wsen)s,
                 %(footprint_partial)s, %(area_m2)s, %(area_geodesic_m2)s, %(area_sigma_m2)s,
                 %(area_q05_m2)s, %(area_q95_m2)s, %(dem_name)s, %(georef_status)s, %(n_ties)s,
                 %(tie_residual_before_m)s, %(rmse_h_m)s, %(rmse_p50_m)s, %(rmse_p90_m)s,
                 %(n_checkpoints)s, %(pose_delta)s, %(pose_sigma)s, %(pose_free)s, %(pose_cond)s,
-                %(prior_source)s, %(gcps_json)s, %(overlay_uri)s, %(georef_modified)s
+                %(prior_source)s, %(gcps_json)s::jsonb, %(overlay_uri)s, %(georef_modified)s
             )
             RETURNING *;
         """)

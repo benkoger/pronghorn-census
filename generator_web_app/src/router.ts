@@ -51,14 +51,24 @@ const router = createRouter({
       },
     },
     {
-      path: "/active-measurement/",
-      name: "active-measurement",
-      component: () => import("@/views/ActiveMeasurementView.vue"),
+      path: "/abundance-estimation/",
+      name: "abundance-estimation",
+      component: () => import("@/views/AbundanceEstimationView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
         icon: "gis:measure-area",
       }
+    },
+    {
+      path: "/survey-maps/",
+      name: "survey-maps",
+      component: () => import("@/views/SurveyMapsView.vue"),
+      meta: {
+        requiresAuth: true,
+        requiresNoLayout: false,
+        icon: "material-symbols:map-outline-rounded",
+      },
     },
     {
       path: "/settings",

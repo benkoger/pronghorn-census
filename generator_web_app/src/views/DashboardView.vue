@@ -3,13 +3,14 @@ import { ref, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSystemStore } from "@/stores/systemStore";
 import { api } from "@/api";
-import type { Survey } from "@/models";
+import type { AbundanceEstimate, Survey } from "@/models";
 
 const router = useRouter();
 const sStore = useSystemStore();
 
 const loadingTelemetry = ref(false);
 const pendingReviewsCount = ref(0);
+const abundanceEstimate = ref<AbundanceEstimate | null>(null);
 
 const totalImagesCount = computed(() => {
   return sStore.imageRecords?.total_images ?? 0;
@@ -53,6 +54,24 @@ async function fetchPendingReviewCount() {
   pendingReviewsCount.value = resp?.count ?? 0;
 }
 
+async function fetchAbundanceEstimate() {
+  if (!sStore.CurrentSurvey) {
+    abundanceEstimate.value = null;
+    return;
+  }
+  // A survey that has not been prepared has no estimate; that is not an error here
+  abundanceEstimate.value = await api
+    .get<AbundanceEstimate>("active-measurements/estimate", {
+      survey_id: sStore.CurrentSurvey.uuid,
+    })
+    .catch(() => null);
+}
+
+const abundanceComplete = computed(() => {
+  const status = abundanceEstimate.value?.status;
+  return status === "finished" || status === "target met" || status === "exhausted";
+});
+
 async function updateTelemetry() {
   if (!sStore.CurrentSurvey) return;
   loadingTelemetry.value = true;
@@ -60,6 +79,7 @@ async function updateTelemetry() {
     await Promise.allSettled([
       sStore.get_survey_images(1, 1),
       fetchPendingReviewCount(),
+      fetchAbundanceEstimate(),
     ]);
   } finally {
     loadingTelemetry.value = false;
@@ -88,6 +108,14 @@ function goToVerifier(survey?: Survey) {
   router.push({ name: "crop-verifier" });
 }
 
+function goToAbundanceEstimation() {
+  router.push({ name: "abundance-estimation" });
+}
+
+function goToSurveyMaps() {
+  router.push({ name: "survey-maps" });
+}
+
 function goToAutoCropper() {
   router.push({ name: "auto-cropper" });
 }
@@ -98,14 +126,14 @@ function goToUpload() {
 </script>
 
 <template>
-  <div class="dashboard-viewport h-100 w-100 d-flex flex-column overflow-hidden">
+  <div class="dashboard-viewport h-100 w-100 d-flex flex-column overflow-y-auto">
     <!-- Main Content: Two Balanced Columns Filling Viewport Exactly -->
-    <BRow g="3" class="mx-0 flex-grow-1 overflow-hidden" style="min-height: 0;">
+    <BRow g="3" class="mx-0 flex-grow-1" style="min-height: 0;">
       <!-- Left Column: Primary Workflows -->
-      <BCol cols="12" lg="5" class="d-flex flex-column gap-3 h-100 overflow-hidden" style="min-height: 0;">
+      <BCol cols="12" lg="5" class="d-flex flex-column gap-3" style="min-height: 0;">
         <!-- Verification Card (Primary Focus) -->
         <BCard
-          class="border-0 bg-body-tertiary shadow-none p-3 flex-grow-1 d-flex flex-column justify-content-between overflow-hidden"
+          class="border-0 bg-body-tertiary shadow-none p-3 flex-grow-1 d-flex flex-column justify-content-between"
           style="min-height: 0;"
         >
           <div>
@@ -168,11 +196,122 @@ function goToUpload() {
           </div>
         </BCard>
 
+        <!-- Abundance Estimation Card -->
+        <BCard
+          class="border-0 bg-body-tertiary shadow-none p-3 flex-grow-1 d-flex flex-column justify-content-between"
+          style="min-height: 0;"
+        >
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <Icon icon="gis:measure-area" class="text-primary" width="24" />
+                <h6 class="m-0 fw-semibold text-body">Abundance Estimation</h6>
+              </div>
+              <BBadge
+                v-if="!sStore.CurrentSurvey"
+                variant="secondary"
+                class="fw-normal extra-small"
+              >
+                No Survey Selected
+              </BBadge>
+              <BBadge
+                v-else-if="!abundanceEstimate"
+                variant="secondary"
+                class="fw-normal extra-small"
+              >
+                Not Prepared
+              </BBadge>
+              <BBadge
+                v-else-if="abundanceComplete"
+                variant="success"
+                class="fw-normal extra-small"
+              >
+                Estimate Complete
+              </BBadge>
+              <BBadge v-else variant="warning" class="fw-normal extra-small">
+                {{ abundanceEstimate.n_reviewed.toLocaleString() }} of
+                {{ abundanceEstimate.n_units.toLocaleString() }} tiles reviewed
+              </BBadge>
+            </div>
+
+            <p class="text-secondary small mb-3">
+              Review sampled image tiles to estimate the survey's animal count and density.
+            </p>
+          </div>
+
+          <div class="pt-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-shrink-0">
+            <div class="text-secondary extra-small me-2" style="min-width: 0;">
+              <template v-if="abundanceEstimate && abundanceEstimate.count !== null">
+                <div class="text-truncate">
+                  Count estimate: <strong>{{ Math.round(abundanceEstimate.count).toLocaleString() }}</strong>
+                  ({{ Math.round(abundanceEstimate.ci_lower ?? 0).toLocaleString() }} –
+                  {{ Math.round(abundanceEstimate.ci_upper ?? 0).toLocaleString() }})
+                </div>
+                <div class="text-truncate">
+                  Abundance estimate:
+                  <template v-if="abundanceEstimate.abundance">
+                    <strong>{{ Math.round(abundanceEstimate.abundance.abundance).toLocaleString() }}</strong>
+                    ({{ Math.round(abundanceEstimate.abundance.ci_lower).toLocaleString() }} –
+                    {{ Math.round(abundanceEstimate.abundance.ci_upper).toLocaleString() }})
+                  </template>
+                  <span v-else class="fst-italic">after the first reviewed tile</span>
+                </div>
+              </template>
+              <span v-else-if="sStore.CurrentSurvey">
+                Target: <strong>{{ sStore.CurrentSurvey.name }}</strong>
+              </span>
+              <span v-else class="fst-italic opacity-75">
+                Select a survey to begin
+              </span>
+            </div>
+            <BButton
+              variant="primary"
+              size="sm"
+              class="text-nowrap"
+              @click="goToAbundanceEstimation"
+              :disabled="!sStore.CurrentSurvey"
+            >
+              {{ abundanceEstimate && abundanceEstimate.n_reviewed > 0 ? "Continue Estimation" : "Start Estimation" }}
+              <Icon
+                icon="material-symbols:arrow-forward-rounded"
+                class="ms-1"
+                width="16"
+              />
+            </BButton>
+          </div>
+        </BCard>
+
         <!-- Secondary Pipelines Card -->
         <BCard
           class="border-0 bg-body-tertiary shadow-none p-3 flex-shrink-0"
         >
           <div class="d-flex flex-column gap-2">
+            <!-- Survey Maps Item -->
+            <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-secondary border-opacity-25">
+              <div class="d-flex align-items-center gap-2">
+                <Icon
+                  icon="material-symbols:map-outline-rounded"
+                  class="text-secondary"
+                  width="20"
+                />
+                <div>
+                  <div class="fw-medium text-body small">Survey Maps</div>
+                  <div class="text-secondary extra-small">
+                    See a survey's footprints, detections and imagery on the ground
+                  </div>
+                </div>
+              </div>
+              <BButton
+                variant="outline-secondary"
+                size="sm"
+                class="extra-small-btn py-1"
+                :disabled="!sStore.CurrentSurvey"
+                @click="goToSurveyMaps"
+              >
+                View Map
+              </BButton>
+            </div>
+
             <!-- Auto-Cropper Item -->
             <div class="d-flex align-items-center justify-content-between py-1">
               <div class="d-flex align-items-center gap-2">
@@ -230,9 +369,9 @@ function goToUpload() {
       </BCol>
 
       <!-- Right Column: Herd Unit & Surveys -->
-      <BCol cols="12" lg="7" class="d-flex flex-column h-100 overflow-hidden" style="min-height: 0;">
+      <BCol cols="12" lg="7" class="d-flex flex-column" style="min-height: 0;">
         <BCard
-          class="border-0 bg-body-tertiary shadow-none p-3 h-100 d-flex flex-column overflow-hidden"
+          class="border-0 bg-body-tertiary shadow-none p-3 flex-grow-1 d-flex flex-column"
           style="min-height: 0;"
         >
           <!-- Herd Unit Header -->
@@ -370,6 +509,7 @@ function goToUpload() {
 </template>
 
 <style scoped>
+/* Scrolls as a whole when the window is too short for its cards */
 .dashboard-viewport {
   max-width: 100%;
 }

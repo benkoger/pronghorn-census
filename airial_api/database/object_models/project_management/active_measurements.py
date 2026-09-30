@@ -36,6 +36,49 @@ CreateActiveMeasurment = CreateActiveMeasurement
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+class ActiveMeasurementQuery(BaseModel):
+    survey_id: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateTilesReq(BaseModel):
+    """The survey to cut into tiles, and optionally the images of it to cut (default: all)."""
+
+    survey_id: UUID
+    image_ids: Optional[list[int]] = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateProposalReq(BaseModel):
+    """A proposal generation: unit order, regressor counts, and the vector units are drawn from."""
+
+    reviewed_area_ids: list[int]
+    raw: list[float]
+    proposal: list[float]
+    n_labels: int = 0
+    model_id: Optional[int] = None
+    alpha: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateTermsReq(BaseModel):
+    """What a survey's terms need that is not stored: the habitable area and, from the
+    georeferencing, the standard deviation and draws of the surveyed area."""
+
+    habitable_area_m2: float
+    area_sigma_m2: float = 0.0
+    area_draws: list[float] = []
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateActiveMeasurement(BaseModel):
     retraining_cadence: Optional[int] = None
     target_percentage: Optional[float] = None

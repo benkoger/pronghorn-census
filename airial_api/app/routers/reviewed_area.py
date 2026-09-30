@@ -70,6 +70,11 @@ def get(query: RAQuery):
         required: false
         type: string
         description: Search term for reviewed area name.
+      - name: type
+        in: query
+        required: false
+        type: string
+        description: Activity type filter ('auto cropper' or 'active measurement').
     responses:
       200:
         description: List of reviewed areas or paginated reviewed areas object.
@@ -89,7 +94,10 @@ def get(query: RAQuery):
         parent_cls = HerdUnit
         parent_pk = query.herd_unit_id[0]
 
-    scope = None if query.include_reviewed else {"reviewed_by_user_id": 0}
+    scope = {} if query.include_reviewed else {"reviewed_by_user_id": 0}
+    if query.type is not None:
+        scope["type"] = query.type
+    scope = scope or None
 
     where_clauses = []
     placeholders = {}

@@ -9,6 +9,7 @@ from uuid import UUID
 from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
 from psycopg import Cursor
+from psycopg.rows import class_row
 from pydantic import BaseModel, field_validator, ConfigDict
 
 
@@ -110,6 +111,7 @@ class Prediction(DBbase):
     def _create(
         cls, cursor: Cursor[Self], req: CreatePredictionReq
     ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
         query = sql.SQL("""
 			INSERT INTO core.predictions (
 				image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
