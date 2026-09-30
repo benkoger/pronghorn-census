@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
 
 <template>
   <!-- Reviewing Mode -->
-  <div v-if="isReviewing && adapter" class="abundance-review d-flex flex-column w-100">
+  <div v-if="isReviewing && adapter" class="abundance-review h-100 d-flex flex-column flex-grow-1 overflow-hidden w-100" style="min-height: 0;">
     <!-- Running Estimate Strip -->
     <div
       class="estimate-strip bg-body-secondary border border-secondary-subtle rounded-3 px-3 py-2 mb-2 shadow-sm d-flex align-items-center gap-4 flex-shrink-0"
@@ -626,6 +626,11 @@ onBeforeUnmount(() => {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
+}
+
+.abundance-review {
+  height: 100%;
+  min-height: 0;
 }
 
 .abundance-config {
