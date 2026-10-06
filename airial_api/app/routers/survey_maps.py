@@ -8,7 +8,6 @@ from uuid import UUID
 from flask import Blueprint, Response
 from flask_login import login_required
 from flask_pydantic import validate
-from pydantic import BaseModel
 
 from app import detection_crops, overlays, proposal_store
 from app.decorators import permission_required
@@ -17,25 +16,12 @@ from database.errors import ObjectNotFound
 from database.modules import activemeasurement, surveymap
 from database.object_models.base import Keyring
 from database.object_models.core.images import Image
+from database.object_models.core.survey_maps import DetectionCropReq, OverlayReq, SurveyMapQuery
 from database.object_models.project_management.surveys import Survey
 
 surveyMapBp = Blueprint("survey_maps", __name__, url_prefix="/api/v1/survey-maps")
 
 # ---------------------------------------------------------------------------------------------------------------------------
-
-
-class SurveyMapQuery(BaseModel):
-    survey_id: UUID
-
-
-class OverlayReq(BaseModel):
-    image_id: UUID
-
-
-class DetectionCropReq(BaseModel):
-    image_id: UUID
-    box: list[int]  # tx, ty, bx, by in image pixels
-    kind: str = "estimated"
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -117,11 +103,13 @@ def get_detections(query: SurveyMapQuery):
     if (state := proposal_store.load(measurement)) is None:
         return nothing, 200
 
+    terms = proposal_store.load_terms(measurement)
     estimate = base.execute(
         activemeasurement.live_estimate,
         measurement,
         state,
         lambda: proposal_store.vectors(measurement, state),
+        terms.surveyed_area_m2 if terms else None,
     )
     expected = dict(zip(state.reviewed_area_ids, map(float, state.raw)))
 

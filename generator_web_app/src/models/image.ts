@@ -67,6 +67,8 @@ export interface updateImageOptions {
 
 export interface ReviewedArea {
   reviewed_area_id: number;
+  // The proposal's expected count of the tile, when served by abundance estimation
+  expected_count?: number;
   image_id: number;
   type: ActivityType;
   name: string;

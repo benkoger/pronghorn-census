@@ -11,7 +11,7 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 
 from ais import MeasurementState, Proposal
-from app import proposal_store, tile_crops
+from app import finishing, proposal_store, tile_crops
 from app.decorators import permission_required
 from app.extensions import base
 from database.errors import MeasurementBlocked
@@ -32,69 +32,6 @@ from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management import User
 
 activeMeasBp = Blueprint("active_measurements", __name__, url_prefix="/api/v1/active-measurements")
-
-# ---------------------------------------------------------------------------------------------------------------------------
-
-
-def _preparation_steps(status: dict) -> list[dict]:
-    """The preparation steps of a survey, each with whether it is done and a sentence saying so.
-
-    A step is done when its process has run; the sentences do not say how many images succeeded.
-    """
-    steps = [
-        ("detections", "Detections", status["images_with_predictions"] > 0,
-         "Predictions generated", "Predictions have not been generated yet"),
-        ("footprints", "Footprints", status["images_with_footprints"] > 0,
-         "Images georeferenced", "Images have not been georeferenced yet"),
-        ("tiles", "Tiles",
-         status["tiles"] > 0 and status["georeferenced_images_without_tiles"] == 0,
-         "Tiles cut", "Tiles have not been cut yet"),
-        ("measurement", "Measurement", status["measurement"] is not None,
-         "Measurement created", "Measurement has not been created yet"),
-        ("proposal", "Sampling proposal", status["proposal_generations"] > 0,
-         "Sampling proposal ready", "Waiting for the sampling proposal"),
-    ]
-
-    return [
-        {"key": key, "label": label, "done": done, "detail": said if done else unsaid}
-        for key, label, done, said, unsaid in steps
-    ]
-
-
-def _store_final_animals(measurement: ActiveMeasurement, state) -> None:
-    """Rewrites a finished measurement's final count and interval as animals (overlap applied)."""
-    terms = proposal_store.load_terms(measurement)
-    if terms is None:
-        return
-
-    estimate = base.execute(
-        activemeasurement.live_estimate,
-        measurement,
-        state,
-        lambda: proposal_store.vectors(measurement, state),
-        terms.surveyed_area_m2,
-    )
-    live = base.execute(
-        abundance.live_abundance,
-        measurement,
-        state,
-        estimate,
-        terms,
-        proposal_store.load_boxes(measurement),
-    )
-    if live is None:
-        return
-
-    corrected = abundance.apply_overlap(estimate, live)
-    base.update(
-        ActiveMeasurement,
-        measurement.active_measurement_id,
-        UpdateActiveMeasurement(
-            final_count=corrected["count"],
-            final_ci_lower=corrected["ci_lower"],
-            final_ci_upper=corrected["ci_upper"],
-        ),
-    )
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -118,7 +55,7 @@ def get_next_unit(query: ActiveMeasurementQuery):
         description: Survey whose active measurement is being reviewed.
     responses:
       200:
-        description: The reviewed area to annotate next. Repeats until it is marked reviewed.
+        description: The reviewed area to annotate next, with the proposal's expected count of it. Repeats until it is marked reviewed.
       204:
         description: The active measurement is finished.
       401:
@@ -145,14 +82,18 @@ def get_next_unit(query: ActiveMeasurementQuery):
     )
 
     if reviewed_area_ids is None:
-        _store_final_animals(measurement, state)
+        finishing.store_final_animals(measurement, state)
         proposal_store.release(measurement)
         return "", 204
 
     reviewed_area = base.get(ReviewedArea, reviewed_area_ids.pkey)
     tile_crops.ensure_crop(reviewed_area)
 
-    return reviewed_area.serialize(), 200
+    # with the proposal's expected count of the unit, for the reviewer
+    return {
+        **reviewed_area.serialize(),
+        "expected_count": cast(MeasurementState, state).model_count(reviewed_area.reviewed_area_id),
+    }, 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -255,7 +196,7 @@ def get_status(query: ActiveMeasurementQuery):
         generations = len(state.generations) if state else 0
 
     status["proposal_generations"] = generations
-    status["steps"] = _preparation_steps(status)
+    status["steps"] = activemeasurement.preparation_steps(status)
     status["ready"] = all(step["done"] for step in status["steps"])
 
     return status, 200

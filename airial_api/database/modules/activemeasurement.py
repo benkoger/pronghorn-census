@@ -14,9 +14,12 @@
 # Serving a unit is a lookup in the serving order. The estimator is only run where its value
 # is needed: at the stop-rule checks and for the live estimate.
 #
-# Every unit is drawn from the same proposal, the expected count shaped g^0.5, so the reviewer
-# is looking for the detector's false positives and its false negatives on every unit. The
-# estimator takes a change of proposal (a refit) as it takes any other generation.
+# The review has two phases. Generation 0 is sharpened (the expected count to the fourth), so the
+# first units are the ones most likely to hold animals and the reviewer confirms the detector's
+# boxes: the detection check. The generation that follows, at CHECK_UNITS reviewed units (or the
+# first refit), is the expected count shaped g^0.5, under which every unit can be drawn and the
+# reviewer looks for both false positives and false negatives: the full review. The estimator
+# takes each change of proposal as it takes a refit.
 #
 # A unit is served with draft boxes: the detector's boxes on it, as annotations the reviewer
 # keeps, moves or deletes, and adds to. What is on the unit when it is marked reviewed is its
@@ -33,7 +36,7 @@ import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.rows import class_row, dict_row, tuple_row
 
-from ais import LogRow, MeasurementState, Session, SessionCache
+from ais import Estimator, EstimatorCache, LogRow, MeasurementState
 from database.errors import MeasurementBlocked, ObjectNotFound
 from database.object_models.base import Keyring, create_spice_update
 from database.object_models.core.activity import ActivityType
@@ -63,11 +66,14 @@ SPICE_BATCH = 500
 IMAGES_PER_STATEMENT = 250
 NO_MODEL_ID = 0
 DRAFT_THRESHOLD = 0.05  # detector boxes at or above this score are drafted onto a served unit
+DETECTION_CHECK = "detection check"  # the first units, drawn where the detector found animals
+FULL_REVIEW = "full review"  # every unit after that
+MIN_UNITS_FOR_ABUNDANCE = 100  # the abundance is reported from this many reviewed units
 Z95 = 1.959963985
 
 Vectors = Callable[[], list[np.ndarray]]  # the proposal vector of every generation, oldest first
 
-sessions = SessionCache()
+estimators = EstimatorCache()
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -156,6 +162,31 @@ def get_unit_states(
         },
     )
     return [UnitState(**row) for row in cursor.fetchall()]
+
+
+def preparation_steps(status: dict) -> list[dict]:
+    """The preparation steps of a survey, each with whether it is done and a sentence saying so.
+
+    A step is done when its process has run; the sentences do not say how many images succeeded.
+    """
+    steps = [
+        ("detections", "Detections", status["images_with_predictions"] > 0,
+         "Predictions generated", "Predictions have not been generated yet"),
+        ("footprints", "Footprints", status["images_with_footprints"] > 0,
+         "Images georeferenced", "Images have not been georeferenced yet"),
+        ("tiles", "Tiles",
+         status["tiles"] > 0 and status["georeferenced_images_without_tiles"] == 0,
+         "Tiles cut", "Tiles have not been cut yet"),
+        ("measurement", "Measurement", status["measurement"] is not None,
+         "Measurement created", "Measurement has not been created yet"),
+        ("proposal", "Sampling proposal", status["proposal_generations"] > 0,
+         "Sampling proposal ready", "Waiting for the sampling proposal"),
+    ]
+
+    return [
+        {"key": key, "label": label, "done": done, "detail": said if done else unsaid}
+        for key, label, done, said, unsaid in steps
+    ]
 
 
 def get_preparation(
@@ -295,12 +326,12 @@ def get_measured_area(
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-def _session(
+def _estimator(
     measurement: ActiveMeasurement,
     state: MeasurementState,
     vectors: Vectors,
     units: list[UnitState],
-) -> Session:
+) -> Estimator:
     """The estimator after the measurement's reviewed units, advanced from the last request's."""
     log = [
         LogRow(
@@ -315,7 +346,7 @@ def _session(
         for step, unit in enumerate((u for u in units if u.reviewed), start=1)
     ]
 
-    return sessions.get(
+    return estimators.get(
         measurement.uuid, state.reviewed_area_ids, vectors(), log, measurement.random_seed
     )
 
@@ -326,6 +357,21 @@ def _target_fraction(measurement: ActiveMeasurement) -> Optional[float]:
     if target is None or target <= 0:
         return None
     return target / 100.0 if target > 1 else target
+
+
+def check_units(measurement: ActiveMeasurement, state: MeasurementState) -> Optional[int]:
+    """
+    Returns the number of units of the detection check: those served under generation 0's
+    sharpened proposal before a differently shaped generation takes over. A refitting
+    measurement still on generation 0 switches at its first refit. None when generation 0 is
+    not sharpened.
+    """
+    first = state.generations[0].alpha
+    if first is None or first <= 1.0:
+        return None
+    if state.switch_at is not None:
+        return state.switch_at
+    return measurement.retraining_cadence if measurement.retraining_cadence > 0 else None
 
 
 def _check_every(measurement: ActiveMeasurement) -> int:
@@ -341,7 +387,7 @@ def _refit_due(state: MeasurementState, n_reviewed: int) -> bool:
     return n_reviewed >= len(state.order) and not _exhausted(state, n_reviewed)
 
 
-def _target_met(measurement: ActiveMeasurement, session: Session) -> bool:
+def _target_met(measurement: ActiveMeasurement, estimator: Estimator) -> bool:
     """True once the interval has stayed at or below target for PERSISTENCE units."""
     if (target := _target_fraction(measurement)) is None:
         return False
@@ -350,14 +396,14 @@ def _target_met(measurement: ActiveMeasurement, session: Session) -> bool:
     min_samples = max(100, 2 * max(measurement.retraining_cadence, 1))
 
     first_below = None
-    for row in session.log():
+    for row in estimator.log():
         if row.step % check_every != 0 or row.step < min_samples:
             continue
 
         met = (
             row.count > 0
             and row.ci95_half / row.count <= target
-            and row.step >= MIN_FRACTION * session.n_units
+            and row.step >= MIN_FRACTION * estimator.n_units
         )
         if not met:
             first_below = None
@@ -379,7 +425,7 @@ def _finite(value: Optional[float]) -> float:
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-def _close_units(cursor: Cursor[Any], units: list[UnitState], session: Session) -> None:
+def _close_units(cursor: Cursor[Any], units: list[UnitState], estimator: Estimator) -> None:
     """Writes the reviewed count and running estimate onto each reviewed unit lacking them."""
     reviewed = [u for u in units if u.reviewed]
     rows = [
@@ -390,7 +436,7 @@ def _close_units(cursor: Cursor[Any], units: list[UnitState], session: Session) 
             "current_ci_lower": _finite(row.count - row.ci95_half),
             "current_ci_upper": _finite(row.count + row.ci95_half),
         }
-        for unit, row in zip(reviewed, session.log())
+        for unit, row in zip(reviewed, estimator.log())
         if unit.stored_human_count != int(row.human_count)
         or unit.stored_count is None
         or abs(unit.stored_count - _finite(row.count)) > 1e-9
@@ -559,11 +605,11 @@ def next_unit(
     if n_reviewed > 0 and (
         n_reviewed % _check_every(measurement) == 0 or _exhausted(state, n_reviewed)
     ):
-        session = _session(measurement, state, vectors, units)
-        _close_units(cursor, units, session)
+        estimator = _estimator(measurement, state, vectors, units)
+        _close_units(cursor, units, estimator)
 
-        if _exhausted(state, n_reviewed) or _target_met(measurement, session):
-            finish(cursor, db, measurement, session)
+        if _exhausted(state, n_reviewed) or _target_met(measurement, estimator):
+            finish(cursor, db, measurement, estimator)
             return None
 
     if _refit_due(state, n_reviewed):
@@ -624,11 +670,11 @@ def finish(
     cursor: Cursor[Any],
     db: "Database",
     measurement: ActiveMeasurement,
-    session: Session,
+    estimator: Estimator,
 ) -> ActiveMeasurement:
     """Writes the final count and interval onto the measurement, which stops it serving units."""
-    estimate = session.estimate()
-    sessions.drop(measurement.uuid)
+    estimate = estimator.estimate()
+    estimators.drop(measurement.uuid)
 
     return db._update(
         cursor,
@@ -661,6 +707,9 @@ def live_estimate(
     """
     result: dict[str, Any] = {
         "active_measurement_id": measurement.active_measurement_id,
+        "phase": None,
+        "check_units": None,
+        "abundance_after": MIN_UNITS_FOR_ABUNDANCE,
         "uuid": str(measurement.uuid),
         "survey_id": measurement.survey_id,
         "status": "waiting for proposal",
@@ -685,15 +734,15 @@ def live_estimate(
         return result
 
     units = get_unit_states(cursor, db, measurement)
-    session = _session(measurement, state, vectors, units)
-    estimate = session.estimate()
-    n_reviewed = session.n_reviewed
+    estimator = _estimator(measurement, state, vectors, units)
+    estimate = estimator.estimate()
+    n_reviewed = estimator.n_reviewed
 
     if measurement.final_count is not None:
         status = "finished"
     elif _exhausted(state, n_reviewed):
         status = "exhausted"
-    elif _target_met(measurement, session):
+    elif _target_met(measurement, estimator):
         status = "target met"
     elif _refit_due(state, n_reviewed):
         status = "waiting for refit"
@@ -702,10 +751,15 @@ def live_estimate(
 
     result.update(
         status=status,
-        n_units=session.n_units,
+        n_units=estimator.n_units,
         n_reviewed=n_reviewed,
         n_pending=sum(1 for unit in units if not unit.reviewed),
         generation=state.generation_at(n_reviewed + 1).generation,
+    )
+    check = check_units(measurement, state)
+    result.update(
+        check_units=check,
+        phase=DETECTION_CHECK if check and n_reviewed < check else FULL_REVIEW,
     )
 
     if n_reviewed == 0 or not isfinite(estimate.count):

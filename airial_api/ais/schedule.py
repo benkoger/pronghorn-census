@@ -1,4 +1,4 @@
-# The order units are served in, and estimator sessions kept between requests
+# The order units are served in, and the estimators kept between requests
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 # A draw depends on the seed, the proposal in force and the units already drawn; never on the
@@ -17,7 +17,7 @@ from typing import Hashable, Optional, Sequence
 import numpy as np
 
 from .proposal import Proposal
-from .session import DEFAULT_EPSILON, LogRow, Session, _Model
+from .estimator import DEFAULT_EPSILON, LogRow, Estimator, _Model
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -115,18 +115,18 @@ class MeasurementState:
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class SessionCache:
-    """Estimator sessions held in this process, advanced as units are reviewed.
+class EstimatorCache:
+    """Estimators held in this process, advanced as units are reviewed.
 
     Rebuilding the estimator costs time quadratic in the number of reviewed units, so the
-    session of a running measurement is kept and only the new units are applied. A session
+    estimator of a running measurement is kept and only the new units are applied. A estimator
     whose recorded units no longer match the log (an annotation edited on an earlier unit)
     is rebuilt from the start.
     """
 
     def __init__(self, max_entries: int = 4):
         self.max_entries = max_entries
-        self._entries: OrderedDict[Hashable, Session] = OrderedDict()
+        self._entries: OrderedDict[Hashable, Estimator] = OrderedDict()
 
     def get(
         self,
@@ -135,21 +135,21 @@ class SessionCache:
         vectors: Sequence[np.ndarray],
         log: Sequence[LogRow],
         seed: int,
-    ) -> Session:
+    ) -> Estimator:
         """`vectors` holds the proposal of every generation the log calls for, oldest first."""
-        session = self._entries.pop(key, None)
+        estimator = self._entries.pop(key, None)
 
-        if session is not None and session.extends(log):
-            session.advance(vectors, log)
+        if estimator is not None and estimator.extends(log):
+            estimator.advance(vectors, log)
         else:
-            session = Session([str(i) for i in unit_ids], vectors[0], seed=seed)
-            session.advance(vectors, log)
+            estimator = Estimator([str(i) for i in unit_ids], vectors[0], seed=seed)
+            estimator.advance(vectors, log)
 
-        self._entries[key] = session
+        self._entries[key] = estimator
         while len(self._entries) > self.max_entries:
             self._entries.popitem(last=False)
 
-        return session
+        return estimator
 
     def drop(self, key: Hashable) -> None:
         self._entries.pop(key, None)

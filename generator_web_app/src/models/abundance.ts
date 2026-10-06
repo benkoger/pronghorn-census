@@ -40,6 +40,12 @@ export interface OverallAbundance {
   };
 }
 
+// detection check: the first tiles, drawn where the detector found animals; the reviewer
+//   confirms the detector's boxes
+// full review: every tile after that, drawn across the survey; the reviewer looks for both
+//   false positives and false negatives
+export type AbundancePhase = "detection check" | "full review";
+
 export interface AbundanceEstimate {
   active_measurement_id: number;
   uuid: string;
@@ -62,8 +68,12 @@ export interface AbundanceEstimate {
   density_per_km2: number | null;
   density_ci_lower_per_km2: number | null;
   density_ci_upper_per_km2: number | null;
-  // null until a tile is reviewed, or when the survey's terms are not stored
+  // null until abundance_after tiles are reviewed, or when the survey's terms are not stored
   abundance: OverallAbundance | null;
+  abundance_after: number;
+  phase: AbundancePhase | null;
+  // Tiles of the detection check; null when the measurement has none
+  check_units: number | null;
 }
 
 export interface AbundancePreparationStep {

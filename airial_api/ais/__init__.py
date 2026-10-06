@@ -12,12 +12,12 @@ from .proposal import Proposal, check_next
 from .schedule import (
     Generation,
     MeasurementState,
-    SessionCache,
+    EstimatorCache,
     draw_order,
     generation_at,
     horizon,
 )
-from .session import DEFAULT_EPSILON, Estimate, LogRow, Session
+from .estimator import DEFAULT_EPSILON, Estimate, Estimator, LogRow
 
 __all__ = [
     "AIS",
@@ -29,8 +29,8 @@ __all__ = [
     "MeasurementState",
     "PlacedBoxes",
     "Proposal",
-    "Session",
-    "SessionCache",
+    "Estimator",
+    "EstimatorCache",
     "SurveyTerms",
     "check_next",
     "draw_order",

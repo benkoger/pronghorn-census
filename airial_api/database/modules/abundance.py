@@ -419,6 +419,11 @@ def apply_overlap(estimate: dict[str, Any], abundance: Optional[dict[str, Any]])
         if estimate.get(key) is not None:
             estimate[key] = estimate[key] * factor
 
+    # the abundance itself is reported only once enough units have been reviewed; the overlap
+    # factor is applied from the first, so the count does not jump when the abundance appears
+    if estimate["n_reviewed"] < estimate["abundance_after"]:
+        estimate["abundance"] = None
+
     return estimate
 
 

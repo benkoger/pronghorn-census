@@ -1323,6 +1323,8 @@ onBeforeUnmount(async () => {
 
       <!-- Main Konva Stage -->
       <BCol cols="9" cols-xxl="10" class="h-100 d-flex flex-column overflow-hidden flex-grow-1" style="min-height: 0;">
+        <!-- Optional note above the image, supplied by the view -->
+        <div v-if="$slots['above-stage']" class="flex-shrink-0"><slot name="above-stage" /></div>
         <div
           id="stagewrapper"
           ref="stagewrapper"

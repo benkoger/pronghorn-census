@@ -8,10 +8,11 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from math import cos, radians
-from typing import Any
+from typing import Any, Optional
 
 import cv2
 import numpy as np
+import shapely
 from flask import current_app
 from scipy.interpolate import LinearNDInterpolator
 
@@ -22,6 +23,7 @@ from database.object_models.core.images import Image
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
+OVERLAY_FILE = "ground_v2.webp"  # the name changes when the drawing does, so stored overlays are redrawn
 OVERLAY_WIDTH_PX = 1024
 SOURCE_REDUCTION = 4  # the source is decoded at a quarter of its size: ample for a map overlay
 WEBP_QUALITY = 85
@@ -34,13 +36,20 @@ STORED_PREFIX = "images/"
 
 
 def _key(image: Image) -> str:
-    return f"{STORED_PREFIX}{image.uuid}/overlay/ground.webp"
+    return f"{STORED_PREFIX}{image.uuid}/overlay/{OVERLAY_FILE}"
 
 
-def render(image_data: bytes, gcps: list[list[float]], bbox_wsen: list[float]) -> bytes:
+def render(
+    image_data: bytes,
+    gcps: list[list[float]],
+    bbox_wsen: list[float],
+    footprint_wkb: Optional[bytes] = None,
+) -> bytes:
     """
     Returns the image drawn over its bounding box as a WebP with transparency. `gcps` are
-    (row, column, longitude, latitude) in pixels of the full-size image.
+    (row, column, longitude, latitude) in pixels of the full-size image. The ground control's
+    triangulation reaches the convex hull of the points, past the footprint where it is concave,
+    so the drawing is cut to `footprint_wkb` when it is given.
     """
     source = cv2.imdecode(np.frombuffer(image_data, dtype=np.uint8), cv2.IMREAD_REDUCED_COLOR_4)
     if source is None:
@@ -62,6 +71,9 @@ def render(image_data: bytes, gcps: list[list[float]], bbox_wsen: list[float]) -
     # ground position -> source pixel (column, row), undefined outside the image
     pixel = LinearNDInterpolator(points[:, [2, 3]], points[:, [1, 0]])(lon, lat)
     covered = np.isfinite(pixel).all(axis=2)
+    if footprint_wkb:
+        footprint = shapely.from_wkb(bytes(footprint_wkb))
+        covered &= shapely.contains_xy(footprint, lon.ravel(), lat.ravel()).reshape(lon.shape)
     pixel = np.nan_to_num(pixel, nan=-1.0) / SOURCE_REDUCTION
 
     drawn = cv2.remap(
@@ -92,13 +104,13 @@ def get_overlay(image: Image) -> dict[str, Any]:
 
     bucket, key = current_app.config["BUCKET_NAME"], source["overlay_uri"]
 
-    if not str(key or "").startswith(STORED_PREFIX):
+    if key != _key(image):  # not stored yet, or drawn by an older version
         key = _key(image)
         image_data = s3.get_object(Bucket=bucket, Key=image.img_key)["Body"].read()
         s3.put_object(
             Bucket=bucket,
             Key=key,
-            Body=render(image_data, source["gcps"], source["bbox_wsen"]),
+            Body=render(image_data, source["gcps"], source["bbox_wsen"], source.get("footprint")),
             ContentType="image/webp",
         )
         base.execute(surveymap.set_overlay_key, source["footprint_id"], key)

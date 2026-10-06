@@ -141,8 +141,8 @@ class PlacedBoxes:
         self.east_m = np.asarray(self.east_m, dtype=float)
         self.north_m = np.asarray(self.north_m, dtype=float)
 
-        lengths = {len(v) for v in (self.image_ids, self.reviewed_area_ids, self.scores)}
-        if lengths | {len(self.east_m), len(self.north_m)} != {len(self.image_ids)}:
+        fields = (self.image_ids, self.reviewed_area_ids, self.scores, self.east_m, self.north_m)
+        if {len(v) for v in fields} != {len(self.image_ids)}:
             raise ValueError("every field of the placed boxes must be the same length")
 
     def __len__(self) -> int:
@@ -261,7 +261,7 @@ def overall_abundance(
 
     if (draws := _draws(animals, animals_sigma, area_m2, terms)) is not None:
         if corrected := bias_corrected_interval(draws, abundance):
-            interval = list(corrected)
+            interval = [max(0.0, corrected[0]), corrected[1]]  # an abundance is never negative
             sigma = float(np.std(draws, ddof=1))
 
     return {

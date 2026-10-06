@@ -155,19 +155,22 @@ def clear_storage(measurements: list[str]) -> dict[str, int]:
     """The bucket, the cache and the permission records of the removed measurements."""
     bucket = current_app.config["BUCKET_NAME"]
     files = 0
+    def remove(uuid: str, key: str) -> bool:
+        full = f"{proposal_store.S3_PREFIX}/{uuid}/{key}"
+        try:
+            s3.head_object(Bucket=bucket, Key=full)
+        except ClientError:
+            return False
+        s3.delete_object(Bucket=bucket, Key=full)
+        return True
+
     for uuid in measurements:
-        keys = [f"proposals/{g:04d}.npz" for g in range(MAX_GENERATIONS)]
-        keys += ["terms.npz", "boxes.npz"]
-        for key in keys:
-            full = f"{proposal_store.S3_PREFIX}/{uuid}/{key}"
-            try:
-                s3.head_object(Bucket=bucket, Key=full)
-            except ClientError:
-                if key.startswith("proposals"):
-                    break  # generations are numbered without gaps
-                continue
-            s3.delete_object(Bucket=bucket, Key=full)
+        for generation in range(MAX_GENERATIONS):  # numbered without gaps: stop at the first missing
+            if not remove(uuid, f"proposals/{generation:04d}.npz"):
+                break
             files += 1
+        for key in ("terms.npz", "boxes.npz"):
+            files += remove(uuid, key)
         for version in range(1, proposal_store.STATE_VERSION + 1):
             cache.delete(f"am_state_{version}_{uuid}")
         for version in range(1, proposal_store.TERMS_VERSION + 1):

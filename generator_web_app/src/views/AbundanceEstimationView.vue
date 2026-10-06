@@ -9,7 +9,8 @@ import { useSystemStore } from "@/stores/systemStore";
 import { api } from "@/api";
 import { AbundanceAdapter } from "@/adapters/abundanceAdapter";
 import Verifier from "@/components/verifier/Verifier.vue";
-import type { AbundanceEstimate, AbundancePreparation } from "@/models";
+import type { AbundanceEstimate, AbundancePreparation, ReviewedArea } from "@/models";
+import type { VerifierItem } from "@/types/verifier";
 
 const pStore = useSystemStore();
 
@@ -56,9 +57,13 @@ async function refreshEstimate() {
   loadingEstimate.value = true;
   refreshPreparation();
   try {
+    const before = estimate.value;
     const now = await api.get<AbundanceEstimate>("active-measurements/estimate", {
       survey_id: pStore.CurrentSurvey.uuid,
     });
+    if (before?.uuid === now.uuid && before.phase === "detection check" && now.phase === "full review") {
+      switchNotice.value = true;
+    }
     estimate.value = now;
     estimateError.value = "";
   } catch (err) {
@@ -87,8 +92,39 @@ async function onVerifierDone() {
   isReviewing.value = false;
   adapter.value = null;
   waitingMessage.value = null;
+  switchNotice.value = false;
+  activeTile.value = null;
   await refreshEstimate();
 }
+
+const switchNotice = ref(false);
+const activeTile = ref<ReviewedArea | null>(null);
+
+function onActiveCrop(item: VerifierItem) {
+  activeTile.value = (item.rawItem as ReviewedArea) ?? null;
+}
+
+const expectedCount = computed(() => activeTile.value?.expected_count ?? null);
+
+const expectedText = computed(() => {
+  const g = expectedCount.value;
+  return g === null ? "" : `${g.toFixed(1)} animals expected in this tile`;
+});
+
+const phaseLabel = computed(() => {
+  const e = estimate.value;
+  if (!e || !e.check_units || e.phase === null) return "";
+  return e.phase === "detection check"
+    ? `Detection check: tile ${Math.min(e.n_reviewed + 1, e.check_units)} of ${e.check_units}`
+    : "Full review";
+});
+
+// Yellow until the interval reaches its target, then green
+const precisionClass = computed(() => {
+  const e = estimate.value;
+  if (!e || e.relative_ci === null || e.target === null) return "";
+  return e.relative_ci <= e.target ? "text-success" : "text-warning";
+});
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Formatting
@@ -228,7 +264,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="strip-stat">
         <span class="strip-label">Estimated count</span>
-        <span class="strip-value font-monospace">{{ whole(estimate?.count) }}</span>
+        <span class="strip-value font-monospace" :class="precisionClass">{{ whole(estimate?.count) }}</span>
       </div>
       <div class="strip-stat">
         <span class="strip-label">95% interval</span>
@@ -242,9 +278,16 @@ onBeforeUnmount(() => {
           ±{{ percent(estimate?.relative_ci) }} / ±{{ percent(estimate?.target) }}
         </span>
       </div>
+      <BBadge
+        v-if="phaseLabel"
+        :variant="estimate?.phase === 'detection check' ? 'info' : 'secondary'"
+        class="ms-auto"
+      >
+        {{ phaseLabel }}
+      </BBadge>
       <div v-if="estimate?.abundance" class="strip-stat">
         <span class="strip-label">Overall abundance</span>
-        <span class="strip-value font-monospace">
+        <span class="strip-value font-monospace" :class="precisionClass">
           {{ whole(estimate.abundance.abundance) }}
           <span class="fw-normal text-secondary">
             ({{ whole(estimate.abundance.ci_lower) }} – {{ whole(estimate.abundance.ci_upper) }})
@@ -254,7 +297,8 @@ onBeforeUnmount(() => {
       <BBadge
         v-if="estimate"
         :variant="statusVariant"
-        class="text-capitalize ms-auto"
+        class="text-capitalize"
+        :class="{ 'ms-auto': !phaseLabel }"
       >
         {{ estimate.status }}
       </BBadge>
@@ -266,7 +310,27 @@ onBeforeUnmount(() => {
       load when it is ready.
     </BAlert>
 
-    <Verifier :adapter="adapter" :labels="pStore.labels" fit="height" @done="onVerifierDone">
+    <BAlert v-model="switchNotice" variant="info" dismissible class="mb-2 py-2 flex-shrink-0">
+      <strong>The detection check is complete.</strong> From here tiles are drawn across the whole
+      survey. Most will be empty and open with no boxes. On every tile, delete boxes that are not
+      animals and draw the animals the detector missed; an empty tile counts as much as an
+      occupied one, so submit each as it is.
+    </BAlert>
+
+    <Verifier
+      :adapter="adapter"
+      :labels="pStore.labels"
+      fit="height"
+      @done="onVerifierDone"
+      @update:active-crop="onActiveCrop"
+    >
+      <template #above-stage>
+        <div class="expected-note small mb-2 px-1">
+          <Icon icon="material-symbols:psychology-outline" class="me-1 text-primary" />
+          <strong v-if="expectedCount !== null">{{ expectedText }}</strong>
+          <span v-else class="text-secondary">The detector's expectation for this tile is not known.</span>
+        </div>
+      </template>
       <template #below-stage>
         <div class="search-reminder small text-secondary mt-2 px-1 flex-shrink-0">
           <Icon icon="material-symbols:search" class="me-1" />
@@ -404,7 +468,7 @@ onBeforeUnmount(() => {
               <BCol cols="12" md="4">
                 <div class="stat-tile">
                   <div class="stat-label">Estimated count</div>
-                  <div class="stat-value font-monospace">{{ whole(estimate.count) }}</div>
+                  <div class="stat-value font-monospace" :class="precisionClass">{{ whole(estimate.count) }}</div>
                   <div class="stat-note">
                     95% interval {{ whole(estimate.ci_lower) }} – {{ whole(estimate.ci_upper) }}
                     <template v-if="estimate.overlap_factor !== null">
@@ -448,6 +512,25 @@ onBeforeUnmount(() => {
         </BCardBody>
       </BCard>
 
+      <!-- Before the abundance is reported -->
+      <BCard
+        v-if="estimate && estimate.count !== null && !estimate.abundance"
+        class="border-secondary-subtle shadow-sm bg-body flex-shrink-0"
+        no-body
+      >
+        <BCardBody class="p-4">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <Icon icon="material-symbols:groups-outline-rounded" class="text-primary fs-3" />
+            <BCardTitle class="mb-0 fw-bold" title-tag="h5">Overall Abundance</BCardTitle>
+          </div>
+          <BCardText class="text-secondary mb-0">
+            The overall abundance, with its uncertainties, is reported once
+            {{ estimate.abundance_after }} tiles have been reviewed.
+            {{ whole(estimate.n_reviewed) }} reviewed so far.
+          </BCardText>
+        </BCardBody>
+      </BCard>
+
       <!-- Overall Abundance Card -->
       <BCard
         v-if="estimate?.abundance"
@@ -464,7 +547,7 @@ onBeforeUnmount(() => {
             <BCol cols="12" md="4">
               <div class="stat-tile">
                 <div class="stat-label">Abundance</div>
-                <div class="stat-value font-monospace">
+                <div class="stat-value font-monospace" :class="precisionClass">
                   {{ whole(estimate.abundance.abundance) }}
                 </div>
                 <div class="stat-note">
@@ -603,13 +686,20 @@ onBeforeUnmount(() => {
             corrects for that choice, so it stays unbiased.
           </BCardText>
           <BCardText class="text-secondary">
-            Every tile is drawn the same way, so on every tile you are looking for both kinds of
-            detector mistake: boxes on things that are not animals, and animals with no box.
             Each tile opens with the detector's boxes already drawn. Delete the boxes that are not
             animals, adjust the ones that are, and search the whole tile for animals the detector
             missed. Then press <kbd class="guide-kbd">Enter</kbd> to submit and load the next tile.
             Every box left on the tile is counted as an animal, so a tile with no animals is
             submitted with no boxes. Reviewing stops when the interval reaches its target.
+          </BCardText>
+          <BCardText v-if="estimate?.check_units" class="text-secondary mb-0">
+            The review has two phases. In the <strong>detection check</strong>, the first
+            {{ estimate.check_units }} tiles are the ones most likely to hold animals, and you
+            confirm which of the detector's boxes are real. In the <strong>full review</strong>
+            that follows, tiles are drawn across the whole survey and you look for both mistakes:
+            boxes that are not animals, and animals with no box. The page tells you when the
+            change happens. The estimate is shown in yellow until its interval reaches the target,
+            then in green.
           </BCardText>
         </BCardBody>
       </BCard>

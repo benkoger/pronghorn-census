@@ -1,21 +1,21 @@
-# The active-measurement count as a replayable session
+# The active-measurement estimator, replayable from the review log
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 #
-# A session is the AIS estimator over one survey's tiles. Its state is a pure function of the
+# A estimator is the AIS estimator over one survey's tiles. Its state is a pure function of the
 # review log: for every reviewed tile, the proposal vector in force at the draw and the human
 # count. That is what makes it serve a web application, where the estimator cannot live in
-# memory across a user's annotation session; the server stores the log and rebuilds the session
+# memory across a user's annotation estimator; the server stores the log and rebuilds the estimator
 # from it on every request.
 #
-#     session = Session(unit_ids, g0, seed=6)
-#     unit = session.next_unit()                 # the tile to review, drawn ∝ max(g, ε)
-#     session.record(unit, human_count=2)        # append; the estimate updates
-#     est = session.estimate()                   # Estimate(count, ci95_half, n_reviewed, ...)
-#     session.set_proposal(g1)                   # after a refit; generation 1 from here on
+#     estimator = Estimator(unit_ids, g0, seed=6)
+#     unit = estimator.next_unit()                 # the tile to review, drawn ∝ max(g, ε)
+#     estimator.record(unit, human_count=2)        # append; the estimate updates
+#     est = estimator.estimate()                   # Estimate(count, ci95_half, n_reviewed, ...)
+#     estimator.set_proposal(g1)                   # after a refit; generation 1 from here on
 #     ...
-#     log = session.log()                        # the rows the server stores
-#     Session.replay(unit_ids, proposals, log)   # identical state, from storage
+#     log = estimator.log()                        # the rows the server stores
+#     Estimator.replay(unit_ids, proposals, log)   # identical state, from storage
 #
 # Sampling is without replacement. The proposal is floored at ε so no tile has zero mass. The
 # estimate is the sqrt-weighted LURE combination (the paper's COMB estimator); the arithmetic is
@@ -96,7 +96,7 @@ class _Model:
         return False
 
 
-class Session:
+class Estimator:
     def __init__(self, unit_ids: Sequence[str], proposal: np.ndarray, *, seed: int = 0,
                  epsilon: float = DEFAULT_EPSILON):
         self.unit_ids = [str(u) for u in unit_ids]
@@ -187,7 +187,7 @@ class Session:
     def reviewed_units(self) -> list[str]:
         return [r.unit_id for r in self._log]
 
-    def advance(self, proposals: Sequence[np.ndarray], log: Sequence[LogRow]) -> "Session":
+    def advance(self, proposals: Sequence[np.ndarray], log: Sequence[LogRow]) -> "Estimator":
         """Apply the rows of `log` beyond those already recorded, installing each proposal
         generation as the rows call for it. `log` must start with the rows already recorded."""
         for row in log[self.n_reviewed:]:
@@ -198,7 +198,7 @@ class Session:
         return self
 
     def extends(self, log: Sequence[LogRow]) -> bool:
-        """True when `log` starts with exactly the units and counts this session has recorded."""
+        """True when `log` starts with exactly the units and counts this estimator has recorded."""
         if len(log) < self.n_reviewed:
             return False
         return all(mine.unit_id == str(row.unit_id) and mine.human_count == float(row.human_count)
@@ -206,12 +206,12 @@ class Session:
 
     @classmethod
     def replay(cls, unit_ids: Sequence[str], proposals: Sequence[np.ndarray], log: Sequence[LogRow],
-               *, seed: int = 0, epsilon: float = DEFAULT_EPSILON) -> "Session":
-        """Rebuild a session from stored proposals and the review log.
+               *, seed: int = 0, epsilon: float = DEFAULT_EPSILON) -> "Estimator":
+        """Rebuild a estimator from stored proposals and the review log.
 
-        The estimator state after replay is identical to the live session's because it depends
+        The estimator state after replay is identical to the live estimator's because it depends
         only on (proposal in force, unit, count) per step. The random state is advanced by one
-        draw per logged unit, as the live session's was, so a replayed session and the live
+        draw per logged unit, as the live estimator's was, so a replayed estimator and the live
         one also agree on the next unit to review. A logged unit that differs from the draw
         (a reviewer who skipped ahead) is honored as logged.
         """

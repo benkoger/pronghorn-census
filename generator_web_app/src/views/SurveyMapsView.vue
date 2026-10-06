@@ -530,6 +530,10 @@ onBeforeUnmount(() => {
               {{ whole(estimate.n_reviewed) }} of {{ whole(estimate.n_units) }}
             </span>
           </div>
+          <div v-if="!estimate.abundance" class="text-secondary fst-italic">
+            The overall abundance is reported once {{ estimate.abundance_after }} tiles have been
+            reviewed.
+          </div>
           <template v-if="estimate.abundance">
             <hr class="my-1 border-secondary-subtle" />
             <div class="d-flex justify-content-between">

@@ -254,7 +254,7 @@ function goToUpload() {
                     ({{ Math.round(abundanceEstimate.abundance.ci_lower).toLocaleString() }} –
                     {{ Math.round(abundanceEstimate.abundance.ci_upper).toLocaleString() }})
                   </template>
-                  <span v-else class="fst-italic">after the first reviewed tile</span>
+                  <span v-else class="fst-italic">after {{ abundanceEstimate.abundance_after }} reviewed tiles</span>
                 </div>
               </template>
               <span v-else-if="sStore.CurrentSurvey">

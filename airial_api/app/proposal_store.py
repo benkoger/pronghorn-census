@@ -188,7 +188,11 @@ def load_boxes(measurement: ActiveMeasurement) -> Optional[PlacedBoxes]:
             return None
         raise
 
-    return _remember(measurement, PlacedBoxes.from_bytes(obj["Body"].read()))
+    try:
+        boxes = PlacedBoxes.from_bytes(obj["Body"].read())
+    except (KeyError, TypeError, ValueError):  # stored in an older layout
+        return None
+    return _remember(measurement, boxes)
 
 
 def save_boxes(measurement: ActiveMeasurement, boxes: PlacedBoxes) -> PlacedBoxes:

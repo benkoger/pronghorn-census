@@ -50,6 +50,7 @@ SIMPLIFY_DEGREES = 0.00001  # about one meter: footprint outlines are drawn, not
 COORDINATE_DIGITS = 6
 DETECTION_THRESHOLD = 0.05  # detector boxes below this score are never shown
 STORED_OVERLAY = "images/%%"  # overlay_uri holds a bucket key once the overlay is stored there
+PIXELS = ("box_tx", "box_ty", "box_bx", "box_by")  # a box in image pixels: left, top, right, bottom
 IMAGES_PER_STATEMENT = 250  # ground control is read this many images at a time
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -332,7 +333,7 @@ def get_detections(
                 "image_id": row["image_id"],
                 "kind": row["kind"],
                 "score": row["score"],
-                "box": [int(row[key]) for key in ("box_tx", "box_ty", "box_bx", "box_by")],
+                "box": [int(row[key]) for key in PIXELS],
                 "lon": lon,
                 "lat": lat,
             }
@@ -356,10 +357,12 @@ def get_overlay_source(
 ) -> Optional[dict[str, Any]]:
     """
     Returns what drawing an image onto the ground needs: its latest footprint's bounding box
-    (west, south, east, north) and ground control points. None when it has no footprint.
+    (west, south, east, north), its ground control points and the footprint itself (WKB). None
+    when it has no footprint.
     """
     stmt = sql.SQL("""
-        SELECT f.footprint_id, f.bbox_wsen, f.gcps, f.overlay_uri
+        SELECT f.footprint_id, f.bbox_wsen, f.gcps, f.overlay_uri,
+               ST_AsBinary(f.footprint) AS footprint
         FROM core.image_footprints f
         WHERE f.image_id = %(image_id)s
         ORDER BY f.footprint_id DESC
