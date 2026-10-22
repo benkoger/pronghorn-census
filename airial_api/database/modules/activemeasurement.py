@@ -55,8 +55,9 @@ if TYPE_CHECKING:
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-TILE_ROWS = 4  # an image is cut into TILE_ROWS x TILE_COLS reviewed areas (eighths)
-TILE_COLS = 2
+TILE_ROWS = 2  # an image is cut into TILE_ROWS x TILE_COLS reviewed areas (eighths); 4 x 2 until 2026-10-20
+TILE_COLS = 4
+TILING = f"{TILE_ROWS}x{TILE_COLS}"  # folder of the tiles' crops in the bucket, so a re-cut never serves a stale crop
 CHECK_EVERY = 50  # units between stop-rule checks when the proposal is frozen
 PERSISTENCE = 50  # units the interval must stay at or below target before stopping
 MIN_FRACTION = 0.03  # share of units reviewed before a stop is allowed
@@ -824,7 +825,7 @@ def create_tiles(
             i.image_id,
             %(type)s,
             i.name || '__r' || r || 'c' || c,
-            'images/' || i.uuid || '/reviewed_area/' || i.name || '__r' || r || 'c' || c,
+            'images/' || i.uuid || '/reviewed_area/' || %(tiling)s || '/' || i.name || '__r' || r || 'c' || c,
             (c * i.image_width_px) / %(cols)s,
             (r * i.image_length_px) / %(rows)s,
             ((c + 1) * i.image_width_px) / %(cols)s,
@@ -859,6 +860,7 @@ def create_tiles(
                 "type": ActivityType.ACTIVE_MEASUREMENT,
                 "rows": TILE_ROWS,
                 "cols": TILE_COLS,
+                "tiling": TILING,
                 "image_ids": to_cut[start : start + IMAGES_PER_STATEMENT],
             },
         )
