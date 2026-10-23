@@ -20,8 +20,8 @@ const emit = defineEmits(["creationSuccessful"]);
 
 const options = ref<createSurveyOptions>({
   name: "",
-  project_id: props.project.uuid,
-  herd_unit_id: props.herd_unit.uuid,
+  project_ids: {"pkey": props.project.project_id,"uuid": props.project.uuid},
+  herd_unit_ids: {"pkey": props.herd_unit.herd_unit_id, "uuid": props.herd_unit.uuid},
   survey_date: "",
   additional_info: "",
 });

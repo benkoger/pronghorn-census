@@ -22,12 +22,15 @@ export default defineComponent({
     if (pStore.projects.length == 0) pStore.get_projects();
     return { pStore, cvStore };
   },
-  mounted() {
+  async mounted() {
     if (this.pStore.CurrentProject) {
       this.$router.push({
         name: "crop-verifier",
         params: { projects: "projects", uuid: this.pStore.CurrentProject.uuid },
       });
+    }
+    if (this.CurrentHerdUnit && this.CurrentSurvey) {
+      await this.cvStore.getReviewCount();
     }
   },
   data() {
@@ -62,6 +65,11 @@ export default defineComponent({
     },
   },
   watch: {
+    async currentStep(newStep: number) {
+      if (newStep === 2 && this.CurrentHerdUnit && this.CurrentSurvey) {
+        await this.cvStore.getReviewCount();
+      }
+    },
     CurrentProject(newValue: Project, oldValue: Project) {
       const currentQuery = { ...this.$route.query };
       this.pStore.clear_models();
@@ -111,6 +119,7 @@ export default defineComponent({
     CurrentHerdUnit(newValue: HerdUnit, oldValue: HerdUnit) {
       const currentQuery = { ...this.$route.query };
       this.pStore.clear_surveys();
+      this.cvStore.needingReviewed = 0;
       if (newValue != oldValue && newValue != undefined) {
         this.pStore.get_herd_unit_surveys();
         const newQuery = {
@@ -143,6 +152,7 @@ export default defineComponent({
           survey: undefined,
         };
         this.$router.push({ query: newQuery });
+        this.cvStore.needingReviewed = 0;
       }
     },
     async alreadyReviewed(newValue: boolean, oldValue: boolean) {
@@ -154,57 +164,32 @@ export default defineComponent({
 });
 </script>
 <template>
-  <BreadCrumb
-    v-model="currentStep"
-    :steps="steps"
-    :showButtons="true"
-    :canContinue="canProceed"
-  />
+  <BreadCrumb v-model="currentStep" :steps="steps" :showButtons="true" :canContinue="canProceed" />
   <BRow v-if="currentStep === 0">
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
-        <SelectList
-          :items="pStore.projects"
-          icon="ix:projects"
-          :active-item="CurrentProject"
-          :select-action="pStore.set_current_project"
-          list-name="Project"
-        />
+        <SelectList :items="pStore.projects" icon="ix:projects" :active-item="CurrentProject"
+          :select-action="pStore.set_current_project" list-name="Project" />
       </div>
     </BCol>
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
-        <SelectList
-          :items="pStore.models"
-          icon="octicon:ai-model-16"
-          :active-item="CurrentModel"
-          :select-action="pStore.set_current_model"
-          listName="Model"
-        />
+        <SelectList :items="pStore.models" icon="octicon:ai-model-16" :active-item="CurrentModel"
+          :select-action="pStore.set_current_model" listName="Model" />
       </div>
     </BCol>
   </BRow>
   <BRow v-if="currentStep === 1">
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
-        <SelectList
-          :items="pStore.herd_units"
-          icon="token:area"
-          :active-item="CurrentHerdUnit"
-          :select-action="pStore.set_current_herd_unit"
-          listName="Herd Unit"
-        />
+        <SelectList :items="pStore.herd_units" icon="token:area" :active-item="CurrentHerdUnit"
+          :select-action="pStore.set_current_herd_unit" listName="Herd Unit" />
       </div>
     </BCol>
     <BCol cols="6">
       <div class="flex-grow-1 overflow-y-auto">
-        <SelectList
-          :items="pStore.surveys"
-          icon="roentgen:survey-point"
-          :active-item="CurrentSurvey"
-          :select-action="pStore.set_current_survey"
-          listName="Survey"
-        />
+        <SelectList :items="pStore.surveys" icon="roentgen:survey-point" :active-item="CurrentSurvey"
+          :select-action="pStore.set_current_survey" listName="Survey" />
       </div>
     </BCol>
   </BRow>
@@ -224,32 +209,22 @@ export default defineComponent({
       </div>
     </BCol>
     <BCol cols="8" class="d-flex">
-      <div
-        class="d-flex flex-column bg-body-secondary rounded-3 shadow flex-grow-1"
-      >
+      <div class="d-flex flex-column bg-body-secondary rounded-3 shadow flex-grow-1">
         <div class="m-3">
           <h3>Cropper session settings</h3>
           <BTabs content-class="mt-3">
             <BTab title="general settings">
-              <BFormCheckbox
-                id="checkbox-1"
-                v-model="cvStore.alreadyReviewed"
-                name="checkbox-1"
-                value="true"
-                unchecked-value="false"
-                switch
-              >
+              <BFormCheckbox id="checkbox-1" v-model="alreadyReviewed" name="checkbox-1" switch>
                 Include crops that have already been approved
               </BFormCheckbox>
+              <BButton class="mt-1" :loading="cvStore.loading" @click="cvStore.closeImages">
+                Close User Images
+              </BButton>
             </BTab>
           </BTabs>
         </div>
-        <BButton
-          variant="primary"
-          class="rounded-top-0 rounded-bottom-3 w-100 mt-auto"
-          size="lg"
-          @click="currentStep += 1"
-        >
+        <BButton variant="primary" class="rounded-top-0 rounded-bottom-3 w-100 mt-auto" size="lg"
+          @click="currentStep += 1" :disabled="cvStore.needingReviewed == 0">
           Start Reviewing
         </BButton>
       </div>

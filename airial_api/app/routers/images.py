@@ -6,7 +6,7 @@
 from uuid import UUID
 
 import cv2
-from flask import Blueprint, Response, abort, current_app
+from flask import Blueprint, Response, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 from app.decorators import permission_required, roles_required
@@ -14,11 +14,15 @@ from app.decorators import permission_required, roles_required
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
 from database.errors import ObjectNotFound
+from database.object_models.base import BulkRequest
 from database.object_models.core import (
+    Image,
+    Prediction,
+    Annotation,
+    ReviewedArea,
     CreateImageReq,
     CreatePredictionCropReq,
     CreatePresignedPutReq,
-    PredictionQuery,
     UpdateImageReq,
 )
 from database.object_models.core.images import (
@@ -34,27 +38,29 @@ imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 # GET
 
 
-@imageBp.get("/<string:image_id>")
+@imageBp.get("/<int:image_id>")
+@imageBp.get("/<uuid:image_id>")
 @login_required
 @permission_required("access")
-def get_by_id(image_id: str):
+def get_by_id(image_id: int | UUID):
     """
-    Request an image object from the database using its UUID.
+    Request an image object from the database using its integer PK or UUID.
     ---
     parameters:
-      - name: image_id
-            in: path
-            type: string
-            required: true
+      - name: image_i
+        in: path
+        type: string
+        required: true
     responses:
       200:
-            description: The requested image was found.
+        description: The requested image was found.
       400:
-            description: Invalid UUID format provided.
+        description: Invalid id format provided.
       404:
-            description: No image record found for the provided ID.
+        description: No image record found for the provided ID.
     """
-    return base.get_image(UUID(image_id)).to_dict(), 200
+
+    return base.get(Image, image_id).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,89 +81,105 @@ def get_prediction_crop(prediction_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@imageBp.get("/<string:image_id>/crops")
+@imageBp.get("/<int:image_id>/crops")
+@imageBp.get("/<uuid:image_id>/crops")
 @login_required
-def get_crops(image_id: str):
+def get_crops(image_id: int | UUID):
     """
     Retrieve crops for a specific image
     ---
     responses:
       200:
-            description: List of crops.
+        description: List of crops (returns [] if parent exists but has no crops).
       404:
-            description: No crops found.
+        description: Parent image not found.
       500:
-            description: Database error.
+        description: Database error.
     """
+    crops = base.get_children(
+        ReviewedArea,
+        Image,
+        image_id,
+    )
 
-    crops = base.get_image_crops(UUID(image_id))
-
-    return [crop.to_dict() for crop in crops], 200
+    return [crop.serialize() for crop in crops], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@imageBp.get("/<string:image_id>/predictions")
+@imageBp.get("/<int:image_id>/predictions")
+@imageBp.get("/<uuid:image_id>/predictions")
 @login_required
 @permission_required("access")
-def get_predictions(image_id: str):
+def get_predictions(image_id: int | UUID):
     """
-    Retrieve all predictions associated with an image.
+    Retrieve all predictions for a specific image.
     ---
     parameters:
-            - name: image_id
-            in: path
-            type: string
-            required: true
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 42
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image (integer ID or UUID).
     responses:
-            200:
-                    description: List of predictions.
-            400:
-                    description: Invalid UUID format.
-            404:
-                    description: No predictions found.
-            500:
-                    description: Database error.
+      200:
+        description: List of predictions.
+      400:
+        description: Invalid id format.
+      404:
+        description: Parent image not found.
+      500:
+        description: Database error.
     """
+    predictions = base.get_children(Prediction, Image, image_id)
 
-    predictions = base.get_image_predictions(UUID(image_id))
-
-    return [pred.to_dict() for pred in predictions], 200
+    return [pred.serialize() for pred in predictions], 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@imageBp.get("/<string:image_id>/annotations")
+@imageBp.get("/<int:image_id>/annotations")
+@imageBp.get("/<uuid:image_id>/annotations")
 @login_required
 @permission_required("access")
-def get_annotations(image_id: str):
+def get_annotations(image_id: int | UUID):
     """
-    Retrieve all annotations associated with an image.
+    Retrieve all annotations for a specific image.
     ---
     parameters:
-            - name: image_id
-              in: path
-              type: string
-              required: true
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 42
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image (integer ID or UUID).
     responses:
-            200:
-                    description: Annotations belonging to a given image.
-            401:
-                    description: User not authorized to perform this action.
-            400:
-                    description: Malformed request.
-            404:
-                    description: Image not found.
-            500:
-                    description: Unexpected error.
-
+      200:
+        description: List of annotations.
+      400:
+        description: Invalid id format.
+      404:
+        description: Parent image not found.
+      500:
+        description: Database error.
     """
 
-    annotations = base.get_image_annotations(UUID(image_id))
+    annotations = base.get_children(Annotation, Image, image_id)
 
-    return [annot.to_dict() for annot in annotations], 200
+    return [annot.serialize() for annot in annotations], 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -186,7 +208,7 @@ def create(body: CreateImageReq):
             500:
                     description: Database error.
     """
-    return base.create_image(body).to_dict(), 201
+    return base.insert(Image, body).serialize(), 201
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,7 +233,7 @@ def create_presigned_get(body: PresignedImageGetReq):
                     description: Storage or database error.
     """
 
-    image = base.get_image(body.image_id)
+    image = base.get(Image, body.image_id)
 
     response = s3.generate_presigned_url(
         "get_object",
@@ -246,12 +268,7 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
     """
     data = body.model_dump()
 
-    image_id = (
-        UUID(data["image_id"])
-        if isinstance(data["image_id"], str)
-        else data["image_id"]
-    )
-    image = base._get_image(image_id)
+    image = base.get(Image, body.image_id)
 
     response = s3.generate_presigned_url(
         ClientMethod="upload_part",
@@ -359,10 +376,9 @@ def abort_upload(body: AbortMulitPartUploadReq):
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
     """"""
-    image = base.get_image(body.image_id)
-    predictions = base.get_predictions(
-        PredictionQuery(prediction_id=body.prediction_id)
-    )
+    image = base.get(Image, body.image_id)
+    req = BulkRequest(object_ids=body.prediction_id) #pyright: ignore
+    predictions = base.bulk_get(Prediction, req)
 
     image_data = cache.get(image.uuid)
 
@@ -378,18 +394,19 @@ def get_prediciton(body: CreatePredictionCropReq):
 
     [cache.set(crop.uuid, crop.get_image(), 3600) for crop in pred_crops]
 
-    return [crop.to_dict() for crop in pred_crops]
+    return [crop.serialize() for crop in pred_crops]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # PATCH
 
 
-@imageBp.patch("/<string:image_id>")
+@imageBp.patch("/<int:image_id>")
+@imageBp.patch("/<uuid:image_id>")
 @login_required
 @permission_required("access")
 @validate()
-def update(body: UpdateImageReq, image_id: str):
+def update(body: UpdateImageReq, image_id: int | UUID):
     """
     Update image object in the database.
     ---
@@ -408,8 +425,7 @@ def update(body: UpdateImageReq, image_id: str):
             500:
                     description: Database error.
     """
-
-    return base.update_image(UUID(image_id), body).to_dict(), 200
+    return base.update(Image, image_id, body).serialize(), 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -419,27 +435,33 @@ def update(body: UpdateImageReq, image_id: str):
 @login_required
 @permission_required("access")
 def close_user_images():
-    """ """
+    """Close all images currently opened by the authenticated user."""
+    req = UpdateImageReq(opened_by_user_id=0)
 
-    base.close_user_images(current_user.user_id)
+    rows_affected = base.bulk_update(
+        Image,
+        req,
+        {"opened_by_user_id": current_user.user_id},
+    )
 
-    return "", 204
+    return {"rows_affected": rows_affected}, 200
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # DELETE
 
 
-@imageBp.delete("/<string:image_id>")
+@imageBp.delete("/<int:image_id>")
+@imageBp.delete("/<uuid:image_id>")
 @login_required
 @permission_required("access")
-def delete_image(image_id: str):
+def delete_image(image_id: int | UUID):
     """ """
 
-    image = base.get_image(UUID(image_id))
+    image = base.get(Image, image_id)
 
     s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)
 
-    base.delete_image(UUID(image_id))
+    base.delete(Image, image_id)
 
     return "", 204

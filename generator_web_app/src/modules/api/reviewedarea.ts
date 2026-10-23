@@ -4,10 +4,10 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import {
-  ReviewedArea,
   type ReviewedAreaIntf,
-  Annotation,
   type AnnotationIntf,
+  Annotation,
+  ReviewedArea,
 } from "@/types/generatorobjects.ts";
 import { ApiError } from "@/modules/api/errors.ts";
 import { api_url } from "@/modules/api/apiV1Methods.ts";
@@ -121,6 +121,22 @@ export async function updateReviewedArea(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(options),
+  });
+
+  if (!response.ok) throw new ApiError(await response.json());
+
+  return new ReviewedArea(await response.json());
+}
+
+export async function setAsReviewed(
+  reviewed_area_id: number | string
+): Promise<ReviewedArea> {
+  const response = await fetch(`${api_url}/reviewed-area/${reviewed_area_id}/set-reviewed`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    }
   });
 
   if (!response.ok) throw new ApiError(await response.json());

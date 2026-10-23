@@ -17,6 +17,7 @@ export interface getReviewedAreaOptions {
   herd_unit_id: string[];
   survey_id: string[];
   include_reviewed: boolean;
+  include_opened?: boolean;
 }
 
 export async function getReviewedArea(
@@ -27,7 +28,10 @@ export async function getReviewedArea(
     params.append("herd_unit_id", id.toString()),
   );
   options.survey_id.forEach((id) => params.append("survey_id", id.toString()));
-  params.append("include_reviewed", options.include_reviewed.toString());
+  params.append("include_reviewed", Boolean(options.include_reviewed).toString());
+  if (options.include_opened !== undefined) {
+    params.append("include_opened", options.include_opened.toString());
+  }
 
   const response = await fetch(
     `${api_url}/verifier/area-needing-reviewed?${params}`,
@@ -56,7 +60,8 @@ export async function getCountNeedingReviewed(
     params.append("herd_unit_id", id.toString()),
   );
   options.survey_id.forEach((id) => params.append("survey_id", id.toString()));
-  params.append("include_reviewed", options.include_reviewed.toString());
+  params.append("include_reviewed", Boolean(options.include_reviewed).toString());
+  params.append("include_opened", (options.include_opened ?? true).toString());
 
   const response = await fetch(
     `${api_url}/verifier/needing-reviewed?${params}`,
@@ -64,7 +69,7 @@ export async function getCountNeedingReviewed(
       method: "GET",
       credentials: "include",
       headers: {
-        "Cotnent-Type": "application/json",
+        "Content-Type": "application/json",
       },
     },
   );

@@ -56,7 +56,7 @@ export const useSystemStore = defineStore("systemStore", {
     async authenticate(email: string, password: string) {
       this.logged_in = await authUser(email, password);
       await this.get_current_user();
-      await this.get_roles();
+      // await this.get_roles();
       if (this.user != undefined) {
         await this.get_organizations();
         this.organization_idx = +Object.keys(this.organizations)[0];

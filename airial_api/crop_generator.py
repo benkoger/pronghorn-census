@@ -3,8 +3,6 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import List, Tuple
-
 from uuid import uuid4
 
 import cv2
@@ -17,7 +15,9 @@ from database.object_models import (
     Label,
     Prediction,
 )
+from database.object_models.base import Keyring
 from database.object_models.core import (
+    ActivityType,
     CreateAnnotationReq,
     CreateReviewedAreaReq,
     PredictionCrop,
@@ -28,11 +28,11 @@ from database.object_models.core import (
 
 def auto_crop(
     image: Image,
-    predictions: List[Prediction],
-    labels: List[Label],
+    predictions: list[Prediction],
+    labels: list[Label],
     num_clusters: int = 1,
     crop_size: int = 2100,
-) -> List[Tuple[CreateReviewedAreaReq, List[CreateAnnotationReq]]]:
+) -> list[tuple[CreateReviewedAreaReq, list[CreateAnnotationReq]]]:
     """Automatically create crops of a given size containing all images with approved annotations
 
     Args:
@@ -106,8 +106,9 @@ def auto_crop(
             y_start -= (y_start + crop_size) - img.shape[0]
 
         crop = CreateReviewedAreaReq(
-            image_id=image.uuid,
+            image_ids=Keyring(image.image_id, image.uuid),
             name=f"{image.name[0:50]}_crop_{crop_num}.JPG",
+            type=ActivityType.AUTO_CROPPER,
             area_tx=x_start,
             area_ty=y_start,
             area_bx=x_end,
@@ -128,8 +129,10 @@ def auto_crop(
                 points_in_crop[p_index] += 1
 
                 annotation = CreateAnnotationReq(
-                    image_id=image.image_id,
-                    prediction_id=pred.uuid,
+                    image_ids=Keyring(image.image_id, image.uuid),
+                    type=ActivityType.AUTO_CROPPER,
+                    reviewed_area_ids=None,
+                    prediction_ids=Keyring(pred.pred_id, pred.uuid),
                     herd_unit_id=image.herd_unit_id,
                     label_id=labels_ids[pred.label],
                     box_tx=box[0],

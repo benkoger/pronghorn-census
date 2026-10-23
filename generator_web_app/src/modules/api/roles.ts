@@ -10,14 +10,14 @@ import { api_url } from "./apiV1Methods";
 // ---------------------------------------------------------------------------------------------------------------------------
 
 interface getRolesOptions {
-  role_id?: string[]
+  object_id?: string[]
 }
 
 export async function getRoles(
   options: getRolesOptions
 ): Promise<Role[]> {
   const params = new URLSearchParams();
-  options.role_id?.forEach((id) => params.append("role_id", id.toString()));
+  options.object_id?.forEach((id) => params.append("role_id", id.toString()));
 
   const response = await fetch(`${api_url}/roles?${params}`, {
     method: "GET",

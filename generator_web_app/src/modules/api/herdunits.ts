@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { HerdUnit, Survey } from "@/types/generatorobjects.ts";
-import type { HerdUnitIntf, SurveyIntf } from "@/types/generatorobjects.ts";
+import type { HerdUnitIntf, Keyring, SurveyIntf } from "@/types/generatorobjects.ts";
 import { ApiError } from "@/modules/api/errors.ts";
 import { api_url } from "@/modules/api/apiV1Methods.ts";
 
@@ -33,7 +33,7 @@ export async function getHerdUnitSurveys(
 // ---------------------------------------------------------------------------------------------------------------------------
 
 export interface createHerdUnitOptions {
-  project_id: string;
+  project_ids: Keyring;
   name: string;
 }
 

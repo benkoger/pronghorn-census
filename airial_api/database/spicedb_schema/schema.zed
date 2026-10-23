@@ -58,6 +58,14 @@ definition label {
   permission access = parent->access + is_root
 }
 
+definition active_measurement {
+  relation parent: survey
+}
+
+definition am_unit {
+  relation parent: active_measurement
+}
+
 definition image {
   relation parent: survey | herd_unit
 
