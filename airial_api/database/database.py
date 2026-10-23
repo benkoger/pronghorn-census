@@ -58,11 +58,12 @@ from database.object_models.core.images import (
 )
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.models import Model, ModelType
-from database.object_models.project_management.surveys import Survey
-from database.object_models.user_management.users import User
+from database.object_models.project_management.surveys import Survey, SurveyStatus
+from database.object_models.user_management.users import User, UserStatus
 from database.query_builder import (
     filter_by_object_ids,
     resolve_identifier,
+    resolve_parent_filter,
     clause_generator,
 )
 
@@ -80,6 +81,8 @@ def configure_connection(conn: Connection):
     for enum_name, enum_cls in [
         ("projectmanagement.model_type", ModelType),
         ("core.activity_type", ActivityType),
+        ("projectmanagement.survey_status", SurveyStatus),
+        ("usermanagement.user_status", UserStatus),
     ]:
         try:
             info = EnumInfo.fetch(conn, enum_name)
@@ -293,6 +296,34 @@ class Database:
         return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _execute(
+        self,
+        cursor: Cursor[Any],
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Internal execution wrapper providing a pooled cursor context."""
+        return fn(cursor, self, *args, **kwargs)
+
+    def execute(
+        self,
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        Execute a domain-specific operation function within a managed connection context.
+
+        Args:
+            fn: Callable accepting (cursor, db, *args, **kwargs)
+            *args, **kwargs: Forwarded to fn
+        """
+        return self._execute(fn, *args, **kwargs)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # INSERT
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -357,7 +388,7 @@ class Database:
 
         cursor.execute(
             query.format(
-                table=cls.get_table_identifier(),
+                table=cls.__table__,
                 id_col=pk_col,
                 set_clause=set_clause,
                 modified_statement=modified_statement,
@@ -425,7 +456,7 @@ class Database:
 
         cursor.execute(
             query.format(
-                table=cls.get_table_identifier(),
+                table=cls.__table__,
                 set_clause=set_clause,
                 where_clause=where_clause,
             ),
@@ -473,7 +504,7 @@ class Database:
         pk_col = resolve_identifier(cls, pk)
 
         cursor.execute(
-            query.format(table=cls.get_table_identifier(), id_col=pk_col),
+            query.format(table=cls.__table__, id_col=pk_col),
             (pk,),
         )
         obj = cursor.fetchone()
@@ -498,14 +529,17 @@ class Database:
         parent_pk: PrimaryKey,
     ) -> list[T]:
         """Internal get_children method."""
-        if isinstance(parent_pk, UUID):
-            parent_obj = self._get(cursor, parent_cls, parent_pk)
+        cond_sql, joins = resolve_parent_filter(child_cls, parent_cls, parent_pk)
+        joins_sql = (
+            sql.SQL(" ") + sql.SQL(" ").join(joins) if joins else sql.SQL("")
+        )
 
-            parent_pk = getattr(parent_obj, parent_cls.__pk_name__)
-
-        query = sql.SQL("SELECT * FROM {table} WHERE {fk_col} = %s;").format(
-            table=child_cls.get_table_identifier(),
-            fk_col=parent_cls.get_pk_identifier(),
+        query = sql.SQL(
+            "SELECT {table}.* FROM {table}{joins} WHERE {cond} = %s;"
+        ).format(
+            table=child_cls.__table__,
+            joins=joins_sql,
+            cond=cond_sql,
         )
 
         cursor.row_factory = class_row(child_cls)
@@ -534,6 +568,292 @@ class Database:
         """
         return self._get_children(child_cls, parent_cls, parent_pk)
 
+    @connect
+    def _get_count(
+        self,
+        cursor: Cursor[Any],
+        cls: type[DBbase],
+        parent_cls: type[DBbase] | None = None,
+        parent_pk: PrimaryKey | None = None,
+        scope: dict[str, Any] | None = None,
+        joins: list[sql.Composable] | None = None,
+        where_clauses: list[sql.Composable] | None = None,
+        placeholders: dict[str, Any] | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Generic method to execute a COUNT(*) query on a table with optional parent, scope, joins, where, and search filters."""
+        params: dict[str, Any] = dict(placeholders) if placeholders else {}
+        conditions: list[sql.Composable] = list(where_clauses) if where_clauses else []
+        all_joins: list[sql.Composable] = list(joins) if joins else []
+
+        if parent_cls is not None and parent_pk is not None:
+            cond_sql, p_joins = resolve_parent_filter(cls, parent_cls, parent_pk)
+            all_joins.extend(p_joins)
+            conditions.append(
+                sql.SQL("{cond} = {placeholder}").format(
+                    cond=cond_sql,
+                    placeholder=sql.Placeholder("_parent_pk"),
+                )
+            )
+            params["_parent_pk"] = parent_pk
+
+        if scope:
+            for col_name, val in scope.items():
+                param_key = f"_scope_{col_name}"
+                if val is None:
+                    conditions.append(
+                        sql.SQL("{table}.{col} IS NULL").format(
+                            table=cls.__table__,
+                            col=sql.Identifier(col_name),
+                        )
+                    )
+                else:
+                    conditions.append(
+                        sql.SQL("{table}.{col} = {placeholder}").format(
+                            table=cls.__table__,
+                            col=sql.Identifier(col_name),
+                            placeholder=sql.Placeholder(param_key),
+                        )
+                    )
+                    params[param_key] = val
+
+        if search:
+            conditions.append(
+                sql.SQL("{table}.name ILIKE {placeholder}").format(
+                    table=cls.__table__,
+                    placeholder=sql.Placeholder("_search_term"),
+                )
+            )
+            params["_search_term"] = f"%{search}%"
+
+        where_sql = (
+            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+            if conditions
+            else sql.SQL("")
+        )
+
+        joins_sql = (
+            sql.SQL(" ") + sql.SQL(" ").join(all_joins)
+            if all_joins
+            else sql.SQL("")
+        )
+
+        count_query = sql.SQL(
+            "SELECT COUNT(*) FROM {table}{joins}{where};"
+        ).format(
+            table=cls.__table__,
+            joins=joins_sql,
+            where=where_sql,
+        )
+
+        cursor.row_factory = tuple_row
+        cursor.execute(count_query, params)
+        res = cursor.fetchone()
+        return int(res[0]) if res else 0
+
+    def get_count(
+        self,
+        cls: type[DBbase],
+        parent_cls: type[DBbase] | None = None,
+        parent_pk: PrimaryKey | None = None,
+        scope: dict[str, Any] | None = None,
+        joins: list[sql.Composable] | None = None,
+        where_clauses: list[sql.Composable] | None = None,
+        placeholders: dict[str, Any] | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Generic method to execute a COUNT(*) query."""
+        return self._get_count(
+            cls=cls,
+            parent_cls=parent_cls,
+            parent_pk=parent_pk,
+            scope=scope,
+            joins=joins,
+            where_clauses=where_clauses,
+            placeholders=placeholders,
+            search=search,
+        )
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @connect
+    def _get_paginated(
+        self,
+        cursor: Cursor[Any],
+        cls: type[T],
+        page: int | None = None,
+        per_page: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        parent_cls: type[DBbase] | None = None,
+        parent_pk: PrimaryKey | None = None,
+        scope: dict[str, Any] | None = None,
+        order_by: str | None = None,
+        descending: bool = False,
+        joins: list[sql.Composable] | None = None,
+        where_clauses: list[sql.Composable] | None = None,
+        placeholders: dict[str, Any] | None = None,
+        search: str | None = None,
+    ) -> tuple[list[T], int]:
+        """Generic method for database results with optional pagination. Returns (items, total_count)."""
+        params: dict[str, Any] = dict(placeholders) if placeholders else {}
+        conditions: list[sql.Composable] = list(where_clauses) if where_clauses else []
+        all_joins: list[sql.Composable] = list(joins) if joins else []
+
+        if parent_cls is not None and parent_pk is not None:
+            cond_sql, p_joins = resolve_parent_filter(cls, parent_cls, parent_pk)
+            all_joins.extend(p_joins)
+            conditions.append(
+                sql.SQL("{cond} = {placeholder}").format(
+                    cond=cond_sql,
+                    placeholder=sql.Placeholder("_parent_pk"),
+                )
+            )
+            params["_parent_pk"] = parent_pk
+
+        if scope:
+            for col_name, val in scope.items():
+                param_key = f"_scope_{col_name}"
+                if val is None:
+                    conditions.append(
+                        sql.SQL("{table}.{col} IS NULL").format(
+                            table=cls.__table__,
+                            col=sql.Identifier(col_name),
+                        )
+                    )
+                else:
+                    conditions.append(
+                        sql.SQL("{table}.{col} = {placeholder}").format(
+                            table=cls.__table__,
+                            col=sql.Identifier(col_name),
+                            placeholder=sql.Placeholder(param_key),
+                        )
+                    )
+                    params[param_key] = val
+
+        if search:
+            conditions.append(
+                sql.SQL("{table}.name ILIKE {placeholder}").format(
+                    table=cls.__table__,
+                    placeholder=sql.Placeholder("_search_term"),
+                )
+            )
+            params["_search_term"] = f"%{search}%"
+
+        where_sql = (
+            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+            if conditions
+            else sql.SQL("")
+        )
+
+        joins_sql = (
+            sql.SQL(" ") + sql.SQL(" ").join(all_joins)
+            if all_joins
+            else sql.SQL("")
+        )
+
+        count_query = sql.SQL(
+            "SELECT COUNT(*) FROM {table}{joins}{where};"
+        ).format(
+            table=cls.__table__,
+            joins=joins_sql,
+            where=where_sql,
+        )
+
+        cursor.row_factory = tuple_row
+        cursor.execute(count_query, params)
+        res = cursor.fetchone()
+        total_count = int(res[0]) if res else 0
+
+        if total_count == 0:
+            return [], 0
+
+        # Optional pagination: apply LIMIT/OFFSET only when limit or page is specified
+        limit_offset_sql = sql.SQL("")
+        if limit is not None:
+            params["_page_limit"] = max(1, limit)
+            params["_page_offset"] = max(0, offset or 0)
+            limit_offset_sql = sql.SQL(" LIMIT {limit_ph} OFFSET {offset_ph}").format(
+                limit_ph=sql.Placeholder("_page_limit"),
+                offset_ph=sql.Placeholder("_page_offset"),
+            )
+        elif page is not None:
+            page_limit = max(1, per_page or 50)
+            page_offset = max(0, (page - 1) * page_limit)
+            params["_page_limit"] = page_limit
+            params["_page_offset"] = page_offset
+            limit_offset_sql = sql.SQL(" LIMIT {limit_ph} OFFSET {offset_ph}").format(
+                limit_ph=sql.Placeholder("_page_limit"),
+                offset_ph=sql.Placeholder("_page_offset"),
+            )
+
+        direction = sql.SQL("DESC") if descending else sql.SQL("ASC")
+        if order_by:
+            order_sql = sql.SQL(" ORDER BY {table}.{col} {dir}").format(
+                table=cls.__table__,
+                col=sql.Identifier(order_by),
+                dir=direction,
+            )
+        elif hasattr(cls, "__pk__") and cls.__pk__:
+            order_sql = sql.SQL(" ORDER BY {table}.{col} {dir}").format(
+                table=cls.__table__,
+                col=cls.__pk__,
+                dir=direction,
+            )
+        else:
+            order_sql = sql.SQL("")
+
+        select_query = sql.SQL(
+            "SELECT {table}.* FROM {table}{joins}{where}{order}{limit_offset};"
+        ).format(
+            table=cls.__table__,
+            joins=joins_sql,
+            where=where_sql,
+            order=order_sql,
+            limit_offset=limit_offset_sql,
+        )
+
+        cursor.row_factory = class_row(cls)
+        cursor.execute(select_query, params)
+        items = cursor.fetchall()
+
+        return items, total_count
+
+    def get_paginated(
+        self,
+        cls: type[T],
+        page: int | None = None,
+        per_page: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        parent_cls: type[DBbase] | None = None,
+        parent_pk: PrimaryKey | None = None,
+        scope: dict[str, Any] | None = None,
+        order_by: str | None = None,
+        descending: bool = False,
+        joins: list[sql.Composable] | None = None,
+        where_clauses: list[sql.Composable] | None = None,
+        placeholders: dict[str, Any] | None = None,
+        search: str | None = None,
+    ) -> tuple[list[T], int]:
+        """Generic method to fetch paginated database entities along with total record count."""
+        return self._get_paginated(
+            cls=cls,
+            page=page,
+            per_page=per_page,
+            limit=limit,
+            offset=offset,
+            parent_cls=parent_cls,
+            parent_pk=parent_pk,
+            scope=scope,
+            order_by=order_by,
+            descending=descending,
+            joins=joins,
+            where_clauses=where_clauses,
+            placeholders=placeholders,
+            search=search,
+        )
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
@@ -557,10 +877,10 @@ class Database:
             "JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} "
             "WHERE r.{where_clause};"
         ).format(
-            target_table=target_cls.get_table_identifier(),
-            relation_table=relation_cls.get_table_identifier(),
-            target_pk=sql.Identifier(target_cls.__pk_name__),
-            fk_field=sql.Identifier(target_cls.__pk_name__),
+            target_table=target_cls.__table__,
+            relation_table=relation_cls.__table__,
+            target_pk=target_cls.__pk__,
+            fk_field=target_cls.__pk__,
             where_clause=where_clause,
         )
 
@@ -597,13 +917,13 @@ class Database:
     def _bulk_get(self, cursor: Cursor[T], cls: type[T], req: BulkRequest) -> list[T]:
         """Internal bulk_get method."""
         cursor.row_factory = class_row(cls)
-        query = sql.SQL("SELECT * FROM {table} as bobj")
+        query = sql.SQL("SELECT * FROM {table}")
 
-        p_filters, data = filter_by_object_ids("bobj", cls.__pk_name__, req.object_ids)
+        p_filters, data = filter_by_object_ids(cls.__table__, cls.__pk__, req.object_ids)
 
         return cursor.execute(
             sql.SQL("{q} WHERE {p}").format(
-                q=query.format(table=cls.get_table_identifier()), p=p_filters
+                q=query.format(table=cls.__table__), p=p_filters
             ),
             data,
         ).fetchall()
@@ -640,7 +960,7 @@ class Database:
         scope_params = {f"_scope_{k}": v for k, v in scope.items()}
 
         query = sql.SQL("SELECT * FROM {table} WHERE {where_clause};").format(
-            table=cls.get_table_identifier(),
+            table=cls.__table__,
             where_clause=where_clause,
         )
 
@@ -682,7 +1002,7 @@ class Database:
 
         cursor.execute(
             query.format(
-                table=cls.get_table_identifier(),
+                table=cls.__table__,
                 id_col=pk_col,
             ),
             (pk,),
@@ -726,7 +1046,7 @@ class Database:
         cursor.row_factory = class_row(cls)
         cursor.execute(
             query.format(
-                table=cls.get_table_identifier(),
+                table=cls.__table__,
                 id_col=pk_col,
             ),
             {"_pk_val": pk},
@@ -846,46 +1166,7 @@ FROM (
         """ """
         return self._get_auto_crop_batch(req, user)
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # Legacy Holdovers -- Not enough time to rewrite
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # TODO: These methods need to be folded into the greater generics pattern !techdebt!
 
-    @connect
-    def _get_survey_images(
-        self, cursor: Cursor[Any], survey_id: UUID, limit: int, offset: int
-    ) -> tuple[list[Image], int]:
-        """ """
-
-        query_1 = sql.SQL("SELECT COUNT(*) FROM core.images WHERE survey_id = %s")
-        query_2 = sql.SQL(""" 
-            SELECT * FROM core.images 
-            WHERE survey_id = %s
-            ORDER BY image_id ASC 
-            LIMIT %s OFFSET %s; 
-        """)
-
-        survey = self._get(cursor, Survey, survey_id)
-
-        cursor.row_factory = tuple_row
-        res = cursor.execute(query_1, (survey.survey_id,)).fetchone()
-
-        if not res:
-            return [], 0
-
-        total_images = int(res[0])
-
-        cursor.row_factory = class_row(Image)
-
-        images = cursor.execute(query_2, (survey.survey_id, limit, offset)).fetchall()
-
-        return images, total_images
-
-    def get_survey_images(
-        self, survey_id: UUID, limit: int, offset: int
-    ) -> tuple[list[Image], int]:
-        """ """
-        return self._get_survey_images(survey_id, limit, offset)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -953,10 +1234,7 @@ FROM (
 			) as images
 		""")
 
-        try:
-            cursor.execute(query.format(image_args=image_params), placeholders)
-        except Exception as e:
-            print(e)
+        cursor.execute(query.format(image_args=image_params), placeholders)
         results = cursor.fetchall()
         return results
 
@@ -972,75 +1250,3 @@ FROM (
             label_ids, date_range, survey_ids, herd_unit_ids
         )
 
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_reviewed_areas(
-        self, cursor: Cursor[ReviewedArea], req: RAQuery
-    ) -> list[ReviewedArea]:
-        """ """
-        query = sql.SQL(""" 
-			SELECT ra.* FROM core.reviewed_area ra
-			JOIN core.images i on i.image_id = ra.image_id
-			WHERE {parameter_field} 
-		""")
-
-        params = []
-        placeholders: dict[str, list[int] | date | int] = {}
-
-        if req.herd_unit_id:
-            herd_unit = self._get(cursor, HerdUnit, req.herd_unit_id[0])
-            params.append(sql.SQL("i.herd_unit_id = ANY(%(herd_unit_ids)s)"))
-            placeholders["herd_unit_ids"] = [herd_unit.herd_unit_id]
-
-        if req.survey_id:
-            survey = self._get(cursor, Survey, req.survey_id[0])
-            params.append(sql.SQL("i.survey_id = ANY(%(survey_ids)s)"))
-            placeholders["survey_ids"] = [survey.survey_id]
-
-        if not req.include_reviewed:
-            params.append(sql.SQL("RA.reviewed_by_user_id = 0"))
-
-        if not req.include_opened:
-            params.append(sql.SQL("i.opened_by_user_id = 0"))
-
-        query_params = sql.SQL(" AND ").join(params)
-
-        if req.num:
-            query_params += sql.SQL(" LIMIT %(num)s ")  # pyright: ignore
-            placeholders["num"] = req.num
-
-        cursor.row_factory = class_row(ReviewedArea)
-        cursor.execute(query.format(parameter_field=query_params), placeholders)
-
-        return cursor.fetchall()
-
-    def get_reviewed_areas(self, req: RAQuery) -> list[ReviewedArea]:
-        """ """
-        return self._get_reviewed_areas(req)
-
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @connect
-    def _get_crop_to_review(
-        self, cursor: Cursor[ReviewedArea], req: RAQuery, user: User
-    ) -> Optional[ReviewedArea]:
-        """Fetch a batch of reviewed areas that have yet to be reviewed."""
-        reviewed_areas = self._get_reviewed_areas(cursor, req)
-
-        if len(reviewed_areas) > 0:
-            image = self._get(cursor, Image, reviewed_areas[0].image_id)
-            self._update(
-                cursor,
-                Image,
-                image.image_id,
-                UpdateImageReq(opened_by_user_id=user.user_id),
-            )
-
-            return reviewed_areas[0]
-        else:
-            return None
-
-    def get_crop_to_review(self, req: RAQuery, user: User) -> Optional[ReviewedArea]:
-        """ """
-        return self._get_crop_to_review(req, user)

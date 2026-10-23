@@ -31,6 +31,7 @@ from database.object_models.project_management import (
 )
 
 from database.object_models.user_management import OrganizationProject
+from database.object_models.user_management.roles import Role
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 
@@ -316,7 +317,9 @@ def create(body: createProjectReq):
       500:
         description: Database error.
     """
-    return base.insert(Project, body, cast(User, current_user)).serialize(), 201
+    role = base.where(Role, {"name": "admin"})[0]
+
+    return base.insert(Project, body, cast(User, current_user), role).serialize(), 201
 
 
 # ---------------------------------------------------------------------------------------------------------------------------

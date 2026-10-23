@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -58,9 +58,8 @@ class Model(DBbase):
     modified: datetime
     uuid: UUID
 
-    __tablename__: str = "models"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "model_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "models")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("model_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

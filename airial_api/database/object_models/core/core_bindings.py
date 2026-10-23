@@ -3,6 +3,10 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
+from typing import ClassVar
+
+import psycopg.sql as sql
+
 from ..base import Relationbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -13,6 +17,5 @@ class AnnotationsReviewedArea(Relationbase):
     annotation_id: int
     reviewed_area_id: int
 
-    __tablename__: str = "annotations_reviewed_area"
-    __schema__: str = "core"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "annotations_reviewed_area")
     __key__: tuple = ("annotation_idi", "reviewed_area_id")

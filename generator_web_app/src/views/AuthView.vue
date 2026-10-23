@@ -1,0 +1,130 @@
+<script lang="ts" setup>
+import { ref, onMounted } from "vue";
+import { useSystemStore } from "@/stores/systemStore";
+import { useRouter, useRoute } from "vue-router";
+import { useToast } from "bootstrap-vue-next";
+import { API_BASE } from "@/api";
+
+const sStore = useSystemStore();
+const router = useRouter();
+const route = useRoute();
+const redirection_path = route.query.redirect as string;
+
+const { create } = useToast();
+
+const email = ref("");
+const password = ref("");
+const showPassword = ref(false);
+const google_auth = `${API_BASE}/authorize/google`;
+
+onMounted(() => {
+  sStore.check_auth().then(() => {
+    if (sStore.logged_in) {
+      if (redirection_path) {
+        router.push(redirection_path);
+      } else {
+        router.push("/");
+      }
+    }
+  });
+});
+
+const submitAuthRequest = async () => {
+  await sStore
+    .authenticate(email.value, password.value)
+    .catch((e: any) => {
+      create({
+        title: "Authentication Failed",
+        body: e.message || "Failed to authenticate",
+        variant: "danger",
+        position: "bottom-start",
+      });
+      return;
+    });
+  if (sStore.logged_in) {
+    if (redirection_path) {
+      router.push(redirection_path);
+    } else {
+      router.push("/");
+    }
+  }
+};
+</script>
+<template>
+  <BRow align-v="center" align-h="center" class="h-100 flex-grow-1 m-0">
+    <BCol cols="11" sm="8" md="6" lg="4">
+      <div class="shadow-sm rounded-3">
+        <h2 class="bg-body-tertiary text-center rounded-top-3 p-2 m-0">
+          Authenticate
+        </h2>
+        <BForm
+          @submit.prevent="submitAuthRequest"
+          class="d-flex flex-column bg-body-secondary rounded-bottom-3"
+        >
+          <BInputGroup class="p-3 mt-2">
+            <template #prepend>
+              <BInputGroupText>
+                <Icon icon="ic:outline-email" width="24" />
+              </BInputGroupText>
+            </template>
+            <BFormFloatingLabel label="Email" label-for="email">
+              <BFormInput
+                id="email"
+                type="email"
+                trim
+                required
+                v-model="email"
+                placeholder=" "
+              />
+            </BFormFloatingLabel>
+          </BInputGroup>
+          <BInputGroup class="p-3">
+            <template #prepend>
+              <BInputGroupText>
+                <Icon
+                  icon="solar:password-minimalistic-input-bold"
+                  width="24"
+                />
+              </BInputGroupText>
+            </template>
+            <BFormFloatingLabel label="Password" lagbel-for="password">
+              <BFormInput
+                id="password"
+                :type="showPassword ? 'text' : 'password'"
+                trim
+                required
+                v-model="password"
+                placeholder=" "
+              />
+            </BFormFloatingLabel>
+            <BInputGroupText
+              role="button"
+              @click="showPassword = !showPassword"
+              style="cursor: pointer"
+            >
+              <Icon
+                :icon="showPassword ? 'mdi:eye-off' : 'mdi-eye'"
+                width="20"
+              />
+            </BInputGroupText>
+          </BInputGroup>
+          <BButton
+            type="submit"
+            variant="primary"
+            size="lg"
+            class="w-100 mt-auto rounded-top-0"
+          >
+            Sign in
+          </BButton>
+        </BForm>
+      </div>
+      <a
+        :href="google_auth"
+        class="btn btn-light gap-2 btn-lg d-flex align-items-center justify-content-center shadow-sm border px-4 py-2 mt-4"
+      >
+        <Icon icon="material-icon-theme:google" />
+        Sign in with Google
+      </a>
+    </BCol>
+  </BRow>
+</template>

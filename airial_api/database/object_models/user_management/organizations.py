@@ -4,8 +4,10 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
+
+import psycopg.sql as sql
 
 from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
@@ -38,9 +40,8 @@ class Organization(DBbase):
     uuid: UUID
     logo_url: Optional[str] = None
 
-    __tablename__: str = "organizations"
-    __schema__: str = "usermanagement"
-    __pk_name__: str = "organization_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("usermanagement", "organizations")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("organization_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

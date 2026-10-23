@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -76,9 +76,10 @@ class Prediction(DBbase):
     uuid: UUID
     dimensions: "Box" = field(init=False)
 
-    __tablename__: str = "predictions"
-    __schema__: str = "core"
-    __pk_name__: str = "pred_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "predictions")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("pred_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

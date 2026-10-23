@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -58,9 +58,8 @@ class Label(DBbase):
     color: str
     uuid: UUID
 
-    __tablename__: str = "labels"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "label_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "labels")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("label_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

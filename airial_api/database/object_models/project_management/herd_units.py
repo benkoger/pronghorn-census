@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -21,6 +21,15 @@ from ..base import DBbase, Keyring, create_spice_update
 class CreateHerdUnitReq(BaseModel):
     name: str
     project_ids: Keyring
+    habitable_area: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class UpdateHerdUnitReq(BaseModel):
+    name: Optional[str] = None
+    habitable_area: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -35,10 +44,10 @@ class HerdUnit(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
+    habitable_area: Optional[float] = None
 
-    __tablename__: str = "herd_units"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "herd_unit_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "herd_units")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("herd_unit_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -47,6 +56,7 @@ class HerdUnit(DBbase):
 
         herd_unit_id: int
         name: str
+        habitable_area: Optional[float] = None
         created: datetime
         modified: datetime
         uuid: UUID
@@ -60,8 +70,8 @@ class HerdUnit(DBbase):
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_herd_unit AS (
-                INSERT INTO projectmanagement.herd_units (name)
-                VALUES (%(name)s)
+                INSERT INTO projectmanagement.herd_units (name, habitable_area)
+                VALUES (%(name)s, %(habitable_area)s)
                 RETURNING *
             ),
             inserted_link AS (

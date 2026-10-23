@@ -10,6 +10,7 @@ from flask_login import current_user, login_required
 from flask_pydantic import validate
 from app.decorators import permission_required
 from app.extensions import base
+from database.object_models.base import Keyring
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
     Annotation,
@@ -17,6 +18,7 @@ from database.object_models.core.annotations import (
     BulkUpdateAnnotationsReq,
     BulkDeleteAnnotationsReq,
 )
+from database.object_models.project_management import HerdUnit
 from database.object_models.user_management import User
 from uuid import UUID
 
@@ -50,7 +52,11 @@ def create(body: CreateAnnotationReq):
       500:
         description: Database error.
     """
-    annotation = base.insert(Annotation, body, cast(User, current_user))
+    herd_unit = base.get(HerdUnit, body.herd_unit_id)
+    h_key = Keyring(herd_unit.herd_unit_id, herd_unit.uuid)
+    u_key = Keyring(current_user.user_id, current_user.uuid)
+
+    annotation = base.insert(Annotation, body, u_key, h_key)
 
     return annotation.serialize(), 201
 
@@ -84,10 +90,17 @@ def import_annotation(body: BulkCreateAnnotationReq):
         description: Database error.
     """
 
+    if not body.requests:
+        return [], 201
+
+    u_key = Keyring(current_user.user_id, current_user.uuid)
+    herd_unit = base.get(HerdUnit, body.requests[0].herd_unit_id)
+    h_key = Keyring(herd_unit.herd_unit_id, herd_unit.uuid)
+
     annotations = []
 
     for req in body.requests:
-        annotations.append(base.insert(Annotation, req, cast(User, current_user)))
+        annotations.append(base.insert(Annotation, req, u_key, h_key))
 
     return [annot.serialize() for annot in annotations], 201
 

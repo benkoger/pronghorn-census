@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Self
+from typing import ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -12,9 +12,21 @@ from psycopg import Cursor
 from psycopg.rows import class_row
 import psycopg.sql as sql
 
+from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase, Keyring, create_spice_update
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class SurveyStatus(StrEnum):
+    UPLOADED = "uploaded"
+    PREPARING = "preparing"
+    READY_FOR_MEASUREMENT = "ready for measurement"
+    MEASURING = "measuring"
+    FINISHED = "finished"
+
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -24,7 +36,9 @@ class CreateSurveyReq(BaseModel):
     herd_unit_ids: Keyring
     survey_date: datetime
     name: str
-    additional_info: Optional[str]
+    additional_info: Optional[str] = None
+    status: Optional[SurveyStatus] = None
+    survey_area: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -34,11 +48,13 @@ class UpdateSurveyReq(BaseModel):
     survey_date: Optional[datetime] = None
     name: Optional[str] = None
     additional_info: Optional[str] = None
+    status: Optional[SurveyStatus] = None
+    survey_area: Optional[float] = None
 
 
 class SurveyImageQuery(BaseModel):
-    page: int = 1
-    per_page: int = 50
+    page: Optional[int] = None
+    per_page: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -55,10 +71,11 @@ class Survey(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
+    status: Optional[SurveyStatus] = None
+    survey_area: Optional[float] = None
 
-    __tablename__: str = "surveys"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "survey_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "surveys")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("survey_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -68,6 +85,8 @@ class Survey(DBbase):
         survey_id: int
         survey_date: datetime
         name: str
+        status: Optional[SurveyStatus] = None
+        survey_area: Optional[float] = None
         additional_info: str | None
         created: datetime
         modified: datetime
@@ -83,10 +102,10 @@ class Survey(DBbase):
         query = sql.SQL("""
             WITH new_survey AS (
                 INSERT INTO projectmanagement.surveys (
-                    survey_date, name, additional_info
+                    survey_date, name, additional_info, status, survey_area
                 )
                 VALUES (
-                    %(survey_date)s, %(name)s, %(additional_info)s
+                    %(survey_date)s, %(name)s, %(additional_info)s, %(status)s, %(survey_area)s
                 )
                 RETURNING *
             ),

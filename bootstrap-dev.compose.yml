@@ -1,7 +1,7 @@
 services:
   db:
     container_name: prong_gres
-    image: postgres:18
+    image: docker.io/postgis/postgis:17-3.5
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U pronghorn_count -d testing"]
       interval: 5s
@@ -16,7 +16,7 @@ services:
       - type: bind 
         source: ./local_db/bootstrap.sh
         target: /docker-entrypoint-initdb.d/bootstrap.sh
-      - ./local_db/db_definitions.sql:/db_definitions.sql:Z
+      - ./docs/database/schemas/airial1-1.sql:/db_definitions.sql:Z
     networks:
       - dev_pronghorn_app_network
     ports:

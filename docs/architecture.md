@@ -36,6 +36,7 @@ Airial is an aerial wildlife census and abundance estimation platform designed f
 
 ### 1. Frontend Web App (`generator_web_app/`)
 * **Framework**: Vue 3 using `<script setup lang="ts">` and Vite 6.
+* **Data Modeling**: Modular domain model abstraction (`src/types/models/` and `@/models`) mirroring the backend API's Pydantic response models across `core`, `project_management`, and `user_management`. See [Frontend Architecture & Data Modeling](frontend-architecture.md).
 * **State Management**: [Pinia](https://pinia.vuejs.org/) stores (`projectStore.ts`, `cropperStore.ts`, `cropVerifierStore.ts`, `systemStore.ts`) with `pinia-plugin-persistedstate`.
 * **Annotation Canvas**: Built with [Vue-Konva](https://konvajs.org/docs/vue/) for interactive zooming, panning, and rendering/editing bounding boxes on high-resolution image crops.
 * **Routing**: Dynamic routing with navigation guards checking API bootstrap readiness and authentication state.

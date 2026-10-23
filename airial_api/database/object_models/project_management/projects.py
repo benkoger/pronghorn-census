@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------------------------------------------------------
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Self, Union
+from typing import ClassVar, List, Optional, Self, Union
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -52,9 +52,8 @@ class Project(DBbase):
     modified: datetime
     uuid: UUID
 
-    __tablename__: str = "projects"
-    __schema__: str = "projectmanagement"
-    __pk_name__: str = "project_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "projects")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("project_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -79,13 +78,19 @@ class Project(DBbase):
                 INSERT INTO projectmanagement.projects (name)
                 VALUES (%(name)s)
                 RETURNING *
+            ),
+            org_link AS (
+                INSERT INTO usermanagement.organizations_projects (
+                    project_id, organization_id
+                )
+                SELECT project_id, %(organization_id)s FROM new_project
+            ),
+            user_link AS (
+                INSERT INTO projectmanagement.projects_users (
+                    project_id, user_id, role_id
+                )
+                SELECT project_id, %(user_id)s, %(role_id)s FROM new_project
             )
-            INSERT INTO usermanagement.organizations_projects (project_id, organization_id)
-            VALUES ((SELECT project_id FROM new_project), %(organization_id)s);
-
-            INSERT INTO projectmanagement.projects_users (project_id, user_id, role_id)
-            VALUES ((SELECT project_id FROM new_project), %(user_id)s, %(role_id)s);
-
             SELECT * FROM new_project;
         """)
 
@@ -95,7 +100,7 @@ class Project(DBbase):
                 **req.model_dump(),
                 "organization_id": req.organization_ids.pkey,
                 "user_id": user.user_id,
-                "role": role.role_id,
+                "role_id": role.role_id,
             },
         )
 

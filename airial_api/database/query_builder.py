@@ -5,7 +5,7 @@
 
 from typing import Tuple, Any
 from uuid import UUID
-from database.object_models.base import PrimaryKey
+from database.object_models.base import PrimaryKey, DBbase
 
 import psycopg.sql as sql
 
@@ -13,25 +13,25 @@ import psycopg.sql as sql
 
 
 def filter_by_object_ids(
-    pfx: str, id_field: str, ids: list[PrimaryKey]
+    table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]
 ) -> Tuple[sql.Composable, dict]:
-    """ """
-    data = {f"{pfx}_ints": [], f"{pfx}_uuids": []}
+    """Builds SQL to filter by integer primary keys or UUIDs."""
+    data = {"_filter_ints": [], "_filter_uuids": []}
 
     for id_val in ids:
         if isinstance(id_val, int):
-            data[f"{pfx}_ints"].append(id_val)
+            data["_filter_ints"].append(id_val)
         elif isinstance(id_val, UUID):
-            data[f"{pfx}_uuids"].append(id_val)
+            data["_filter_uuids"].append(id_val)
 
     return (
         sql.SQL(
-            "{prefix}.{ident} = ANY({i_placehodler}::int[]) OR {prefix}.uuid = ANY({u_placeholder}::uuid[])"
+            "{table}.{pk_col} = ANY({i_placeholder}::int[]) OR {table}.uuid = ANY({u_placeholder}::uuid[])"
         ).format(
-            prefix=sql.Identifier(pfx),
-            ident=sql.Identifier(id_field),
-            i_placehodler=sql.Placeholder(f"{pfx}_ints"),
-            u_placeholder=sql.Placeholder(f"{pfx}_uuids"),
+            table=table,
+            pk_col=pk_col,
+            i_placeholder=sql.Placeholder("_filter_ints"),
+            u_placeholder=sql.Placeholder("_filter_uuids"),
         ),
         data,
     )
@@ -52,14 +52,61 @@ def clause_generator(
     )
 
 
-def resolve_identifier(cls, key: PrimaryKey) -> sql.Identifier:
+def resolve_identifier(cls: type[DBbase], key: PrimaryKey) -> sql.Identifier:
     """Determine which key type a PrimaryKey object is"""
     match key:
         case int():
-            pk_col = cls.get_pk_identifier()
+            pk_col = cls.__pk__
         case UUID():
             pk_col = sql.Identifier("uuid")
         case _:
             raise Exception(f"type {type(key)}")
 
     return pk_col
+
+
+def resolve_parent_filter(
+    cls: type[DBbase],
+    parent_cls: type[DBbase],
+    parent_pk: PrimaryKey,
+) -> tuple[sql.Composable, list[sql.Composable]]:
+    """Resolves foreign key filter condition and required joins for a parent class.
+
+    Supports direct parent-child relationships and indirect relationships
+    defined via __parent_table__ and __parent_fk__.
+    Uses sql.Identifier directly without deconstruction.
+    """
+    joins: list[sql.Composable] = []
+
+    # 1. Determine which table holds parent_cls.__pk__
+    if cls.__parent_table__ and cls.__parent_fk__:
+        inter_table = cls.__parent_table__
+        inter_fk = cls.__parent_fk__
+        joins.append(
+            sql.SQL("JOIN {inter_table} ON {inter_table}.{inter_fk} = {child_table}.{inter_fk}").format(
+                inter_table=inter_table,
+                inter_fk=inter_fk,
+                child_table=cls.__table__,
+            )
+        )
+        target_table = inter_table
+    else:
+        target_table = cls.__table__
+
+    # 2. Condition depends on whether parent_pk is UUID or int
+    if isinstance(parent_pk, UUID):
+        joins.append(
+            sql.SQL("JOIN {parent_table} ON {parent_table}.{pk} = {target_table}.{pk}").format(
+                parent_table=parent_cls.__table__,
+                pk=parent_cls.__pk__,
+                target_table=target_table,
+            )
+        )
+        condition = sql.SQL("{parent_table}.uuid").format(parent_table=parent_cls.__table__)
+    else:
+        condition = sql.SQL("{target_table}.{pk}").format(
+            target_table=target_table,
+            pk=parent_cls.__pk__,
+        )
+
+    return condition, joins

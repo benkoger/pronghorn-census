@@ -5,7 +5,7 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 import cv2
@@ -77,11 +77,6 @@ class CreateImageReq(BaseModel):
     img_key: str
     image_length_px: int
     image_width_px: int
-    area: Optional[int] = None
-    viewshed_polygon: Optional[list[list[float]]] = None
-    has_detection: bool = False
-    dem_name: Optional[str] = None
-    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -135,12 +130,7 @@ class UpdateImageReq(BaseModel):
     img_key: Optional[str] = None
     image_length_px: Optional[int] = None
     image_width_px: Optional[int] = None
-    area: Optional[int] = None
     opened_by_user_id: Optional[int] = None
-    viewshed_polygon: Optional[list[list[float]]] = None
-    has_detection: bool = False
-    dem_name: Optional[str] = None
-    bbox_wsen: Optional[list[int]] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -166,13 +156,17 @@ class CreatePredictionCropReq(BaseModel):
 
 
 class RAQuery(BaseModel):
-    herd_unit_id: Optional[list[UUID]]
-    survey_id: Optional[list[UUID]]
+    herd_unit_id: Optional[list[UUID]] = None
+    survey_id: Optional[list[UUID]] = None
     include_reviewed: Optional[bool] = False
     include_opened: Optional[bool] = False
     num: Optional[int] = None
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+    search: Optional[str] = None
+    exclude_ids: Optional[list[UUID]] = None
 
-    @field_validator("herd_unit_id", "survey_id", mode="before")
+    @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")
     @classmethod
     def ensure_list(cls, value):
         if isinstance(value, list):
@@ -242,18 +236,12 @@ class Image(DBbase, ImageMixin):
     modified: datetime
     image_length_px: int
     image_width_px: int
-    area: float
-    viewshed_polygon: list[list[float]]
-    has_detection: bool
-    dem_name: str
-    bbox_wsen: Optional[list[int]]
     uuid: UUID
 
     image: Optional[np.ndarray] = field(default=None, init=False)
 
-    __tablename__: str = "images"
-    __schema__: str = "core"
-    __pk_name__: str = "image_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -283,15 +271,13 @@ class Image(DBbase, ImageMixin):
         query = sql.SQL("""
             INSERT INTO core.images (
                 herd_unit_id, survey_id, name, img_key, image_length_px,
-                image_width_px, area, viewshed_polygon, has_detection,
-                dem_name, bbox_wsen
+                image_width_px
             )
             VALUES (
                 %(herd_unit_id)s, %(survey_id)s, %(name)s,
                 %(img_key)s, %(image_length_px)s,
-                %(image_width_px)s, %(area)s, %(viewshed_polygon)s,
-                %(has_detection)s, %(dem_name)s, %(bbox_wsen)s
-                )
+                %(image_width_px)s
+            )
             RETURNING *;
         """)
 
@@ -347,9 +333,10 @@ class ReviewedArea(DBbase, ImageMixin):
     ra_key: Optional[str] = None
     dimensions: "Box" = field(init=False)
 
-    __tablename__: str = "reviewed_area"
-    __schema__: str = "core"
-    __pk_name__: str = "reviewed_area_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "reviewed_area")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("reviewed_area_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

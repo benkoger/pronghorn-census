@@ -6,6 +6,7 @@
 from flask import Blueprint, request
 from app.decorators import permission_required
 from database.object_models.core.annotations import Annotation
+from database.object_models.core.images import Image
 from database.object_models.project_management import CreateSurveyReq, UpdateSurveyReq
 from app.extensions import base
 from datetime import datetime
@@ -142,14 +143,13 @@ def get_herd_units(survey_id: int | UUID):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-# TODO update get_children method to use pagination and get this to use get_children
 @surveyBp.get("/<string:survey_id>/images")
 @login_required
 @permission_required("access")
 @validate()
 def get_images(query: SurveyImageQuery, survey_id: str):
     """
-    Retrieve paginated images belonging to a specific survey.
+    Retrieve images belonging to a specific survey with optional pagination.
     ---
     parameters:
       - name: survey_id
@@ -161,16 +161,16 @@ def get_images(query: SurveyImageQuery, survey_id: str):
       - name: page
         in: query
         type: integer
-        default: 1
+        required: false
         description: Page number for pagination.
       - name: per_page
         in: query
         type: integer
-        default: 20
+        required: false
         description: Number of images per page.
     responses:
       200:
-        description: Paginated image collection with total count.
+        description: Image collection with total count.
       400:
         description: Invalid UUID or query parameters.
       401:
@@ -180,18 +180,28 @@ def get_images(query: SurveyImageQuery, survey_id: str):
       500:
         description: Database error.
     """
-    offset = (query.page - 1) * query.per_page
-
-    images, total_images = base.get_survey_images(
-        UUID(survey_id), query.per_page, offset
-    )
-
-    return {
-        "images": [image.serialize() for image in images],
-        "total": total_images,
-        "page": query.page,
-        "per_page": query.per_page,
-    }, 200
+    if query.page is not None:
+        page = max(1, query.page)
+        per_page = max(1, query.per_page or 20)
+        images, total_images = base.get_paginated(
+            cls=Image,
+            parent_cls=Survey,
+            parent_pk=UUID(survey_id),
+            page=page,
+            per_page=per_page,
+        )
+        return {
+            "images": [image.serialize() for image in images],
+            "total": total_images,
+            "page": page,
+            "per_page": per_page,
+        }, 200
+    else:
+        images = base.get_children(Image, Survey, UUID(survey_id))
+        return {
+            "images": [image.serialize() for image in images],
+            "total": len(images),
+        }, 200
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

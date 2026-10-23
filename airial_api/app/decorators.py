@@ -10,6 +10,8 @@ from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
 from database.object_models.project_management import HerdUnit
 from database.object_models.core.images import Image
+from database.object_models.core.image_metadata import ImageMetadata
+from database.object_models.core.image_footprints import ImageFootprint
 from database.object_models.project_management.labels import Label
 from database.object_models.user_management.organizations import Organization
 from database.object_models.user_management.users import User
@@ -17,6 +19,9 @@ from database.object_models.user_management.users import User
 # Model map replacing obsolete base methods
 MODEL_MAP = {
     "image": Image,
+    "image_metadata": ImageMetadata,
+    "image_footprint": ImageFootprint,
+    "image_footprints": ImageFootprint,
     "label": Label,
     "herd_unit": HerdUnit,
     "org": Organization,
@@ -25,6 +30,9 @@ MODEL_MAP = {
 
 check_exist = {
     "image": lambda val: base._exists(Image, val),
+    "image_metadata": lambda val: base._exists(ImageMetadata, val),
+    "image_footprint": lambda val: base._exists(ImageFootprint, val),
+    "image_footprints": lambda val: base._exists(ImageFootprint, val),
     "label": lambda val: base._exists(Label, val),
     "herd_unit": lambda val: base._exists(HerdUnit, val),
     "org": lambda val: base._exists(Organization, val),

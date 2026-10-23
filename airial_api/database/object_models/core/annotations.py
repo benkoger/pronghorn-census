@@ -4,14 +4,14 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Optional, Self
+from typing import Any, ClassVar, List, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.rows import class_row
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from ..base import (
     Box,
@@ -51,13 +51,25 @@ class BulkCreateAnnotationReq(BaseModel):
 
 
 class UpdateAnnotationReq(BaseModel):
+    annotation_id: Optional[UUID] = Field(default=None, exclude=True)
     image_id: Optional[Keyring] = None
-    label_id: Optional[Keyring] = None
+    label_id: Optional[int | Keyring] = None
     type: Optional[ActivityType] = None
     box_tx: Optional[int] = None
     box_ty: Optional[int] = None
     box_bx: Optional[int] = None
     box_by: Optional[int] = None
+
+    @field_validator("label_id", mode="before")
+    @classmethod
+    def resolve_label_id(cls, value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, dict) and "pkey" in value:
+            return value["pkey"]
+        if hasattr(value, "pkey"):
+            return value.pkey
+        return int(value)
 
 
 class BulkUpdateAnnotationsReq(BulkRequestModel):
@@ -100,9 +112,10 @@ class Annotation(DBbase):
     uuid: UUID
     dimensions: "Box" = field(init=False)
 
-    __schema__: str = "core"
-    __tablename__: str = "annotations"
-    __pk_name__: str = "annotation_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "annotations")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("annotation_id")
+    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
+    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
@@ -22,6 +22,7 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 class CreateAmUnitReq(BaseModel):
     previous_unit_id: Optional[int] = None
     next_unit_id: Optional[int] = None
+    relative_position: Optional[int] = None
     active_measurement_ids: Keyring
     reviewed_area_ids: Optional[Keyring] = None
     reviwed_area_ids: Optional[Keyring] = None
@@ -43,6 +44,7 @@ class CreateAmUnitReq(BaseModel):
 class UpdateAmUnitReq(BaseModel):
     next_unit_id: Optional[int] = None
     previous_unit_id: Optional[int] = None
+    relative_position: Optional[int] = None
     human_count: Optional[int] = None
     current_count: Optional[float] = None
     current_ci_lower: Optional[float] = None
@@ -69,10 +71,10 @@ class AmUnit(DBbase):
     uuid: UUID
     next_unit_id: Optional[int] = None
     previous_unit_id: Optional[int] = None
+    relative_position: Optional[int] = None
 
-    __schema__: str = "core"
-    __tablename__: str = "am_units"
-    __pk_name__: str = "am_unit_id"
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "am_units")
+    __pk__: ClassVar[sql.Identifier] = sql.Identifier("am_unit_id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 
@@ -81,6 +83,7 @@ class AmUnit(DBbase):
         am_unit_id: int
         next_unit_id: Optional[int] = None
         previous_unit_id: Optional[int] = None
+        relative_position: Optional[int] = None
         active_measurement_id: int
         reviewed_area_id: int
         reg_model_id: int
@@ -116,13 +119,13 @@ class AmUnit(DBbase):
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.am_units (
-                next_unit_id, previous_unit_id, active_measurement_id,
+                next_unit_id, previous_unit_id, relative_position, active_measurement_id,
                 reviewed_area_id, reg_model_id, dect_model_id,
                 created_by_user_id, model_count, human_count,
                 current_count, current_ci_lower, current_ci_upper
             )
             VALUES (
-                %(next_unit_id)s, %(previous_unit_id)s,
+                %(next_unit_id)s, %(previous_unit_id)s, %(relative_position)s,
                 %(active_measurement_id)s,
                 %(reviewed_area_id)s, %(reg_model_id)s, %(dect_model_id)s,
                 %(created_by_user_id)s, %(model_count)s, %(human_count)s,
@@ -137,6 +140,7 @@ class AmUnit(DBbase):
                 **req.model_dump(),
                 "next_unit_id": req.next_unit_id,
                 "previous_unit_id": req.previous_unit_id,
+                "relative_position": req.relative_position,
                 "active_measurement_id": req.active_measurement_ids.pkey,
                 "reviewed_area_id": reviewed_area_key.pkey,
                 "reg_model_id": req.reg_model_ids.pkey,

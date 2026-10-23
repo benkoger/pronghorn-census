@@ -1,20 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Authenticate from "@/pages/authenticate.vue";
-import { useSystemStore } from "@/modules/stores/systemStore";
-import { checkApiBootstrapped } from "./modules/api/apiV1Methods";
+import Authenticate from "@/views/AuthView.vue";
+import { useSystemStore, setSystemStoreRouter } from "@/stores/systemStore";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: "/setup",
-      name: "setup",
-      component: () => import("@/pages/initialSetup.vue"),
-      meta: {
-        requiresAuth: false,
-        requiresNoLayout: true,
-      },
-    },
     {
       path: "/authenticate",
       name: "authenticate",
@@ -24,16 +14,17 @@ const router = createRouter({
     {
       path: "/",
       name: "dashboard",
-      component: () => import("@/pages/dashboard.vue"),
+      component: () => import("@/views/DashboardView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:dashboard-rounded",
       },
     },
     // {
     //   path: "/users/:uuid?",
     //   name: "users",
-    //   component: () => import("@/pages/users.vue"),
+    //   component: () => import("@/views/UsersView.vue"),
     //   meta: {
     //     requiresAuth: true,
     //     requiresNoLayout: false,
@@ -42,64 +33,72 @@ const router = createRouter({
     {
       path: "/auto-cropper/",
       name: "auto-cropper",
-      component: () => import("@/pages/autoCropper/autoCropperPage.vue"),
+      component: () => import("@/views/AutoCropperView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "fluent:crop-sparkle-24-filled",
       },
     },
     {
       path: "/crop-verifier/",
       name: "crop-verifier",
-      component: () => import("@/pages/cropVerifier/cropVerifierPage.vue"),
+      component: () => import("@/views/CropVerifierView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "mynaui:bounding-box-solid",
       },
+    },
+    {
+      path: "/active-measurement/",
+      name: "active-measurement",
+      component: () => import("@/views/ActiveMeasurementView.vue"),
+      meta: {
+        requiresAuth: true,
+        requiresNoLayout: false,
+        icon: "gis:measure-area",
+      }
     },
     {
       path: "/settings",
       name: "settings",
-      component: () => import("@/pages/settings.vue"),
+      component: () => import("@/views/SettingsView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:settings-rounded",
       },
     },
     {
       path: "/upload/",
       name: "upload",
-      component: () => import("@/pages/uploader/uploaderPage.vue"),
+      component: () => import("@/views/UploaderView.vue"),
       meta: {
         requiresAuth: true,
         requiresNoLayout: false,
+        icon: "material-symbols:upload",
       },
     },
-    // {
-    //   path: "/data",
-    //   name: "data-manager",
-    //   component: () => import("@/pages/dataManager.vue"),
-    //   meta: {
-    //     requiresAuth: true,
-    //     requiresNoLayout: false,
-    //   },
-    // },
+    {
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("@/views/NotFoundView.vue"),
+      meta: {
+        requiresAuth: false,
+        requiresNoTitle: true,
+        requiresNoLayout: true,
+      },
+    },
   ],
 });
 
 router.beforeEach(async (to) => {
   const sStore = useSystemStore();
 
-  if (sStore.bootstrapped === undefined) {
-    sStore.bootstrapped = await checkApiBootstrapped();
-  }
-
-  if (!sStore.bootstrapped) {
-    return to.name === "setup" ? true : { name: "setup" };
-  }
-
-  if (sStore.bootstrapped && to.name === "setup") {
-    return { name: "authenticate" };
+  const isHealthy = await sStore.check_api();
+  if (!isHealthy) {
+    return false;
   }
 
   if (to.meta.requiresAuth) {
@@ -117,6 +116,13 @@ router.beforeEach(async (to) => {
   }
 
   return true;
+});
+
+setSystemStoreRouter(router);
+
+router.afterEach((to) => {
+  const sStore = useSystemStore();
+  sStore.syncFromRoute(to);
 });
 
 export default router;

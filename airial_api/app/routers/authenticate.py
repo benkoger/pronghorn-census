@@ -11,12 +11,13 @@ from urllib.parse import urlencode
 
 import requests
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
-from flask_login import login_required, login_user, logout_user
+from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from werkzeug.security import check_password_hash
 
 from app.extensions import base
 from database import AuthenticationFailure
+from database.object_models.core import Image, UpdateImageReq
 from database.object_models.user_management import (
     LegacyAuthReq,
     Organization,
@@ -181,6 +182,11 @@ def authenticate(body: LegacyAuthReq):
 @authBp.post("/deauthenticate")
 @login_required
 def logout():
-    """Logout current user session"""
+    """Logout current user session and release any locked images."""
+    base.bulk_update(
+        Image,
+        UpdateImageReq(opened_by_user_id=0),
+        {"opened_by_user_id": current_user.user_id},
+    )
     logout_user()
     return "", 200
