@@ -70,8 +70,6 @@ class ImageMetadata(DBbase):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "image_metadata")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("metadata_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # -----------------------------------------------------------------------------------------------------------------------
 

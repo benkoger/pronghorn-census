@@ -9,10 +9,13 @@ from pydantic import TypeAdapter
 import pytest
 
 from database.object_models.core.annotations import Annotation
+from database.object_models.core.image_footprints import ImageFootprint
+from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.images import Image, ReviewedArea
 from database.object_models.core.predictions import Prediction
+from database.object_models.project_management import HerdUnit, Survey
 from testing_core import APITester
-from app.extensions import cache
+from app.extensions import cache, base
 
 import io
 from PIL import Image as PILImage
@@ -43,8 +46,18 @@ class TestImages(APITester):
                 True,
             ),
             (
-                "api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/annotations",
+                "/api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/annotations",
                 Annotation.Response,
+                True,
+            ),
+            (
+                "/api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/metadata",
+                ImageMetadata.Response,
+                True,
+            ),
+            (
+                "/api/v1/images/26be495e-3ec2-41c8-ba14-d0b65726bb67/footprints",
+                ImageFootprint.Response,
                 True,
             ),
         ],
@@ -75,7 +88,7 @@ class TestImages(APITester):
     def test_get_image_not_found(self, auth_client, path_suffix):
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/images/{random_uuid}{path_suffix}")
-        assert response.status_code == 401
+        assert response.status_code == 404
 
     # -------------------------------------------------------------------------
     # 3. POST Endpoint Validation & Payloads
@@ -89,8 +102,14 @@ class TestImages(APITester):
                 "/api/v1/images",
                 {
                     "name": f"pronghorn_{uuid4().hex[:6]}",
-                    "herd_unit_id": 1,
-                    "survey_id": 1,
+                    "herd_unit_ids": {
+                        "pkey": 1,
+                        "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
+                    },
+                    "survey_ids": {
+                        "pkey": 1,
+                        "uuid": "f4c0b5e0-af30-46fa-a276-6169932b6a34",
+                    },
                     "img_key": f"s3://bucket/test_{uuid4().hex}.jpg",
                     "image_length_px": 1080,
                     "image_width_px": 1920,
@@ -164,8 +183,14 @@ class TestImages(APITester):
     def test_delete_image_lifecycle(self, auth_client):
         payload = {
             "name": f"pronghorn_{uuid4().hex[:6]}",
-            "herd_unit_id": 1,
-            "survey_id": 1,
+            "herd_unit_ids": {
+                "pkey": 1,
+                "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
+            },
+            "survey_ids": {
+                "pkey": 1,
+                "uuid": "f4c0b5e0-af30-46fa-a276-6169932b6a34",
+            },
             "img_key": f"s3://temp/delete_{uuid4().hex}.jpg",
             "image_length_px": 100,
             "image_width_px": 101,
@@ -343,4 +368,4 @@ class TestImages(APITester):
 
     def test_close_user_images_success(self, auth_client):
         response = auth_client.patch("/api/v1/images/close-user-images")
-        assert response.status_code == 204
+        assert response.status_code == 200

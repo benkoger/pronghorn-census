@@ -114,8 +114,6 @@ class Annotation(DBbase):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "annotations")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("annotation_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
