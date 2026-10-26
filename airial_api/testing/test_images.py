@@ -2,7 +2,6 @@
 # Author Michael B. Lance
 
 import hashlib
-from typing import List
 from uuid import uuid4
 
 from pydantic import TypeAdapter
@@ -13,10 +12,8 @@ from database.object_models.core.image_footprints import ImageFootprint
 from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.images import Image, ReviewedArea
 from database.object_models.core.predictions import Prediction
-from database.object_models.project_management import HerdUnit, Survey
 from testing_core import APITester
-from app.extensions import cache, base
-
+from app.extensions import cache
 import io
 from PIL import Image as PILImage
 
@@ -70,7 +67,7 @@ class TestImages(APITester):
 
         data = response.get_json()
         if is_list:
-            TypeAdapter(List[expected_schema]).validate_python(data)
+            TypeAdapter(list[expected_schema]).validate_python(data)
         else:
             expected_schema.model_validate(data)
 
