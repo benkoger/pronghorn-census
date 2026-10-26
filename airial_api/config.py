@@ -10,6 +10,10 @@ load_dotenv()
 true_set = ("true", "1", "t")
 
 
+valkey_cert_path = (
+    os.environ.get("VALKEY_CERT_PATH") or "/etc/valkey/certs/valkey.crt"
+)
+
 # Create redis connections
 session_redis_url = os.environ.get("SESSION_REDIS", "redis://@prong_valkey:6379/0")
 cache_redis_url = os.environ.get("CACHE_REDIS", "redis://@prong_valkey:6379/1")
@@ -18,12 +22,16 @@ session_redis_kwargs = {}
 cache_redis_kwargs = {}
 
 if session_redis_url.startswith("rediss://"):
-    session_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    session_redis_kwargs["ssl_cert_reqs"] = "none"
     session_redis_kwargs["ssl_check_hostname"] = False
+    if os.path.exists(valkey_cert_path):
+        session_redis_kwargs["ssl_ca_certs"] = valkey_cert_path
 
 if cache_redis_url.startswith("rediss://"):
-    cache_redis_kwargs["ssl_cert_reqs"] = ssl.CERT_NONE
+    cache_redis_kwargs["ssl_cert_reqs"] = "none"
     cache_redis_kwargs["ssl_check_hostname"] = False
+    if os.path.exists(valkey_cert_path):
+        cache_redis_kwargs["ssl_ca_certs"] = valkey_cert_path
 
 session_redis = redis.from_url(session_redis_url, **session_redis_kwargs)
 cache_redis = redis.from_url(cache_redis_url, **cache_redis_kwargs)
@@ -92,8 +100,15 @@ if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
 cache_config = {
     "CACHE_TYPE": "RedisCache",
     "CACHE_DEFAULT_TIMEOUT": 300,
-    "CACHE_REDIS_HOST": cache_redis,
+    "CACHE_REDIS_URL": cache_redis_url,
 }
+
+if cache_redis_url.startswith("rediss://"):
+    cache_config["CACHE_REDIS_SSL"] = True
+    cache_config["CACHE_REDIS_SSL_CERT_REQS"] = "none"
+    cache_config["CACHE_REDIS_SSL_CHECK_HOSTNAME"] = False
+    if os.path.exists(valkey_cert_path):
+        cache_config["CACHE_REDIS_SSL_CA_CERTS"] = valkey_cert_path
 
 
 s3_config = Config(
