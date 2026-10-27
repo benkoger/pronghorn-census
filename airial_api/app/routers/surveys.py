@@ -17,6 +17,7 @@ from flask_login import (
 from uuid import UUID
 
 from database.object_models.project_management.herd_units import HerdUnit
+from database.object_models.project_management.projectmanagement_bindings import SurveysHerdUnits
 from database.object_models.project_management.surveys import Survey, SurveyImageQuery
 
 surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
@@ -135,7 +136,12 @@ def get_herd_units(survey_id: int | UUID):
       500:
         description: Database error.
     """
-    herd_units = base.get_children(HerdUnit, Survey, survey_id)
+    
+    if isinstance(survey_id, UUID):
+        survey = base.get(Survey, survey_id)
+        survey_id = survey.survey_id
+
+    herd_units = base.get_related(SurveysHerdUnits, HerdUnit, {"survey_id": survey_id})
 
     return [herd_unit.serialize() for herd_unit in herd_units], 200
 
