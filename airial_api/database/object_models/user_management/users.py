@@ -1,25 +1,27 @@
 # Class definition for User objects in the database
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+"""User database models and schemas."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import ClassVar, List, Optional, Union
+from enum import StrEnum
+from typing import ClassVar
 from uuid import UUID
 
 import psycopg.sql as sql
-
-from enum import StrEnum
 from flask_login import UserMixin
 from msgpack import packb
 from pydantic import BaseModel, ConfigDict
 
-from ..base import DBbase, Keyring
+from ..base import DBbase
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UserStatus(StrEnum):
+    """Enumeration of user statuses."""
+
     ACTIVE = "active"
     INVITED = "invited"
     DISABLED = "disabled"
@@ -30,6 +32,8 @@ class UserStatus(StrEnum):
 
 @dataclass
 class User(UserMixin, DBbase):
+    """Database representation of a user."""
+
     user_id: int
     username: str
     email: str
@@ -42,8 +46,8 @@ class User(UserMixin, DBbase):
     uuid: UUID
     default_org_id: int
     password_hash: str
-    roles: Optional[List[str]] = None
-    locale: Optional[str] = None
+    roles: list[str] | None = None
+    locale: str | None = None
     id: str = field(init=False)
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("usermanagement", "users")
@@ -52,6 +56,8 @@ class User(UserMixin, DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a user."""
+
         model_config = ConfigDict(from_attributes=True)
 
         user_id: int
@@ -61,22 +67,25 @@ class User(UserMixin, DBbase):
         created: datetime
         modified: datetime
         last_login: datetime
-        locale: Optional[str]
+        locale: str | None
         default_org_id: int
         uuid: UUID
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __post_init__(self):
+        """Initialize string ID from UUID."""
         self.id = str(self.uuid)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getId(self) -> str:
+        """Return the user ID string."""
         return self.id
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def hasRole(self, role_name: str) -> bool:
+        """Check if the user has a specific role."""
         return role_name in self.roles if self.roles else False
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,11 +98,13 @@ class User(UserMixin, DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
+        """Serialize user model to a dictionary."""
         return User.Response.model_validate(self).model_dump(mode="json")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def to_cache(self):
+        """Serialize user model to packed msgpack bytes for caching."""
         return packb(
             {
                 **self.serialize(),
@@ -110,32 +121,38 @@ class User(UserMixin, DBbase):
 
 
 class CreateUserReq(BaseModel):
+    """Request schema for creating a user."""
+
     username: str
     email: str
     password: str
-    external_auth_id: Optional[str] = None
-    external_auth_provider: Optional[str] = None
-    status: Optional[UserStatus] = UserStatus.INVITED
-    locale: Optional[str] = "en/us"
-    organization_id: Optional[UUID] = None
-    role_ids: Optional[List[UUID]] = None
+    external_auth_id: str | None = None
+    external_auth_provider: str | None = None
+    status: UserStatus | None = UserStatus.INVITED
+    locale: str | None = "en/us"
+    organization_id: UUID | None = None
+    role_ids: list[UUID] | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateUserReq(BaseModel):
-    username: Optional[str] = None
-    last_login: Optional[datetime] = None
-    status: Optional[UserStatus] = None
-    external_auth_provider: Optional[str] = None
-    external_auth_id: Optional[str] = None
+    """Request schema for updating a user."""
+
+    username: str | None = None
+    last_login: datetime | None = None
+    status: UserStatus | None = None
+    external_auth_provider: str | None = None
+    external_auth_id: str | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class LegacyAuthReq(BaseModel):
+    """Request schema for legacy email/password authentication."""
+
     email: str
     password: str
 
@@ -144,6 +161,8 @@ class LegacyAuthReq(BaseModel):
 
 
 class RoleNameQuery(BaseModel):
+    """Query parameters for role lookup."""
+
     role_name: str
 
 
@@ -151,6 +170,8 @@ class RoleNameQuery(BaseModel):
 
 
 class UserQuery(BaseModel):
+    """Query parameters for user lookup by organization."""
+
     organization_id: UUID
 
 
@@ -158,4 +179,6 @@ class UserQuery(BaseModel):
 
 
 class SetActiveOrgReq(BaseModel):
-    org_id: Union[int, UUID]
+    """Request schema for setting the active organization."""
+
+    org_id: int | UUID

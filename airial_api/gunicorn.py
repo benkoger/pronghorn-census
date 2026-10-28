@@ -1,5 +1,8 @@
+"""Gunicorn WSGI server configuration and lifecycle hooks."""
+
 import multiprocessing
 import os
+
 import gevent.monkey
 
 bind = "0.0.0.0:8000"
@@ -10,10 +13,12 @@ worker_connections = 2000
 
 
 def when_ready(server):
+    """Apply monkey patching when server starts."""
     gevent.monkey.patch_all()
 
 
 def post_fork(server, worker):
+    """Initialize worker-specific database connection pool after fork."""
     from app.extensions import base
 
     worker.log.info(f"Creating pool for worker: {worker.pid}")

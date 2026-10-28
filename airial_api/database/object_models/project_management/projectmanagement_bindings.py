@@ -1,6 +1,7 @@
 # Multi table bindings for the projectmanagement schema
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Project management relational bindings models."""
 
 from dataclasses import dataclass
 from typing import ClassVar
@@ -14,6 +15,8 @@ from ..base import Relationbase
 
 @dataclass(frozen=True)
 class ProjectsHerdUnits(Relationbase):
+    """Relational binding between projects and herd units."""
+
     project_id: int
     herd_unit_id: int
 
@@ -26,6 +29,8 @@ class ProjectsHerdUnits(Relationbase):
 
 @dataclass(frozen=True)
 class ProjectsModels(Relationbase):
+    """Relational binding between projects and models."""
+
     project_id: int
     model_id: int
 
@@ -38,6 +43,8 @@ class ProjectsModels(Relationbase):
 
 @dataclass(frozen=True)
 class ProjectsSurveys(Relationbase):
+    """Relational binding between projects and surveys."""
+
     project_id: int
     survey_id: int
 
@@ -50,6 +57,8 @@ class ProjectsSurveys(Relationbase):
 
 @dataclass(frozen=True)
 class ProjectsSchemas(Relationbase):
+    """Relational binding between projects and schemas."""
+
     project_id: int
     survey_id: int
 
@@ -62,6 +71,8 @@ class ProjectsSchemas(Relationbase):
 
 @dataclass(frozen=True)
 class SurveysHerdUnits(Relationbase):
+    """Relational binding between surveys and herd units."""
+
     survey_id: int
     herd_unit_id: int
 

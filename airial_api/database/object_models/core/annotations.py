@@ -2,16 +2,18 @@
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
+"""Database model and request schemas for annotations."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, ClassVar, List, Optional, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..base import (
     Box,
@@ -26,6 +28,8 @@ from .activity import ActivityType
 
 
 class CreateAnnotationReq(BaseModel):
+    """Request schema for creating a single annotation."""
+
     label_id: int
     image_ids: Keyring
     herd_unit_id: int
@@ -35,34 +39,39 @@ class CreateAnnotationReq(BaseModel):
     box_by: int
     uuid: UUID
     type: ActivityType = ActivityType.AUTO_CROPPER
-    prediction_ids: Optional[Keyring] = None
-    reviewed_area_ids: Optional[Keyring] = None
+    prediction_ids: Keyring | None = None
+    reviewed_area_ids: Keyring | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class BulkCreateAnnotationReq(BaseModel):
+    """Request schema for bulk creating annotations for a reviewed area."""
+
     reviewed_area_id: UUID
-    requests: List[CreateAnnotationReq]
+    requests: list[CreateAnnotationReq]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateAnnotationReq(BaseModel):
-    annotation_id: Optional[UUID] = Field(default=None, exclude=True)
-    image_id: Optional[Keyring] = None
-    label_id: Optional[int | Keyring] = None
-    type: Optional[ActivityType] = None
-    box_tx: Optional[int] = None
-    box_ty: Optional[int] = None
-    box_bx: Optional[int] = None
-    box_by: Optional[int] = None
+    """Request schema for updating an existing annotation."""
+
+    annotation_id: UUID | None = Field(default=None, exclude=True)
+    image_id: Keyring | None = None
+    label_id: int | Keyring | None = None
+    type: ActivityType | None = None
+    box_tx: int | None = None
+    box_ty: int | None = None
+    box_bx: int | None = None
+    box_by: int | None = None
 
     @field_validator("label_id", mode="before")
     @classmethod
-    def resolve_label_id(cls, value: Any) -> Optional[int]:
+    def resolve_label_id(cls, value: Any) -> int | None:
+        """Normalize label ID from integer, dict, or Keyring representation."""
         if value is None:
             return None
         if isinstance(value, dict) and "pkey" in value:
@@ -73,14 +82,18 @@ class UpdateAnnotationReq(BaseModel):
 
 
 class BulkUpdateAnnotationsReq(BulkRequestModel):
+    """Request schema for bulk updating annotations for a reviewed area."""
+
     reviewed_area_id: UUID
-    requests: List[UpdateAnnotationReq]
+    requests: list[UpdateAnnotationReq]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class DeleteAnnotationReq(BaseModel):
+    """Request schema for deleting a single annotation."""
+
     annotation_id: UUID
 
 
@@ -88,7 +101,9 @@ class DeleteAnnotationReq(BaseModel):
 
 
 class BulkDeleteAnnotationsReq(BulkRequestModel):
-    requests: List[DeleteAnnotationReq]
+    """Request schema for bulk deleting annotations."""
+
+    requests: list[DeleteAnnotationReq]
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -96,6 +111,8 @@ class BulkDeleteAnnotationsReq(BulkRequestModel):
 
 @dataclass
 class Annotation(DBbase):
+    """Database entity representing an image annotation."""
+
     label_id: int
     image_id: int
     type: ActivityType
@@ -120,11 +137,14 @@ class Annotation(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def __post_init__(self):
+        """Construct Box dimensions from coordinates."""
         self.dimensions = Box((self.box_tx, self.box_ty), (self.box_bx, self.box_by))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Pydantic response model for serialized Annotation entities."""
+
         model_config = ConfigDict(from_attributes=True)
 
         annotation_id: int
@@ -140,6 +160,7 @@ class Annotation(DBbase):
         @field_validator("dimensions", mode="before")
         @classmethod
         def transform_box(cls, value: Any) -> dict[str, dict[str, int]]:
+            """Serialize Box instance into nested dictionary."""
             if isinstance(value, Box):
                 return value.serialize()
             return value
@@ -153,7 +174,7 @@ class Annotation(DBbase):
         req: CreateAnnotationReq,
         user_key: Keyring,
         herd_unit_key: Keyring,
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    ) -> tuple[Self, list[RelationshipUpdate]] | None:
 
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
@@ -164,7 +185,7 @@ class Annotation(DBbase):
                 )
                 VALUES (
                     %(label_id)s, %(image_id)s, %(type)s, %(herd_unit_id)s, %(box_tx)s,
-                    %(box_ty)s, %(box_bx)s, %(box_by)s, %(created_by_user_id)s, 
+                    %(box_ty)s, %(box_bx)s, %(box_by)s, %(created_by_user_id)s,
                     %(pred_id)s, %(uuid)s
                 )
                 RETURNING *
@@ -196,15 +217,12 @@ class Annotation(DBbase):
         if not (annotation := cursor.fetchone()):
             return None
 
-        spice_updates = [
-            create_spice_update(
-                "annotation", annotation.uuid, "image", req.image_ids.uuid, "parent"
-            )
-        ]
+        spice_updates = [create_spice_update("annotation", annotation.uuid, "image", req.image_ids.uuid, "parent")]
 
         return annotation, spice_updates
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize Annotation entity to dictionary."""
         return Annotation.Response.model_validate(self).model_dump(mode="json")

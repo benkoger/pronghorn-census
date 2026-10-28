@@ -1,6 +1,8 @@
 # Endpoints for managing images in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing images in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -9,22 +11,22 @@ import cv2
 from flask import Blueprint, Response, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from app.decorators import permission_required, roles_required
 
+from app.decorators import permission_required, roles_required
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
 from database.errors import ObjectNotFound
 from database.object_models.base import BulkRequest
 from database.object_models.core import (
-    Image,
-    ImageMetadata,
-    ImageFootprint,
-    Prediction,
     Annotation,
-    ReviewedArea,
     CreateImageReq,
     CreatePredictionCropReq,
     CreatePresignedPutReq,
+    Image,
+    ImageFootprint,
+    ImageMetadata,
+    Prediction,
+    ReviewedArea,
     UpdateImageReq,
 )
 from database.object_models.core.images import (
@@ -45,8 +47,8 @@ imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 @login_required
 @permission_required("access")
 def get_by_id(image_id: int | UUID):
-    """
-    Request an image object from the database using its integer PK or UUID.
+    """Request an image object from the database using its integer PK or UUID.
+
     ---
     parameters:
       - name: image_i
@@ -61,7 +63,6 @@ def get_by_id(image_id: int | UUID):
       404:
         description: No image record found for the provided ID.
     """
-
     return base.get(Image, image_id).serialize(), 200
 
 
@@ -71,7 +72,7 @@ def get_by_id(image_id: int | UUID):
 @permission_required("access")
 @imageBp.get("/prediction_crops/<string:prediction_id>")
 def get_prediction_crop(prediction_id: str):
-    """ """
+    """Retrieve a cached prediction crop image."""
     crop = cache.get(prediction_id)
     if crop is None:
         raise ObjectNotFound("prediction_crop", prediction_id)
@@ -87,8 +88,8 @@ def get_prediction_crop(prediction_id: str):
 @imageBp.get("/<uuid:image_id>/crops")
 @login_required
 def get_crops(image_id: int | UUID):
-    """
-    Retrieve crops for a specific image
+    """Retrieve crops for a specific image.
+
     ---
     responses:
       200:
@@ -115,8 +116,8 @@ def get_crops(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_predictions(image_id: int | UUID):
-    """
-    Retrieve all predictions for a specific image.
+    """Retrieve all predictions for a specific image.
+
     ---
     parameters:
       - name: image_id
@@ -153,8 +154,8 @@ def get_predictions(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_metadata(image_id: int | UUID):
-    """
-    Retrieve metadata associated with a specific image.
+    """Retrieve metadata associated with a specific image.
+
     ---
     parameters:
       - name: image_id
@@ -185,8 +186,8 @@ def get_metadata(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_footprints(image_id: int | UUID):
-    """
-    Retrieve footprints associated with a specific image.
+    """Retrieve footprints associated with a specific image.
+
     ---
     parameters:
       - name: image_id
@@ -217,8 +218,8 @@ def get_footprints(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_annotations(image_id: int | UUID):
-    """
-    Retrieve all annotations for a specific image.
+    """Retrieve all annotations for a specific image.
+
     ---
     parameters:
       - name: image_id
@@ -242,7 +243,6 @@ def get_annotations(image_id: int | UUID):
       500:
         description: Database error.
     """
-
     annotations = base.get_children(Annotation, Image, image_id)
 
     return [annot.serialize() for annot in annotations], 200
@@ -257,8 +257,8 @@ def get_annotations(image_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateImageReq):
-    """
-    Create a new image object.
+    """Create a new image object.
+
     ---
     parameters:
             - name: create image request
@@ -285,8 +285,8 @@ def create(body: CreateImageReq):
 @permission_required("access")
 @validate()
 def create_presigned_get(body: PresignedImageGetReq):
-    """
-    Generate a presigned GET URL for an image.
+    """Generate a presigned GET URL for an image.
+
     ---
     responses:
             201:
@@ -298,7 +298,6 @@ def create_presigned_get(body: PresignedImageGetReq):
             500:
                     description: Storage or database error.
     """
-
     image = base.get(Image, body.image_id)
 
     response = s3.generate_presigned_url(
@@ -319,8 +318,8 @@ def create_presigned_get(body: PresignedImageGetReq):
 @permission_required("access")
 @validate()
 def create_chunk_presigned_put(body: CreatePresignedPutReq):
-    """
-    Generates a pre-signed URL for a single file chunk (UploadPart).
+    """Generates a pre-signed URL for a single file chunk (UploadPart).
+
     ---
     responses:
             201:
@@ -360,8 +359,8 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
 @permission_required("access")
 @validate()
 def create_multipart_upload(body: CreateImageMultiPartUploadReq):
-    """
-    Initiates a new multipart upload.
+    """Initiates a new multipart upload.
+
     ---
     responses:
             201:
@@ -386,8 +385,8 @@ def create_multipart_upload(body: CreateImageMultiPartUploadReq):
 @permission_required("access")
 @validate()
 def complete_upload(body: CompleteMultiPartUploadReq):
-    """
-    Completes a new multipart upload.
+    """Completes a new multipart upload.
+
     ---
     responses:
             200:
@@ -395,7 +394,6 @@ def complete_upload(body: CompleteMultiPartUploadReq):
             500:
                     description: S3 or system error.
     """
-
     response = s3.complete_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
         Key=body.image_key,
@@ -414,8 +412,8 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @permission_required("access")
 @validate()
 def abort_upload(body: AbortMulitPartUploadReq):
-    """
-    Aborts a multipart upload.
+    """Aborts a multipart upload.
+
     ---
     responses:
             200:
@@ -423,7 +421,6 @@ def abort_upload(body: AbortMulitPartUploadReq):
             500:
                     description: S3 or system error.
     """
-
     response = s3.abort_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
         Key=body.image_key,
@@ -441,17 +438,15 @@ def abort_upload(body: AbortMulitPartUploadReq):
 @permission_required("access")
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
-    """"""
+    """Generate and cache prediction crop chips."""
     image = base.get(Image, body.image_id)
-    req = BulkRequest(object_ids=body.prediction_id) #pyright: ignore
+    req = BulkRequest(object_ids=body.prediction_id)  # pyright: ignore
     predictions = base.bulk_get(Prediction, req)
 
     image_data = cache.get(image.uuid)
 
     if not image_data:
-        image_data = s3.get_object(
-            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
-        )["Body"].read()
+        image_data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)["Body"].read()
 
         cache.set(image.uuid, image_data, 500)
 
@@ -473,8 +468,8 @@ def get_prediciton(body: CreatePredictionCropReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateImageReq, image_id: int | UUID):
-    """
-    Update image object in the database.
+    """Update image object in the database.
+
     ---
     paramete:qrsrs:
             - name: image_id
@@ -522,8 +517,7 @@ def close_user_images():
 @login_required
 @permission_required("access")
 def delete_image(image_id: int | UUID):
-    """ """
-
+    """Delete an image and its associated records by integer ID or UUID."""
     image = base.get(Image, image_id)
 
     s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)

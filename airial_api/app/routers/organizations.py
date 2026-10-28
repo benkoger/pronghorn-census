@@ -1,17 +1,17 @@
 # Endpoints for managing organizations in the api
 # Author: Michael B. Lance
 
+"""Endpoints for managing organizations in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint
 from flask_login import login_required
-from app.decorators import permission_required
-from database.object_models.user_management import createOrganizationReq
-from database.object_models.user_management import Organization
-
 from flask_pydantic import validate
 
+from app.decorators import permission_required
 from app.extensions import base
+from database.object_models.user_management import Organization, createOrganizationReq
 
 orgBp = Blueprint("organizations", __name__, url_prefix="/api/v1/organizations")
 
@@ -24,8 +24,8 @@ orgBp = Blueprint("organizations", __name__, url_prefix="/api/v1/organizations")
 @permission_required("access")
 @validate()
 def create(body: createOrganizationReq):
-    """
-    Create a new organization using the schema-driven base._insert.
+    """Create a new organization using the schema-driven base._insert.
+
     ---
     parameters:
       - name: body

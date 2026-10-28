@@ -1,10 +1,24 @@
 # Endpoints for managing projects in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing projects in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
+from typing import cast
 from uuid import UUID
 
+from flask import Blueprint, session
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+from msgpack import unpackb
+
+from app.decorators import permission_required
+from app.extensions import base
+from database.object_models.project_management import (
+    Project,
+    ProjectsHerdUnits,
+)
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.models import Model
 from database.object_models.project_management.projectmanagement_bindings import (
@@ -15,22 +29,7 @@ from database.object_models.project_management.projectmanagement_bindings import
 from database.object_models.project_management.projects import createProjectReq
 from database.object_models.project_management.schemas import Schema
 from database.object_models.project_management.surveys import Survey
-from database.object_models.user_management import User, Organization
-from flask import Blueprint, session
-from flask_login import login_required, current_user
-from flask_pydantic import validate
-from msgpack import unpackb
-from typing import cast
-
-from app.decorators import permission_required
-
-from app.extensions import base
-from database.object_models.project_management import (
-    Project,
-    ProjectsHerdUnits,
-)
-
-from database.object_models.user_management import OrganizationProject
+from database.object_models.user_management import Organization, OrganizationProject, User
 from database.object_models.user_management.roles import Role
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
@@ -44,8 +43,8 @@ projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 @permission_required("access")
 @validate()
 def get_all():
-    """
-    Retrieve all projects belonging to the currently active session organization.
+    """Retrieve all projects belonging to the currently active session organization.
+
     ---
     responses:
       200:
@@ -55,7 +54,6 @@ def get_all():
       500:
         description: Database or session error.
     """
-
     org_id = session.get("active_org_uuid")
     active_org = session.get(f"org_{org_id}")
     org = Organization(**unpackb(active_org))
@@ -74,8 +72,8 @@ def get_all():
 @login_required
 @permission_required("access")
 def get_by_id(project_id: int | UUID):
-    """
-    Request a project object from the database using its integer PK or UUID.
+    """Request a project object from the database using its integer PK or UUID.
+
     ---
     parameters:
       - name: project_id
@@ -101,7 +99,6 @@ def get_by_id(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     return base.get(Project, project_id).serialize(), 200
 
 
@@ -113,8 +110,8 @@ def get_by_id(project_id: int | UUID):
 @permission_required("access")
 @login_required
 def get_models(project_id: int | UUID):
-    """
-    Retrieve all models associated with a specific project.
+    """Retrieve all models associated with a specific project.
+
     ---
     parameters:
       - name: project_id
@@ -140,7 +137,6 @@ def get_models(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
         project_id = project.project_id
@@ -158,8 +154,8 @@ def get_models(project_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_herd_units(project_id: int | UUID):
-    """
-    Retrieve all herd units associated with a specific project.
+    """Retrieve all herd units associated with a specific project.
+
     ---
     parameters:
       - name: project_id
@@ -185,14 +181,11 @@ def get_herd_units(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
         project_id = project.project_id
 
-    herd_units = base.get_related(
-        ProjectsHerdUnits, HerdUnit, {"project_id": project_id}
-    )
+    herd_units = base.get_related(ProjectsHerdUnits, HerdUnit, {"project_id": project_id})
 
     return [herd_unit.serialize() for herd_unit in herd_units], 200
 
@@ -205,8 +198,8 @@ def get_herd_units(project_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_surveys(project_id: int | UUID):
-    """
-    Retrieve all surveys associated with a specific project.
+    """Retrieve all surveys associated with a specific project.
+
     ---
     parameters:
       - name: project_id
@@ -232,7 +225,6 @@ def get_surveys(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
         project_id = project.project_id
@@ -250,8 +242,8 @@ def get_surveys(project_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_schemas(project_id: int | UUID):
-    """
-    Retrieve all schemas associated with a specific project.
+    """Retrieve all schemas associated with a specific project.
+
     ---
     parameters:
       - name: project_id
@@ -277,7 +269,6 @@ def get_schemas(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(project_id, UUID):
         project = base.get(Project, project_id)
         project_id = project.project_id
@@ -296,8 +287,8 @@ def get_schemas(project_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: createProjectReq):
-    """
-    Create a new project object.
+    """Create a new project object.
+
     ---
     parameters:
       - name: body
@@ -331,8 +322,8 @@ def create(body: createProjectReq):
 @login_required
 @permission_required("access")
 def delete(project_id: int | UUID):
-    """
-    Delete a project by its integer ID or UUID.
+    """Delete a project by its integer ID or UUID.
+
     ---
     parameters:
       - name: project_id
@@ -358,7 +349,6 @@ def delete(project_id: int | UUID):
       500:
         description: Database error.
     """
-
     base.delete(Project, project_id)
 
     return "", 204

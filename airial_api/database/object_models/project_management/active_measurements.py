@@ -1,17 +1,17 @@
 # Class definition for ActiveMeasurement objects in the database
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Active measurement database models and schemas."""
 
-
-from typing import Any, ClassVar, Optional, Self
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
-from psycopg.rows import class_row
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
+from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
 
 from database.object_models.base import DBbase, Keyring, create_spice_update
@@ -20,14 +20,16 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 
 
 class CreateActiveMeasurement(BaseModel):
+    """Request schema for creating an active measurement."""
+
     survey_ids: Keyring
     label_ids: Keyring
     random_seed: int
     retraining_cadence: int
-    target_percentage: Optional[float] = None
-    final_count: Optional[float] = None
-    final_ci_upper: Optional[float] = None
-    final_ci_lower: Optional[float] = None
+    target_percentage: float | None = None
+    final_count: float | None = None
+    final_ci_upper: float | None = None
+    final_ci_lower: float | None = None
 
 
 CreateActiveMeasurment = CreateActiveMeasurement
@@ -37,11 +39,13 @@ CreateActiveMeasurment = CreateActiveMeasurement
 
 
 class UpdateActiveMeasurement(BaseModel):
-    retraining_cadence: Optional[int] = None
-    target_percentage: Optional[float] = None
-    final_count: Optional[float] = None
-    final_ci_upper: Optional[float] = None
-    final_ci_lower: Optional[float] = None
+    """Request schema for updating an active measurement."""
+
+    retraining_cadence: int | None = None
+    target_percentage: float | None = None
+    final_count: float | None = None
+    final_ci_upper: float | None = None
+    final_ci_lower: float | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -49,6 +53,8 @@ class UpdateActiveMeasurement(BaseModel):
 
 @dataclass
 class ActiveMeasurement(DBbase):
+    """Database representation of an active measurement."""
+
     active_measurement_id: int
     survey_id: int
     label_id: int
@@ -57,10 +63,10 @@ class ActiveMeasurement(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
-    target_percentage: Optional[float] = None
-    final_count: Optional[float] = None
-    final_ci_upper: Optional[float] = None
-    final_ci_lower: Optional[float] = None
+    target_percentage: float | None = None
+    final_count: float | None = None
+    final_ci_upper: float | None = None
+    final_ci_lower: float | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "active_measurements")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("active_measurement_id")
@@ -68,16 +74,18 @@ class ActiveMeasurement(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for an active measurement."""
+
         model_config = ConfigDict(from_attributes=True)
         active_measurement_id: int
         survey_id: int
         label_id: int
         random_seed: int
         retraining_cadence: int
-        target_percentage: Optional[float] = None
-        final_count: Optional[float] = None
-        final_ci_upper: Optional[float] = None
-        final_ci_lower: Optional[float] = None
+        target_percentage: float | None = None
+        final_count: float | None = None
+        final_ci_upper: float | None = None
+        final_ci_lower: float | None = None
         created: datetime
         modified: datetime
         uuid: UUID
@@ -85,9 +93,7 @@ class ActiveMeasurement(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateActiveMeasurement
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateActiveMeasurement) -> tuple[Self, list[RelationshipUpdate]] | None:
 
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
@@ -130,4 +136,5 @@ class ActiveMeasurement(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize active measurement model to a dictionary."""
         return ActiveMeasurement.Response.model_validate(self).model_dump(mode="json")

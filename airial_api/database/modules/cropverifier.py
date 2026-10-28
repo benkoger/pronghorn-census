@@ -2,7 +2,10 @@
 # Author: Michael B. Lance / Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
+"""Specialized database operations for crop verifier workflow."""
+
 from typing import TYPE_CHECKING, Any
+
 import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.rows import class_row, tuple_row
@@ -22,9 +25,9 @@ def get_available_crops(
     query: RAQuery,
     user: User,
 ) -> list[ReviewedArea]:
-    """
-    Finds an available image with eligible crops in the survey, atomically locks it
-    for the current user, and returns all candidate crops on that image in a single query.
+    """Find an available image with eligible crops, atomically lock it, and return candidate crops.
+
+    Locks for the current user and returns all candidate crops on that image in a single query.
     """
     stmt = sql.SQL("""
         WITH available_image AS (

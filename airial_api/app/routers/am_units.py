@@ -1,6 +1,8 @@
 # Endpoints for managing AM units in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing AM units in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import cast
@@ -31,8 +33,8 @@ amUnitBp = Blueprint("am_units", __name__, url_prefix="/api/v1/am-units")
 @login_required
 @permission_required("access")
 def get_by_id(am_unit_id: int | UUID):
-    """
-    Retrieve an AM unit by its integer ID or UUID.
+    """Retrieve an AM unit by its integer ID or UUID.
+
     ---
     parameters:
       - name: am_unit_id
@@ -70,8 +72,8 @@ def get_by_id(am_unit_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateAmUnitReq):
-    """
-    Create a new AM unit record.
+    """Create a new AM unit record.
+
     ---
     parameters:
       - name: body
@@ -106,8 +108,8 @@ def create(body: CreateAmUnitReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateAmUnitReq, am_unit_id: int | UUID):
-    """
-    Update an AM unit by integer ID or UUID.
+    """Update an AM unit by integer ID or UUID.
+
     ---
     parameters:
       - name: am_unit_id
@@ -150,8 +152,8 @@ def update(body: UpdateAmUnitReq, am_unit_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(am_unit_id: int | UUID):
-    """
-    Delete an AM unit by integer ID or UUID.
+    """Delete an AM unit by integer ID or UUID.
+
     ---
     parameters:
       - name: am_unit_id

@@ -1,6 +1,8 @@
 # Endpoints for managing models in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing models and their artifacts in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------#
 from uuid import UUID
 
@@ -10,7 +12,6 @@ from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-
 from database.object_models.project_management import CreateModelReq
 from database.object_models.project_management.models import Model, UpdateModelReq
 from database.object_models.project_management.schemas import Schema
@@ -28,8 +29,8 @@ modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 @login_required
 @permission_required("access")
 def get_by_id(model_id: int | UUID):
-    """
-    Request a model object from the database using its integer PK or UUID.
+    """Request a model object from the database using its integer PK or UUID.
+
     ---
     parameters:
       - name: model_id
@@ -65,8 +66,8 @@ def get_by_id(model_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_json_all():
-    """
-    Retrieve all dataset JSON configurations for a specific model from S3.
+    """Retrieve all dataset JSON configurations for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -94,8 +95,8 @@ def get_json_all():
 @login_required
 @permission_required("access")
 def get_json_train():
-    """
-    Retrieve train dataset JSON for a specific model from S3.
+    """Retrieve train dataset JSON for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -123,8 +124,8 @@ def get_json_train():
 @login_required
 @permission_required("access")
 def get_json_test():
-    """
-    Retrieve validation dataset JSON for a specific model from S3.
+    """Retrieve validation dataset JSON for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -152,8 +153,8 @@ def get_json_test():
 @login_required
 @permission_required("access")
 def get_weights():
-    """
-    Retrieve weights artifact file for a specific model from S3.
+    """Retrieve weights artifact file for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -181,8 +182,8 @@ def get_weights():
 @login_required
 @permission_required("access")
 def get_config():
-    """
-    Retrieve architecture configuration file for a specific model from S3.
+    """Retrieve architecture configuration file for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -210,8 +211,8 @@ def get_config():
 @login_required
 @permission_required("access")
 def get_readme():
-    """
-    Retrieve documentation/readme artifact for a specific model from S3.
+    """Retrieve documentation/readme artifact for a specific model from S3.
+
     ---
     parameters:
       - name: model_id
@@ -240,8 +241,8 @@ def get_readme():
 @login_required
 @permission_required("access")
 def get_schema(model_id: int | UUID):
-    """
-    Retrieve the label schema definition associated with a specific model.
+    """Retrieve the label schema definition associated with a specific model.
+
     ---
     parameters:
       - name: model_id
@@ -304,8 +305,8 @@ def get_schema(model_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateModelReq):
-    """
-    Create a new model record in the database.
+    """Create a new model record in the database.
+
     ---
     parameters:
       - name: body
@@ -335,8 +336,8 @@ def create(body: CreateModelReq):
 @login_required
 @permission_required("access")
 def create_train_json(model_id: str):
-    """
-    Upload or initialize training dataset JSON on S3 for a model.
+    """Upload or initialize training dataset JSON on S3 for a model.
+
     ---
     parameters:
       - name: model_id
@@ -362,8 +363,8 @@ def create_train_json(model_id: str):
 @login_required
 @permission_required("access")
 def create_val_json(mdoel_id: str):
-    """
-    Upload or initialize validation dataset JSON on S3 for a model.
+    """Upload or initialize validation dataset JSON on S3 for a model.
+
     ---
     parameters:
       - name: mdoel_id
@@ -389,8 +390,8 @@ def create_val_json(mdoel_id: str):
 @login_required
 @permission_required("access")
 def create_weights(mdoel_id: str):
-    """
-    Upload model weights file to S3.
+    """Upload model weights file to S3.
+
     ---
     parameters:
       - name: mdoel_id
@@ -415,8 +416,8 @@ def create_weights(mdoel_id: str):
 @modelBp.post("/<string:model_id>/config")
 @login_required
 def create_config(model_id: str):
-    """
-    Upload model architecture config to S3.
+    """Upload model architecture config to S3.
+
     ---
     parameters:
       - name: model_id
@@ -442,8 +443,8 @@ def create_config(model_id: str):
 @login_required
 @permission_required("access")
 def create_readme(model_id: str):
-    """
-    Upload documentation/readme for a model to S3.
+    """Upload documentation/readme for a model to S3.
+
     ---
     parameters:
       - name: model_id
@@ -470,8 +471,8 @@ def create_readme(model_id: str):
 @login_required
 @permission_required("access")
 def replace(model_id: str):
-    """
-    Replace complete model artifacts and definition.
+    """Replace complete model artifacts and definition.
+
     ---
     parameters:
       - name: model_id
@@ -497,8 +498,8 @@ def replace(model_id: str):
 @login_required
 @permission_required("access")
 def replace_train_json(model_id: str):
-    """
-    Replace the train.json file on S3 under the model's base key.
+    """Replace the train.json file on S3 under the model's base key.
+
     ---
     parameters:
       - name: model_id
@@ -524,8 +525,8 @@ def replace_train_json(model_id: str):
 @login_required
 @permission_required("access")
 def replace_val_json(model_id: str):
-    """
-    Replace the val.json file on S3 under the model's base key.
+    """Replace the val.json file on S3 under the model's base key.
+
     ---
     parameters:
       - name: model_id
@@ -551,8 +552,8 @@ def replace_val_json(model_id: str):
 @login_required
 @permission_required("access")
 def replace_weights(mdoel_id: str):
-    """
-    Replace weights artifact on S3.
+    """Replace weights artifact on S3.
+
     ---
     parameters:
       - name: mdoel_id
@@ -578,8 +579,8 @@ def replace_weights(mdoel_id: str):
 @login_required
 @permission_required("access")
 def replace_config(mdoel_id: str):
-    """
-    Replace configuration artifact on S3.
+    """Replace configuration artifact on S3.
+
     ---
     parameters:
       - name: mdoel_id
@@ -605,8 +606,8 @@ def replace_config(mdoel_id: str):
 @login_required
 @permission_required("access")
 def replace_readme(model_id: str):
-    """
-    Replace documentation/readme artifact on S3.
+    """Replace documentation/readme artifact on S3.
+
     ---
     parameters:
       - name: model_id
@@ -635,8 +636,8 @@ def replace_readme(model_id: str):
 @permission_required("access")
 @validate()
 def update(body: UpdateModelReq, model_id: int | UUID):
-    """
-    Update model metadata in the database.
+    """Update model metadata in the database.
+
     ---
     parameters:
       - name: model_id
@@ -667,7 +668,6 @@ def update(body: UpdateModelReq, model_id: int | UUID):
       500:
         description: Database error.
     """
-
     return base.update(Model, model_id, body).serialize(), 200
 
 
@@ -680,8 +680,8 @@ def update(body: UpdateModelReq, model_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete_model(model_id: int | UUID):
-    """
-    Delete a model by its integer ID or UUID.
+    """Delete a model by its integer ID or UUID.
+
     ---
     parameters:
       - name: model_id
@@ -707,7 +707,6 @@ def delete_model(model_id: int | UUID):
       500:
         description: Database error.
     """
-
     base.delete(Model, model_id)
 
     return "", 204

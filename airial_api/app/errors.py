@@ -1,16 +1,20 @@
 # Error Handling for the Airial API
 # Author: Michael B. Lance
 
+"""HTTP and Airial database error handlers for Flask."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from flask import current_app
 from werkzeug.exceptions import HTTPException
+
 from database.errors import AirialError
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 def handle_generic_http(error: HTTPException):
+    """Handle generic Werkzeug HTTP exceptions and return JSON response."""
     current_app.logger.error(f"HTTP {error.code}: {error.description}")
 
     status_code = error.code if error.code is not None else 500
@@ -25,6 +29,7 @@ def handle_generic_http(error: HTTPException):
 
 
 def handle_airial_error(error: AirialError):
+    """Handle Airial custom domain exceptions and return JSON response."""
     current_app.logger.error(str(error))
     return (
         {"error": error.name, "code": error.code, "message": error.message},
@@ -36,6 +41,7 @@ def handle_airial_error(error: AirialError):
 
 
 def internal_service_error(error: Exception):
+    """Handle uncaught 500 exceptions and log traceback."""
     current_app.logger.exception(error)
     return (
         {

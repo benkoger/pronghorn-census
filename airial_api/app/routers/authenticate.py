@@ -3,10 +3,12 @@
 # https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
 # Author: Michael B. Lance
 
+"""Endpoints for integrating OAuth2 and legacy password authentication."""
+
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import requests
@@ -21,8 +23,8 @@ from database.object_models.core import Image, UpdateImageReq
 from database.object_models.user_management import (
     LegacyAuthReq,
     Organization,
-    User,
     UpdateUserReq,
+    User,
 )
 
 authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
@@ -33,7 +35,7 @@ authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
 @authBp.get("/authorize/<string:provider>")
 def oauth2_authorize(provider: str):
-    """Initiate OAuth2 authorization redirect"""
+    """Initiate OAuth2 authorization redirect."""
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -44,9 +46,7 @@ def oauth2_authorize(provider: str):
     query_string = urlencode(
         {
             "client_id": provider_data["client_id"],
-            "redirect_uri": url_for(
-                ".oauth2_callback", provider=provider, _external=True
-            ),
+            "redirect_uri": url_for(".oauth2_callback", provider=provider, _external=True),
             "response_type": "code",
             "scope": " ".join(provider_data["scopes"]),
             "state": session["oauth2_state"],
@@ -61,7 +61,7 @@ def oauth2_authorize(provider: str):
 
 @authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-    """OAuth2 callback handler"""
+    """OAuth2 callback handler."""
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -85,9 +85,7 @@ def oauth2_callback(provider: str):
             "client_secret": provider_data["client_secret"],
             "code": request.args["code"],
             "grant_type": "authorization_code",
-            "redirect_uri": url_for(
-                ".oauth2_callback", provider=provider, _external=True
-            ),
+            "redirect_uri": url_for(".oauth2_callback", provider=provider, _external=True),
         },
         headers={"Accept": "application/json"},
     )
@@ -124,13 +122,11 @@ def oauth2_callback(provider: str):
                 status="active",
                 external_auth_provider=provider,
                 external_auth_id=response.json().get("sub"),
-                last_login=datetime.now(timezone.utc),
+                last_login=datetime.now(UTC),
             ),
         )
     else:
-        base.update(
-            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
-        )
+        base.update(User, user.user_id, UpdateUserReq(last_login=datetime.now(UTC)))
 
     login_user(user)
 
@@ -149,8 +145,7 @@ def oauth2_callback(provider: str):
 @authBp.post("/authenticate")
 @validate()
 def authenticate(body: LegacyAuthReq):
-    """Basic email/password authentication"""
-
+    """Basic email/password authentication."""
     users = base.where(User, {"email": body.email})
     if not users:
         raise AuthenticationFailure()
@@ -160,9 +155,7 @@ def authenticate(body: LegacyAuthReq):
         abort(400, "User account is not configured for password authentication.")
 
     if check_password_hash(user.password_hash, body.password):
-        base.update(
-            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
-        )
+        base.update(User, user.user_id, UpdateUserReq(last_login=datetime.now(UTC)))
     else:
         raise AuthenticationFailure()
 

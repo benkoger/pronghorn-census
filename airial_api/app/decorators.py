@@ -1,3 +1,5 @@
+"""Route authorization decorators for SpiceDB permissions and role checking."""
+
 from functools import wraps
 from typing import cast
 
@@ -8,10 +10,10 @@ from pydantic import BaseModel
 
 from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
-from database.object_models.project_management import HerdUnit
-from database.object_models.core.images import Image
-from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.image_footprints import ImageFootprint
+from database.object_models.core.image_metadata import ImageMetadata
+from database.object_models.core.images import Image
+from database.object_models.project_management import HerdUnit
 from database.object_models.project_management.labels import Label
 from database.object_models.user_management.organizations import Organization
 from database.object_models.user_management.users import User
@@ -41,6 +43,8 @@ check_exist = {
 
 
 def roles_required(*roles):
+    """Ensure current user has at least one of the specified roles."""
+
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
@@ -58,6 +62,8 @@ def roles_required(*roles):
 
 
 def permission_required(permission: str):
+    """Enforce SpiceDB permission check on targets extracted from request arguments or body."""
+
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
@@ -67,9 +73,7 @@ def permission_required(permission: str):
 
             req_body = next((arg for arg in args if isinstance(arg, BaseModel)), None)
             if not req_body:
-                req_body = next(
-                    (v for v in kwargs.values() if isinstance(v, BaseModel)), None
-                )
+                req_body = next((v for v in kwargs.values() if isinstance(v, BaseModel)), None)
 
             resources = req_body.model_dump() if req_body else {}
             resources.update(kwargs)
@@ -91,9 +95,7 @@ def permission_required(permission: str):
                                 model_cls = MODEL_MAP[obj_type]
                                 db_obj = base._get(model_cls, value)
                                 if not db_obj:
-                                    abort(
-                                        404, f"{obj_type} with id of {value} not found."
-                                    )
+                                    abort(404, f"{obj_type} with id of {value} not found.")
                                 obj_id = str(getattr(db_obj, "uuid", db_obj))
                             except (ObjectNotFound, KeyError) as e:
                                 current_app.logger.exception(e)
@@ -125,15 +127,10 @@ def permission_required(permission: str):
 
             if check_items:
                 consistency = Consistency(fully_consistent=True)
-                bulk_res = base.bulk_check_permission(
-                    check_items, consistency=consistency
-                )
+                bulk_res = base.bulk_check_permission(check_items, consistency=consistency)
 
                 for i, pair in enumerate(bulk_res.pairs):
-                    if (
-                        pair.item.permissionship
-                        != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
-                    ):
+                    if pair.item.permissionship != CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
                         obj_type, obj_id = targets[i]
                         e = AuthorizationFailure(user.id, permission, obj_type, obj_id)
                         abort(401, str(e))

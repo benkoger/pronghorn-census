@@ -1,14 +1,15 @@
 # Class definition for Herd Unit objects in the database
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Herd unit database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar, Optional, Self
+from typing import ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
@@ -19,17 +20,21 @@ from ..base import DBbase, Keyring, create_spice_update
 
 
 class CreateHerdUnitReq(BaseModel):
+    """Request schema for creating a herd unit."""
+
     name: str
     project_ids: Keyring
-    habitable_area: Optional[float] = None
+    habitable_area: float | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateHerdUnitReq(BaseModel):
-    name: Optional[str] = None
-    habitable_area: Optional[float] = None
+    """Request schema for updating a herd unit."""
+
+    name: str | None = None
+    habitable_area: float | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -37,14 +42,14 @@ class UpdateHerdUnitReq(BaseModel):
 
 @dataclass
 class HerdUnit(DBbase):
-    """Dataclass for representing Herd Units from the database"""
+    """Dataclass for representing Herd Units from the database."""
 
     herd_unit_id: int
     name: str
     created: datetime
     modified: datetime
     uuid: UUID
-    habitable_area: Optional[float] = None
+    habitable_area: float | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "herd_units")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("herd_unit_id")
@@ -52,11 +57,13 @@ class HerdUnit(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a herd unit."""
+
         model_config = ConfigDict(from_attributes=True)
 
         herd_unit_id: int
         name: str
-        habitable_area: Optional[float] = None
+        habitable_area: float | None = None
         created: datetime
         modified: datetime
         uuid: UUID
@@ -64,9 +71,7 @@ class HerdUnit(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateHerdUnitReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateHerdUnitReq) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_herd_unit AS (
@@ -103,4 +108,5 @@ class HerdUnit(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self):
+        """Serialize herd unit model to a dictionary."""
         return HerdUnit.Response.model_validate(self).model_dump(mode="json")

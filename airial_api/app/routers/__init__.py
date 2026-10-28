@@ -2,31 +2,32 @@
 # Author: Michael B. Lance
 # TODO: Finish removing endpoints into sub routers
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+"""Core router package registering API blueprints."""
 
+# ---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint
 
+from .active_measurements import activeMeasBp
+from .am_units import amUnitBp
+from .annotations import annotBp
 from .authenticate import authBp
 from .autocropper import cropBp
 from .cropverifier import verifierBp
 from .herd_units import herdunitBp
+from .image_footprints import imageFootprintBp
+from .image_metadata import imageMetadataBp
 from .images import imageBp
+from .labels import labelBp
 from .models import modelBp
 from .organizations import orgBp
 from .projects import projectBp
 from .reviewed_area import raBp
+from .roles import roleBp
 from .schemas import schemaBp
 from .surveys import surveyBp
-from .users import userBp
-from .annotations import annotBp
 from .system import systemBp
-from .roles import roleBp
-from .labels import labelBp
-from .active_measurements import activeMeasBp
-from .am_units import amUnitBp
-from .image_metadata import imageMetadataBp
-from .image_footprints import imageFootprintBp
+from .users import userBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 

@@ -1,6 +1,8 @@
 # Endpoints for managing active measurements in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing active measurements in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -29,8 +31,8 @@ activeMeasBp = Blueprint("active_measurements", __name__, url_prefix="/api/v1/ac
 @login_required
 @permission_required("access")
 def get_by_id(active_measurement_id: int | UUID):
-    """
-    Retrieve an active measurement by its integer ID or UUID.
+    """Retrieve an active measurement by its integer ID or UUID.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -67,8 +69,8 @@ def get_by_id(active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_am_units(active_measurement_id: int | UUID):
-    """
-    Retrieve all AM units associated with an active measurement.
+    """Retrieve all AM units associated with an active measurement.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -107,8 +109,8 @@ def get_am_units(active_measurement_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateActiveMeasurement):
-    """
-    Create a new active measurement.
+    """Create a new active measurement.
+
     ---
     parameters:
       - name: body
@@ -141,8 +143,8 @@ def create(body: CreateActiveMeasurement):
 @permission_required("access")
 @validate()
 def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
-    """
-    Update an active measurement by integer ID or UUID (e.g., retraining cadence).
+    """Update an active measurement by integer ID or UUID (e.g., retraining cadence).
+
     ---
     parameters:
       - name: active_measurement_id
@@ -185,8 +187,8 @@ def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(active_measurement_id: int | UUID):
-    """
-    Delete an active measurement by integer ID or UUID.
+    """Delete an active measurement by integer ID or UUID.
+
     ---
     parameters:
       - name: active_measurement_id

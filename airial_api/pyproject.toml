@@ -145,6 +145,16 @@ exclude_lines = [
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.0.0",
     "pytest-cov>=7.1.0",
     "pytest-env>=1.2.0",
+    "ruff>=0.17.3",
 ]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 126
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []

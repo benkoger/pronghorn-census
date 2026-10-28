@@ -1,20 +1,21 @@
 # Psycopg3 sql based helpers
 # Author: Michael B. Lance
 
+"""Psycopg3 SQL query construction helpers and identifier resolvers."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import Tuple, Any
+from typing import Any
 from uuid import UUID
-from database.object_models.base import PrimaryKey, DBbase
 
 import psycopg.sql as sql
 
+from database.object_models.base import DBbase, PrimaryKey
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-def filter_by_object_ids(
-    table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]
-) -> Tuple[sql.Composable, dict]:
+def filter_by_object_ids(table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]) -> tuple[sql.Composable, dict]:
     """Builds SQL to filter by integer primary keys or UUIDs."""
     data = {"_filter_ints": [], "_filter_uuids": []}
 
@@ -25,9 +26,7 @@ def filter_by_object_ids(
             data["_filter_uuids"].append(id_val)
 
     return (
-        sql.SQL(
-            "{table}.{pk_col} = ANY({i_placeholder}::int[]) OR {table}.uuid = ANY({u_placeholder}::uuid[])"
-        ).format(
+        sql.SQL("{table}.{pk_col} = ANY({i_placeholder}::int[]) OR {table}.uuid = ANY({u_placeholder}::uuid[])").format(
             table=table,
             pk_col=pk_col,
             i_placeholder=sql.Placeholder("_filter_ints"),
@@ -53,7 +52,7 @@ def clause_generator(
 
 
 def resolve_identifier(cls: type[DBbase], key: PrimaryKey) -> sql.Identifier:
-    """Determine which key type a PrimaryKey object is"""
+    """Determine which key type a PrimaryKey object is."""
     match key:
         case int():
             pk_col = cls.__pk__

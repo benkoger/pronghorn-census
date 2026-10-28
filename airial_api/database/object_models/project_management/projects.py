@@ -1,13 +1,15 @@
 # Class definition for Project objects in the database
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Project database models and schemas."""
+
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar, List, Optional, Self, Union
+from typing import ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -21,11 +23,14 @@ from ..base import DBbase, Keyring, create_spice_update
 
 
 class ProjectQuery(BaseModel):
-    project_id: Optional[List[Union[int, UUID]]] = None
+    """Query parameters for projects."""
+
+    project_id: list[int | UUID] | None = None
 
     @field_validator("project_id", mode="before")
     @classmethod
     def ensure_list(cls, value):
+        """Ensure project ID is a list."""
         if isinstance(value, list):
             return value
         return [value]
@@ -35,6 +40,8 @@ class ProjectQuery(BaseModel):
 
 
 class createProjectReq(BaseModel):
+    """Request schema for creating a project."""
+
     name: str
     organization_ids: Keyring
 
@@ -44,7 +51,7 @@ class createProjectReq(BaseModel):
 
 @dataclass
 class Project(DBbase):
-    """Dataclass for representing projects from the databse"""
+    """Dataclass for representing projects from the database."""
 
     project_id: int
     name: str
@@ -58,6 +65,8 @@ class Project(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a project."""
+
         model_config = ConfigDict(from_attributes=True)
 
         project_id: int
@@ -71,7 +80,7 @@ class Project(DBbase):
     @classmethod
     def _create(
         cls, cursor: Cursor[Self], req: createProjectReq, user: User, role: Role
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    ) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_project AS (
@@ -115,9 +124,7 @@ class Project(DBbase):
                 req.organization_ids.uuid,
                 "parent",
             ),
-            create_spice_update(
-                "project", project.uuid, "user", user.uuid, "annotator"
-            ),
+            create_spice_update("project", project.uuid, "user", user.uuid, "annotator"),
         ]
 
         return project, spice_updates
@@ -125,4 +132,5 @@ class Project(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self):
+        """Serialize project model to a dictionary."""
         return Project.Response.model_validate(self).model_dump(mode="json")

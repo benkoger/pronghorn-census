@@ -1,6 +1,8 @@
 # Genera high quality crops of training data with model assisted labeling and Kmeans clustering
 # Authors: Ben Koger, Michael B. Lance
 
+"""Generate high quality crops of training data with model assisted labeling and KMeans clustering."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import uuid4
@@ -33,15 +35,17 @@ def auto_crop(
     num_clusters: int = 1,
     crop_size: int = 2100,
 ) -> list[tuple[CreateReviewedAreaReq, list[CreateAnnotationReq]]]:
-    """Automatically create crops of a given size containing all images with approved annotations
+    """Automatically create crops of a given size containing all images with approved annotations.
 
     Args:
-                    image: source image that predictions were made from
-                    points: List of coordinate points of the approximate center for each prediction associated with the image
-                    crop_size: dimension for crop (note only square crops are currently supported)
-                    num_clusters: number of centers for kmeans to determine clusters
+        image: Source image that predictions were made from.
+        predictions: List of candidate prediction objects.
+        labels: List of valid labels for classification.
+        num_clusters: Number of centers for KMeans to determine clusters.
+        crop_size: Dimension for crop (note only square crops are currently supported).
 
-    Returns list of crops based on original image
+    Returns:
+        List of crops based on original image with draft annotations.
     """
     points = []
     centers = []
@@ -85,9 +89,7 @@ def auto_crop(
         if len(points) >= num_clusters:
             kmeans.fit(points_array)
         else:
-            raise Exception(
-                "Cropping Failed! There were more clusters needed than points."
-            )
+            raise Exception("Cropping Failed! There were more clusters needed than points.")
 
         centers = kmeans.cluster_centers_
 
@@ -123,9 +125,7 @@ def auto_crop(
         for p_index, pred in enumerate(predictions):
             box = pred.dimensions.getPoints()
 
-            if ((box[0] >= x_start) and (box[2] <= x_end)) and (
-                (box[1] >= y_start) and (box[3] <= y_end)
-            ):
+            if ((box[0] >= x_start) and (box[2] <= x_end)) and ((box[1] >= y_start) and (box[3] <= y_end)):
                 points_in_crop[p_index] += 1
 
                 annotation = CreateAnnotationReq(
@@ -170,6 +170,7 @@ def create_subcrop(
     crop_size: int = 150,
     drawBox: bool = False,
 ) -> list[PredictionCrop]:
+    """Generate small subcrops centered on individual model predictions."""
     crops = []
     img = image.get_image()
     if len(predictions) == 0:

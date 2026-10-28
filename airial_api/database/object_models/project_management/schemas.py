@@ -1,17 +1,17 @@
 # Class definition for Schema objects in the database
 # Author: Michael B. Lance
-
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Schema database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar, Optional, Self
+from typing import ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
-from psycopg.rows import class_row
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
+from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase, Keyring, create_spice_update
@@ -20,6 +20,8 @@ from ..base import DBbase, Keyring, create_spice_update
 
 
 class createSchemaReq(BaseModel):
+    """Request schema for creating a schema."""
+
     name: str
     project_ids: Keyring
     model_ids: Keyring
@@ -30,7 +32,7 @@ class createSchemaReq(BaseModel):
 
 @dataclass
 class Schema(DBbase):
-    """Dataclass for representing scehmas from the databse"""
+    """Dataclass for representing schemas from the database."""
 
     schema_id: int
     name: str
@@ -44,6 +46,8 @@ class Schema(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a schema."""
+
         model_config = ConfigDict(from_attributes=True)
 
         schema_id: int
@@ -55,9 +59,7 @@ class Schema(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: createSchemaReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: createSchemaReq) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_schema AS (
@@ -76,15 +78,12 @@ class Schema(DBbase):
         if not (schema := cursor.fetchone()):
             return None
 
-        spice_updates = [
-            create_spice_update(
-                "schema", schema.uuid, "model", req.model_ids.uuid, "parent"
-            )
-        ]
+        spice_updates = [create_spice_update("schema", schema.uuid, "model", req.model_ids.uuid, "parent")]
 
         return schema, spice_updates
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
+        """Serialize schema model to a dictionary."""
         return Schema.Response.model_validate(self).model_dump(mode="json")

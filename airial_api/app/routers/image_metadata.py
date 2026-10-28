@@ -2,6 +2,8 @@
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
+"""Endpoints for managing image metadata in the API."""
+
 from uuid import UUID
 
 from flask import Blueprint
@@ -11,8 +13,8 @@ from flask_pydantic import validate
 from app.decorators import permission_required
 from app.extensions import base
 from database.object_models.core.image_metadata import (
-    ImageMetadata,
     CreateImageMetadataReq,
+    ImageMetadata,
     UpdateImageMetadataReq,
 )
 
@@ -27,8 +29,8 @@ imageMetadataBp = Blueprint("image_metadata", __name__, url_prefix="/api/v1/imag
 @login_required
 @permission_required("access")
 def get_by_id(metadata_id: int | UUID):
-    """
-    Retrieve image metadata by its integer ID or UUID.
+    """Retrieve image metadata by its integer ID or UUID.
+
     ---
     parameters:
       - name: metadata_id
@@ -66,8 +68,8 @@ def get_by_id(metadata_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateImageMetadataReq):
-    """
-    Create a new image metadata record.
+    """Create a new image metadata record.
+
     ---
     parameters:
       - name: body
@@ -98,8 +100,8 @@ def create(body: CreateImageMetadataReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateImageMetadataReq, metadata_id: int | UUID):
-    """
-    Update image metadata by integer ID or UUID.
+    """Update image metadata by integer ID or UUID.
+
     ---
     parameters:
       - name: metadata_id
@@ -142,8 +144,8 @@ def update(body: UpdateImageMetadataReq, metadata_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(metadata_id: int | UUID):
-    """
-    Delete image metadata by integer ID or UUID.
+    """Delete image metadata by integer ID or UUID.
+
     ---
     parameters:
       - name: metadata_id

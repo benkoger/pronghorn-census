@@ -1,8 +1,10 @@
+"""Flask extensions and service clients initialization."""
+
 from flask import current_app
-from healthcheck import HealthCheck
 from flask_caching import Cache
 from flask_login import LoginManager
 from flask_session import Session
+from healthcheck import HealthCheck
 from werkzeug.local import LocalProxy
 
 from config import db_config, spice_config
@@ -19,6 +21,7 @@ health = HealthCheck()
 
 
 def first_run():
+    """Check if database has completed bootstrap initialization."""
     return base.check_bootstrapped(), "first_run"
 
 

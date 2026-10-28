@@ -2,6 +2,8 @@
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
+"""Multi-table relation bindings for the core schema."""
+
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -14,6 +16,8 @@ from ..base import Relationbase
 
 @dataclass(frozen=True)
 class AnnotationsReviewedArea(Relationbase):
+    """Junction relation linking annotations to reviewed areas."""
+
     annotation_id: int
     reviewed_area_id: int
 

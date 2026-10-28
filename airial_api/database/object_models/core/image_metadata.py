@@ -1,14 +1,15 @@
 # Class definition for ImageMetadata objects in the database
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
+"""Image metadata database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, ClassVar, Optional, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
 import psycopg.sql as sql
+from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
@@ -19,6 +20,8 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 
 
 class CreateImageMetadataReq(BaseModel):
+    """Request schema for creating image metadata."""
+
     image_ids: Keyring
     captured_at: datetime
     gps_lon: float
@@ -37,15 +40,17 @@ class CreateImageMetadataReq(BaseModel):
 
 
 class UpdateImageMetadataReq(BaseModel):
-    captured_at: Optional[datetime] = None
-    gps_lon: Optional[float] = None
-    gps_lat: Optional[float] = None
-    gps_alt_msl_m: Optional[float] = None
-    yaw_deg: Optional[float] = None
-    pitch_deg: Optional[float] = None
-    fov_deg: Optional[float] = None
-    terrain_elev_m: Optional[float] = None
-    agl_m: Optional[float] = None
+    """Request schema for updating image metadata."""
+
+    captured_at: datetime | None = None
+    gps_lon: float | None = None
+    gps_lat: float | None = None
+    gps_alt_msl_m: float | None = None
+    yaw_deg: float | None = None
+    pitch_deg: float | None = None
+    fov_deg: float | None = None
+    terrain_elev_m: float | None = None
+    agl_m: float | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -53,6 +58,8 @@ class UpdateImageMetadataReq(BaseModel):
 
 @dataclass
 class ImageMetadata(DBbase):
+    """Database representation of image metadata."""
+
     metadata_id: int
     image_id: int
     captured_at: datetime
@@ -76,6 +83,8 @@ class ImageMetadata(DBbase):
     # -----------------------------------------------------------------------------------------------------------------------
 
     class Response(BaseModel):
+        """Response schema for image metadata."""
+
         model_config = ConfigDict(from_attributes=True)
 
         metadata_id: int
@@ -96,9 +105,7 @@ class ImageMetadata(DBbase):
     # -----------------------------------------------------------------------------------------------------------------------
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateImageMetadataReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateImageMetadataReq) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.image_metadata (
@@ -138,4 +145,5 @@ class ImageMetadata(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize image metadata to a dictionary."""
         return ImageMetadata.Response.model_validate(self).model_dump(mode="json")

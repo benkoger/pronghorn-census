@@ -1,15 +1,17 @@
 # Endpoints for managing reviewed areas in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing reviewed areas in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
 
+import psycopg.sql as sql
 from flask import Blueprint, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
 
-import psycopg.sql as sql
 from app.decorators import permission_required
 from app.extensions import base, s3
 from database.object_models.base import PrimaryKey
@@ -35,8 +37,8 @@ raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 @permission_required("access")
 @validate()
 def get(query: RAQuery):
-    """
-    Retrieve reviewed areas filtered by query criteria with optional pagination.
+    """Retrieve reviewed areas filtered by query criteria with optional pagination.
+
     ---
     parameters:
       - name: herd_unit_id
@@ -135,8 +137,8 @@ def get(query: RAQuery):
 @login_required
 @permission_required("access")
 def get_by_id(reviewed_area_id: int | UUID):
-    """
-    Request a reviewed area object from the database using its integer PK or UUID.
+    """Request a reviewed area object from the database using its integer PK or UUID.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -173,8 +175,8 @@ def get_by_id(reviewed_area_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_annotations(reviewed_area_id: int | UUID):
-    """
-    Retrieve all annotations associated with a specific reviewed area.
+    """Retrieve all annotations associated with a specific reviewed area.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -200,14 +202,11 @@ def get_annotations(reviewed_area_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(reviewed_area_id, UUID):
         reviewed_area = base.get(ReviewedArea, reviewed_area_id)
         reviewed_area_id = reviewed_area.reviewed_area_id
 
-    annotations = base.get_related(
-        AnnotationsReviewedArea, Annotation, {"reviewed_area_id": reviewed_area_id}
-    )
+    annotations = base.get_related(AnnotationsReviewedArea, Annotation, {"reviewed_area_id": reviewed_area_id})
 
     return [annot.serialize() for annot in annotations], 200
 
@@ -221,8 +220,8 @@ def get_annotations(reviewed_area_id: int | UUID):
 @permission_required("access")
 @validate()
 def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
-    """
-    Generate a presigned GET URL for downloading a reviewed area crop.
+    """Generate a presigned GET URL for downloading a reviewed area crop.
+
     ---
     parameters:
       - name: body
@@ -263,8 +262,8 @@ def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
 @permission_required("access")
 @validate()
 def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UUID):
-    """
-    Update a reviewed area in the database.
+    """Update a reviewed area in the database.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -295,7 +294,6 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UU
       500:
         description: Unexpected error.
     """
-
     return base.update(ReviewedArea, reviewed_area_id, body).serialize(), 200
 
 
@@ -308,8 +306,8 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UU
 @permission_required("access")
 @validate()
 def set_reviewed(reviewed_area_id: PrimaryKey):
-    """
-    Mark a reviewed area as reviewed by the currently authenticated user.
+    """Mark a reviewed area as reviewed by the currently authenticated user.
+
     ---
     parameters:
       - name: reviewed_area_id

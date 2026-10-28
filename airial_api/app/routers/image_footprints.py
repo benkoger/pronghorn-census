@@ -2,6 +2,8 @@
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
+"""Endpoints for managing image footprints in the API."""
+
 from uuid import UUID
 
 from flask import Blueprint
@@ -11,8 +13,8 @@ from flask_pydantic import validate
 from app.decorators import permission_required
 from app.extensions import base
 from database.object_models.core.image_footprints import (
-    ImageFootprint,
     CreateImageFootprintReq,
+    ImageFootprint,
     UpdateImageFootprintReq,
 )
 
@@ -27,8 +29,8 @@ imageFootprintBp = Blueprint("image_footprints", __name__, url_prefix="/api/v1/i
 @login_required
 @permission_required("access")
 def get_by_id(footprint_id: int | UUID):
-    """
-    Retrieve an image footprint by its integer ID or UUID.
+    """Retrieve an image footprint by its integer ID or UUID.
+
     ---
     parameters:
       - name: footprint_id
@@ -66,8 +68,8 @@ def get_by_id(footprint_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateImageFootprintReq):
-    """
-    Create a new image footprint record.
+    """Create a new image footprint record.
+
     ---
     parameters:
       - name: body
@@ -98,8 +100,8 @@ def create(body: CreateImageFootprintReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateImageFootprintReq, footprint_id: int | UUID):
-    """
-    Update an image footprint by integer ID or UUID.
+    """Update an image footprint by integer ID or UUID.
+
     ---
     parameters:
       - name: footprint_id
@@ -142,8 +144,8 @@ def update(body: UpdateImageFootprintReq, footprint_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(footprint_id: int | UUID):
-    """
-    Delete an image footprint by integer ID or UUID.
+    """Delete an image footprint by integer ID or UUID.
+
     ---
     parameters:
       - name: footprint_id

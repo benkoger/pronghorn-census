@@ -1,10 +1,13 @@
 # Endpoints for managing Users in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing users and user authentication sessions in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID, uuid4
 
+from authzed.api.v1 import CheckPermissionResponse
 from flask import Blueprint, abort, session
 from flask_login import current_user, login_required, login_user
 from flask_pydantic import validate
@@ -12,18 +15,16 @@ from msgpack import unpackb
 
 from app.decorators import permission_required
 from app.extensions import base, cache, login_manager
-from authzed.api.v1 import CheckPermissionResponse
+from database.object_models.base import create_spice_update
 from database.object_models.user_management import (
     CreateUserReq,
     Organization,
+    OrganizationUser,
     Role,
     RoleNameQuery,
     SetActiveOrgReq,
     User,
-    OrganizationUser,
 )
-
-from database.object_models.base import create_spice_update
 
 userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -32,6 +33,7 @@ userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
 @login_manager.user_loader
 def load(session_user_id: str):
+    """Load user by session ID from cache or database."""
     user_key = f"user_{session_user_id}"
     cached_user = cache.get(user_key)
 
@@ -65,6 +67,7 @@ def load(session_user_id: str):
 
 @login_manager.unauthorized_handler
 def unathorizated_callback():
+    """Handle unauthorized access attempts for Flask-Login."""
     abort(401, "You are not authorized to access this resource.")
 
 
@@ -76,8 +79,8 @@ def unathorizated_callback():
 @login_required
 @permission_required("access")
 def get_all():
-    """
-    Retrieve all users under the currently active session organization.
+    """Retrieve all users under the currently active session organization.
+
     ---
     responses:
       200:
@@ -104,8 +107,8 @@ def get_all():
 
 @userBp.get("/check-auth")
 def check_auth():
-    """
-    Check if the current request session is authenticated.
+    """Check if the current request session is authenticated.
+
     ---
     responses:
       200:
@@ -123,8 +126,8 @@ def check_auth():
 @userBp.get("/current-user")
 @login_required
 def get_current_user():
-    """
-    Retrieve profile and role information for the currently logged-in user.
+    """Retrieve profile and role information for the currently logged-in user.
+
     ---
     responses:
       200:
@@ -142,8 +145,8 @@ def get_current_user():
 @userBp.get("/<uuid:user_id>/organizations")
 @login_required
 def get_orgs(user_id: int | UUID):
-    """
-    Retrieve organizations linked to a specific user.
+    """Retrieve organizations linked to a specific user.
+
     ---
     parameters:
       - name: user_id
@@ -189,8 +192,8 @@ def get_orgs(user_id: int | UUID):
 @login_required
 @validate()
 def check_role(query: RoleNameQuery):
-    """
-    Check if the current authenticated user has a specific role.
+    """Check if the current authenticated user has a specific role.
+
     ---
     parameters:
       - name: role_name
@@ -219,8 +222,8 @@ def check_role(query: RoleNameQuery):
 @permission_required("access")
 @validate()
 def create(body: CreateUserReq):
-    """
-    Create a standard user in the database.
+    """Create a standard user in the database.
+
     ---
     parameters:
       - name: body
@@ -251,8 +254,8 @@ def create(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def create_super(body: CreateUserReq):
-    """
-    Bootstrap the initial root super user during first-time platform setup.
+    """Bootstrap the initial root super user during first-time platform setup.
+
     ---
     parameters:
       - name: body
@@ -286,9 +289,7 @@ def create_super(body: CreateUserReq):
 
     user = base.insert(User, body)
 
-    base.write_spice_relationships(
-        [create_spice_update("platform", uuid4(), "user", user.uuid, "root")]
-    )
+    base.write_spice_relationships([create_spice_update("platform", uuid4(), "user", user.uuid, "root")])
 
     login_user(user)
     return user.serialize(), 200
@@ -303,8 +304,8 @@ def create_super(body: CreateUserReq):
 @permission_required("access")
 @validate()
 def set_org(body: SetActiveOrgReq):
-    """
-    Set active organization context in the user's session.
+    """Set active organization context in the user's session.
+
     ---
     parameters:
       - name: body
@@ -328,9 +329,7 @@ def set_org(body: SetActiveOrgReq):
     if not organization:
         abort(404, "Organization not found.")
 
-    res = base.check_permission(
-        "organization", str(organization.uuid), str(current_user.uuid), "access"
-    )
+    res = base.check_permission("organization", str(organization.uuid), str(current_user.uuid), "access")
 
     if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
         session["active_org_uuid"] = str(organization.uuid)

@@ -1,4 +1,6 @@
-from typing import List, Any
+"""Pydantic request and query models for the autocropper pipeline."""
+
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, model_validator
@@ -9,22 +11,27 @@ from .core import Prediction
 
 
 class AutoCropperBatchQuery(BaseModel):
+    """Query parameters for fetching a batch of candidate images to auto-crop."""
+
     survey_id: UUID
     herd_unit_id: UUID
     model_id: UUID
-    label: List[int]
+    label: list[int]
     batch_size: int
     min_confidence: float
 
 
 class AutoCropReq(BaseModel):
+    """Request model for auto-cropping an image with candidate predictions."""
+
     image_id: UUID
-    predictions: List[Prediction]
-    label_ids: List[PrimaryKey]
+    predictions: list[Prediction]
+    label_ids: list[PrimaryKey]
 
     @model_validator(mode="before")
     @classmethod
     def flatten_prediction_dimensions(cls, data: Any) -> Any:
+        """Normalize incoming nested bounding box format to flat coordinates."""
         if isinstance(data, dict) and "predictions" in data:
             flattened_predictions = []
 

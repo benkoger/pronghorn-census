@@ -1,21 +1,24 @@
 # Endpoints for managing surveys in the API
 # Author: Michael B. Lance
 
+"""Endpoints for managing surveys in the API."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from flask import Blueprint, request
-from app.decorators import permission_required
-from database.object_models.core.annotations import Annotation
-from database.object_models.core.images import Image
-from database.object_models.project_management import CreateSurveyReq, UpdateSurveyReq
-from app.extensions import base
 from datetime import datetime
-from flask_pydantic import validate
+from uuid import UUID
+
+from flask import Blueprint, request
 from flask_login import (
     login_required,
 )
-from uuid import UUID
+from flask_pydantic import validate
 
+from app.decorators import permission_required
+from app.extensions import base
+from database.object_models.core.annotations import Annotation
+from database.object_models.core.images import Image
+from database.object_models.project_management import CreateSurveyReq, UpdateSurveyReq
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.surveys import Survey, SurveyImageQuery
 
@@ -30,8 +33,8 @@ surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 @login_required
 @permission_required("access")
 def get_by_id(survey_id: int | UUID):
-    """
-    Request a survey object from the database using its integer PK or UUID.
+    """Request a survey object from the database using its integer PK or UUID.
+
     ---
     parameters:
       - name: survey_id
@@ -68,8 +71,8 @@ def get_by_id(survey_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_annotations(survey_id: int | UUID):
-    """
-    Retrieve all annotations associated with a specific survey.
+    """Retrieve all annotations associated with a specific survey.
+
     ---
     parameters:
       - name: survey_id
@@ -108,8 +111,8 @@ def get_annotations(survey_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_herd_units(survey_id: int | UUID):
-    """
-    Retrieve all herd units associated with a specific survey.
+    """Retrieve all herd units associated with a specific survey.
+
     ---
     parameters:
       - name: survey_id
@@ -148,8 +151,8 @@ def get_herd_units(survey_id: int | UUID):
 @permission_required("access")
 @validate()
 def get_images(query: SurveyImageQuery, survey_id: str):
-    """
-    Retrieve images belonging to a specific survey with optional pagination.
+    """Retrieve images belonging to a specific survey with optional pagination.
+
     ---
     parameters:
       - name: survey_id
@@ -213,8 +216,8 @@ def get_images(query: SurveyImageQuery, survey_id: str):
 @login_required
 @permission_required("access")
 def get_annotated_images(survey_id: int | UUID):
-    """
-    Retrieve annotated images within a survey, optionally filtered by label, herd unit, and date range.
+    """Retrieve annotated images within a survey, optionally filtered by label, herd unit, and date range.
+
     ---
     parameters:
       - name: survey_id
@@ -283,8 +286,8 @@ def get_annotated_images(survey_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateSurveyReq):
-    """
-    Create a new survey object.
+    """Create a new survey object.
+
     ---
     parameters:
       - name: body
@@ -320,8 +323,8 @@ def create(body: CreateSurveyReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateSurveyReq, survey_id: int | UUID):
-    """
-    Update survey metadata by its integer ID or UUID.
+    """Update survey metadata by its integer ID or UUID.
+
     ---
     parameters:
       - name: survey_id
@@ -364,8 +367,8 @@ def update(body: UpdateSurveyReq, survey_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete_survey(survey_id: int | UUID):
-    """
-    Delete a survey by its integer ID or UUID.
+    """Delete a survey by its integer ID or UUID.
+
     ---
     parameters:
       - name: survey_id

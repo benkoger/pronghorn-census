@@ -1,9 +1,11 @@
+"""Configuration module for Flask, Valkey/Redis, S3, PostgreSQL, and SpiceDB."""
+
 import os
+import ssl
+
+import redis
 from botocore.config import Config
 from dotenv import load_dotenv
-from boto3.s3.transfer import TransferConfig
-import ssl
-import redis
 
 load_dotenv()
 
@@ -30,15 +32,13 @@ cache_redis = redis.from_url(cache_redis_url, **cache_redis_kwargs)
 
 
 class FlaskConfig:
+    """Flask application configuration settings."""
+
     SECRET_KEY = os.environ.get("SECRET_KEY")
     SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE") or "Lax"
-    SESSION_COOKIE_SECURE = (
-        os.environ.get("SESSION_COOKIE_SECURE") or "true"
-    ).lower() in true_set
+    SESSION_COOKIE_SECURE = (os.environ.get("SESSION_COOKIE_SECURE") or "true").lower() in true_set
     SESSION_TYPE = "redis"
-    SESSION_PERMANENT = (
-        os.environ.get("SESSION_PERMANENT") or "true"
-    ).lower() in true_set
+    SESSION_PERMANENT = (os.environ.get("SESSION_PERMANENT") or "true").lower() in true_set
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
     SESSION_REDIS = session_redis
     ORIGIN_URL = os.environ.get("ORIGIN_URL")  # pyright: ignore
@@ -84,9 +84,7 @@ spice_config = {
 
 if (os.environ.get("SPICEDB_TLS") or "false").lower() in true_set:
     spice_config["use_tls"] = True
-    spice_config["SPICEDB_CERT_PATH"] = (
-        os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
-    )
+    spice_config["SPICEDB_CERT_PATH"] = os.environ.get("SPICEDB_CERT_PATH") or "/etc/spicedb/certs/spicedb.crt"
 
 
 cache_config = {
