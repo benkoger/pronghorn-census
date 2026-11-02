@@ -202,8 +202,7 @@ class TestImages(APITester):
         delete_res = auth_client.delete(f"/api/v1/images/{target_id}")
         assert delete_res.status_code == 204
 
-        # Currently 404 because SpiceDB relationships are not deleted yet on resource deletion.
-        # Expected behavior once bug is fixed: 401
+        # SpiceDB relationships are not deleted yet (needs fixed).
         assert auth_client.get(f"/api/v1/images/{target_id}").status_code == 404
 
     # -------------------------------------------------------------------------
