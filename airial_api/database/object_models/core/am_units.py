@@ -79,6 +79,7 @@ class AmUnit(DBbase):
     # -----------------------------------------------------------------------------------------------------------------------
 
     class Response(BaseModel):
+        model_config = ConfigDict(from_attributes=True)
 
         am_unit_id: int
         next_unit_id: Optional[int] = None
