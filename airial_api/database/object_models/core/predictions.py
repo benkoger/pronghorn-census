@@ -1,16 +1,15 @@
 # Class definition for Prediction objects in the database
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Prediction database models and schemas."""
-
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
+from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..base import Box, DBbase, Keyring, PrimaryKey, create_spice_update
@@ -19,14 +18,11 @@ from ..base import Box, DBbase, Keyring, PrimaryKey, create_spice_update
 
 
 class PredictionQuery(BaseModel):
-    """Query parameters for predictions."""
-
     prediction_id: list[PrimaryKey]
 
     @field_validator("prediction_id")
     @classmethod
     def ensure_list(cls, value):
-        """Ensure prediction IDs are a list."""
         if isinstance(value, list):
             return value
         if value is None or value == "":
@@ -38,8 +34,6 @@ class PredictionQuery(BaseModel):
 
 
 class CreatePredictionReq(BaseModel):
-    """Request schema for creating a prediction."""
-
     image_ids: Keyring
     model_ids: Keyring
     label: int
@@ -54,15 +48,13 @@ class CreatePredictionReq(BaseModel):
 
 
 class UpdatePredictionReq(BaseModel):
-    """Request schema for updating a prediction."""
-
-    reviewed_by_user_id: int | None = None
-    label: int | None = None
-    score: float | None = None
-    box_tx: int | None = None
-    box_ty: int | None = None
-    box_bx: int | None = None
-    box_by: int | None = None
+    reviewed_by_user_id: Optional[int] = None
+    label: Optional[int] = None
+    score: Optional[float] = None
+    box_tx: Optional[int] = None
+    box_ty: Optional[int] = None
+    box_bx: Optional[int] = None
+    box_by: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -70,8 +62,6 @@ class UpdatePredictionReq(BaseModel):
 
 @dataclass
 class Prediction(DBbase):
-    """Database representation of a prediction."""
-
     pred_id: int
     image_id: int
     model_id: int
@@ -88,20 +78,15 @@ class Prediction(DBbase):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "predictions")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("pred_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def __post_init__(self):
-        """Initialize dimensions box."""
         self.dimensions = Box((self.box_tx, self.box_ty), (self.box_bx, self.box_by))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
-        """Response schema for a prediction."""
-
         model_config = ConfigDict(from_attributes=True)
 
         pred_id: int
@@ -113,7 +98,6 @@ class Prediction(DBbase):
         @field_validator("dimensions", mode="before")
         @classmethod
         def transform_box(cls, value: Any) -> dict[str, dict[str, int]]:
-            """Transform box object into serialized dictionary."""
             if isinstance(value, Box):
                 return value.serialize()
             return value
@@ -121,16 +105,18 @@ class Prediction(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(cls, cursor: Cursor[Self], req: CreatePredictionReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+    def _create(cls, cursor: Cursor[Self], req: CreatePredictionReq) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        cursor.row_factory = class_row(cls)
         query = sql.SQL("""
-            INSERT INTO core.predictions (
-                image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
-            )
-            VALUES (
-                %(image_id)s, %(model_id)s, %(label)s, %(score)s, %(box_tx)s, %(box_ty)s, %(box_bx)s, %(box_by)s
-            )
-            RETURNING *;
-        """)
+			INSERT INTO core.predictions (
+				image_id, model_id, label, score, box_tx, box_ty, box_bx, box_by
+			)
+			VALUES (
+				%(image_id)s, %(model_id)s, %(label)s, %(score)s, %(box_tx)s, %(box_ty)s, %(box_bx)s, %(box_by)s
+			)
+			RETURNING *;
+
+			""")
 
         cursor.execute(
             query,
@@ -158,5 +144,4 @@ class Prediction(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize prediction model to a dictionary."""
         return Prediction.Response.model_validate(self).model_dump(mode="json")

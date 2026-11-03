@@ -11,6 +11,7 @@ from psycopg import Cursor
 from psycopg.rows import class_row, tuple_row
 
 from database.object_models.base import Keyring
+from database.object_models.core.activity import ActivityType
 from database.object_models.core.images import RAQuery, ReviewedArea
 from database.object_models.user_management.users import User
 
@@ -38,6 +39,7 @@ def get_available_crops(
               AND EXISTS (
                   SELECT 1 FROM core.reviewed_area ra
                   WHERE ra.image_id = i.image_id
+                    AND ra.type = %(type)s
                     AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
               )
             ORDER BY i.image_id ASC
@@ -53,7 +55,8 @@ def get_available_crops(
         SELECT ra.*
         FROM core.reviewed_area ra
         JOIN locked_image ON locked_image.image_id = ra.image_id
-        WHERE (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
+        WHERE ra.type = %(type)s
+          AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
         ORDER BY ra.reviewed_area_id ASC;
     """)
 
@@ -61,6 +64,7 @@ def get_available_crops(
         "survey_id": survey_ids.pkey,
         "user_id": user.user_id,
         "include_reviewed": bool(query.include_reviewed),
+        "type": ActivityType.AUTO_CROPPER,
     }
 
     cursor.row_factory = class_row(ReviewedArea)
@@ -80,6 +84,7 @@ def get_selection_count(
         FROM core.reviewed_area ra
         JOIN core.images i ON i.image_id = ra.image_id
         WHERE i.survey_id = %(survey_id)s
+          AND ra.type = %(type)s
           AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
           AND (%(include_opened)s OR i.opened_by_user_id = 0);
     """)
@@ -88,6 +93,7 @@ def get_selection_count(
         "survey_id": survey_ids.pkey,
         "include_reviewed": bool(query.include_reviewed),
         "include_opened": bool(query.include_opened),
+        "type": ActivityType.AUTO_CROPPER,
     }
 
     cursor.row_factory = tuple_row

@@ -6,7 +6,7 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Optional, Self
 from uuid import UUID
 
 import cv2
@@ -182,15 +182,16 @@ class CreatePredictionCropReq(BaseModel):
 class RAQuery(BaseModel):
     """Query parameters for filtering reviewed areas."""
 
-    herd_unit_id: list[UUID] | None = None
-    survey_id: list[UUID] | None = None
-    include_reviewed: bool | None = False
-    include_opened: bool | None = False
-    num: int | None = None
-    page: int | None = None
-    per_page: int | None = None
-    search: str | None = None
-    exclude_ids: list[UUID] | None = None
+    herd_unit_id: Optional[list[UUID]] = None
+    survey_id: Optional[list[UUID]] = None
+    include_reviewed: Optional[bool] = False
+    include_opened: Optional[bool] = False
+    num: Optional[int] = None
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+    search: Optional[str] = None
+    exclude_ids: Optional[list[UUID]] = None
+    type: ActivityType | None = None
 
     @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")
     @classmethod
@@ -369,8 +370,6 @@ class ReviewedArea(DBbase, ImageMixin):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "reviewed_area")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("reviewed_area_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

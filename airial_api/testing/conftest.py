@@ -1,8 +1,7 @@
-import os
-
 import pytest
+from dotenv import load_dotenv
 
-os.environ["SESSION_REDIS"] = "redis://:Zp1dRLnsUKY9CNOW6ukL@localhost:6379"
+load_dotenv(".env.test", override=True)
 
 
 @pytest.fixture(scope="session", autouse=True)

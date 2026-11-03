@@ -93,8 +93,6 @@ class DBbase(ABC):
 
     __table__: ClassVar[sql.Identifier]
     __pk__: ClassVar[sql.Identifier]
-    __parent_table__: ClassVar[sql.Identifier | None] = None
-    __parent_fk__: ClassVar[sql.Identifier | None] = None
 
     Response: ClassVar[type[BaseModel]]
 
