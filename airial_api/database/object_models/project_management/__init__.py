@@ -5,7 +5,6 @@ from database.object_models.core.activity import ActivityType
 from .active_measurements import (
     ActiveMeasurement,
     CreateActiveMeasurement,
-    CreateActiveMeasurment,
     UpdateActiveMeasurement,
 )
 from .herd_units import (
@@ -52,7 +51,6 @@ __all__ = [
     "ActiveMeasurement",
     "ActivityType",
     "CreateActiveMeasurement",
-    "CreateActiveMeasurment",
     "CreateHerdUnitReq",
     "CreateLabelReq",
     "CreateModelReq",

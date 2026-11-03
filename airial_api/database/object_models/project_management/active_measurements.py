@@ -32,9 +32,6 @@ class CreateActiveMeasurement(BaseModel):
     final_ci_lower: float | None = None
 
 
-CreateActiveMeasurment = CreateActiveMeasurement
-
-
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
