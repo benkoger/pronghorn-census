@@ -335,8 +335,6 @@ class ReviewedArea(DBbase, ImageMixin):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "reviewed_area")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("reviewed_area_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

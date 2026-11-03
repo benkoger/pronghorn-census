@@ -78,8 +78,6 @@ class Prediction(DBbase):
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "predictions")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("pred_id")
-    __parent_table__: ClassVar[sql.Identifier] = sql.Identifier("core", "images")
-    __parent_fk__: ClassVar[sql.Identifier] = sql.Identifier("image_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

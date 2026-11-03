@@ -81,8 +81,6 @@ class BulkRequestModel(BaseModel):
 class DBbase(ABC):
     __table__: ClassVar[sql.Identifier]
     __pk__: ClassVar[sql.Identifier]
-    __parent_table__: ClassVar[Optional[sql.Identifier]] = None
-    __parent_fk__: ClassVar[Optional[sql.Identifier]] = None
 
     Response: ClassVar[Type[BaseModel]]
 
