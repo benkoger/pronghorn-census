@@ -66,6 +66,8 @@ class Organization(DBbase):
         uuid: UUID
         logo_url: str | None = None
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod

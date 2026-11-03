@@ -71,6 +71,8 @@ class User(UserMixin, DBbase):
         default_org_id: int
         uuid: UUID
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __post_init__(self):
         """Initialize string ID from UUID."""

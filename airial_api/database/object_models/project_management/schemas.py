@@ -56,6 +56,8 @@ class Schema(DBbase):
         modified: datetime
         uuid: UUID
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod

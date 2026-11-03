@@ -299,7 +299,9 @@ class Image(DBbase, ImageMixin):
         image_width_px: int
         uuid: UUID
 
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Response: ClassVar[type[BaseModel]] = Response
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: CreateImageReq) -> tuple[Self, list[RelationshipUpdate]] | None:
@@ -404,7 +406,9 @@ class ReviewedArea(DBbase, ImageMixin):
                 return value.serialize()
             return value
 
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Response: ClassVar[type[BaseModel]] = Response
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: CreateReviewedAreaReq) -> tuple[Self, list[RelationshipUpdate]] | None:
@@ -488,6 +492,8 @@ class PredictionCrop(DBbase, ImageMixin):
             if isinstance(value, Box):
                 return value.serialize()
             return value
+
+    Response: ClassVar[type[BaseModel]] = Response
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

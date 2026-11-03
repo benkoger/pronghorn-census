@@ -102,6 +102,8 @@ class Prediction(DBbase):
                 return value.serialize()
             return value
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod

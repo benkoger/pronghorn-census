@@ -83,6 +83,8 @@ class Label(DBbase):
         color: str
         uuid: UUID
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod

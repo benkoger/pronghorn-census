@@ -180,6 +180,8 @@ class ImageFootprint(DBbase):
             raw = bytes.fromhex(v) if isinstance(v, str) else bytes(v)
             return shapely.geometry.mapping(shapely.from_wkb(raw))
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # -----------------------------------------------------------------------------------------------------------------------
 
     @classmethod
@@ -196,16 +198,6 @@ class ImageFootprint(DBbase):
             )
             VALUES (
                 %(image_id)s,
-<<<<<<< HEAD
-                CASE
-                    WHEN %(footprint_json)s IS NOT NULL THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_json)s), 4326)
-                    ELSE NULL
-                END,
-                %(has_detection)s,
-                CASE
-                    WHEN %(footprint_metadata_json)s IS NOT NULL
-                    THEN ST_SetSRID(ST_GeomFromGeoJSON(%(footprint_metadata_json)s), 4326)
-=======
                 CASE WHEN %(footprint_json)s::text IS NOT NULL
                     THEN ST_SetSRID(
                         ST_GeomFromGeoJSON(%(footprint_json)s::text), 4326
@@ -218,7 +210,6 @@ class ImageFootprint(DBbase):
                         ST_GeomFromGeoJSON(%(footprint_metadata_json)s::text),
                         4326
                     )
->>>>>>> origin/indev
                     ELSE NULL
                 END,
                 %(bbox_wsen)s,
@@ -231,7 +222,6 @@ class ImageFootprint(DBbase):
             )
             RETURNING *;
         """)
-
         cursor.execute(
             query,
             {
