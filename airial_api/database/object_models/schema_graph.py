@@ -19,6 +19,12 @@ SCHEMA_GRAPH: dict[tuple[str, str], list[tuple[tuple[str, str], str]]] = {
     ("core", "am_units"): [
         (("projectmanagement", "active_measurements"), "active_measurement_id")
     ],
+    ("core", "proposal_generations"): [
+        (("projectmanagement", "active_measurements"), "active_measurement_id")
+    ],
+    ("projectmanagement", "active_measurements"): [
+        (("projectmanagement", "surveys"), "survey_id")
+    ],
     ("projectmanagement", "surveys"): [(("projectmanagement", "projects"), "project_id")],
     ("projectmanagement", "herd_units"): [(("projectmanagement", "projects"), "project_id")],
 }

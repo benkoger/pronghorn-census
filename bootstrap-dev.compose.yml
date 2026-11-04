@@ -16,7 +16,7 @@ services:
       - type: bind 
         source: ./local_db/bootstrap.sh
         target: /docker-entrypoint-initdb.d/bootstrap.sh
-      - ./docs/database/schemas/airial1-1.sql:/db_definitions.sql:Z
+      - ./docs/database/schemas/airial1-2.sql:/db_definitions.sql:Z
     networks:
       - dev_pronghorn_app_network
     ports:
