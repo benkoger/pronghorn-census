@@ -31,7 +31,14 @@ class AutoCropReq(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def flatten_prediction_dimensions(cls, data: Any) -> Any:
-        """Normalize incoming nested bounding box format to flat coordinates."""
+        """Normalize incoming nested bounding box format to flat coordinates.
+
+        Args:
+            data: Raw input data dictionary or model attributes.
+
+        Returns:
+            Normalized data structure with flattened prediction bounding boxes.
+        """
         if isinstance(data, dict) and "predictions" in data:
             flattened_predictions = []
 

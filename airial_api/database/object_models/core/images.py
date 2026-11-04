@@ -1,7 +1,7 @@
-# Class definition for Image objects in the database
+"""Image and reviewed area database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Image and reviewed area database models and schemas."""
 
 import io
 from dataclasses import dataclass, field
@@ -32,7 +32,11 @@ class ImageMixin:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def set_image(self, imageData: np.ndarray):
-        """Set internal image array from raw bytes or ndarray."""
+        """Set internal image array from raw bytes or ndarray.
+
+        Args:
+            imageData: Raw image byte buffer or numpy ndarray.
+        """
         if isinstance(imageData, bytes):
             try:
                 pilImage = PillowImage.open(io.BytesIO(imageData))
@@ -47,7 +51,11 @@ class ImageMixin:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_image(self) -> np.ndarray | None:
-        """Get internal image array."""
+        """Get internal image array.
+
+        Returns:
+            Image array as numpy ndarray, or None if not set.
+        """
         if self.image is not None:
             return self.image
 
@@ -60,7 +68,17 @@ class ImageMixin:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serve(self, img_format: str):
-        """Encode internal image into the specified format and return bytes."""
+        """Encode internal image into the specified format and return bytes.
+
+        Args:
+            img_format: Image file extension format (e.g. '.jpg', '.webp').
+
+        Returns:
+            Encoded image bytes.
+
+        Raises:
+            Exception: If no image data is loaded.
+        """
         if self.image is not None:
             _, img_encoded = cv2.imencode(
                 img_format,
@@ -196,7 +214,14 @@ class RAQuery(BaseModel):
     @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")
     @classmethod
     def ensure_list(cls, value):
-        """Ensure value is converted to a list."""
+        """Ensure value is converted to a list.
+
+        Args:
+            value: Scalar identifier or list of identifiers.
+
+        Returns:
+            Normalized list of identifiers.
+        """
         if isinstance(value, list):
             return value
         if value is None or value == "":
@@ -341,7 +366,11 @@ class Image(DBbase, ImageMixin):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
-        """Serialize image model to a dictionary."""
+        """Serialize image model to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to Image.Response schema.
+        """
         return Image.Response.model_validate(self).model_dump(mode="json")
 
 
@@ -446,7 +475,11 @@ class ReviewedArea(DBbase, ImageMixin):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
-        """Serialize reviewed area model to a dictionary."""
+        """Serialize reviewed area model to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to ReviewedArea.Response schema.
+        """
         return ReviewedArea.Response.model_validate(self).model_dump(mode="json")
 
 
@@ -488,7 +521,14 @@ class PredictionCrop(DBbase, ImageMixin):
         @field_validator("dimensions", "boundingBox", mode="before")
         @classmethod
         def transform(cls, value: Any) -> Any:
-            """Transform box objects into serialized dictionaries."""
+            """Transform box objects into serialized dictionaries.
+
+            Args:
+                value: Box instance or existing dictionary.
+
+            Returns:
+                Serialized dictionary mapping of the box coordinates.
+            """
             if isinstance(value, Box):
                 return value.serialize()
             return value
@@ -506,7 +546,11 @@ class PredictionCrop(DBbase, ImageMixin):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize prediction crop model to a dictionary."""
+        """Serialize prediction crop model to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to PredictionCrop.Response schema.
+        """
         return PredictionCrop.Response.model_validate(self).model_dump(mode="json")
 
 

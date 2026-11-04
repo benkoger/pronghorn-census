@@ -1,8 +1,7 @@
-# Enum definition for ActivityType
+"""Activity type enum definitions for core operations."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-
-"""Activity type enum definitions for core operations."""
 
 from enum import StrEnum
 

@@ -1,8 +1,7 @@
-# Endpoints for managing image metadata in the API
+"""Endpoints for managing image metadata in the API."""
+
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
-
-"""Endpoints for managing image metadata in the API."""
 
 from uuid import UUID
 
@@ -30,6 +29,12 @@ imageMetadataBp = Blueprint("image_metadata", __name__, url_prefix="/api/v1/imag
 @permission_required("access")
 def get_by_id(metadata_id: int | UUID):
     """Retrieve image metadata by its integer ID or UUID.
+
+    Args:
+        metadata_id: Primary key of the metadata record (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized image metadata and HTTP status 200.
 
     ---
     parameters:
@@ -70,6 +75,12 @@ def get_by_id(metadata_id: int | UUID):
 def create(body: CreateImageMetadataReq):
     """Create a new image metadata record.
 
+    Args:
+        body: Image metadata creation payload with camera/telemetry values.
+
+    Returns:
+        Tuple containing the serialized created metadata and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -101,6 +112,13 @@ def create(body: CreateImageMetadataReq):
 @validate()
 def update(body: UpdateImageMetadataReq, metadata_id: int | UUID):
     """Update image metadata by integer ID or UUID.
+
+    Args:
+        body: Metadata update payload.
+        metadata_id: Primary key of the metadata record to update.
+
+    Returns:
+        Tuple containing the serialized updated metadata and HTTP status 200.
 
     ---
     parameters:
@@ -145,6 +163,12 @@ def update(body: UpdateImageMetadataReq, metadata_id: int | UUID):
 @permission_required("access")
 def delete(metadata_id: int | UUID):
     """Delete image metadata by integer ID or UUID.
+
+    Args:
+        metadata_id: Primary key of the metadata record to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

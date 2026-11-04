@@ -1,8 +1,6 @@
-# Endpoints for managing active measurements in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing active measurements in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -32,6 +30,12 @@ activeMeasBp = Blueprint("active_measurements", __name__, url_prefix="/api/v1/ac
 @permission_required("access")
 def get_by_id(active_measurement_id: int | UUID):
     """Retrieve an active measurement by its integer ID or UUID.
+
+    Args:
+        active_measurement_id: Primary key of the active measurement (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized active measurement and HTTP status 200.
 
     ---
     parameters:
@@ -70,6 +74,12 @@ def get_by_id(active_measurement_id: int | UUID):
 @permission_required("access")
 def get_am_units(active_measurement_id: int | UUID):
     """Retrieve all AM units associated with an active measurement.
+
+    Args:
+        active_measurement_id: Primary key of the parent active measurement (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized AM units and HTTP status 200.
 
     ---
     parameters:
@@ -111,6 +121,12 @@ def get_am_units(active_measurement_id: int | UUID):
 def create(body: CreateActiveMeasurement):
     """Create a new active measurement.
 
+    Args:
+        body: Active measurement creation payload.
+
+    Returns:
+        Tuple containing the serialized created active measurement and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -144,6 +160,13 @@ def create(body: CreateActiveMeasurement):
 @validate()
 def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
     """Update an active measurement by integer ID or UUID (e.g., retraining cadence).
+
+    Args:
+        body: Active measurement update payload.
+        active_measurement_id: Primary key of the active measurement to update.
+
+    Returns:
+        Tuple containing the serialized updated active measurement and HTTP status 200.
 
     ---
     parameters:
@@ -188,6 +211,12 @@ def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
 @permission_required("access")
 def delete(active_measurement_id: int | UUID):
     """Delete an active measurement by integer ID or UUID.
+
+    Args:
+        active_measurement_id: Primary key of the active measurement to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

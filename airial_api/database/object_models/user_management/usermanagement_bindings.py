@@ -1,7 +1,7 @@
-# Multi table bindings for the usermanagement schema
+"""User management relational bindings models."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""User management relational bindings models."""
 
 from dataclasses import dataclass
 from typing import ClassVar

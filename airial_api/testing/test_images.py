@@ -1,5 +1,6 @@
-# Pytest runner for the images router in the Airial API
-# Author Michael B. Lance
+"""Pytest runner for the images router in the Airial API."""
+
+# Author: Michael B. Lance
 
 import hashlib
 import io
@@ -19,6 +20,8 @@ from database.object_models.core.predictions import Prediction
 
 
 class TestImages(APITester):
+    """Test suite covering single, list, upload, crop, and mutation image endpoints."""
+
     # -------------------------------------------------------------------------
     # 1. GET Single & List Endpoint Schema Validation
     # -------------------------------------------------------------------------
@@ -59,6 +62,14 @@ class TestImages(APITester):
         ],
     )
     def test_get_endpoints_schema_success(self, auth_client, endpoint, expected_schema, is_list):
+        """Validate GET endpoint responses conform to their respective Pydantic schemas.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+            endpoint: API endpoint path to request.
+            expected_schema: Pydantic model class expected to validate the response.
+            is_list: Whether the endpoint returns a list of schema models.
+        """
         response = auth_client.get(endpoint)
         assert response.status_code == 200
 
@@ -80,6 +91,12 @@ class TestImages(APITester):
         ],
     )
     def test_get_image_not_found(self, auth_client, path_suffix):
+        """Assert 404 is returned when querying a nonexistent image UUID.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+            path_suffix: URL sub-path suffix appended to the image endpoint.
+        """
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/images/{random_uuid}{path_suffix}")
         assert response.status_code == 404
@@ -155,6 +172,14 @@ class TestImages(APITester):
         ],
     )
     def test_post_endpoints(self, auth_client, endpoint, payload, expected_status):
+        """Validate POST image endpoints with sample payloads and assert expected status.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+            endpoint: POST endpoint path to request.
+            payload: JSON payload dictionary to send in the request body.
+            expected_status: Expected HTTP response status code.
+        """
         response = auth_client.post(endpoint, json=payload)
         assert response.status_code == expected_status
 
@@ -163,6 +188,11 @@ class TestImages(APITester):
     # -------------------------------------------------------------------------
 
     def test_update_image_success(self, auth_client):
+        """Validate updating image metadata via PATCH.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
         new_name = f"updated_{uuid4().hex[:4]}"
 
@@ -173,6 +203,11 @@ class TestImages(APITester):
         assert response.get_json()["name"] == new_name
 
     def test_delete_image_lifecycle(self, auth_client):
+        """Validate full lifecycle of creating, retrieving, and deleting an image.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         payload = {
             "name": f"pronghorn_{uuid4().hex[:6]}",
             "herd_unit_ids": {
@@ -205,10 +240,20 @@ class TestImages(APITester):
     # -------------------------------------------------------------------------
 
     def test_get_prediction_crop_not_found(self, auth_client):
+        """Assert 404 is returned when requesting a crop for an unknown prediction.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{str(uuid4())}")
         assert res_404.status_code == 404
 
     def test_create_prediction_crops_cache_miss_success(self, auth_client):
+        """Verify generating prediction crops on cache miss by fetching from S3.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
 
         img_res = auth_client.get(f"/api/v1/images/{img_id}")
@@ -250,6 +295,11 @@ class TestImages(APITester):
         assert decoded_img.height > 0
 
     def test_create_prediction_crops_cache_hit_success(self, auth_client):
+        """Verify generating prediction crops using pre-cached image data.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
 
         img_res = auth_client.get(f"/api/v1/images/{img_id}")
@@ -283,6 +333,11 @@ class TestImages(APITester):
     # -------------------------------------------------------------------------
 
     def test_abort_multipart_upload_success(self, auth_client):
+        """Verify aborting an active S3 multipart upload.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         key = f"uploads/test_abort_{uuid4().hex[:6]}.jpg"
 
         upload_res = auth_client.post(
@@ -302,6 +357,11 @@ class TestImages(APITester):
         assert response.status_code == 200
 
     def test_complete_multipart_upload_success(self, auth_client):
+        """Verify completing an S3 multipart upload with uploaded parts.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         key = f"uploads/test_complete_{uuid4().hex[:6]}.jpg"
 
         init_res = auth_client.post(
@@ -352,5 +412,10 @@ class TestImages(APITester):
     # -------------------------------------------------------------------------
 
     def test_close_user_images_success(self, auth_client):
+        """Verify closing in-review images assigned to the authenticated user.
+
+        Args:
+            auth_client: Authenticated test client fixture.
+        """
         response = auth_client.patch("/api/v1/images/close-user-images")
         assert response.status_code == 200

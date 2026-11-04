@@ -1,8 +1,7 @@
-# Class definition for Annotation objects in the database
+"""Database model and request schemas for annotations."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-
-"""Database model and request schemas for annotations."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -71,7 +70,14 @@ class UpdateAnnotationReq(BaseModel):
     @field_validator("label_id", mode="before")
     @classmethod
     def resolve_label_id(cls, value: Any) -> int | None:
-        """Normalize label ID from integer, dict, or Keyring representation."""
+        """Normalize label ID from integer, dict, or Keyring representation.
+
+        Args:
+            value: Integer, dictionary with 'pkey', Keyring instance, or None.
+
+        Returns:
+            Resolved integer label ID, or None if input was None.
+        """
         if value is None:
             return None
         if isinstance(value, dict) and "pkey" in value:
@@ -224,5 +230,9 @@ class Annotation(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize Annotation entity to dictionary."""
+        """Serialize Annotation entity to dictionary.
+
+        Returns:
+            Dictionary serialized via Annotation.Response schema.
+        """
         return Annotation.Response.model_validate(self).model_dump(mode="json")

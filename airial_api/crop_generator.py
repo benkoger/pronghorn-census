@@ -1,7 +1,6 @@
-# Genera high quality crops of training data with model assisted labeling and Kmeans clustering
-# Authors: Ben Koger, Michael B. Lance
-
 """Generate high quality crops of training data with model assisted labeling and KMeans clustering."""
+
+# Authors: Ben Koger, Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -170,7 +169,20 @@ def create_subcrop(
     crop_size: int = 150,
     drawBox: bool = False,
 ) -> list[PredictionCrop]:
-    """Generate small subcrops centered on individual model predictions."""
+    """Generate small subcrops centered on individual model predictions.
+
+    Args:
+        image: Source Image object containing prediction targets.
+        predictions: List of Prediction models to crop around.
+        crop_size: Pixel radius around prediction center. Defaults to 150.
+        drawBox: If True, draws bounding boxes on the original image. Defaults to False.
+
+    Returns:
+        List of generated PredictionCrop instances with localized bounding boxes.
+
+    Raises:
+        Exception: If predictions list is empty or image data could not be loaded.
+    """
     crops = []
     img = image.get_image()
     if len(predictions) == 0:

@@ -1,3 +1,5 @@
+"""Shared test fixtures and core test harness for Airial API testing."""
+
 import io
 from contextlib import contextmanager
 from typing import Any
@@ -12,15 +14,34 @@ from app.extensions import base
 
 
 class APITester:
+    """Base API test suite providing Flask app contexts, mock S3, and test clients."""
+
     @staticmethod
     def _generate_jpeg_bytes(width: int = 500, height: int = 500, color: str = "red") -> bytes:
-        """Generate fresh in-memory JPEG bytes."""
+        """Generate fresh in-memory JPEG bytes.
+
+        Args:
+            width: Image width in pixels.
+            height: Image height in pixels.
+            color: Solid color name or hex string for the test image.
+
+        Returns:
+            Encoded JPEG byte string.
+        """
         buf = io.BytesIO()
         PILImage.new("RGB", (width, height), color=color).save(buf, format="JPEG")
         return buf.getvalue()
 
     @pytest.fixture
     def app(self, monkeypatch):
+        """Configure and yield a mocked Flask application context.
+
+        Args:
+            monkeypatch: Pytest monkeypatch fixture to override AWS environment variables.
+
+        Yields:
+            Configured Flask application instance with mocked S3 and database pool.
+        """
         monkeypatch.delenv("AWS_ENDPOINT_URL_S3", raising=False)
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "foobar_key")
         monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "foobar_secret")
@@ -58,11 +79,28 @@ class APITester:
 
     @pytest.fixture
     def client(self, app):
+        """Yield an unauthenticated Flask test client.
+
+        Args:
+            app: Configured test Flask application.
+
+        Yields:
+            Flask test client instance.
+        """
         with app.test_client() as client:
             yield client
 
     @pytest.fixture
     def auth_client(self, client, app):
+        """Authenticate as test user and yield the authenticated test client.
+
+        Args:
+            client: Unauthenticated Flask test client.
+            app: Configured test Flask application.
+
+        Yields:
+            Authenticated Flask test client.
+        """
         client.post(
             "/api/v1/authenticate",
             json={"email": "tester@local.host", "password": "Learning2Count"},
@@ -72,10 +110,23 @@ class APITester:
 
     @pytest.fixture
     def runner(self, app):
+        """Return a Flask CLI test runner.
+
+        Args:
+            app: Configured test Flask application.
+
+        Returns:
+            Flask CLI test runner instance.
+        """
         return app.test_cli_runner()
 
     @pytest.fixture(scope="function", autouse=True)
     def rollback_db_transaction(self, app):
+        """Wrap test in a rollback transaction to isolate database modifications.
+
+        Args:
+            app: Configured test Flask application.
+        """
         db_instance = app.extensions["base"]
 
         if not db_instance._pool:

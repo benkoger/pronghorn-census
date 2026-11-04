@@ -1,7 +1,7 @@
-# Class definition for User objects in the database
+"""User database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""User database models and schemas."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -81,32 +81,59 @@ class User(UserMixin, DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getId(self) -> str:
-        """Return the user ID string."""
+        """Return the user ID string.
+
+        Returns:
+            str: String representation of the user UUID.
+        """
         return self.id
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def hasRole(self, role_name: str) -> bool:
-        """Check if the user has a specific role."""
+        """Check if the user has a specific role.
+
+        Args:
+            role_name: Name of the role to check.
+
+        Returns:
+            bool: True if the user has the role, False otherwise.
+        """
         return role_name in self.roles if self.roles else False
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
     def _create(cls, *args, **kwargs):
-        """Stubbed to satisfy DBbase ABC contract."""
+        """Stubbed to satisfy DBbase ABC contract.
+
+        Args:
+            *args: Positional arguments.
+            **kwargs: Keyword arguments.
+
+        Raises:
+            NotImplementedError: Always raised since base._insert should be used.
+        """
         raise NotImplementedError("Use base._insert(User, ...) for record creation.")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
-        """Serialize user model to a dictionary."""
+        """Serialize user model to a dictionary.
+
+        Returns:
+            dict: Serialized user representation.
+        """
         return User.Response.model_validate(self).model_dump(mode="json")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def to_cache(self):
-        """Serialize user model to packed msgpack bytes for caching."""
+    def to_cache(self) -> bytes:
+        """Serialize user model to packed msgpack bytes for caching.
+
+        Returns:
+            bytes: Msgpack-encoded user state.
+        """
         return packb(
             {
                 **self.serialize(),

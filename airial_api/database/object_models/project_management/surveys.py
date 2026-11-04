@@ -1,7 +1,7 @@
-# Class definition for Survey objects in the database
+"""Survey database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Survey database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -108,6 +108,15 @@ class Survey(DBbase):
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: CreateSurveyReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new survey record and associate it with project and herd unit.
+
+        Args:
+            cursor: Active database cursor.
+            req: Survey creation request containing survey details and parent IDs.
+
+        Returns:
+            Optional tuple containing created Survey and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_survey AS (
@@ -161,5 +170,9 @@ class Survey(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
-        """Serialize survey model to a dictionary."""
+        """Serialize survey model to a dictionary.
+
+        Returns:
+            dict: Serialized survey representation.
+        """
         return Survey.Response.model_validate(self).model_dump(mode="json")

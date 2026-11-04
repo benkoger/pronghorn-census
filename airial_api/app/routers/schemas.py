@@ -1,8 +1,6 @@
-# Endpoints for managing schemas in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing label schemas in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -30,6 +28,12 @@ schemaBp = Blueprint("schemas", __name__, url_prefix="/api/v1/schemas")
 @permission_required("access")
 def get_labels(schema_id: int | UUID):
     """Retrieve all labels associated with a specific schema.
+
+    Args:
+        schema_id: Primary key of the schema (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized labels and HTTP status 200.
 
     ---
     parameters:
@@ -70,6 +74,12 @@ def get_labels(schema_id: int | UUID):
 @permission_required("access")
 def get_models(schema_id: int | UUID):
     """Retrieve all models associated with a specific schema.
+
+    Args:
+        schema_id: Primary key of the schema (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized models and HTTP status 200.
 
     ---
     parameters:
@@ -112,6 +122,12 @@ def get_models(schema_id: int | UUID):
 def create(body: createSchemaReq):
     """Create a new schema object.
 
+    Args:
+        body: Schema creation payload.
+
+    Returns:
+        Tuple containing the serialized created schema and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -146,6 +162,12 @@ def create(body: createSchemaReq):
 @permission_required("access")
 def delete_schema(schema_id: int | UUID):
     """Delete a schema by its integer ID or UUID.
+
+    Args:
+        schema_id: Primary key of the schema to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

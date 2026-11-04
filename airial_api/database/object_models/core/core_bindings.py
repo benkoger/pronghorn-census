@@ -1,8 +1,7 @@
-# Multi table bindings for the projectmanagement schema
+"""Multi-table relation bindings for the core schema."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-
-"""Multi-table relation bindings for the core schema."""
 
 from dataclasses import dataclass
 from typing import ClassVar

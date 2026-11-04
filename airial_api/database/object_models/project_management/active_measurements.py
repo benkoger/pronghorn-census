@@ -1,7 +1,7 @@
-# Class definition for ActiveMeasurement objects in the database
+"""Active measurement database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Active measurement database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -135,5 +135,9 @@ class ActiveMeasurement(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize active measurement model to a dictionary."""
+        """Serialize active measurement model to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to ActiveMeasurement.Response schema.
+        """
         return ActiveMeasurement.Response.model_validate(self).model_dump(mode="json")

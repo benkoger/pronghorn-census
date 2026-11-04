@@ -17,7 +17,11 @@ from database.errors import AirialError
 
 
 def create_app():
-    """Create and configure the Flask application instance."""
+    """Create and configure the Flask application instance.
+
+    Returns:
+        Configured Flask application instance.
+    """
     app = Flask(__name__)
     app.config.from_object(FlaskConfig)
 

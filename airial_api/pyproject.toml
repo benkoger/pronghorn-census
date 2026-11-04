@@ -156,5 +156,8 @@ target-version = "py313"
 line-length = 126
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
+select = ["E", "F", "W", "I", "D"]
 ignore = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

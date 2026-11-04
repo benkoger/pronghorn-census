@@ -1,6 +1,8 @@
-# Class definition for Prediction objects in the database
+"""Prediction database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, ClassVar, Optional, Self
@@ -18,11 +20,21 @@ from ..base import Box, DBbase, Keyring, PrimaryKey, create_spice_update
 
 
 class PredictionQuery(BaseModel):
+    """Query parameters for prediction lookups."""
+
     prediction_id: list[PrimaryKey]
 
     @field_validator("prediction_id")
     @classmethod
-    def ensure_list(cls, value):
+    def ensure_list(cls, value: Any) -> list[PrimaryKey]:
+        """Ensure incoming prediction_id value is converted to a list.
+
+        Args:
+            value: Scalar primary key or list of primary keys.
+
+        Returns:
+            List of primary keys.
+        """
         if isinstance(value, list):
             return value
         if value is None or value == "":
@@ -34,6 +46,8 @@ class PredictionQuery(BaseModel):
 
 
 class CreatePredictionReq(BaseModel):
+    """Request schema for creating a single prediction."""
+
     image_ids: Keyring
     model_ids: Keyring
     label: int
@@ -48,6 +62,8 @@ class CreatePredictionReq(BaseModel):
 
 
 class UpdatePredictionReq(BaseModel):
+    """Request schema for updating an existing prediction."""
+
     reviewed_by_user_id: Optional[int] = None
     label: Optional[int] = None
     score: Optional[float] = None
@@ -62,6 +78,8 @@ class UpdatePredictionReq(BaseModel):
 
 @dataclass
 class Prediction(DBbase):
+    """Dataclass representing a model prediction in the database."""
+
     pred_id: int
     image_id: int
     model_id: int
@@ -82,11 +100,14 @@ class Prediction(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def __post_init__(self):
+        """Initialize bounding box dimensions from corner coordinates."""
         self.dimensions = Box((self.box_tx, self.box_ty), (self.box_bx, self.box_by))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a prediction."""
+
         model_config = ConfigDict(from_attributes=True)
 
         pred_id: int
@@ -98,6 +119,14 @@ class Prediction(DBbase):
         @field_validator("dimensions", mode="before")
         @classmethod
         def transform_box(cls, value: Any) -> dict[str, dict[str, int]]:
+            """Transform a Box instance into its serialized dictionary representation.
+
+            Args:
+                value: Box instance or raw dictionary representation.
+
+            Returns:
+                Dictionary with top_left and bottom_right coordinate mappings.
+            """
             if isinstance(value, Box):
                 return value.serialize()
             return value
@@ -108,6 +137,16 @@ class Prediction(DBbase):
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: CreatePredictionReq) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+        """Insert a new prediction record and generate SpiceDB relationship update.
+
+        Args:
+            cursor: Database cursor.
+            req: Prediction creation request payload.
+
+        Returns:
+            Tuple of created Prediction instance and list of SpiceDB relationship updates,
+            or None if insertion failed.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
 			INSERT INTO core.predictions (
@@ -146,4 +185,9 @@ class Prediction(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize prediction instance to a dictionary.
+
+        Returns:
+            JSON-serializable dictionary representation of the prediction.
+        """
         return Prediction.Response.model_validate(self).model_dump(mode="json")

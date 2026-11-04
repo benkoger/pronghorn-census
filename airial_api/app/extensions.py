@@ -21,7 +21,11 @@ health = HealthCheck()
 
 
 def first_run():
-    """Check if database has completed bootstrap initialization."""
+    """Check if database has completed bootstrap initialization.
+
+    Returns:
+        Tuple containing a boolean bootstrap status and check label string.
+    """
     return base.check_bootstrapped(), "first_run"
 
 

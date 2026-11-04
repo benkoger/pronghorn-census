@@ -1,7 +1,7 @@
-# Class definition for Project objects in the database
+"""Project database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Project database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,8 +29,15 @@ class ProjectQuery(BaseModel):
 
     @field_validator("project_id", mode="before")
     @classmethod
-    def ensure_list(cls, value):
-        """Ensure project ID is a list."""
+    def ensure_list(cls, value: int | UUID | list[int | UUID] | None) -> list[int | UUID] | None:
+        """Ensure project ID is a list.
+
+        Args:
+            value: Single project ID, list of project IDs, or None.
+
+        Returns:
+            List of project IDs or None.
+        """
         if isinstance(value, list):
             return value
         return [value]
@@ -83,6 +90,17 @@ class Project(DBbase):
     def _create(
         cls, cursor: Cursor[Self], req: createProjectReq, user: User, role: Role
     ) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new project record and associated organization and user links.
+
+        Args:
+            cursor: Active database cursor.
+            req: Project creation request with name and organization IDs.
+            user: Creating user who will be assigned to the project.
+            role: Role to assign to the user on the project.
+
+        Returns:
+            Optional tuple containing created Project and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_project AS (
@@ -133,6 +151,10 @@ class Project(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def serialize(self):
-        """Serialize project model to a dictionary."""
+    def serialize(self) -> dict:
+        """Serialize project model to a dictionary.
+
+        Returns:
+            dict: Serialized project representation.
+        """
         return Project.Response.model_validate(self).model_dump(mode="json")

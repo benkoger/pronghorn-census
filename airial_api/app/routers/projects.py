@@ -1,8 +1,6 @@
-# Endpoints for managing projects in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing projects in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import cast
@@ -45,6 +43,9 @@ projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 def get_all():
     """Retrieve all projects belonging to the currently active session organization.
 
+    Returns:
+        Tuple containing list of serialized projects and HTTP status 200.
+
     ---
     responses:
       200:
@@ -73,6 +74,12 @@ def get_all():
 @permission_required("access")
 def get_by_id(project_id: int | UUID):
     """Request a project object from the database using its integer PK or UUID.
+
+    Args:
+        project_id: Primary key of the project (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized project and HTTP status 200.
 
     ---
     parameters:
@@ -111,6 +118,12 @@ def get_by_id(project_id: int | UUID):
 @login_required
 def get_models(project_id: int | UUID):
     """Retrieve all models associated with a specific project.
+
+    Args:
+        project_id: Primary key of the project (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized models and HTTP status 200.
 
     ---
     parameters:
@@ -156,6 +169,12 @@ def get_models(project_id: int | UUID):
 def get_herd_units(project_id: int | UUID):
     """Retrieve all herd units associated with a specific project.
 
+    Args:
+        project_id: Primary key of the project (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized herd units and HTTP status 200.
+
     ---
     parameters:
       - name: project_id
@@ -200,6 +219,12 @@ def get_herd_units(project_id: int | UUID):
 def get_surveys(project_id: int | UUID):
     """Retrieve all surveys associated with a specific project.
 
+    Args:
+        project_id: Primary key of the project (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized surveys and HTTP status 200.
+
     ---
     parameters:
       - name: project_id
@@ -243,6 +268,12 @@ def get_surveys(project_id: int | UUID):
 @permission_required("access")
 def get_schemas(project_id: int | UUID):
     """Retrieve all schemas associated with a specific project.
+
+    Args:
+        project_id: Primary key of the project (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized schemas and HTTP status 200.
 
     ---
     parameters:
@@ -289,6 +320,12 @@ def get_schemas(project_id: int | UUID):
 def create(body: createProjectReq):
     """Create a new project object.
 
+    Args:
+        body: Project creation payload.
+
+    Returns:
+        Tuple containing the serialized created project and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -323,6 +360,12 @@ def create(body: createProjectReq):
 @permission_required("access")
 def delete(project_id: int | UUID):
     """Delete a project by its integer ID or UUID.
+
+    Args:
+        project_id: Primary key of the project to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

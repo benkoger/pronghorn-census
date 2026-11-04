@@ -1,9 +1,7 @@
-# Endpoints for managing models in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing models and their artifacts in the API."""
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# Author: Michael B. Lance
+# ---------------------------------------------------------------------------------------------------------------------------
 from uuid import UUID
 
 from flask import Blueprint
@@ -30,6 +28,12 @@ modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 @permission_required("access")
 def get_by_id(model_id: int | UUID):
     """Request a model object from the database using its integer PK or UUID.
+
+    Args:
+        model_id: Primary key of the model (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized model and HTTP status 200.
 
     ---
     parameters:
@@ -68,6 +72,9 @@ def get_by_id(model_id: int | UUID):
 def get_json_all():
     """Retrieve all dataset JSON configurations for a specific model from S3.
 
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: model_id
@@ -96,6 +103,9 @@ def get_json_all():
 @permission_required("access")
 def get_json_train():
     """Retrieve train dataset JSON for a specific model from S3.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -126,6 +136,9 @@ def get_json_train():
 def get_json_test():
     """Retrieve validation dataset JSON for a specific model from S3.
 
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: model_id
@@ -154,6 +167,9 @@ def get_json_test():
 @permission_required("access")
 def get_weights():
     """Retrieve weights artifact file for a specific model from S3.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -184,6 +200,9 @@ def get_weights():
 def get_config():
     """Retrieve architecture configuration file for a specific model from S3.
 
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: model_id
@@ -212,6 +231,9 @@ def get_config():
 @permission_required("access")
 def get_readme():
     """Retrieve documentation/readme artifact for a specific model from S3.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -242,6 +264,12 @@ def get_readme():
 @permission_required("access")
 def get_schema(model_id: int | UUID):
     """Retrieve the label schema definition associated with a specific model.
+
+    Args:
+        model_id: Primary key of the model.
+
+    Returns:
+        Tuple containing the serialized schema and HTTP status 200.
 
     ---
     parameters:
@@ -307,6 +335,12 @@ def get_schema(model_id: int | UUID):
 def create(body: CreateModelReq):
     """Create a new model record in the database.
 
+    Args:
+        body: Model creation payload.
+
+    Returns:
+        Tuple containing the serialized created model and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -338,6 +372,12 @@ def create(body: CreateModelReq):
 def create_train_json(model_id: str):
     """Upload or initialize training dataset JSON on S3 for a model.
 
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Empty string response.
+
     ---
     parameters:
       - name: model_id
@@ -364,6 +404,12 @@ def create_train_json(model_id: str):
 @permission_required("access")
 def create_val_json(mdoel_id: str):
     """Upload or initialize validation dataset JSON on S3 for a model.
+
+    Args:
+        mdoel_id: Model identifier.
+
+    Returns:
+        Empty string response.
 
     ---
     parameters:
@@ -392,6 +438,12 @@ def create_val_json(mdoel_id: str):
 def create_weights(mdoel_id: str):
     """Upload model weights file to S3.
 
+    Args:
+        mdoel_id: Model identifier.
+
+    Returns:
+        Empty string response.
+
     ---
     parameters:
       - name: mdoel_id
@@ -417,6 +469,12 @@ def create_weights(mdoel_id: str):
 @login_required
 def create_config(model_id: str):
     """Upload model architecture config to S3.
+
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -444,6 +502,12 @@ def create_config(model_id: str):
 @permission_required("access")
 def create_readme(model_id: str):
     """Upload documentation/readme for a model to S3.
+
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -473,6 +537,12 @@ def create_readme(model_id: str):
 def replace(model_id: str):
     """Replace complete model artifacts and definition.
 
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: model_id
@@ -499,6 +569,12 @@ def replace(model_id: str):
 @permission_required("access")
 def replace_train_json(model_id: str):
     """Replace the train.json file on S3 under the model's base key.
+
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -527,6 +603,12 @@ def replace_train_json(model_id: str):
 def replace_val_json(model_id: str):
     """Replace the val.json file on S3 under the model's base key.
 
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: model_id
@@ -553,6 +635,12 @@ def replace_val_json(model_id: str):
 @permission_required("access")
 def replace_weights(mdoel_id: str):
     """Replace weights artifact on S3.
+
+    Args:
+        mdoel_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -581,6 +669,12 @@ def replace_weights(mdoel_id: str):
 def replace_config(mdoel_id: str):
     """Replace configuration artifact on S3.
 
+    Args:
+        mdoel_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
     ---
     parameters:
       - name: mdoel_id
@@ -607,6 +701,12 @@ def replace_config(mdoel_id: str):
 @permission_required("access")
 def replace_readme(model_id: str):
     """Replace documentation/readme artifact on S3.
+
+    Args:
+        model_id: Model identifier.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
@@ -637,6 +737,13 @@ def replace_readme(model_id: str):
 @validate()
 def update(body: UpdateModelReq, model_id: int | UUID):
     """Update model metadata in the database.
+
+    Args:
+        body: Model update payload containing updated name.
+        model_id: Primary key of the model to update.
+
+    Returns:
+        Tuple containing the serialized updated model and HTTP status 200.
 
     ---
     parameters:
@@ -681,6 +788,12 @@ def update(body: UpdateModelReq, model_id: int | UUID):
 @permission_required("access")
 def delete_model(model_id: int | UUID):
     """Delete a model by its integer ID or UUID.
+
+    Args:
+        model_id: Primary key of the model to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

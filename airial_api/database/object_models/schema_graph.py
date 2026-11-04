@@ -1,5 +1,7 @@
-# Schema relationship graph and traversal utilities
+"""Schema relationship graph and path traversal utilities."""
+
 # Authors: Michael B. Lance, Antigravity
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from collections import deque
 from typing import Optional
@@ -16,9 +18,7 @@ SCHEMA_GRAPH: dict[tuple[str, str], list[tuple[tuple[str, str], str]]] = {
     ],
     ("projectmanagement", "labels"): [(("projectmanagement", "schemas"), "schema_id")],
     ("projectmanagement", "models"): [(("projectmanagement", "schemas"), "schema_id")],
-    ("core", "am_units"): [
-        (("projectmanagement", "active_measurements"), "active_measurement_id")
-    ],
+    ("core", "am_units"): [(("projectmanagement", "active_measurements"), "active_measurement_id")],
     ("projectmanagement", "surveys"): [(("projectmanagement", "projects"), "project_id")],
     ("projectmanagement", "herd_units"): [(("projectmanagement", "projects"), "project_id")],
 }
@@ -28,7 +28,19 @@ def find_relationship_path(
     start_table: tuple[str, ...],
     end_table: tuple[str, ...],
 ) -> Optional[list[tuple[tuple[str, ...], tuple[str, ...], str]]]:
-    """Finds the shortest path of (from_table, to_table, fk_col) from start to end."""
+    """Find the shortest foreign key relationship path between two database tables.
+
+    Performs a breadth-first search across the schema relationship graph to determine
+    the sequence of join edges from `start_table` to `end_table`.
+
+    Args:
+        start_table: Schema and table tuple of the origin entity (e.g. ("core", "predictions")).
+        end_table: Schema and table tuple of the target entity (e.g. ("projectmanagement", "surveys")).
+
+    Returns:
+        List of tuples representing join edges `(from_table, to_table, fk_col)`, an empty list
+        if start and end tables are identical, or None if no relationship path exists.
+    """
     if start_table == end_table:
         return []
 

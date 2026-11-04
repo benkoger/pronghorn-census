@@ -1,9 +1,7 @@
-# Endpoints for managing herd units in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing herd units in the API."""
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# Author: Michael B. Lance
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
 
@@ -32,6 +30,12 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @permission_required("access")
 def get_by_id(herd_unit_id: int | UUID):
     """Request a herd unit object from the database using its integer PK or UUID.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized herd unit and HTTP status 200.
 
     ---
     parameters:
@@ -70,6 +74,12 @@ def get_by_id(herd_unit_id: int | UUID):
 @permission_required("access")
 def get_surveys(herd_unit_id: int | UUID):
     """Retrieve all surveys associated with a herd unit.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized surveys and HTTP status 200.
 
     ---
     parameters:
@@ -120,6 +130,12 @@ def get_surveys(herd_unit_id: int | UUID):
 def create(body: CreateHerdUnitReq):
     """Create a new herd unit object.
 
+    Args:
+        body: Herd unit creation payload.
+
+    Returns:
+        Tuple containing the serialized created herd unit and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -152,6 +168,12 @@ def create(body: CreateHerdUnitReq):
 @permission_required("access")
 def delete(herd_unit_id: int | UUID):
     """Delete a herd unit by its integer ID or UUID.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

@@ -1,7 +1,7 @@
-# Class definition for ImageMetadata objects in the database
+"""Image metadata database models and schemas."""
+
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Image metadata database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -145,5 +145,9 @@ class ImageMetadata(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize image metadata to a dictionary."""
+        """Serialize image metadata to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to ImageMetadata.Response schema.
+        """
         return ImageMetadata.Response.model_validate(self).model_dump(mode="json")

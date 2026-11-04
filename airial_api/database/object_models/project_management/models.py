@@ -1,7 +1,7 @@
-# Class definition for Model objects in the database
+"""Model database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Model database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -88,7 +88,15 @@ class Model(DBbase):
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: CreateModelReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new model record and project relationship.
 
+        Args:
+            cursor: Active database cursor.
+            req: Creation request containing model details and parent IDs.
+
+        Returns:
+            Optional tuple containing created Model and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_model AS (
@@ -113,6 +121,10 @@ class Model(DBbase):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def serialize(self):
-        """Serialize model to a dictionary."""
+    def serialize(self) -> dict:
+        """Serialize model to a dictionary.
+
+        Returns:
+            dict: Serialized model representation.
+        """
         return Model.Response.model_validate(self).model_dump(mode="json")

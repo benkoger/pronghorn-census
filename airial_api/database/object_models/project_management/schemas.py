@@ -1,7 +1,7 @@
-# Class definition for Schema objects in the database
+"""Schema database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Schema database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -62,6 +62,15 @@ class Schema(DBbase):
 
     @classmethod
     def _create(cls, cursor: Cursor[Self], req: createSchemaReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new schema record and project link.
+
+        Args:
+            cursor: Active database cursor.
+            req: Schema creation request containing name, project IDs, and model IDs.
+
+        Returns:
+            Optional tuple containing created Schema and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_schema AS (
@@ -87,5 +96,9 @@ class Schema(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
-        """Serialize schema model to a dictionary."""
+        """Serialize schema model to a dictionary.
+
+        Returns:
+            dict: Serialized schema representation.
+        """
         return Schema.Response.model_validate(self).model_dump(mode="json")

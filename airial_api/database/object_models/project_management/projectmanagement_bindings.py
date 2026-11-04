@@ -1,7 +1,7 @@
-# Multi table bindings for the projectmanagement schema
+"""Project management relational bindings models."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Project management relational bindings models."""
 
 from dataclasses import dataclass
 from typing import ClassVar

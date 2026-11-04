@@ -1,7 +1,7 @@
-# Class definition for Herd Unit objects in the database
+"""Herd unit database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Herd unit database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -110,5 +110,9 @@ class HerdUnit(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self):
-        """Serialize herd unit model to a dictionary."""
+        """Serialize herd unit model to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to HerdUnit.Response schema.
+        """
         return HerdUnit.Response.model_validate(self).model_dump(mode="json")

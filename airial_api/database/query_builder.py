@@ -1,4 +1,5 @@
-# Psycopg3 sql based helpers
+"""Psycopg3 SQL query composition and relationship join helpers."""
+
 # Author: Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -15,7 +16,16 @@ from database.object_models.schema_graph import find_relationship_path
 
 
 def filter_by_object_ids(table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]) -> Tuple[sql.Composable, dict]:
-    """Builds SQL to filter by integer primary keys or UUIDs."""
+    """Builds SQL to filter by integer primary keys or UUIDs.
+
+    Args:
+        table: SQL identifier representing the table to filter on.
+        pk_col: SQL identifier representing the primary key column name.
+        ids: List of integer primary keys or UUIDs to filter by.
+
+    Returns:
+        Tuple containing the composed SQL condition and placeholder parameter dictionary.
+    """
     data = {"_filter_ints": [], "_filter_uuids": []}
 
     for id_val in ids:
@@ -40,7 +50,16 @@ def clause_generator(
     sep: sql.SQL = sql.SQL(", "),
     prefix: str = "",
 ) -> sql.Composed:
-    """Generate SQL statements from a dictionary."""
+    """Generate SQL statements from a dictionary.
+
+    Args:
+        clauses: Mapping of column names to values.
+        sep: SQL separator between assignment clauses. Defaults to comma.
+        prefix: Optional prefix for placeholder identifiers.
+
+    Returns:
+        Composed SQL statement of joined column assignments.
+    """
     return sep.join(
         sql.SQL("{} = {}").format(
             sql.Identifier(col),
@@ -51,7 +70,15 @@ def clause_generator(
 
 
 def resolve_identifier(cls: type[DBbase], key: PrimaryKey) -> sql.Identifier:
-    """Determine which key type a PrimaryKey object is"""
+    """Determine which key type a PrimaryKey object is.
+
+    Args:
+        cls: Target database model class.
+        key: Primary key instance (integer ID or UUID).
+
+    Returns:
+        SQL identifier for the primary key column.
+    """
     match key:
         case int():
             pk_col = cls.__pk__
@@ -70,6 +97,17 @@ def resolve_parent_filter(
 
     Traverses the schema relationship graph to construct the exact sequence of joins
     from child to parent without redundant or duplicate joins.
+
+    Args:
+        cls: Child database model class.
+        parent_cls: Target parent database model class to filter by.
+        parent_pk: Primary key value of the parent instance (integer or UUID).
+
+    Returns:
+        Tuple containing the parent filter condition and list of SQL join clauses.
+
+    Raises:
+        ValueError: If no relationship path exists between child and parent models.
     """
     start_key = tuple(cls.__table__._obj)
     end_key = tuple(parent_cls.__table__._obj)

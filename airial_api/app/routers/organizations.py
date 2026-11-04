@@ -1,8 +1,6 @@
-# Endpoints for managing organizations in the api
-# Author: Michael B. Lance
-
 """Endpoints for managing organizations in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 from flask import Blueprint
@@ -25,6 +23,12 @@ orgBp = Blueprint("organizations", __name__, url_prefix="/api/v1/organizations")
 @validate()
 def create(body: createOrganizationReq):
     """Create a new organization using the schema-driven base._insert.
+
+    Args:
+        body: Organization creation payload containing the organization name.
+
+    Returns:
+        Tuple containing the serialized organization and HTTP status 201.
 
     ---
     parameters:

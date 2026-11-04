@@ -1,8 +1,6 @@
-# Endpoints for managing labels in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing labels in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -28,6 +26,12 @@ labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 @validate()
 def create(body: CreateLabelReq):
     """Create a new label object.
+
+    Args:
+        body: Label creation payload.
+
+    Returns:
+        Tuple containing the serialized created label and HTTP status 201.
 
     ---
     parameters:
@@ -61,6 +65,12 @@ def create(body: CreateLabelReq):
 @permission_required("access")
 def delete(label_id: int | UUID):
     """Delete a label by its integer ID or UUID.
+
+    Args:
+        label_id: Primary key of the label to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

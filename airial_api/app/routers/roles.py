@@ -1,8 +1,6 @@
-# Endpoints for managing Roles in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing user roles in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -28,6 +26,12 @@ roleBp = Blueprint("roles", __name__, url_prefix="/api/v1/roles")
 @validate()
 def get(query: BulkRequest):
     """Retrieve multiple roles by a list of integer IDs or UUIDs.
+
+    Args:
+        query: Bulk request containing list of role IDs.
+
+    Returns:
+        Tuple containing list of serialized roles and HTTP status 200.
 
     ---
     parameters:
@@ -63,6 +67,12 @@ def get(query: BulkRequest):
 @validate()
 def get_by_id(role_id: int | UUID):
     """Request a role object from the database using its integer PK or UUID.
+
+    Args:
+        role_id: Primary key of the role (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized role and HTTP status 200.
 
     ---
     parameters:

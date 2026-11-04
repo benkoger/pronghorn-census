@@ -13,12 +13,21 @@ worker_connections = 2000
 
 
 def when_ready(server):
-    """Apply monkey patching when server starts."""
+    """Apply monkey patching when server starts.
+
+    Args:
+        server: Gunicorn Arbiter server instance.
+    """
     gevent.monkey.patch_all()
 
 
 def post_fork(server, worker):
-    """Initialize worker-specific database connection pool after fork."""
+    """Initialize worker-specific database connection pool after fork.
+
+    Args:
+        server: Gunicorn Arbiter server instance.
+        worker: Gunicorn worker process instance.
+    """
     from app.extensions import base
 
     worker.log.info(f"Creating pool for worker: {worker.pid}")

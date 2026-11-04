@@ -1,8 +1,7 @@
-# Core router for the API
+"""Core router package registering API blueprints."""
+
 # Author: Michael B. Lance
 # TODO: Finish removing endpoints into sub routers
-
-"""Core router package registering API blueprints."""
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 

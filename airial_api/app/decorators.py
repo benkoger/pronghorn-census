@@ -43,7 +43,14 @@ check_exist = {
 
 
 def roles_required(*roles):
-    """Ensure current user has at least one of the specified roles."""
+    """Ensure current user has at least one of the specified roles.
+
+    Args:
+        *roles: Role names that grant access to the decorated route.
+
+    Returns:
+        Decorated view function that enforces role membership.
+    """
 
     def wrapper(f):
         @wraps(f)
@@ -62,7 +69,14 @@ def roles_required(*roles):
 
 
 def permission_required(permission: str):
-    """Enforce SpiceDB permission check on targets extracted from request arguments or body."""
+    """Enforce SpiceDB permission check on targets extracted from request arguments or body.
+
+    Args:
+        permission: SpiceDB permission name to verify against the target resources.
+
+    Returns:
+        Decorated view function that validates permissions before execution.
+    """
 
     def wrapper(f):
         @wraps(f)

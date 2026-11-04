@@ -1,11 +1,9 @@
-# Endpoints for integrating oauth2.0
-# Special thanks to Miguel Grinberg for the excellent guide
-# https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
-# Author: Michael B. Lance
-
 """Endpoints for integrating OAuth2 and legacy password authentication."""
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# Author: Michael B. Lance
+# Special thanks to Miguel Grinberg for the excellent guide:
+# https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
+# ---------------------------------------------------------------------------------------------------------------------------
 
 import secrets
 from datetime import UTC, datetime
@@ -35,7 +33,14 @@ authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
 @authBp.get("/authorize/<string:provider>")
 def oauth2_authorize(provider: str):
-    """Initiate OAuth2 authorization redirect."""
+    """Initiate OAuth2 authorization redirect.
+
+    Args:
+        provider: Name of the OAuth2 provider (e.g., 'google').
+
+    Returns:
+        Redirect response directing user to provider's login portal.
+    """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -61,7 +66,14 @@ def oauth2_authorize(provider: str):
 
 @authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-    """OAuth2 callback handler."""
+    """OAuth2 callback handler.
+
+    Args:
+        provider: Name of the OAuth2 provider processing the callback.
+
+    Returns:
+        Redirect response directing user to frontend application.
+    """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -145,7 +157,17 @@ def oauth2_callback(provider: str):
 @authBp.post("/authenticate")
 @validate()
 def authenticate(body: LegacyAuthReq):
-    """Basic email/password authentication."""
+    """Basic email/password authentication.
+
+    Args:
+        body: Login credentials containing email and password.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
+    Raises:
+        AuthenticationFailure: If user does not exist or credentials do not match.
+    """
     users = base.where(User, {"email": body.email})
     if not users:
         raise AuthenticationFailure()
@@ -175,7 +197,11 @@ def authenticate(body: LegacyAuthReq):
 @authBp.post("/deauthenticate")
 @login_required
 def logout():
-    """Logout current user session and release any locked images."""
+    """Logout current user session and release any locked images.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+    """
     base.bulk_update(
         Image,
         UpdateImageReq(opened_by_user_id=0),

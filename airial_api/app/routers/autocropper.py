@@ -1,8 +1,6 @@
-# Endpoints for the autocropper utility
-# Author: Michael B. Lance
-
 """Endpoints for the automated crop generator utility."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 import io
@@ -39,7 +37,14 @@ cropBp = Blueprint("autocropper", __name__, url_prefix="/api/v1/autocropper")
 @permission_required("access")
 @validate()
 def fetch_batch(query: AutoCropperBatchQuery):
-    """Fetch a candidate batch of images and predictions for auto-cropping."""
+    """Fetch a candidate batch of images and predictions for auto-cropping.
+
+    Args:
+        query: Query parameters specifying survey, herd unit, model, labels, and batch size.
+
+    Returns:
+        Tuple containing list of batch image and prediction payloads and HTTP status 200.
+    """
     batch = base.get_auto_crop_batch(query, cast(User, current_user))
 
     return batch, 200
@@ -54,7 +59,14 @@ def fetch_batch(query: AutoCropperBatchQuery):
 @permission_required("access")
 @validate()
 def auto_crop_image(body: AutoCropReq):
-    """Generate spatial crops and draft annotations for an image using KMeans clustering."""
+    """Generate spatial crops and draft annotations for an image using KMeans clustering.
+
+    Args:
+        body: Request containing image ID, candidate predictions, and taxonomy label IDs.
+
+    Returns:
+        Tuple containing empty string and HTTP status 201.
+    """
     image = base.get(Image, body.image_id)
     predictions = body.predictions
 

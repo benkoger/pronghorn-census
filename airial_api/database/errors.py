@@ -1,7 +1,6 @@
-# Psycopg3 database abstraction layer errors for crop generator_api
-# Author: Michael B. Lance
-
 """Database and authorization exception classes for the Airial API."""
+
+# Author: Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -28,7 +27,12 @@ class ObjectNotFound(AirialError):
     """Raised when an image UUID does not exist in the database."""
 
     def __init__(self, object_type: str, object_id: str):
-        """Initialize ObjectNotFound exception."""
+        """Initialize ObjectNotFound exception.
+
+        Args:
+            object_type: Name of the missing entity model type.
+            object_id: Identifier of the entity that was not found.
+        """
         super().__init__("Object Not Found", 404, f"{object_type} with ID {object_id} not found.")
 
 
@@ -39,7 +43,11 @@ class FailedToCreate(AirialError):
     """Raised when an object fails to be created."""
 
     def __init__(self, object_type: str):
-        """Initialize FailedToCreate exception."""
+        """Initialize FailedToCreate exception.
+
+        Args:
+            object_type: Name of the entity model type that failed creation.
+        """
         self.message = f"Failed to create {object_type}"
         super().__init__("Invalid Request", 400, self.message)
 
@@ -74,6 +82,13 @@ class AuthorizationFailure(AirialError):
     """Raised when a user attempts to access an object without authorization."""
 
     def __init__(self, user_id: str, permission: str, object_type: str, object_id: str):
-        """Initialize AuthorizationFailure exception."""
+        """Initialize AuthorizationFailure exception.
+
+        Args:
+            user_id: User identifier lacking permission.
+            permission: Requested permission relation name.
+            object_type: Target resource entity type.
+            object_id: Target resource identifier.
+        """
         self.message = f"User: {user_id} does not have permission {permission} for {object_type}: {object_id}"
         super().__init__("Unauthorized", 401, self.message)

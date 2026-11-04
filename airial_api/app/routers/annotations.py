@@ -1,8 +1,6 @@
-# Endpoints for managing annotations in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing annotations in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -35,6 +33,12 @@ annotBp = Blueprint("annotations", __name__, url_prefix="/api/v1/annotations")
 @validate()
 def create(body: CreateAnnotationReq):
     """Create a new annotation object.
+
+    Args:
+        body: Annotation creation payload.
+
+    Returns:
+        Tuple containing the serialized annotation and HTTP status 201.
 
     ---
     parameters:
@@ -73,6 +77,12 @@ def create(body: CreateAnnotationReq):
 @permission_required("access")
 def import_annotation(body: BulkCreateAnnotationReq):
     """Bulk import multiple annotation records.
+
+    Args:
+        body: Batch request containing list of annotations to create.
+
+    Returns:
+        Tuple containing list of serialized annotations and HTTP status 201.
 
     ---
     parameters:
@@ -117,6 +127,13 @@ def import_annotation(body: BulkCreateAnnotationReq):
 @validate()
 def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
     """Update an annotation object in the database by its integer ID or UUID.
+
+    Args:
+        body: Annotation update payload.
+        annotation_id: Primary key of the annotation to update.
+
+    Returns:
+        Tuple containing the serialized updated annotation and HTTP status 200.
 
     ---
     parameters:
@@ -163,6 +180,12 @@ def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
 def bulk_update(body: BulkUpdateAnnotationsReq):
     """Update several annotation objects in the database in a batch.
 
+    Args:
+        body: Batch request containing list of annotations to update.
+
+    Returns:
+        Tuple containing list of serialized updated annotations and HTTP status 200.
+
     ---
     parameters:
       - name: body
@@ -204,6 +227,12 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
 def delete(annotation_id: int | UUID):
     """Delete an annotation by its integer ID or UUID.
 
+    Args:
+        annotation_id: Primary key of the annotation to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: annotation_id
@@ -243,6 +272,12 @@ def delete(annotation_id: int | UUID):
 @validate()
 def bulk_delete(body: BulkDeleteAnnotationsReq):
     """Delete multiple annotations in a batch.
+
+    Args:
+        body: Batch request containing list of annotations to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:

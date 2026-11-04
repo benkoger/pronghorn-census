@@ -1,7 +1,7 @@
-# Class definition for Role objects in the database
+"""Role database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Role database models and schemas."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -52,10 +52,24 @@ class Role(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(cls, cursor: Cursor[Self], req: CreateRoleReq) -> tuple[Self, list[RelationshipUpdate]] | None: ...
+    def _create(cls, cursor: Cursor[Self], req: CreateRoleReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new role record.
+
+        Args:
+            cursor: Active database cursor.
+            req: Role creation request.
+
+        Returns:
+            Optional tuple containing created Role and SpiceDB relationship updates, or None.
+        """
+        ...
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def serialize(self):
-        """Serialize role model to a dictionary."""
+    def serialize(self) -> dict:
+        """Serialize role model to a dictionary.
+
+        Returns:
+            dict: Serialized role representation.
+        """
         return Role.Response.model_validate(self).model_dump(mode="json")

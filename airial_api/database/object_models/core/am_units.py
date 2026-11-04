@@ -1,8 +1,7 @@
-# Class definition for AmUnit objects in the database
+"""Database model and request schemas for active measurement units (AmUnit)."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
-
-"""Database model and request schemas for active measurement units (AmUnit)."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -181,5 +180,9 @@ class AmUnit(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize AmUnit instance to JSON-compatible dictionary."""
+        """Serialize AmUnit instance to JSON-compatible dictionary.
+
+        Returns:
+            Dictionary representation conforming to AmUnit.Response schema.
+        """
         return AmUnit.Response.model_validate(self).model_dump(mode="json")

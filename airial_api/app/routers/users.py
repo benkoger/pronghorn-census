@@ -1,8 +1,6 @@
-# Endpoints for managing Users in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing users and user authentication sessions in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID, uuid4
@@ -33,7 +31,14 @@ userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
 @login_manager.user_loader
 def load(session_user_id: str):
-    """Load user by session ID from cache or database."""
+    """Load user by session ID from cache or database.
+
+    Args:
+        session_user_id: String representation of the user UUID.
+
+    Returns:
+        User instance if found, or None.
+    """
     user_key = f"user_{session_user_id}"
     cached_user = cache.get(user_key)
 
@@ -81,6 +86,9 @@ def unathorizated_callback():
 def get_all():
     """Retrieve all users under the currently active session organization.
 
+    Returns:
+        Tuple containing list of serialized users and HTTP status 200.
+
     ---
     responses:
       200:
@@ -109,6 +117,9 @@ def get_all():
 def check_auth():
     """Check if the current request session is authenticated.
 
+    Returns:
+        Tuple containing string "true" or "false" and HTTP status 200.
+
     ---
     responses:
       200:
@@ -128,6 +139,9 @@ def check_auth():
 def get_current_user():
     """Retrieve profile and role information for the currently logged-in user.
 
+    Returns:
+        Tuple containing serialized current user object and HTTP status 200.
+
     ---
     responses:
       200:
@@ -146,6 +160,12 @@ def get_current_user():
 @login_required
 def get_orgs(user_id: int | UUID):
     """Retrieve organizations linked to a specific user.
+
+    Args:
+        user_id: Primary key of the user (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized organizations and HTTP status 200.
 
     ---
     parameters:
@@ -194,6 +214,12 @@ def get_orgs(user_id: int | UUID):
 def check_role(query: RoleNameQuery):
     """Check if the current authenticated user has a specific role.
 
+    Args:
+        query: Query parameters containing role_name.
+
+    Returns:
+        Tuple containing string "true" or "false" and HTTP status 200.
+
     ---
     parameters:
       - name: role_name
@@ -223,6 +249,12 @@ def check_role(query: RoleNameQuery):
 @validate()
 def create(body: CreateUserReq):
     """Create a standard user in the database.
+
+    Args:
+        body: User creation payload.
+
+    Returns:
+        Tuple containing the serialized created user and HTTP status 201.
 
     ---
     parameters:
@@ -255,6 +287,12 @@ def create(body: CreateUserReq):
 @validate()
 def create_super(body: CreateUserReq):
     """Bootstrap the initial root super user during first-time platform setup.
+
+    Args:
+        body: Super user creation payload.
+
+    Returns:
+        Tuple containing the serialized super user and HTTP status 200.
 
     ---
     parameters:
@@ -305,6 +343,12 @@ def create_super(body: CreateUserReq):
 @validate()
 def set_org(body: SetActiveOrgReq):
     """Set active organization context in the user's session.
+
+    Args:
+        body: Payload containing the target organization UUID.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:

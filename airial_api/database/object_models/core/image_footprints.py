@@ -1,7 +1,7 @@
-# Class definition for ImageFootprint objects in the database
+"""Image footprint database models and schemas."""
+
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
-"""Image footprint database models and schemas."""
 
 import json
 from dataclasses import dataclass
@@ -253,5 +253,9 @@ class ImageFootprint(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        """Serialize image footprint to a dictionary."""
+        """Serialize image footprint to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to ImageFootprint.Response schema.
+        """
         return ImageFootprint.Response.model_validate(self).model_dump(mode="json")

@@ -1,8 +1,6 @@
-# Endpoints for managing surveys in the API
-# Author: Michael B. Lance
-
 """Endpoints for managing surveys in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from datetime import datetime
@@ -34,6 +32,12 @@ surveyBp = Blueprint("surveys", __name__, url_prefix="/api/v1/surveys")
 @permission_required("access")
 def get_by_id(survey_id: int | UUID):
     """Request a survey object from the database using its integer PK or UUID.
+
+    Args:
+        survey_id: Primary key of the survey (integer ID or UUID).
+
+    Returns:
+        Serialized survey dictionary.
 
     ---
     parameters:
@@ -72,6 +76,12 @@ def get_by_id(survey_id: int | UUID):
 @permission_required("access")
 def get_annotations(survey_id: int | UUID):
     """Retrieve all annotations associated with a specific survey.
+
+    Args:
+        survey_id: Primary key of the survey (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized annotations and HTTP status 200.
 
     ---
     parameters:
@@ -113,6 +123,12 @@ def get_annotations(survey_id: int | UUID):
 def get_herd_units(survey_id: int | UUID):
     """Retrieve all herd units associated with a specific survey.
 
+    Args:
+        survey_id: Primary key of the survey (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized herd units and HTTP status 200.
+
     ---
     parameters:
       - name: survey_id
@@ -152,6 +168,13 @@ def get_herd_units(survey_id: int | UUID):
 @validate()
 def get_images(query: SurveyImageQuery, survey_id: str):
     """Retrieve images belonging to a specific survey with optional pagination.
+
+    Args:
+        query: Pagination query parameters.
+        survey_id: UUID string of the survey.
+
+    Returns:
+        Tuple containing dictionary with images and count, and HTTP status 200.
 
     ---
     parameters:
@@ -217,6 +240,12 @@ def get_images(query: SurveyImageQuery, survey_id: str):
 @permission_required("access")
 def get_annotated_images(survey_id: int | UUID):
     """Retrieve annotated images within a survey, optionally filtered by label, herd unit, and date range.
+
+    Args:
+        survey_id: Primary key of the survey.
+
+    Returns:
+        Tuple containing list of annotated image dictionaries and HTTP status 200.
 
     ---
     parameters:
@@ -288,6 +317,12 @@ def get_annotated_images(survey_id: int | UUID):
 def create(body: CreateSurveyReq):
     """Create a new survey object.
 
+    Args:
+        body: Survey creation payload.
+
+    Returns:
+        Tuple containing the serialized created survey and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -324,6 +359,13 @@ def create(body: CreateSurveyReq):
 @validate()
 def update(body: UpdateSurveyReq, survey_id: int | UUID):
     """Update survey metadata by its integer ID or UUID.
+
+    Args:
+        body: Survey update payload.
+        survey_id: Primary key of the survey to update.
+
+    Returns:
+        Tuple containing the serialized updated survey and HTTP status 200.
 
     ---
     parameters:
@@ -368,6 +410,12 @@ def update(body: UpdateSurveyReq, survey_id: int | UUID):
 @permission_required("access")
 def delete_survey(survey_id: int | UUID):
     """Delete a survey by its integer ID or UUID.
+
+    Args:
+        survey_id: Primary key of the survey to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
 
     ---
     parameters:
