@@ -1,6 +1,6 @@
 # Database & Authorization Architecture
 
-This document details the database layer, PostgreSQL schemas based on the canonical DDL in `docs/database/schemas/airial1-1.sql`, the custom Psycopg3 abstraction, PostGIS spatial extensions, and the Relationship-Based Access Control (ReBAC) system.
+This document details the database layer, PostgreSQL schemas based on the canonical DDL in `docs/database/schemas/airial1-2.sql`, the custom Psycopg3 abstraction, PostGIS spatial extensions, and the Relationship-Based Access Control (ReBAC) system.
 
 ---
 
@@ -19,12 +19,13 @@ The database schema is partitioned into three PostgreSQL schemas, with PostGIS s
 ### `core` Schema
 Handles aerial survey imagery, georeferenced spatial footprints, telemetry metadata, computer vision inference, spatial review crops, and census units:
 * **`images`**: Metadata for raw survey frames (`name`, `img_key` in S3, pixel dimensions `image_length_px`, `image_width_px`, `in_training`, `crops_generated`, `opened_by_user_id`, `uuid`).
-* **`image_metadata`**: Flight telemetry and camera orientation records linked 1:1 to images (`image_id`, `captured_at`, `gps_lon`, `gps_lat`, `gps_alt_msl_m`, `yaw_deg`, `pitch_deg`, `fov_deg`, `terrain_elev_m`, `agl_m`, `uuid`).
+* **`image_metadata`**: Flight telemetry and camera orientation records linked 1:1 to images (`image_id`, `captured_at`, `gps_lon`, `gps_lat`, `gps_alt_msl_m`, `yaw_deg`, `pitch_deg`, `fov_deg`, `terrain_elev_m`, `agl_m`, `transect_id` flight line numbered from 0 within the survey or -1 for none, `uuid`).
 * **`image_footprints`**: Georeferenced spatial footprint polygons and camera pose solve records linked 1:1 to images (`image_id`, `footprint` polygon, `footprint_metadata` polygon, `has_detection`, `bbox_wsen`, `footprint_partial`, `area_m2`, `area_geodesic_m2`, `dem_name`, `georef_status`, `rmse_h_m`, pose deltas, `gcps` JSONB, `uuid`).
 * **`predictions`**: Candidate detections produced by CV models (`score`, bounding box `box_tx`, `box_ty`, `box_bx`, `box_by`, integer `label`, `model_id`, `uuid`).
 * **`reviewed_area`**: Bounded spatial crops produced by Auto-Cropper (default $2100 \times 2100$ px, `ra_key` in S3, `type` of `core.activity_type`, `reviewed_by_user_id`, `uuid`).
 * **`annotations`**: Verified ground-truth bounding boxes (`label_id`, `image_id`, `pred_id`, `herd_unit_id`, `type`, `created_by_user_id`, `uuid`).
-* **`am_units`**: Active measurement census units (`model_count`, `human_count`, `current_count`, `relative_position`, confidence intervals).
+* **`am_units`**: Active measurement census units (`model_count`, `human_count`, `current_count`, `relative_position`, confidence intervals), linked to their neighbours through `previous_unit_id` and `next_unit_id`.
+* **`proposal_generations`**: One row per generation of a measurement's sampling proposal (`active_measurement_id`, `generation`, `n_labels`, `model_id`, `alpha`, and the whole-vector columns `reviewed_area_ids`, `raw`, `proposal`), unique on (`active_measurement_id`, `generation`).
 * **`training`**: Junction table (`reviewed_area_id`, `model_id`) tracking crops used for model training.
 * **`annotations_reviewed_area`**: Spatial junction table (`annotation_id`, `reviewed_area_id`).
 
@@ -92,7 +93,7 @@ Queries dynamically resolve whether an integer or UUID was passed using `resolve
 
 Database schema changes are managed with [Atlas](https://atlasgo.io/) in the `local_db/migrations/` directory:
 * Versioned SQL migration files are tracked with an integrity checksum in `local_db/migrations/atlas.sum`.
-* The canonical schema definition for reference is maintained in `docs/database/schemas/airial1-1.sql`.
+* The canonical schema definition for reference is maintained in `docs/database/schemas/airial1-2.sql`.
 * Ephemeral development diffing and migration applications are executed against the running `prong_gres` database container.
 
 ---
