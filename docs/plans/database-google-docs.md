@@ -17,7 +17,7 @@ This is a documentation and code-quality update with zero runtime, schema, or fu
 - Provide consistent Google-style docstrings (`Args:`, `Returns:`, `Raises:`) across all query builders, object models, and database access methods.
 - Standardize import ordering across all 35 database source files into standard library, third-party, and local application blocks.
 - Modernize collection typing (e.g., `collections.abc.Callable`, `collections.abc.Iterable`) and clean up unused imports (`Optional`, `Type`, redundant `UUID` bindings).
-- Keep lines within standard 80-column formatting limits where practical without compromising readability.
+- Keep lines within 126-column formatting limits where practical without compromising readability.
 
 ## 3. Core Concepts
 
