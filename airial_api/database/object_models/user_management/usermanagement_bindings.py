@@ -1,6 +1,5 @@
 """User management relational bindings models."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

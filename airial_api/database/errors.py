@@ -1,7 +1,5 @@
 """Database and authorization exception classes for the Airial API."""
 
-# Author: Michael B. Lance
-
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from abc import ABC

@@ -1,5 +1,4 @@
 # Class definition for ProposalGeneration objects in the database
-# Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

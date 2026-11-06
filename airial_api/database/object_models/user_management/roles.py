@@ -1,6 +1,5 @@
 """Role database models and schemas."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

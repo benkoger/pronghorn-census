@@ -1,6 +1,5 @@
 """Image metadata database models and schemas."""
 
-# Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

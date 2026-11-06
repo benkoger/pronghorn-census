@@ -1,6 +1,5 @@
 """Image footprint database models and schemas."""
 
-# Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
 import json

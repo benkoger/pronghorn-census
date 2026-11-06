@@ -1,6 +1,5 @@
 """Schema relationship graph and path traversal utilities."""
 
-# Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from collections import deque

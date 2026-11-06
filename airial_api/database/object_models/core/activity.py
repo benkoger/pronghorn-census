@@ -1,6 +1,5 @@
 """Activity type enum definitions for core operations."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from enum import StrEnum

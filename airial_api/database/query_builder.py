@@ -1,7 +1,5 @@
 """Psycopg3 SQL query composition and relationship join helpers."""
 
-# Author: Michael B. Lance
-
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import Any, Tuple

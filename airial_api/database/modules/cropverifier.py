@@ -1,6 +1,5 @@
 """Specialized database operations for crop verifier workflow."""
 
-# Author: Michael B. Lance / Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import TYPE_CHECKING, Any

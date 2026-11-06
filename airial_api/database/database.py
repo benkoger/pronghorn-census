@@ -1,7 +1,5 @@
 """Psycopg3 database abstraction layer and SpiceDB ReBAC integration."""
 
-# Author: Michael B. Lance
-
 # ---------------------------------------------------------------------------------------------------------------------------#
 
 import atexit

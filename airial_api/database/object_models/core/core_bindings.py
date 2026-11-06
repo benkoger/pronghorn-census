@@ -1,6 +1,5 @@
 """Multi-table relation bindings for the core schema."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

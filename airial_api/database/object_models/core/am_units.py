@@ -1,6 +1,5 @@
 """Database model and request schemas for active measurement units (AmUnit)."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass

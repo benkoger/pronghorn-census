@@ -1,6 +1,5 @@
 """Database model and request schemas for annotations."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass, field

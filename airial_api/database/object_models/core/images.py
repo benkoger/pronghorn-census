@@ -1,6 +1,5 @@
 """Image and reviewed area database models and schemas."""
 
-# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 import io
