@@ -1,4 +1,5 @@
-# Endpoints for managing image footprints in the API
+"""Endpoints for managing image footprints in the API."""
+
 # Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -11,8 +12,8 @@ from flask_pydantic import validate
 from app.decorators import permission_required
 from app.extensions import base
 from database.object_models.core.image_footprints import (
-    ImageFootprint,
     CreateImageFootprintReq,
+    ImageFootprint,
     UpdateImageFootprintReq,
 )
 
@@ -27,8 +28,14 @@ imageFootprintBp = Blueprint("image_footprints", __name__, url_prefix="/api/v1/i
 @login_required
 @permission_required("access")
 def get_by_id(footprint_id: int | UUID):
-    """
-    Retrieve an image footprint by its integer ID or UUID.
+    """Retrieve an image footprint by its integer ID or UUID.
+
+    Args:
+        footprint_id: Primary key of the footprint record (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized image footprint and HTTP status 200.
+
     ---
     parameters:
       - name: footprint_id
@@ -66,8 +73,14 @@ def get_by_id(footprint_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateImageFootprintReq):
-    """
-    Create a new image footprint record.
+    """Create a new image footprint record.
+
+    Args:
+        body: Image footprint creation payload.
+
+    Returns:
+        Tuple containing the serialized created footprint and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -98,8 +111,15 @@ def create(body: CreateImageFootprintReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateImageFootprintReq, footprint_id: int | UUID):
-    """
-    Update an image footprint by integer ID or UUID.
+    """Update an image footprint by integer ID or UUID.
+
+    Args:
+        body: Footprint update payload.
+        footprint_id: Primary key of the footprint record to update.
+
+    Returns:
+        Tuple containing the serialized updated footprint and HTTP status 200.
+
     ---
     parameters:
       - name: footprint_id
@@ -142,8 +162,14 @@ def update(body: UpdateImageFootprintReq, footprint_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(footprint_id: int | UUID):
-    """
-    Delete an image footprint by integer ID or UUID.
+    """Delete an image footprint by integer ID or UUID.
+
+    Args:
+        footprint_id: Primary key of the footprint record to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: footprint_id

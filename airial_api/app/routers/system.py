@@ -1,6 +1,6 @@
-# Endpoints for managing the API
-# Author: Michael B. Lance
+"""Endpoints for managing system state and bootstrap status in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from flask import Blueprint
@@ -15,7 +15,11 @@ systemBp = Blueprint("system", __name__, url_prefix="/api/v1")
 
 @systemBp.get("/bootstrapped")
 def check_bootstrapped():
-    """ """
+    """Check whether the application and database have been bootstrapped.
+
+    Returns:
+        Tuple containing a dictionary with boolean result and HTTP status 200.
+    """
     res = base.check_bootstrapped()
 
     return {"result": res}, 200
@@ -27,7 +31,11 @@ def check_bootstrapped():
 @systemBp.post("/bootstrapped")
 @login_required
 def finish_bootstrapp():
-    """ """
+    """Mark the application bootstrap process as complete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+    """
     base.set_bootstrapped()
 
     return "", 204

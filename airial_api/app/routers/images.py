@@ -1,6 +1,6 @@
-# Endpoints for managing images in the API
-# Author: Michael B. Lance
+"""Endpoints for managing images in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -9,22 +9,22 @@ import cv2
 from flask import Blueprint, Response, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
-from app.decorators import permission_required, roles_required
 
+from app.decorators import permission_required, roles_required
 from app.extensions import base, cache, s3
 from crop_generator import create_subcrop
 from database.errors import ObjectNotFound
 from database.object_models.base import BulkRequest
 from database.object_models.core import (
-    Image,
-    ImageMetadata,
-    ImageFootprint,
-    Prediction,
     Annotation,
-    ReviewedArea,
     CreateImageReq,
     CreatePredictionCropReq,
     CreatePresignedPutReq,
+    Image,
+    ImageFootprint,
+    ImageMetadata,
+    Prediction,
+    ReviewedArea,
     UpdateImageReq,
 )
 from database.object_models.core.images import (
@@ -45,8 +45,14 @@ imageBp = Blueprint("images", __name__, url_prefix="/api/v1/images")
 @login_required
 @permission_required("access")
 def get_by_id(image_id: int | UUID):
-    """
-    Request an image object from the database using its integer PK or UUID.
+    """Request an image object from the database using its integer PK or UUID.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized image and HTTP status 200.
+
     ---
     parameters:
       - name: image_i
@@ -61,7 +67,6 @@ def get_by_id(image_id: int | UUID):
       404:
         description: No image record found for the provided ID.
     """
-
     return base.get(Image, image_id).serialize(), 200
 
 
@@ -71,7 +76,17 @@ def get_by_id(image_id: int | UUID):
 @permission_required("access")
 @imageBp.get("/prediction_crops/<string:prediction_id>")
 def get_prediction_crop(prediction_id: str):
-    """ """
+    """Retrieve a cached prediction crop image.
+
+    Args:
+        prediction_id: Unique string identifier of the cached prediction crop.
+
+    Returns:
+        Response containing image bytes with webp mimetype and HTTP status 200.
+
+    Raises:
+        ObjectNotFound: If prediction crop is not found in cache.
+    """
     crop = cache.get(prediction_id)
     if crop is None:
         raise ObjectNotFound("prediction_crop", prediction_id)
@@ -87,8 +102,14 @@ def get_prediction_crop(prediction_id: str):
 @imageBp.get("/<uuid:image_id>/crops")
 @login_required
 def get_crops(image_id: int | UUID):
-    """
-    Retrieve crops for a specific image
+    """Retrieve crops for a specific image.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized reviewed area crops and HTTP status 200.
+
     ---
     responses:
       200:
@@ -115,8 +136,14 @@ def get_crops(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_predictions(image_id: int | UUID):
-    """
-    Retrieve all predictions for a specific image.
+    """Retrieve all predictions for a specific image.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized predictions and HTTP status 200.
+
     ---
     parameters:
       - name: image_id
@@ -153,8 +180,14 @@ def get_predictions(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_metadata(image_id: int | UUID):
-    """
-    Retrieve metadata associated with a specific image.
+    """Retrieve metadata associated with a specific image.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized metadata records and HTTP status 200.
+
     ---
     parameters:
       - name: image_id
@@ -185,8 +218,14 @@ def get_metadata(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_footprints(image_id: int | UUID):
-    """
-    Retrieve footprints associated with a specific image.
+    """Retrieve footprints associated with a specific image.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized footprint records and HTTP status 200.
+
     ---
     parameters:
       - name: image_id
@@ -217,8 +256,14 @@ def get_footprints(image_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_annotations(image_id: int | UUID):
-    """
-    Retrieve all annotations for a specific image.
+    """Retrieve all annotations for a specific image.
+
+    Args:
+        image_id: Primary key of the image (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized annotations and HTTP status 200.
+
     ---
     parameters:
       - name: image_id
@@ -242,7 +287,6 @@ def get_annotations(image_id: int | UUID):
       500:
         description: Database error.
     """
-
     annotations = base.get_children(Annotation, Image, image_id)
 
     return [annot.serialize() for annot in annotations], 200
@@ -257,8 +301,14 @@ def get_annotations(image_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateImageReq):
-    """
-    Create a new image object.
+    """Create a new image object.
+
+    Args:
+        body: Image creation request containing key, survey ID, and metadata.
+
+    Returns:
+        Tuple containing the serialized created image and HTTP status 201.
+
     ---
     parameters:
             - name: create image request
@@ -285,8 +335,14 @@ def create(body: CreateImageReq):
 @permission_required("access")
 @validate()
 def create_presigned_get(body: PresignedImageGetReq):
-    """
-    Generate a presigned GET URL for an image.
+    """Generate a presigned GET URL for an image.
+
+    Args:
+        body: Request containing image ID.
+
+    Returns:
+        Tuple containing presigned S3 GET URL and HTTP status 201.
+
     ---
     responses:
             201:
@@ -298,7 +354,6 @@ def create_presigned_get(body: PresignedImageGetReq):
             500:
                     description: Storage or database error.
     """
-
     image = base.get(Image, body.image_id)
 
     response = s3.generate_presigned_url(
@@ -319,8 +374,14 @@ def create_presigned_get(body: PresignedImageGetReq):
 @permission_required("access")
 @validate()
 def create_chunk_presigned_put(body: CreatePresignedPutReq):
-    """
-    Generates a pre-signed URL for a single file chunk (UploadPart).
+    """Generates a pre-signed URL for a single file chunk (UploadPart).
+
+    Args:
+        body: Request containing image ID, upload ID, part number, chunk size, and MD5.
+
+    Returns:
+        Tuple containing presigned S3 upload part URL and HTTP status 201.
+
     ---
     responses:
             201:
@@ -360,8 +421,14 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
 @permission_required("access")
 @validate()
 def create_multipart_upload(body: CreateImageMultiPartUploadReq):
-    """
-    Initiates a new multipart upload.
+    """Initiates a new multipart upload.
+
+    Args:
+        body: Request containing S3 image key.
+
+    Returns:
+        Tuple containing initiated S3 upload ID and HTTP status 201.
+
     ---
     responses:
             201:
@@ -386,8 +453,14 @@ def create_multipart_upload(body: CreateImageMultiPartUploadReq):
 @permission_required("access")
 @validate()
 def complete_upload(body: CompleteMultiPartUploadReq):
-    """
-    Completes a new multipart upload.
+    """Completes a new multipart upload.
+
+    Args:
+        body: Request containing image key, upload ID, and parts array.
+
+    Returns:
+        Tuple containing S3 completion response dictionary and HTTP status 200.
+
     ---
     responses:
             200:
@@ -395,7 +468,6 @@ def complete_upload(body: CompleteMultiPartUploadReq):
             500:
                     description: S3 or system error.
     """
-
     response = s3.complete_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
         Key=body.image_key,
@@ -414,8 +486,14 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @permission_required("access")
 @validate()
 def abort_upload(body: AbortMulitPartUploadReq):
-    """
-    Aborts a multipart upload.
+    """Aborts a multipart upload.
+
+    Args:
+        body: Request containing image key and upload ID to abort.
+
+    Returns:
+        Tuple containing S3 abort response dictionary and HTTP status 200.
+
     ---
     responses:
             200:
@@ -423,7 +501,6 @@ def abort_upload(body: AbortMulitPartUploadReq):
             500:
                     description: S3 or system error.
     """
-
     response = s3.abort_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
         Key=body.image_key,
@@ -441,17 +518,22 @@ def abort_upload(body: AbortMulitPartUploadReq):
 @permission_required("access")
 @validate()
 def get_prediciton(body: CreatePredictionCropReq):
-    """"""
+    """Generate and cache prediction crop chips.
+
+    Args:
+        body: Request containing image ID and prediction IDs to crop.
+
+    Returns:
+        List of serialized prediction crop responses.
+    """
     image = base.get(Image, body.image_id)
-    req = BulkRequest(object_ids=body.prediction_id) #pyright: ignore
+    req = BulkRequest(object_ids=body.prediction_id)  # pyright: ignore
     predictions = base.bulk_get(Prediction, req)
 
     image_data = cache.get(image.uuid)
 
     if not image_data:
-        image_data = s3.get_object(
-            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
-        )["Body"].read()
+        image_data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)["Body"].read()
 
         cache.set(image.uuid, image_data, 500)
 
@@ -473,8 +555,15 @@ def get_prediciton(body: CreatePredictionCropReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateImageReq, image_id: int | UUID):
-    """
-    Update image object in the database.
+    """Update image object in the database.
+
+    Args:
+        body: Image update payload.
+        image_id: Primary key of the image to update.
+
+    Returns:
+        Tuple containing the serialized updated image and HTTP status 200.
+
     ---
     paramete:qrsrs:
             - name: image_id
@@ -501,7 +590,11 @@ def update(body: UpdateImageReq, image_id: int | UUID):
 @login_required
 @permission_required("access")
 def close_user_images():
-    """Close all images currently opened by the authenticated user."""
+    """Close all images currently opened by the authenticated user.
+
+    Returns:
+        Tuple containing dictionary with rows affected count and HTTP status 200.
+    """
     req = UpdateImageReq(opened_by_user_id=0)
 
     rows_affected = base.bulk_update(
@@ -522,8 +615,14 @@ def close_user_images():
 @login_required
 @permission_required("access")
 def delete_image(image_id: int | UUID):
-    """ """
+    """Delete an image and its associated records by integer ID or UUID.
 
+    Args:
+        image_id: Primary key of the image to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+    """
     image = base.get(Image, image_id)
 
     s3.delete_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)

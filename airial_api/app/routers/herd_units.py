@@ -1,15 +1,15 @@
-# Endpoints for managing herd units in the API
-# Author: Michael B. Lance
+"""Endpoints for managing herd units in the API."""
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# Author: Michael B. Lance
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
 
 from flask import Blueprint
 from flask_login import login_required
-from app.decorators import permission_required
 from flask_pydantic import validate
 
+from app.decorators import permission_required
 from app.extensions import base
 from database.object_models.project_management import CreateHerdUnitReq
 from database.object_models.project_management.herd_units import HerdUnit
@@ -29,8 +29,14 @@ herdunitBp = Blueprint("herd_units", __name__, url_prefix="/api/v1/herd-units")
 @login_required
 @permission_required("access")
 def get_by_id(herd_unit_id: int | UUID):
-    """
-    Request a herd unit object from the database using its integer PK or UUID.
+    """Request a herd unit object from the database using its integer PK or UUID.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized herd unit and HTTP status 200.
+
     ---
     parameters:
       - name: herd_unit_id
@@ -67,8 +73,14 @@ def get_by_id(herd_unit_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_surveys(herd_unit_id: int | UUID):
-    """
-    Retrieve all surveys associated with a herd unit.
+    """Retrieve all surveys associated with a herd unit.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized surveys and HTTP status 200.
+
     ---
     parameters:
       - name: herd_unit_id
@@ -94,7 +106,6 @@ def get_surveys(herd_unit_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(herd_unit_id, UUID):
         herd_unit = base.get(HerdUnit, herd_unit_id)
         herd_unit_id = herd_unit.herd_unit_id
@@ -117,8 +128,14 @@ def get_surveys(herd_unit_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateHerdUnitReq):
-    """
-    Create a new herd unit object.
+    """Create a new herd unit object.
+
+    Args:
+        body: Herd unit creation payload.
+
+    Returns:
+        Tuple containing the serialized created herd unit and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -150,8 +167,14 @@ def create(body: CreateHerdUnitReq):
 @login_required
 @permission_required("access")
 def delete(herd_unit_id: int | UUID):
-    """
-    Delete a herd unit by its integer ID or UUID.
+    """Delete a herd unit by its integer ID or UUID.
+
+    Args:
+        herd_unit_id: Primary key of the herd unit to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: herd_unit_id

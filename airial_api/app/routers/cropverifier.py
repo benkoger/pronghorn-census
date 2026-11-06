@@ -1,8 +1,10 @@
-# Endpoints for crop verification in the API
-# Author: Michael B. Lance / Antigravity
+"""Endpoints for crop verification in the API."""
+
+# Authors: Michael B. Lance, Antigravity
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import cast
+
 from flask import Blueprint
 from flask_login import current_user, login_required
 from flask_pydantic import validate
@@ -26,8 +28,14 @@ verifierBp = Blueprint("verifier", __name__, url_prefix="/api/v1/verifier")
 @permission_required("access")
 @validate()
 def get(query: RAQuery):
-    """
-    Retrieve crops for an available image in survey order, locking the image.
+    """Retrieve crops for an available image in survey order, locking the image.
+
+    Args:
+        query: Query parameters with survey ID and review status filters.
+
+    Returns:
+        Tuple containing list of serialized crops and HTTP status 200, or empty string and 204.
+
     ---
     parameters:
       - name: survey_id
@@ -79,8 +87,14 @@ def get(query: RAQuery):
 @permission_required("access")
 @validate()
 def get_selection_count(query: RAQuery):
-    """
-    Count of crops matching review criteria in the survey.
+    """Count of crops matching review criteria in the survey.
+
+    Args:
+        query: Query parameters with survey ID and review/opened status filters.
+
+    Returns:
+        Tuple containing dictionary with count and HTTP status 200.
+
     ---
     parameters:
       - name: survey_id

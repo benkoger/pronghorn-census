@@ -1,6 +1,6 @@
-# Endpoints for managing schemas in the API
-# Author: Michael B. Lance
+"""Endpoints for managing label schemas in the API."""
 
+# Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from uuid import UUID
@@ -27,8 +27,14 @@ schemaBp = Blueprint("schemas", __name__, url_prefix="/api/v1/schemas")
 @login_required
 @permission_required("access")
 def get_labels(schema_id: int | UUID):
-    """
-    Retrieve all labels associated with a specific schema.
+    """Retrieve all labels associated with a specific schema.
+
+    Args:
+        schema_id: Primary key of the schema (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized labels and HTTP status 200.
+
     ---
     parameters:
       - name: schema_id
@@ -54,7 +60,6 @@ def get_labels(schema_id: int | UUID):
       500:
         description: Database error.
     """
-
     labels = base.get_children(Label, Schema, schema_id)
 
     return [label.serialize() for label in labels], 200
@@ -68,8 +73,14 @@ def get_labels(schema_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_models(schema_id: int | UUID):
-    """
-    Retrieve all models associated with a specific schema.
+    """Retrieve all models associated with a specific schema.
+
+    Args:
+        schema_id: Primary key of the schema (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized models and HTTP status 200.
+
     ---
     parameters:
       - name: schema_id
@@ -95,7 +106,6 @@ def get_models(schema_id: int | UUID):
       500:
         description: Database error.
     """
-
     models = base.get_children(Model, Schema, schema_id)
 
     return [model.serialize() for model in models], 200
@@ -110,8 +120,14 @@ def get_models(schema_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: createSchemaReq):
-    """
-    Create a new schema object.
+    """Create a new schema object.
+
+    Args:
+        body: Schema creation payload.
+
+    Returns:
+        Tuple containing the serialized created schema and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -145,8 +161,14 @@ def create(body: createSchemaReq):
 @login_required
 @permission_required("access")
 def delete_schema(schema_id: int | UUID):
-    """
-    Delete a schema by its integer ID or UUID.
+    """Delete a schema by its integer ID or UUID.
+
+    Args:
+        schema_id: Primary key of the schema to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: schema_id
@@ -172,7 +194,6 @@ def delete_schema(schema_id: int | UUID):
       500:
         description: Database error.
     """
-
     base.delete(Schema, schema_id)
 
     return "", 204
