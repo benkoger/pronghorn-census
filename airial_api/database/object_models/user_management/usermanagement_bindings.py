@@ -1,4 +1,5 @@
-# Multi table bindings for the usermanagement schema
+"""User management relational bindings models."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -9,12 +10,13 @@ import psycopg.sql as sql
 
 from ..base import Relationbase
 
-
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class OrganizationUser(Relationbase):
+    """Relational binding between organizations, users, and roles."""
+
     user_id: int
     organization_id: int
     role_id: int
@@ -28,6 +30,8 @@ class OrganizationUser(Relationbase):
 
 @dataclass(frozen=True)
 class OrganizationProject(Relationbase):
+    """Relational binding between organizations and projects."""
+
     project_id: int
     organization_id: int
 

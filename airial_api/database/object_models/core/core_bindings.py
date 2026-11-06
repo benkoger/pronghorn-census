@@ -1,4 +1,5 @@
-# Multi table bindings for the projectmanagement schema
+"""Multi-table relation bindings for the core schema."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -14,6 +15,8 @@ from ..base import Relationbase
 
 @dataclass(frozen=True)
 class AnnotationsReviewedArea(Relationbase):
+    """Junction relation linking annotations to reviewed areas."""
+
     annotation_id: int
     reviewed_area_id: int
 

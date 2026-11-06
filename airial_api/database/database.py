@@ -1,25 +1,20 @@
-# Psycopg3 database abstraction layer for airial_apidatabase.py
+"""Psycopg3 database abstraction layer and SpiceDB ReBAC integration."""
+
 # Author: Michael B. Lance
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
-
 import atexit
-from datetime import date
 import uuid
+from collections.abc import Callable, Iterable
+from datetime import date
 from functools import wraps
 from typing import (
     Any,
-    Callable,
-    Optional,
     cast,
-    Type,
 )
 
-from collections.abc import Iterable
-from pydantic import BaseModel
-from uuid import UUID
-
+import psycopg.sql as sql
 from authzed.api.v1 import (
     BulkCheckPermissionRequest,
     BulkCheckPermissionRequestItem,
@@ -39,32 +34,25 @@ from grpc import (
     composite_channel_credentials,
     ssl_channel_credentials,
 )
-import psycopg.sql as sql
 from psycopg import Connection, Cursor
 from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg.types.enum import EnumInfo, register_enum
 from psycopg_pool import ConnectionPool
+from pydantic import BaseModel
 
 from database.object_models.autocropper import AutoCropperBatchQuery
-from database.object_models.base import DBbase, T, Relationbase, PrimaryKey, BulkRequest
-
+from database.object_models.base import BulkRequest, DBbase, PrimaryKey, Relationbase, T
 from database.object_models.core.activity import ActivityType
-from database.object_models.core.images import (
-    Image,
-    RAQuery,
-    ReviewedArea,
-    UpdateImageReq,
-)
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.models import Model, ModelType
 from database.object_models.project_management.surveys import Survey, SurveyStatus
 from database.object_models.user_management.users import User, UserStatus
 from database.query_builder import (
+    clause_generator,
     filter_by_object_ids,
     resolve_identifier,
     resolve_parent_filter,
-    clause_generator,
 )
 
 from .errors import (
@@ -78,6 +66,11 @@ EXT_KEY = "base"
 
 
 def configure_connection(conn: Connection):
+    """Configure PostgreSQL connection with custom enum types and row factories.
+
+    Args:
+        conn: Newly established Psycopg database connection to configure.
+    """
     for enum_name, enum_cls in [
         ("projectmanagement.model_type", ModelType),
         ("core.activity_type", ActivityType),
@@ -99,24 +92,27 @@ def configure_connection(conn: Connection):
 
 
 class Database:
-    """A psycopg3 based database abstraction layer for the airial_api package"""
+    """A psycopg3 based database abstraction layer for the airial_api package."""
 
     def __init__(
         self,
         db_config: dict[str, str],
         spice_config: dict[str, str | bool],
     ):
+        """Initialize Database instance with database and SpiceDB connection configs.
+
+        Args:
+            db_config: PostgreSQL connection parameters dictionary.
+            spice_config: SpiceDB connection parameters including URL, TLS flag, and tokens.
+        """
         self._config = db_config
         self._pool = None
 
         if spice_config["use_tls"]:
-
             with open(cast(str, spice_config["SPICEDB_CERT_PATH"]), "rb") as f:
                 tls_creds = ssl_channel_credentials(f.read())
 
-            token_creds = access_token_call_credentials(
-                cast(str, spice_config["bearer_token"])
-            )
+            token_creds = access_token_call_credentials(cast(str, spice_config["bearer_token"]))
 
             combined_creds = composite_channel_credentials(tls_creds, token_creds)
 
@@ -125,7 +121,6 @@ class Database:
                 combined_creds,
             )
         else:
-
             self._spice_client = InsecureClient(
                 cast(str, spice_config["spice_url"]),
                 cast(str, spice_config["bearer_token"]),
@@ -134,7 +129,12 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def init_app(self, app, app_attribute_name="database"):
-        """ """
+        """Initialize Flask application extension state.
+
+        Args:
+            app: Flask application instance to register with.
+            app_attribute_name: Attribute name on app for the database instance. Defaults to "database".
+        """
         if not hasattr(app, "extensions"):
             app.extensions = {}
         app.extensions[EXT_KEY] = self
@@ -144,6 +144,12 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def create_pool(self, min_size: int = 2, max_size: int = 4):
+        """Create and start Psycopg connection pool.
+
+        Args:
+            min_size: Minimum number of pooled connections. Defaults to 2.
+            max_size: Maximum number of pooled connections. Defaults to 4.
+        """
         if self._pool is not None:  # dispose of existing pool
             self.close_pool()
 
@@ -163,24 +169,26 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def close_pool(self):
+        """Close the database connection pool."""
         if self._pool:
             self._pool.close()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def connect(fn: Callable[..., Any]) -> Callable[..., Any]:  # type: ignore
-        """Wrapper function for handling connection context
+    def connect(fn: Callable[..., Any]) -> Callable[..., Any]:
+        """Wrapper function for handling connection context.
 
         Args:
-                fn: method of Database class that needs to interact with the database
+            fn: Method of Database class that needs to interact with the database.
+
+        Returns:
+            Wrapped callable with active cursor injection.
         """
 
         @wraps(fn)
         def wrapper(self, *args, **kwargs):
 
-            has_cursor = "cursor" in kwargs or (
-                len(args) > 0 and args[0].__class__.__name__ == "Cursor"
-            )
+            has_cursor = "cursor" in kwargs or (len(args) > 0 and args[0].__class__.__name__ == "Cursor")
 
             if has_cursor:
                 return fn(self, *args, **kwargs)
@@ -196,23 +204,34 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def write_spice_relationships(self, updates: list[RelationshipUpdate]):
-        """ """
-        return self._spice_client.WriteRelationships(
-            WriteRelationshipsRequest(updates=updates)
-        )
+        """Write relationship updates to SpiceDB.
+
+        Args:
+            updates: List of SpiceDB RelationshipUpdate operations to write.
+
+        Returns:
+            SpiceDB WriteRelationshipsResponse.
+        """
+        return self._spice_client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def create_bulk_check_request(
-        self, object_type: str, object_id: str, subject_id: str, permission: str
-    ):
-        """ """
+    def create_bulk_check_request(self, object_type: str, object_id: str, subject_id: str, permission: str):
+        """Create a bulk check permission request item for SpiceDB.
+
+        Args:
+            object_type: Target SpiceDB resource type (e.g. "image", "survey").
+            object_id: Public UUID string of the resource.
+            subject_id: Public UUID string of the subject user.
+            permission: Name of permission relation to check.
+
+        Returns:
+            BulkCheckPermissionRequestItem configured for the subject and resource.
+        """
         return BulkCheckPermissionRequestItem(
             resource=ObjectReference(object_type=object_type, object_id=object_id),
             permission=permission,
-            subject=SubjectReference(
-                object=ObjectReference(object_type="user", object_id=subject_id)
-            ),
+            subject=SubjectReference(object=ObjectReference(object_type="user", object_id=subject_id)),
         )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -222,6 +241,15 @@ class Database:
         items: Iterable[BulkCheckPermissionRequestItem],
         consistency: Consistency | None = None,
     ) -> BulkCheckPermissionResponse:
+        """Execute bulk permission check request against SpiceDB.
+
+        Args:
+            items: Iterable collection of permission check request items.
+            consistency: Consistency level for SpiceDB evaluation. Defaults to fully consistent.
+
+        Returns:
+            BulkCheckPermissionResponse containing permission results for each item.
+        """
         if consistency is None:
             consistency = Consistency(fully_consistent=True)
 
@@ -230,10 +258,18 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def check_permission(
-        self, object_type: str, object_id: str, subject_id: str, permission: str
-    ):
-        """ """
+    def check_permission(self, object_type: str, object_id: str, subject_id: str, permission: str):
+        """Check single subject permission on a resource in SpiceDB.
+
+        Args:
+            object_type: Target SpiceDB resource type name.
+            object_id: Resource identifier string.
+            subject_id: Subject user identifier string.
+            permission: Permission relation to check.
+
+        Returns:
+            SpiceDB CheckPermissionResponse.
+        """
         return self._spice_client.CheckPermission(
             CheckPermissionRequest(
                 resource=ObjectReference(object_type=object_type, object_id=object_id),
@@ -249,17 +285,22 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def create_lookup_resource(
-        self, resource_type: str, permission: str, subject_id: str
-    ):
-        """ """
+    def create_lookup_resource(self, resource_type: str, permission: str, subject_id: str):
+        """Lookup resource IDs accessible to a subject via SpiceDB.
+
+        Args:
+            resource_type: Resource type name to filter by.
+            permission: Permission name required on resources.
+            subject_id: Subject user identifier string.
+
+        Returns:
+            Iterable stream of LookupResourcesResponse items.
+        """
         return self._spice_client.LookupResources(
             LookupResourcesRequest(
                 resource_object_type=resource_type,
                 permission=permission,
-                subject=SubjectReference(
-                    object=ObjectReference(object_type="user", object_id=subject_id)
-                ),
+                subject=SubjectReference(object=ObjectReference(object_type="user", object_id=subject_id)),
             )
         )
 
@@ -267,7 +308,14 @@ class Database:
 
     @connect
     def _check_bootstrapped(self, cursor: Cursor) -> bool:
-        """ """
+        """Query database initialization state.
+
+        Args:
+            cursor: Active database cursor.
+
+        Returns:
+            True if the database has completed first-run initialization, False otherwise.
+        """
         query = sql.SQL("SELECT first_run FROM usermanagement.initialization;")
         res = cursor.execute(query).fetchone()
 
@@ -278,13 +326,25 @@ class Database:
         return False if res[0] else True
 
     def check_bootstrapped(self) -> bool:
+        """Check whether database initialization has completed.
+
+        Returns:
+            True if database bootstrap is complete, False otherwise.
+        """
         return self._check_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
     def _set_bootstrapped(self, cursor: Cursor) -> bool:
-        """ """
+        """Update database initialization flag to complete.
+
+        Args:
+            cursor: Active database cursor.
+
+        Returns:
+            True on successful update.
+        """
         query = sql.SQL("UPDATE usermanagement.initialization SET first_run = false;")
 
         cursor.execute(query)
@@ -292,7 +352,11 @@ class Database:
         return True
 
     def set_bootstrapped(self) -> bool:
-        """ """
+        """Mark bootstrap initialization as finished.
+
+        Returns:
+            True on success.
+        """
         return self._set_bootstrapped()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -305,7 +369,17 @@ class Database:
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """Internal execution wrapper providing a pooled cursor context."""
+        """Internal execution wrapper providing a pooled cursor context.
+
+        Args:
+            cursor: Active database cursor.
+            fn: Callable accepting cursor and database instance as first arguments.
+            *args: Positional arguments forwarded to fn.
+            **kwargs: Keyword arguments forwarded to fn.
+
+        Returns:
+            Result returned by fn.
+        """
         return fn(cursor, self, *args, **kwargs)
 
     def execute(
@@ -314,12 +388,15 @@ class Database:
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """
-        Execute a domain-specific operation function within a managed connection context.
+        """Execute a domain-specific operation function within a managed connection context.
 
         Args:
-            fn: Callable accepting (cursor, db, *args, **kwargs)
-            *args, **kwargs: Forwarded to fn
+            fn: Callable accepting (cursor, db, *args, **kwargs).
+            *args: Positional arguments forwarded to fn.
+            **kwargs: Keyword arguments forwarded to fn.
+
+        Returns:
+            Result from fn execution.
         """
         return self._execute(fn, *args, **kwargs)
 
@@ -329,7 +406,20 @@ class Database:
 
     @connect
     def _insert(self, cursor: Cursor[T], cls: type[T], req: BaseModel, *args) -> T:
-        """Internal insert method."""
+        """Internal insert method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: The model class to insert.
+            req: Pydantic request model with creation fields.
+            *args: Keyrings for parent relationships.
+
+        Returns:
+            The newly created entity.
+
+        Raises:
+            FailedToCreate: If creation fails.
+        """
         if not (result := cls._create(cursor, req, *args)):
             raise FailedToCreate(cls.__name__)
 
@@ -345,10 +435,11 @@ class Database:
 
         Args:
             cls: The model class to insert into.
-            **req: Pydantic request model.
+            req: Pydantic request model.
+            *args: Keyrings for parent relationships.
 
         Returns:
-            T: The newly created entity.
+            The newly created entity.
 
         Raises:
             ForeignKeyViolation: If a foreign key references a non-existent record.
@@ -361,10 +452,21 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _update(
-        self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey, req: BaseModel
-    ) -> T:
-        """Internal update method."""
+    def _update(self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey, req: BaseModel) -> T:
+        """Internal update method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: The model class to update.
+            pk: Primary key (integer ID or UUID) of the target record.
+            req: Pydantic request model with fields to update.
+
+        Returns:
+            The updated entity instance re-hydrated from the database.
+
+        Raises:
+            ObjectNotFound: If no database record matches the primary key.
+        """
         query = sql.SQL("""
             UPDATE {table}
             SET {set_clause}{modified_statement}
@@ -436,7 +538,17 @@ class Database:
         req: BaseModel,
         scope: dict[str, Any],
     ) -> int:
-        """ """
+        """Internal bulk update implementation.
+
+        Args:
+            cursor: Active database cursor.
+            cls: The model class to update.
+            req: Pydantic request model with fields to update.
+            scope: Column-value dictionary defining filter conditions.
+
+        Returns:
+            Total number of rows updated in the database.
+        """
         query = sql.SQL("""
             UPDATE {table}
             SET {set_clause}, modified = CURRENT_TIMESTAMP
@@ -496,8 +608,20 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _get(self, cursor: Cursor[T], cls: Type[T], pk: PrimaryKey) -> T:
-        """Internal get method."""
+    def _get(self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey) -> T:
+        """Internal get method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: The model class to query.
+            pk: Primary key (integer ID or UUID) of the target record.
+
+        Returns:
+            Hydrated model instance.
+
+        Raises:
+            ObjectNotFound: If no record matches the primary key.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL(" SELECT * FROM {table} WHERE {id_col} = %s ")
 
@@ -514,8 +638,19 @@ class Database:
 
         return obj
 
-    def get(self, cls: Type[T], pk: PrimaryKey) -> T:
-        """Selects a single record by primary key and returns an instantiated object."""
+    def get(self, cls: type[T], pk: PrimaryKey) -> T:
+        """Selects a single record by primary key and returns an instantiated object.
+
+        Args:
+            cls: The model class to query.
+            pk: Primary key (integer ID or UUID) of the target record.
+
+        Returns:
+            Hydrated model instance.
+
+        Raises:
+            ObjectNotFound: If no record matches the primary key.
+        """
         return self._get(cls, pk)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -528,15 +663,21 @@ class Database:
         parent_cls: type[DBbase],
         parent_pk: PrimaryKey,
     ) -> list[T]:
-        """Internal get_children method."""
-        cond_sql, joins = resolve_parent_filter(child_cls, parent_cls, parent_pk)
-        joins_sql = (
-            sql.SQL(" ") + sql.SQL(" ").join(joins) if joins else sql.SQL("")
-        )
+        """Internal get_children method.
 
-        query = sql.SQL(
-            "SELECT {table}.* FROM {table}{joins} WHERE {cond} = %s;"
-        ).format(
+        Args:
+            cursor: Active database cursor.
+            child_cls: Child entity model class to hydrate and return.
+            parent_cls: Parent entity model class.
+            parent_pk: Primary key of the parent entity.
+
+        Returns:
+            List of child model instances belonging to the parent.
+        """
+        cond_sql, joins = resolve_parent_filter(child_cls, parent_cls, parent_pk)
+        joins_sql = sql.SQL(" ") + sql.SQL(" ").join(joins) if joins else sql.SQL("")
+
+        query = sql.SQL("SELECT {table}.* FROM {table}{joins} WHERE {cond} = %s;").format(
             table=child_cls.__table__,
             joins=joins_sql,
             cond=cond_sql,
@@ -558,7 +699,6 @@ class Database:
             child_cls: The child model class to return.
             parent_cls: The parent model class.
             parent_pk: The primary key of the parent record.
-            foreign_key: Foreign key column name on the child. Inferred if omitted.
 
         Returns:
             list[T]: The child records, or an empty list if none exist.
@@ -581,7 +721,24 @@ class Database:
         placeholders: dict[str, Any] | None = None,
         search: str | None = None,
     ) -> int:
-        """Generic method to execute a COUNT(*) query on a table with optional parent, scope, joins, where, and search filters."""
+        """Generic method to execute a COUNT(*) query on a table.
+
+        Supports optional parent, scope, joins, where, and search filters.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to count.
+            parent_cls: Optional parent entity class.
+            parent_pk: Optional parent entity primary key.
+            scope: Optional dictionary of exact column matches.
+            joins: Optional additional SQL join statements.
+            where_clauses: Optional additional WHERE expressions.
+            placeholders: Optional dictionary of parameter values.
+            search: Optional ILIKE name search string.
+
+        Returns:
+            Total count of matching records.
+        """
         params: dict[str, Any] = dict(placeholders) if placeholders else {}
         conditions: list[sql.Composable] = list(where_clauses) if where_clauses else []
         all_joins: list[sql.Composable] = list(joins) if joins else []
@@ -626,21 +783,11 @@ class Database:
             )
             params["_search_term"] = f"%{search}%"
 
-        where_sql = (
-            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
-            if conditions
-            else sql.SQL("")
-        )
+        where_sql = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
 
-        joins_sql = (
-            sql.SQL(" ") + sql.SQL(" ").join(all_joins)
-            if all_joins
-            else sql.SQL("")
-        )
+        joins_sql = sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
 
-        count_query = sql.SQL(
-            "SELECT COUNT(*) FROM {table}{joins}{where};"
-        ).format(
+        count_query = sql.SQL("SELECT COUNT(*) FROM {table}{joins}{where};").format(
             table=cls.__table__,
             joins=joins_sql,
             where=where_sql,
@@ -662,7 +809,21 @@ class Database:
         placeholders: dict[str, Any] | None = None,
         search: str | None = None,
     ) -> int:
-        """Generic method to execute a COUNT(*) query."""
+        """Generic method to execute a COUNT(*) query on an entity table.
+
+        Args:
+            cls: Entity model class to count.
+            parent_cls: Optional parent entity class.
+            parent_pk: Optional parent entity primary key.
+            scope: Optional dictionary of exact column matches.
+            joins: Optional additional SQL join statements.
+            where_clauses: Optional additional WHERE expressions.
+            placeholders: Optional dictionary of parameter values.
+            search: Optional ILIKE name search string.
+
+        Returns:
+            Total count of matching records.
+        """
         return self._get_count(
             cls=cls,
             parent_cls=parent_cls,
@@ -695,7 +856,28 @@ class Database:
         placeholders: dict[str, Any] | None = None,
         search: str | None = None,
     ) -> tuple[list[T], int]:
-        """Generic method for database results with optional pagination. Returns (items, total_count)."""
+        """Generic method for database results with optional pagination.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to query.
+            page: 1-indexed page number.
+            per_page: Number of items per page.
+            limit: Direct SQL LIMIT count.
+            offset: Direct SQL OFFSET count.
+            parent_cls: Optional parent entity model class.
+            parent_pk: Optional parent entity primary key.
+            scope: Optional dictionary of column-value filter conditions.
+            order_by: Column name to sort results by.
+            descending: If True, sort in descending order. Defaults to False.
+            joins: Optional list of additional SQL join statements.
+            where_clauses: Optional list of additional WHERE expressions.
+            placeholders: Optional dictionary of query placeholder values.
+            search: Optional search term for ILIKE matching on name column.
+
+        Returns:
+            Tuple containing list of hydrated entity models and the total count.
+        """
         params: dict[str, Any] = dict(placeholders) if placeholders else {}
         conditions: list[sql.Composable] = list(where_clauses) if where_clauses else []
         all_joins: list[sql.Composable] = list(joins) if joins else []
@@ -740,21 +922,11 @@ class Database:
             )
             params["_search_term"] = f"%{search}%"
 
-        where_sql = (
-            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
-            if conditions
-            else sql.SQL("")
-        )
+        where_sql = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
 
-        joins_sql = (
-            sql.SQL(" ") + sql.SQL(" ").join(all_joins)
-            if all_joins
-            else sql.SQL("")
-        )
+        joins_sql = sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
 
-        count_query = sql.SQL(
-            "SELECT COUNT(*) FROM {table}{joins}{where};"
-        ).format(
+        count_query = sql.SQL("SELECT COUNT(*) FROM {table}{joins}{where};").format(
             table=cls.__table__,
             joins=joins_sql,
             where=where_sql,
@@ -803,9 +975,7 @@ class Database:
         else:
             order_sql = sql.SQL("")
 
-        select_query = sql.SQL(
-            "SELECT {table}.* FROM {table}{joins}{where}{order}{limit_offset};"
-        ).format(
+        select_query = sql.SQL("SELECT {table}.* FROM {table}{joins}{where}{order}{limit_offset};").format(
             table=cls.__table__,
             joins=joins_sql,
             where=where_sql,
@@ -836,7 +1006,27 @@ class Database:
         placeholders: dict[str, Any] | None = None,
         search: str | None = None,
     ) -> tuple[list[T], int]:
-        """Generic method to fetch paginated database entities along with total record count."""
+        """Generic method to fetch paginated database entities along with total record count.
+
+        Args:
+            cls: Entity model class to query.
+            page: 1-indexed page number.
+            per_page: Number of items per page.
+            limit: Direct SQL LIMIT count.
+            offset: Direct SQL OFFSET count.
+            parent_cls: Optional parent entity model class.
+            parent_pk: Optional parent entity primary key.
+            scope: Optional dictionary of column-value filter conditions.
+            order_by: Column name to sort results by.
+            descending: If True, sort in descending order. Defaults to False.
+            joins: Optional list of additional SQL join statements.
+            where_clauses: Optional list of additional WHERE expressions.
+            placeholders: Optional dictionary of query placeholder values.
+            search: Optional search term for ILIKE matching on name column.
+
+        Returns:
+            Tuple containing list of hydrated entity models and the total count.
+        """
         return self._get_paginated(
             cls=cls,
             page=page,
@@ -860,11 +1050,24 @@ class Database:
     def _get_related(
         self,
         cursor: Cursor[T],
-        relation_cls: Type[Relationbase],
-        target_cls: Type[T],
+        relation_cls: type[Relationbase],
+        target_cls: type[T],
         scope: dict[str, Any],
     ) -> list[T]:
-        """Internal method to fetch target models via a relation join table."""
+        """Internal method to fetch target models via a relation join table.
+
+        Args:
+            cursor: Active database cursor.
+            relation_cls: BaseRelation junction table model class.
+            target_cls: Concrete target entity model class to hydrate.
+            scope: Filter criteria dictionary applied to the junction table.
+
+        Returns:
+            List of hydrated target model instances.
+
+        Raises:
+            ValueError: If scope dictionary is empty.
+        """
         if not scope:
             raise ValueError("At least one filter condition must be provided.")
 
@@ -873,9 +1076,7 @@ class Database:
         scope_params = {f"_scope_{k}": v for k, v in scope.items()}
 
         query = sql.SQL(
-            "SELECT t.* FROM {target_table} t "
-            "JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} "
-            "WHERE r.{where_clause};"
+            "SELECT t.* FROM {target_table} t JOIN {relation_table} r ON t.{target_pk} = r.{fk_field} WHERE r.{where_clause};"
         ).format(
             target_table=target_cls.__table__,
             relation_table=relation_cls.__table__,
@@ -890,24 +1091,22 @@ class Database:
 
     def get_related(
         self,
-        relation_cls: Type[Relationbase],
-        target_cls: Type[T],
+        relation_cls: type[Relationbase],
+        target_cls: type[T],
         scope: dict[str, Any],
     ) -> list[T]:
-        """
-        Fetches target entity models joined through a BaseRelation junction table.
+        """Fetches target entity models joined through a BaseRelation junction table.
 
-            Args:
-                relation_cls: The BaseRelation junction model class.
-                target_cls: The concrete entity model class to hydrate and return.
-                scope: Key-value filter pairs applied to the junction table.
-                fk_field: The foreign key column name on the junction table linking to target_cls.
+        Args:
+            relation_cls: The BaseRelation junction model class.
+            target_cls: The concrete entity model class to hydrate and return.
+            scope: Key-value filter pairs applied to the junction table.
 
-            Returns:
-                list[T]: Concrete entity records matching the criteria.
+        Returns:
+            List of concrete entity records matching the criteria.
 
-            Raises:
-                ValueError: If scope is empty.
+        Raises:
+            ValueError: If scope is empty.
         """
         return self._get_related(relation_cls, target_cls, scope)
 
@@ -915,33 +1114,38 @@ class Database:
 
     @connect
     def _bulk_get(self, cursor: Cursor[T], cls: type[T], req: BulkRequest) -> list[T]:
-        """Internal bulk_get method."""
+        """Internal bulk_get method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to fetch.
+            req: BulkRequest model containing object identifiers.
+
+        Returns:
+            List of matching entity models.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("SELECT * FROM {table}")
 
         p_filters, data = filter_by_object_ids(cls.__table__, cls.__pk__, req.object_ids)
 
         return cursor.execute(
-            sql.SQL("{q} WHERE {p}").format(
-                q=query.format(table=cls.__table__), p=p_filters
-            ),
+            sql.SQL("{q} WHERE {p}").format(q=query.format(table=cls.__table__), p=p_filters),
             data,
         ).fetchall()
 
     def bulk_get(self, cls: type[T], req: BulkRequest) -> list[T]:
-        """
-        Fetch a collection of entities efficiently using a collection of primary keys
+        """Fetch a collection of entities efficiently using a collection of primary keys.
 
         Args:
             cls: The DBbase entity model class to fetch.
-            req: A pydantic request model including PrimaryKey identifiers
+            req: A pydantic request model including PrimaryKey identifiers.
 
         Returns:
-            A list of entities according to the provided identifiers
+            A list of entities according to the provided identifiers.
 
         Raises:
             ObjectNotFound: If one or more provided identifiers do not have a corresponding entity.
-
         """
         return self._bulk_get(cls, req)
 
@@ -950,8 +1154,20 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _where(self, cursor: Cursor[T], cls: Type[T], scope: dict[str, Any]) -> list[T]:
-        """Internal where method."""
+    def _where(self, cursor: Cursor[T], cls: type[T], scope: dict[str, Any]) -> list[T]:
+        """Internal where method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to query.
+            scope: Dictionary of column-value filter conditions.
+
+        Returns:
+            List of matching entity models.
+
+        Raises:
+            ValueError: If scope is empty.
+        """
         if not scope:
             raise ValueError("At least one filter condition must be provided.")
 
@@ -968,20 +1184,19 @@ class Database:
         cursor.execute(query, scope_params)
         return cursor.fetchall()
 
-    def where(self, cls: Type[T], scope: dict[str, Any]) -> list[T]:
-        """
-        Fetches records matching column filter criteria.
+    def where(self, cls: type[T], scope: dict[str, Any]) -> list[T]:
+        """Fetches records matching column filter criteria.
 
-            Args:
-                cls: The target model class to return.
-                **filters: Key-value pairs to filter by (e.g., status="active").
+        Args:
+            cls: The target model class to return.
+            scope: Key-value pairs to filter by (e.g., {"status": "active"}).
 
-            Returns:
-                list[T]: Records matching all criteria.
+        Returns:
+            list[T]: Records matching all criteria.
 
-            Raises:
-                ValueError: If no filter parameters are passed.
-                ObjectNotFound: If no matching records are found.
+        Raises:
+            ValueError: If no filter parameters are passed.
+            ObjectNotFound: If no matching records are found.
         """
         return self._where(cls, scope)
 
@@ -995,7 +1210,19 @@ class Database:
         cls: type[DBbase],
         pk: PrimaryKey,
     ) -> bool:
-        """Internal exists method"""
+        """Internal exists method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to check.
+            pk: Primary key value.
+
+        Returns:
+            True if entity exists.
+
+        Raises:
+            ObjectNotFound: If entity does not exist.
+        """
         query = sql.SQL("SELECT EXISTS(SELECT 1 FROM {table} WHERE {id_col} = %s);")
 
         pk_col = resolve_identifier(cls, pk)
@@ -1035,7 +1262,16 @@ class Database:
 
     @connect
     def _delete(self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey) -> bool:
-        """internal delete method"""
+        """Internal delete method.
+
+        Args:
+            cursor: Active database cursor.
+            cls: Entity model class to delete from.
+            pk: Primary key value of the record.
+
+        Returns:
+            True on successful deletion.
+        """
         query = sql.SQL("""
         DELETE FROM {table}
         WHERE {id_col} = %(_pk_val)s
@@ -1055,14 +1291,14 @@ class Database:
         return True
 
     def delete(self, cls: type[T], pk: PrimaryKey) -> bool:
-        """Delete an object from the database
+        """Delete an object from the database.
 
         Args:
-        cls: the model class to delete.
-        pk: The primary key of the record.
+            cls: Entity model class to delete from.
+            pk: Primary key value of the record.
 
         Returns:
-            bool: True if the operation was successful.
+            True on successful deletion.
         """
         return self._delete(cls, pk)
 
@@ -1074,12 +1310,22 @@ class Database:
     def _get_auto_crop_batch(
         self, cursor: Cursor[dict], params: AutoCropperBatchQuery, user: User
     ) -> dict[str, str | int | list[int]]:
-        """ """
+        """Query and lock a batch of images and predictions for auto-cropping.
+
+        Args:
+            cursor: Active database cursor.
+            params: AutoCropper batch query parameters.
+            user: Current User locking the batch.
+
+        Returns:
+            Serialized JSON aggregate dictionary of images and predictions.
+
+        Raises:
+            Exception: If the query fails to fetch a batch.
+        """
         q_params = {
             "survey_id": self._get(cursor, Survey, params.survey_id).survey_id,
-            "herd_unit_id": self._get(
-                cursor, HerdUnit, params.herd_unit_id
-            ).herd_unit_id,
+            "herd_unit_id": self._get(cursor, HerdUnit, params.herd_unit_id).herd_unit_id,
             "model_id": self._get(cursor, Model, params.model_id).model_id,
             "labels": params.label,
             "score": params.min_confidence,
@@ -1087,8 +1333,8 @@ class Database:
         }
 
         cursor.row_factory = dict_row
-        query = sql.SQL(""" 
-		    WITH SelectedImages AS (
+        query = sql.SQL("""
+            WITH SelectedImages AS (
     SELECT I.image_id
     FROM core.images I
     INNER JOIN core.predictions P ON I.image_id = P.image_id
@@ -1096,11 +1342,11 @@ class Database:
       AND I.survey_id = %(survey_id)s
       AND I.opened_by_user_id = 0
       AND P.model_id = %(model_id)s
-      AND P.reviewed_by_user_id = 0  
+      AND P.reviewed_by_user_id = 0
       AND P.label = ANY(%(labels)s)
       AND P.score > %(score)s
     GROUP BY I.image_id
-    ORDER BY MAX(P.score) DESC  
+    ORDER BY MAX(P.score) DESC
     LIMIT %(batch_size)s
 )
 SELECT json_agg(row_to_json(img_preds))
@@ -1121,7 +1367,7 @@ FROM (
                 'image_id', P.image_id,
                 'model_id', P.model_id,
                 'dimensions', json_build_object(
-                    'top_left', json_build_array(P.box_tx, P.box_ty), 
+                    'top_left', json_build_array(P.box_tx, P.box_ty),
                     'bottom_right', json_build_array(P.box_bx, P.box_by)),
                 'score', P.score,
                 'label', P.label,
@@ -1153,20 +1399,22 @@ FROM (
             ids.append((user.user_id, row["image_id"]))
 
         cursor.executemany(
-            sql.SQL(
-                "UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s"
-            ),
+            sql.SQL("UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s"),
             ids,
         )
         return cast(dict, results)["json_agg"]
 
-    def get_auto_crop_batch(
-        self, req: AutoCropperBatchQuery, user: User
-    ) -> dict[str, str | int | list[int]]:
-        """ """
+    def get_auto_crop_batch(self, req: AutoCropperBatchQuery, user: User) -> dict[str, str | int | list[int]]:
+        """Fetch and lock a batch of candidate images for auto-cropping.
+
+        Args:
+            req: AutoCropper batch query parameters.
+            user: Current User locking the batch.
+
+        Returns:
+            Serialized JSON aggregate dictionary of images and predictions.
+        """
         return self._get_auto_crop_batch(req, user)
-
-
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1179,7 +1427,18 @@ FROM (
         survey_ids: list[int] | None,
         herd_unit_ids: list[int] | None,
     ):
-        """ """
+        """Query survey images with their associated annotations.
+
+        Args:
+            cursor: Active database cursor.
+            label_ids: List of label IDs to filter annotations.
+            date_range: Optional tuple of lower and upper creation dates.
+            survey_ids: Optional list of survey IDs to filter images.
+            herd_unit_ids: Optional list of herd unit IDs to filter images.
+
+        Returns:
+            List of image record dicts with nested annotations array.
+        """
         cursor.row_factory = dict_row
 
         params_1 = []
@@ -1194,11 +1453,7 @@ FROM (
             placeholders["herd_unit_ids"] = herd_unit_ids
 
         if date_range is not None:
-            params_1.append(
-                sql.SQL(
-                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
-                )
-            )
+            params_1.append(sql.SQL("i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"))
             placeholders["date_range_lower"] = date_range[0]
             placeholders["date_range_upper"] = date_range[1]
 
@@ -1222,7 +1477,7 @@ FROM (
 							'box_by', a.box_by,
 							'created_by_user_id', a.created_by_user_id,
 							'created', a.created,
-							'modified', a.modified, 
+							'modified', a.modified,
 							'uuid', a.uuid
 						)
 					) as annotations
@@ -1245,8 +1500,15 @@ FROM (
         survey_ids: list[int] | None,
         herd_unit_ids: list[int] | None,
     ):
-        """ """
-        return self._get_survey_annotated_images(
-            label_ids, date_range, survey_ids, herd_unit_ids
-        )
+        """Retrieve images and associated annotations for a survey.
 
+        Args:
+            label_ids: List of label IDs to filter annotations.
+            date_range: Optional tuple of lower and upper creation dates.
+            survey_ids: Optional list of survey IDs to filter images.
+            herd_unit_ids: Optional list of herd unit IDs to filter images.
+
+        Returns:
+            List of image record dicts with nested annotations array.
+        """
+        return self._get_survey_annotated_images(label_ids, date_range, survey_ids, herd_unit_ids)

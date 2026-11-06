@@ -1,18 +1,19 @@
-# Class definition for Model objects in the database
+"""Model database models and schemas."""
+
 # Author: Michael B. Lance
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import ClassVar, Optional, Self
+from typing import ClassVar, Self
 from uuid import UUID
 
+import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
 from psycopg import Cursor
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
-import psycopg.sql as sql
 
 from ..base import DBbase, Keyring, create_spice_update
 
@@ -20,6 +21,8 @@ from ..base import DBbase, Keyring, create_spice_update
 
 
 class ModelType(StrEnum):
+    """Enumeration of model types."""
+
     DETECTION = "detection"
     REGRESSION = "regression"
     DEPTH_ESTIMATION = "depth estimation"
@@ -30,6 +33,8 @@ class ModelType(StrEnum):
 
 
 class CreateModelReq(BaseModel):
+    """Request schema for creating a model."""
+
     name: str
     model_type: ModelType
     project_ids: Keyring
@@ -40,6 +45,8 @@ class CreateModelReq(BaseModel):
 
 
 class UpdateModelReq(BaseModel):
+    """Request schema for updating a model."""
+
     name: str
 
 
@@ -48,7 +55,7 @@ class UpdateModelReq(BaseModel):
 
 @dataclass
 class Model(DBbase):
-    """Dataclass for representing Models from the database"""
+    """Dataclass for representing models from the database."""
 
     model_id: int
     schema_id: int
@@ -64,6 +71,8 @@ class Model(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a model."""
+
         model_config = ConfigDict(from_attributes=True)
         model_id: int
         schema_id: int
@@ -73,13 +82,21 @@ class Model(DBbase):
         modified: datetime
         uuid: UUID
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateModelReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateModelReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new model record and project relationship.
 
+        Args:
+            cursor: Active database cursor.
+            req: Creation request containing model details and parent IDs.
+
+        Returns:
+            Optional tuple containing created Model and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_model AS (
@@ -98,15 +115,16 @@ class Model(DBbase):
         if not (model := cursor.fetchone()):
             return None
 
-        spice_updates = [
-            create_spice_update(
-                "model", model.uuid, "project", req.project_ids.uuid, "parent"
-            )
-        ]
+        spice_updates = [create_spice_update("model", model.uuid, "project", req.project_ids.uuid, "parent")]
 
         return model, spice_updates
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def serialize(self):
+    def serialize(self) -> dict:
+        """Serialize model to a dictionary.
+
+        Returns:
+            dict: Serialized model representation.
+        """
         return Model.Response.model_validate(self).model_dump(mode="json")
