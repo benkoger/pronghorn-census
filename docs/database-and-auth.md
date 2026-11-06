@@ -137,4 +137,16 @@ platform (root)
 ## 5. Cache & Session Store (Valkey)
 
 * **Valkey DB 0 (Flask-Session)**: Stores server-side session payloads signed cryptographically with `SECRET_KEY`. Cookies are set with `SameSite=Lax`.
-* **Valkey DB 1 (Flask-Caching)**: Short-term cache for image byte buffers (TTL 500s) to avoid repeated S3 requests during active cropping sessions.
+* **Valkey DB 1 (Flask-Caching)**: Short-term cache for image byte buffers (TTL 500s) to avoid repeated S3 requests during active cropping sessions, and the working state of active measurements.
+
+Python objects are stored msgpack-serialised (`packb` / `unpackb`), never pickled. The API keeps no state in the process: it runs under several gunicorn workers, so anything one request needs from another lives here or in PostgreSQL.
+
+**Active measurement keys** (`app/proposal_store.py`, behind the `/api/v1/active-measurements` routes). The durable record of a measurement is its rows in `core.proposal_generations` and `core.am_units`; the cache only saves rebuilding the serving state on every request.
+
+| Key | Holds | Written by | Dropped by |
+| :--- | :--- | :--- | :--- |
+| `am_state_<measurement uuid>` | msgpacked `MeasurementState`: unit order, serving order, latest expected counts | `load` on a miss, `save` after a new generation | finish, delete, the reset tool |
+| `am_terms_<measurement uuid>` | msgpacked `SurveyTerms` of the abundance | survey terms preparation | finish, delete, the reset tool |
+| `am_area_<measurement uuid>` | msgpacked float: the ground area of the units' images, the union of their footprints | the first estimate that needs it | finish, delete, the reset tool |
+
+Neither key expires. Losing them (a Valkey restart, no persistence in production) costs one rebuild from the rows on the next request.

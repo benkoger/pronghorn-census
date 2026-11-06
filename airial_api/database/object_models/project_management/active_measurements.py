@@ -33,6 +33,56 @@ class CreateActiveMeasurement(BaseModel):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+class ActiveMeasurementQuery(BaseModel):
+    """The survey whose current measurement a request is about."""
+
+    survey_id: UUID
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateTilesReq(BaseModel):
+    """The survey to cut into tiles and, optionally, which of its images.
+
+    Attributes:
+        survey_id: The survey.
+        image_ids: Images to cut; every image of the survey when None.
+    """
+
+    survey_id: UUID
+    image_ids: list[int] | None = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class CreateProposalReq(BaseModel):
+    """A proposal generation as the fitting service posts it.
+
+    The generation number is assigned by the server: the next one after
+    those stored.
+
+    Attributes:
+        reviewed_area_ids: Unit order the sampler indexes.
+        raw: Expected count per unit, in reviewed_area_ids order.
+        proposal: Shaped vector the sampler draws from, in the same order.
+        n_labels: Reviewed units the generation was fitted on; 0 at first.
+        model_id: Regression model that produced it, when registered.
+        alpha: Exponent that shaped the proposal from the expected counts.
+    """
+
+    reviewed_area_ids: list[int]
+    raw: list[float]
+    proposal: list[float]
+    n_labels: int = 0
+    model_id: int | None = None
+    alpha: float | None = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateActiveMeasurement(BaseModel):
     """Request schema for updating an active measurement."""
 

@@ -21,6 +21,10 @@ import type { VerifierAdapter, VerifierItem, VerifierAction } from "@/types/veri
 const props = defineProps<{
   adapter: VerifierAdapter;
   labels?: Label[];
+  // How an image is sized when it opens: whole image in view (default) or filling the height
+  fit?: "contain" | "height";
+  // Cells per side of a red orientation grid drawn over the image; none when unset
+  grid?: number;
 }>();
 
 const emit = defineEmits<{
@@ -76,6 +80,64 @@ const updates = ref<Record<string, updateAnnotationOptions[]>>({});
 // Interactive / Drawing State
 const selectedShapeName = ref("");
 const hoveredUuid = ref("");
+
+// The boxes can be hidden to search the image under them; drawing still works
+const showBoxes = ref(true);
+
+// Pixel size of the image on the stage, for the grid
+const imageSize = ref<{ width: number; height: number } | null>(null);
+const gridLines = computed(() => {
+  const n = props.grid ?? 0;
+  const size = imageSize.value;
+  if (n < 1 || !size) return [];
+  const lines: number[][] = [];
+  for (let i = 1; i < n; i++) {
+    const x = (size.width * i) / n;
+    const y = (size.height * i) / n;
+    lines.push([x, 0, x, size.height]);
+    lines.push([0, y, size.width, y]);
+  }
+  return lines;
+});
+
+// The grid cell the view is zoomed to, from 0 across then down; -1 is the whole image.
+// ] moves to the next cell, [ to the previous, Reset View returns to the whole image.
+const gridCell = ref(-1);
+const gridCellCount = computed(() => (props.grid ?? 0) ** 2);
+const gridCellRect = computed(() => {
+  const n = props.grid ?? 0;
+  const size = imageSize.value;
+  if (gridCell.value < 0 || n < 1 || !size) return null;
+  const width = size.width / n;
+  const height = size.height / n;
+  return {
+    x: (gridCell.value % n) * width,
+    y: Math.floor(gridCell.value / n) * height,
+    width,
+    height,
+  };
+});
+
+function focusGridCell(index: number) {
+  const count = gridCellCount.value;
+  if (count === 0) return;
+  gridCell.value = ((index % count) + count) % count;
+  nextTick(() => {
+    const stage = stageRef.value?.getNode();
+    const cell = gridCellRect.value;
+    if (!stage || !cell) return;
+    const sWidth = stageWidth.value || stage.width();
+    const sHeight = stageHeight.value || stage.height();
+    // The cell fills the stage with a small margin, centred
+    const scale = Math.min(sWidth / cell.width, sHeight / cell.height) * 0.96;
+    stage.scale({ x: scale, y: scale });
+    stage.position({
+      x: (sWidth - cell.width * scale) / 2 - cell.x * scale,
+      y: (sHeight - cell.height * scale) / 2 - cell.y * scale,
+    });
+    onStageChange();
+  });
+}
 const isDrawing = ref(false);
 const drawingRect = ref<tempRect>({
   startPointX: 0,
@@ -335,6 +397,7 @@ function updateSize() {
 }
 
 function fitImageToStage() {
+  gridCell.value = -1;
   nextTick(() => {
     if (!stageRef.value) return;
     const stage = stageRef.value.getNode();
@@ -364,9 +427,14 @@ function fitImageToStage() {
     }
 
     if (!imgWidth || !imgHeight) return;
+    imageSize.value = { width: imgWidth, height: imgHeight };
 
-    const scale = Math.min(sWidth / imgWidth, sHeight / imgHeight);
-    const x = (sWidth - imgWidth * scale) / 2;
+    // "height" fills the stage's height; an image wider than the stage then starts at its left edge
+    const scale =
+      props.fit === "height"
+        ? sHeight / imgHeight
+        : Math.min(sWidth / imgWidth, sHeight / imgHeight);
+    const x = Math.max(0, (sWidth - imgWidth * scale) / 2);
     const y = (sHeight - imgHeight * scale) / 2;
 
     stage.scale({ x: scale, y: scale });
@@ -886,6 +954,15 @@ function handleKeyPress(event: KeyboardEvent) {
     case event.code === "Delete":
       handleDelete();
       break;
+    case event.code === "KeyB" && !event.ctrlKey && !event.metaKey:
+      showBoxes.value = !showBoxes.value;
+      break;
+    case event.code === "BracketRight" && gridCellCount.value > 0:
+      focusGridCell(gridCell.value + 1);
+      break;
+    case event.code === "BracketLeft" && gridCellCount.value > 0:
+      focusGridCell(gridCell.value < 0 ? gridCellCount.value - 1 : gridCell.value - 1);
+      break;
     case event.code.startsWith("Digit"):
       decodeDigit(event);
       break;
@@ -1203,17 +1280,31 @@ onBeforeUnmount(async () => {
           <div class="d-flex align-items-center justify-content-between small text-secondary mt-1">
             <span class="text-secondary fw-semibold" style="font-size: 0.75rem;">
               {{ totalAnnotationsCount }} detection{{ totalAnnotationsCount === 1 ? '' : 's' }}
+              <template v-if="gridCell >= 0"> · cell {{ gridCell + 1 }} of {{ gridCellCount }}</template>
             </span>
-            <BButton
-              size="sm"
-              variant="link"
-              class="p-0 text-secondary d-flex align-items-center gap-1 text-decoration-none"
-              @click="fitImageToStage"
-              title="Reset zoom & center crop"
-            >
-              <Icon icon="material-symbols:center-focus-strong" width="14" />
-              <span style="font-size: 0.72rem;">Reset View</span>
-            </BButton>
+            <div class="d-flex align-items-center gap-3">
+              <BButton
+                size="sm"
+                variant="link"
+                class="p-0 d-flex align-items-center gap-1 text-decoration-none"
+                :class="showBoxes ? 'text-secondary' : 'text-warning'"
+                @click="showBoxes = !showBoxes"
+                :title="showBoxes ? 'Hide the boxes to look under them (B)' : 'Show the boxes (B)'"
+              >
+                <Icon :icon="showBoxes ? 'material-symbols:visibility-outline' : 'material-symbols:visibility-off-outline'" width="14" />
+                <span style="font-size: 0.72rem;">{{ showBoxes ? 'Hide Boxes' : 'Show Boxes' }}</span>
+              </BButton>
+              <BButton
+                size="sm"
+                variant="link"
+                class="p-0 text-secondary d-flex align-items-center gap-1 text-decoration-none"
+                @click="fitImageToStage"
+                title="Reset zoom & center crop"
+              >
+                <Icon icon="material-symbols:center-focus-strong" width="14" />
+                <span style="font-size: 0.72rem;">Reset View</span>
+              </BButton>
+            </div>
           </div>
         </div>
 
@@ -1317,6 +1408,8 @@ onBeforeUnmount(async () => {
 
       <!-- Main Konva Stage -->
       <BCol cols="9" cols-xxl="10" class="h-100 d-flex flex-column overflow-hidden flex-grow-1" style="min-height: 0;">
+        <!-- Optional note above the image, supplied by the view -->
+        <div v-if="$slots['above-stage']" class="flex-shrink-0"><slot name="above-stage" /></div>
         <div
           id="stagewrapper"
           ref="stagewrapper"
@@ -1343,6 +1436,63 @@ onBeforeUnmount(async () => {
               />
             </v-layer>
 
+            <!-- Orientation grid, over the image and under the boxes -->
+            <v-layer :config="{ listening: false, visible: gridLines.length > 0 }">
+              <v-rect
+                :config="{
+                  x: 0,
+                  y: 0,
+                  width: imageSize?.width ?? 0,
+                  height: imageSize?.height ?? 0,
+                  stroke: '#ff2d2d',
+                  strokeWidth: 1.5,
+                  strokeScaleEnabled: false,
+                  opacity: 0.8,
+                }"
+              />
+              <v-line
+                v-for="(pts, i) in gridLines"
+                :key="i"
+                :config="{
+                  points: pts,
+                  stroke: '#ff2d2d',
+                  strokeWidth: 1,
+                  strokeScaleEnabled: false,
+                  opacity: 0.6,
+                }"
+              />
+              <!-- The cell the view is zoomed to, numbered in its corner -->
+              <v-rect
+                v-if="gridCellRect"
+                :config="{
+                  ...gridCellRect,
+                  stroke: '#ff2d2d',
+                  strokeWidth: 3,
+                  strokeScaleEnabled: false,
+                }"
+              />
+              <v-label
+                v-if="gridCellRect"
+                :config="{
+                  x: gridCellRect.x,
+                  y: gridCellRect.y,
+                  scaleX: 1 / stageTransform.scale,
+                  scaleY: 1 / stageTransform.scale,
+                }"
+              >
+                <v-tag :config="{ fill: '#ff2d2d' }" />
+                <v-text
+                  :config="{
+                    text: String(gridCell + 1),
+                    fontSize: 11,
+                    fontStyle: 'bold',
+                    fill: '#ffffff',
+                    padding: 2,
+                  }"
+                />
+              </v-label>
+            </v-layer>
+
             <!-- Annotations Layer -->
             <v-layer>
               <v-rect
@@ -1351,6 +1501,7 @@ onBeforeUnmount(async () => {
                 :config="{
                   ...conf,
                   name: uuid,
+                  visible: showBoxes,
                   draggable: !isDrawing,
                   stroke:
                     conf.stroke ||
@@ -1495,6 +1646,9 @@ onBeforeUnmount(async () => {
             </BButton>
           </div>
         </div>
+
+        <!-- Optional note below the image, supplied by the view -->
+        <div v-if="$slots['below-stage']" class="flex-shrink-0"><slot name="below-stage" /></div>
       </BCol>
     </BRow>
 

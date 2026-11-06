@@ -8,3 +8,4 @@ export * from "./image";
 export * from "./user";
 export * from "./autocropper";
 export * from "./verifier";
+export * from "./abundance";

@@ -27,6 +27,7 @@ from .active_measurements import activeMeasBp
 from .am_units import amUnitBp
 from .image_metadata import imageMetadataBp
 from .image_footprints import imageFootprintBp
+from .predictions import predBp
 
 # ---------------------------------------------------------------------------------------------------------------------------#
 
@@ -60,3 +61,5 @@ bp.register_blueprint(labelBp)
 
 bp.register_blueprint(activeMeasBp)
 bp.register_blueprint(amUnitBp)
+
+bp.register_blueprint(predBp)

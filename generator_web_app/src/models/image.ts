@@ -67,6 +67,12 @@ export interface updateImageOptions {
 
 export interface ReviewedArea {
   reviewed_area_id: number;
+  // The detector's expected count of the tile when served by abundance estimation: the
+  // sum of its boxes' scores above the draft threshold, and the number of those boxes
+  expected_count?: number;
+  n_boxes?: number;
+  // The detector score at or above which boxes were drafted on the tile
+  draft_threshold?: number;
   image_id: number;
   type: ActivityType;
   name: string;
