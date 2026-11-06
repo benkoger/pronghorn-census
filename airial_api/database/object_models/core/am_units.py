@@ -27,7 +27,6 @@ class CreateAmUnitReq(BaseModel):
     relative_position: int | None = None
     active_measurement_ids: Keyring
     reviewed_area_ids: Keyring | None = None
-    reviwed_area_ids: Keyring | None = None
     reg_model_ids: Keyring
     dect_model_ids: Keyring
     model_count: float
@@ -120,7 +119,7 @@ class AmUnit(DBbase):
         user_key: Keyring,
     ) -> tuple[Self, list[RelationshipUpdate]] | None:
 
-        reviewed_area_key = req.reviewed_area_ids or req.reviwed_area_ids
+        reviewed_area_key = req.reviewed_area_ids
         if not reviewed_area_key:
             raise ValueError("reviewed_area_ids is required")
 
