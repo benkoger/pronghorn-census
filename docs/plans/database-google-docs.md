@@ -33,17 +33,7 @@ This is a documentation and code-quality update with zero runtime, schema, or fu
 - Zero method signature or return value changes.
 - Zero schema or SpiceDB relationship changes.
 
-## 4. Edge Cases
-
-| Scenario | Expected behaviour |
-| :--- | :--- |
-| Runtime execution | Unchanged; no algorithmic or functional modifications. |
-| SQL queries | SQL strings, query compositions, and parameters remain identical. |
-| Model interfaces | All method signatures, arguments, defaults, and return types remain identical. |
-| Pydantic schemas | Request and response validation rules and field types remain identical. |
-| Import namespace | Unused imports removed; all exported public symbols in `__all__` remain available. |
-
-## 5. Acceptance Criteria
+## 4. Acceptance Criteria
 
 - [x] All 35 modified files in `airial_api/database/` pass Python compilation (`py_compile`) with zero syntax errors.
 - [x] All public modules have module-level docstrings describing their role in the database architecture.
