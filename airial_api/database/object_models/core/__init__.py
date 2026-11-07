@@ -54,6 +54,7 @@ from .predictions import (
     PredictionQuery,
     UpdatePredictionReq,
 )
+from .proposal_generations import CreateProposalGenerationReq, ProposalGeneration
 
 __all__ = [
     "AbortMulitPartUploadReq",
@@ -76,6 +77,7 @@ __all__ = [
     "CreatePredictionCropReq",
     "CreatePredictionReq",
     "CreatePresignedPutReq",
+    "CreateProposalGenerationReq",
     "CreateReviewedAreaReq",
     "DeleteAnnotationReq",
     "Image",
@@ -86,6 +88,7 @@ __all__ = [
     "PredictionCrop",
     "PredictionQuery",
     "PresignedImageGetReq",
+    "ProposalGeneration",
     "RAQuery",
     "ReviewedArea",
     "UpdateAmUnitReq",

@@ -15,7 +15,6 @@ class AirialError(ABC, Exception):
     name: str
     code: int
     message: str
-    pass
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -47,6 +46,21 @@ class FailedToCreate(AirialError):
             object_type: Name of the entity model type that failed creation.
         """
         self.message = f"Failed to create {object_type}"
+        super().__init__("Invalid Request", 400, self.message)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+class FailedToFetch(AirialError):
+    """Raised when a fetch operation from the database fails."""
+
+    def __init__(self, object_type: str):
+        """Initialize FailedToFetch exception.
+        
+        Args:
+            object_type: Name of the entity model type that could not be fetched.
+        """
+        self.message = f"Failed to fetch {object_type}"
         super().__init__("Invalid Request", 400, self.message)
 
 
@@ -90,3 +104,19 @@ class AuthorizationFailure(AirialError):
         """
         self.message = f"User: {user_id} does not have permission {permission} for {object_type}: {object_id}"
         super().__init__("Unauthorized", 401, self.message)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class MissingImageData(AirialError):
+    """Raised when an images serve method is called when its data has not been loaded from s3."""
+
+    def __init__(self, image_id: str):
+        """Initialize Missing ImageData exception.
+
+        Args:
+            image_id: Identifier for image object.
+        """
+        self.mesage = f"Image: {image_id} does not have any data loaded!"
+        super().__init__("No Image Data", 500, self.message)

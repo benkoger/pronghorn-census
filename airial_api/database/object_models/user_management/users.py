@@ -8,9 +8,9 @@ from enum import StrEnum
 from typing import ClassVar
 from uuid import UUID
 
-import psycopg.sql as sql
 from flask_login import UserMixin
 from msgpack import packb
+from psycopg import sql
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase

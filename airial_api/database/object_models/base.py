@@ -6,7 +6,6 @@ from typing import Any, ClassVar, NamedTuple, TypeVar
 from uuid import UUID
 
 import numpy as np
-import psycopg.sql as sql
 from authzed.api.v1 import (
     ObjectReference,
     Relationship,
@@ -14,7 +13,7 @@ from authzed.api.v1 import (
     SubjectReference,
 )
 from msgpack import packb
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from pydantic import BaseModel, field_validator
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -235,8 +234,8 @@ class Box:
         height_I = y1_I - y0_I
 
         # Handle the negative value width or height of the intersection area
-        width_I = 0 if width_I < 0 else width_I
-        height_I = 0 if height_I < 0 else height_I
+        width_I = max(width_I, 0)
+        height_I = max(height_I, 0)
         # Calculate the intersection area:
         intersection = width_I * height_I
         # Calculate the union area:

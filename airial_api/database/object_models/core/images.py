@@ -5,17 +5,18 @@
 import io
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, ClassVar, Optional, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
 import cv2
 import numpy as np
 import PIL.Image as PillowImage
-import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict, field_validator
+
+from database.errors import MissingImageData
 
 from ..base import Box, DBbase, Keyring, create_spice_update
 from .activity import ActivityType
@@ -41,7 +42,7 @@ class ImageMixin:
                 pilImage = PillowImage.open(io.BytesIO(imageData))
                 pilImage = pilImage.convert("RGB")
                 self.image = cv2.cvtColor(np.array(pilImage), cv2.COLOR_RGB2BGR)
-            except Exception as e:
+            except ValueError as e:
                 print(f"Error converting bytes to image: {e}")
                 self.image = None
         elif isinstance(imageData, np.ndarray):
@@ -78,14 +79,14 @@ class ImageMixin:
         Raises:
             Exception: If no image data is loaded.
         """
-        if self.image is not None:
+        if (img := self.get_image()) is not None:
             _, img_encoded = cv2.imencode(
                 img_format,
-                self.get_image(),  # pyright: ignore
-                [cv2.IMWRITE_JPEG_QUALITY, 100],  # pyright: ignore
+                img,
+                [cv2.IMWRITE_JPEG_QUALITY, 100],
             )
         else:
-            raise Exception("no image data")
+            raise MissingImageData("no image data")
         return img_encoded.tobytes()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,15 +200,15 @@ class CreatePredictionCropReq(BaseModel):
 class RAQuery(BaseModel):
     """Query parameters for filtering reviewed areas."""
 
-    herd_unit_id: Optional[list[UUID]] = None
-    survey_id: Optional[list[UUID]] = None
-    include_reviewed: Optional[bool] = False
-    include_opened: Optional[bool] = False
-    num: Optional[int] = None
-    page: Optional[int] = None
-    per_page: Optional[int] = None
-    search: Optional[str] = None
-    exclude_ids: Optional[list[UUID]] = None
+    herd_unit_id: list[UUID] | None = None
+    survey_id: list[UUID] | None = None
+    include_reviewed: bool | None = False
+    include_opened: bool | None = False
+    num: int | None = None
+    page: int | None = None
+    per_page: int | None = None
+    search: str | None = None
+    exclude_ids: list[UUID] | None = None
     type: ActivityType | None = None
 
     @field_validator("herd_unit_id", "survey_id", "exclude_ids", mode="before")

@@ -2,18 +2,20 @@
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-from typing import Any, Tuple
+from typing import Any
 from uuid import UUID
 
-import psycopg.sql as sql
+from psycopg import sql
 
 from database.object_models.base import DBbase, PrimaryKey
 from database.object_models.schema_graph import find_relationship_path
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
+# default separator for clause_generator function (function-call-in-default-argument (B008))
+DEFAULT_SEP = sql.SQL(', ')
 
-def filter_by_object_ids(table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]) -> Tuple[sql.Composable, dict]:
+def filter_by_object_ids(table: sql.Identifier, pk_col: sql.Identifier, ids: list[PrimaryKey]) -> tuple[sql.Composable, dict]:
     """Builds SQL to filter by integer primary keys or UUIDs.
 
     Args:
@@ -45,7 +47,7 @@ def filter_by_object_ids(table: sql.Identifier, pk_col: sql.Identifier, ids: lis
 
 def clause_generator(
     clauses: dict[str, Any],
-    sep: sql.SQL = sql.SQL(", "),
+    sep: sql.SQL = DEFAULT_SEP,
     prefix: str = "",
 ) -> sql.Composed:
     """Generate SQL statements from a dictionary.
@@ -63,7 +65,7 @@ def clause_generator(
             sql.Identifier(col),
             sql.Placeholder(f"{prefix}{col}"),
         )
-        for col in clauses.keys()
+        for col in clauses
     )
 
 

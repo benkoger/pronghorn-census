@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-import psycopg.sql as sql
+from psycopg import sql
 
 from ..base import Relationbase
 

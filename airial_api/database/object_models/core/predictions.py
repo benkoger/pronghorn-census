@@ -4,12 +4,11 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, ClassVar, Optional, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
-import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -63,13 +62,13 @@ class CreatePredictionReq(BaseModel):
 class UpdatePredictionReq(BaseModel):
     """Request schema for updating an existing prediction."""
 
-    reviewed_by_user_id: Optional[int] = None
-    label: Optional[int] = None
-    score: Optional[float] = None
-    box_tx: Optional[int] = None
-    box_ty: Optional[int] = None
-    box_bx: Optional[int] = None
-    box_by: Optional[int] = None
+    reviewed_by_user_id: int | None = None
+    label: int | None = None
+    score: float | None = None
+    box_tx: int | None = None
+    box_ty: int | None = None
+    box_bx: int | None = None
+    box_by: int | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -135,7 +134,7 @@ class Prediction(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(cls, cursor: Cursor[Self], req: CreatePredictionReq) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreatePredictionReq) -> tuple[Self, list[RelationshipUpdate]] | None:
         """Insert a new prediction record and generate SpiceDB relationship update.
 
         Args:

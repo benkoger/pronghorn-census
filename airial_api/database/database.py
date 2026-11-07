@@ -12,7 +12,6 @@ from typing import (
     cast,
 )
 
-import psycopg.sql as sql
 from authzed.api.v1 import (
     BulkCheckPermissionRequest,
     BulkCheckPermissionRequestItem,
@@ -32,7 +31,7 @@ from grpc import (
     composite_channel_credentials,
     ssl_channel_credentials,
 )
-from psycopg import Connection, Cursor
+from psycopg import Connection, Cursor, sql
 from psycopg.errors import DatabaseError
 from psycopg.rows import class_row, dict_row, tuple_row
 from psycopg.types.enum import EnumInfo, register_enum
@@ -55,6 +54,7 @@ from database.query_builder import (
 
 from .errors import (
     FailedToCreate,
+    FailedToFetch,
     ObjectNotFound,
 )
 
@@ -75,15 +75,12 @@ def configure_connection(conn: Connection):
         ("projectmanagement.survey_status", SurveyStatus),
         ("usermanagement.user_status", UserStatus),
     ]:
-        try:
-            info = EnumInfo.fetch(conn, enum_name)
-            if not info:
-                info = EnumInfo.fetch(conn, enum_name.split(".")[-1])
-            if info:
-                mapping = [(member, member.value) for member in enum_cls]
-                register_enum(info, context=conn, enum=enum_cls, mapping=mapping)
-        except Exception:
-            continue
+        info = EnumInfo.fetch(conn, enum_name)
+        if not info:
+            info = EnumInfo.fetch(conn, enum_name.split(".")[-1])
+        if info:
+            mapping = [(member, member.value) for member in enum_cls]
+            register_enum(info, context=conn, enum=enum_cls, mapping=mapping)
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -110,7 +107,9 @@ class Database:
             with open(cast(str, spice_config["SPICEDB_CERT_PATH"]), "rb") as f:
                 tls_creds = ssl_channel_credentials(f.read())
 
-            token_creds = access_token_call_credentials(cast(str, spice_config["bearer_token"]))
+            token_creds = access_token_call_credentials(
+                cast(str, spice_config["bearer_token"])
+            )
 
             combined_creds = composite_channel_credentials(tls_creds, token_creds)
 
@@ -186,16 +185,17 @@ class Database:
         @wraps(fn)
         def wrapper(self, *args, **kwargs):
 
-            has_cursor = "cursor" in kwargs or (len(args) > 0 and args[0].__class__.__name__ == "Cursor")
+            has_cursor = "cursor" in kwargs or (
+                len(args) > 0 and args[0].__class__.__name__ == "Cursor"
+            )
 
             if has_cursor:
                 return fn(self, *args, **kwargs)
 
             if not self._pool:
                 self.create_pool()
-            with self._pool.connection() as conn:
-                with conn.cursor() as cursor:
-                    return fn(self, cursor, *args, **kwargs)
+            with self._pool.connection() as conn, conn.cursor() as cursor:
+                return fn(self, cursor, *args, **kwargs)
 
         return wrapper
 
@@ -210,11 +210,15 @@ class Database:
         Returns:
             SpiceDB WriteRelationshipsResponse.
         """
-        return self._spice_client.WriteRelationships(WriteRelationshipsRequest(updates=updates))
+        return self._spice_client.WriteRelationships(
+            WriteRelationshipsRequest(updates=updates)
+        )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def create_bulk_check_request(self, object_type: str, object_id: str, subject_id: str, permission: str):
+    def create_bulk_check_request(
+        self, object_type: str, object_id: str, subject_id: str, permission: str
+    ):
         """Create a bulk check permission request item for SpiceDB.
 
         Args:
@@ -229,7 +233,9 @@ class Database:
         return BulkCheckPermissionRequestItem(
             resource=ObjectReference(object_type=object_type, object_id=object_id),
             permission=permission,
-            subject=SubjectReference(object=ObjectReference(object_type="user", object_id=subject_id)),
+            subject=SubjectReference(
+                object=ObjectReference(object_type="user", object_id=subject_id)
+            ),
         )
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -256,7 +262,9 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def check_permission(self, object_type: str, object_id: str, subject_id: str, permission: str):
+    def check_permission(
+        self, object_type: str, object_id: str, subject_id: str, permission: str
+    ):
         """Check single subject permission on a resource in SpiceDB.
 
         Args:
@@ -283,7 +291,9 @@ class Database:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def create_lookup_resource(self, resource_type: str, permission: str, subject_id: str):
+    def create_lookup_resource(
+        self, resource_type: str, permission: str, subject_id: str
+    ):
         """Lookup resource IDs accessible to a subject via SpiceDB.
 
         Args:
@@ -298,7 +308,9 @@ class Database:
             LookupResourcesRequest(
                 resource_object_type=resource_type,
                 permission=permission,
-                subject=SubjectReference(object=ObjectReference(object_type="user", object_id=subject_id)),
+                subject=SubjectReference(
+                    object=ObjectReference(object_type="user", object_id=subject_id)
+                ),
             )
         )
 
@@ -321,7 +333,7 @@ class Database:
             # first_run is set up during database bootstrapping
             raise DatabaseError()
 
-        return False if res[0] else True
+        return not res[0]
 
     def check_bootstrapped(self) -> bool:
         """Check whether database initialization has completed.
@@ -450,7 +462,9 @@ class Database:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @connect
-    def _update(self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey, req: BaseModel) -> T:
+    def _update(
+        self, cursor: Cursor[T], cls: type[T], pk: PrimaryKey, req: BaseModel
+    ) -> T:
         """Internal update method.
 
         Args:
@@ -675,7 +689,9 @@ class Database:
         cond_sql, joins = resolve_parent_filter(child_cls, parent_cls, parent_pk)
         joins_sql = sql.SQL(" ") + sql.SQL(" ").join(joins) if joins else sql.SQL("")
 
-        query = sql.SQL("SELECT {table}.* FROM {table}{joins} WHERE {cond} = %s;").format(
+        query = sql.SQL(
+            "SELECT {table}.* FROM {table}{joins} WHERE {cond} = %s;"
+        ).format(
             table=child_cls.__table__,
             joins=joins_sql,
             cond=cond_sql,
@@ -781,9 +797,15 @@ class Database:
             )
             params["_search_term"] = f"%{search}%"
 
-        where_sql = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
+        where_sql = (
+            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+            if conditions
+            else sql.SQL("")
+        )
 
-        joins_sql = sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
+        joins_sql = (
+            sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
+        )
 
         count_query = sql.SQL("SELECT COUNT(*) FROM {table}{joins}{where};").format(
             table=cls.__table__,
@@ -920,9 +942,15 @@ class Database:
             )
             params["_search_term"] = f"%{search}%"
 
-        where_sql = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
+        where_sql = (
+            sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+            if conditions
+            else sql.SQL("")
+        )
 
-        joins_sql = sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
+        joins_sql = (
+            sql.SQL(" ") + sql.SQL(" ").join(all_joins) if all_joins else sql.SQL("")
+        )
 
         count_query = sql.SQL("SELECT COUNT(*) FROM {table}{joins}{where};").format(
             table=cls.__table__,
@@ -973,7 +1001,9 @@ class Database:
         else:
             order_sql = sql.SQL("")
 
-        select_query = sql.SQL("SELECT {table}.* FROM {table}{joins}{where}{order}{limit_offset};").format(
+        select_query = sql.SQL(
+            "SELECT {table}.* FROM {table}{joins}{where}{order}{limit_offset};"
+        ).format(
             table=cls.__table__,
             joins=joins_sql,
             where=where_sql,
@@ -1125,10 +1155,14 @@ class Database:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("SELECT * FROM {table}")
 
-        p_filters, data = filter_by_object_ids(cls.__table__, cls.__pk__, req.object_ids)
+        p_filters, data = filter_by_object_ids(
+            cls.__table__, cls.__pk__, req.object_ids
+        )
 
         return cursor.execute(
-            sql.SQL("{q} WHERE {p}").format(q=query.format(table=cls.__table__), p=p_filters),
+            sql.SQL("{q} WHERE {p}").format(
+                q=query.format(table=cls.__table__), p=p_filters
+            ),
             data,
         ).fetchall()
 
@@ -1323,7 +1357,9 @@ class Database:
         """
         q_params = {
             "survey_id": self._get(cursor, Survey, params.survey_id).survey_id,
-            "herd_unit_id": self._get(cursor, HerdUnit, params.herd_unit_id).herd_unit_id,
+            "herd_unit_id": self._get(
+                cursor, HerdUnit, params.herd_unit_id
+            ).herd_unit_id,
             "model_id": self._get(cursor, Model, params.model_id).model_id,
             "labels": params.label,
             "score": params.min_confidence,
@@ -1390,19 +1426,23 @@ FROM (
         results = cursor.fetchone()
 
         if results is None:
-            raise Exception("Failed to fetch batch")
+            raise FailedToFetch("Failed to fetch batch")
 
         ids = []
         for row in cast(dict, results)["json_agg"]:
             ids.append((user.user_id, row["image_id"]))
 
         cursor.executemany(
-            sql.SQL("UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s"),
+            sql.SQL(
+                "UPDATE core.images SET opened_by_user_id = %s WHERE image_id = %s"
+            ),
             ids,
         )
         return cast(dict, results)["json_agg"]
 
-    def get_auto_crop_batch(self, req: AutoCropperBatchQuery, user: User) -> dict[str, str | int | list[int]]:
+    def get_auto_crop_batch(
+        self, req: AutoCropperBatchQuery, user: User
+    ) -> dict[str, str | int | list[int]]:
         """Fetch and lock a batch of candidate images for auto-cropping.
 
         Args:
@@ -1451,7 +1491,11 @@ FROM (
             placeholders["herd_unit_ids"] = herd_unit_ids
 
         if date_range is not None:
-            params_1.append(sql.SQL("i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"))
+            params_1.append(
+                sql.SQL(
+                    "i.created BETWEEN %(date_range_lower)s AND %(date_range_upper)s"
+                )
+            )
             placeholders["date_range_lower"] = date_range[0]
             placeholders["date_range_upper"] = date_range[1]
 
@@ -1509,4 +1553,6 @@ FROM (
         Returns:
             List of image record dicts with nested annotations array.
         """
-        return self._get_survey_annotated_images(label_ids, date_range, survey_ids, herd_unit_ids)
+        return self._get_survey_annotated_images(
+            label_ids, date_range, survey_ids, herd_unit_ids
+        )

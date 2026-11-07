@@ -1,4 +1,5 @@
 """Image metadata database models and schemas."""
+# TODO: Finish removing endpoints into sub routers
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -7,15 +8,16 @@ from datetime import datetime
 from typing import Any, ClassVar, Self
 from uuid import UUID
 
-import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
 
 from database.object_models.base import DBbase, Keyring, create_spice_update
 
 # ---------------------------------------------------------------------------------------------------------------------------
+
+NO_TRANSECT = -1
 
 
 class CreateImageMetadataReq(BaseModel):
@@ -50,6 +52,7 @@ class UpdateImageMetadataReq(BaseModel):
     fov_deg: float | None = None
     terrain_elev_m: float | None = None
     agl_m: float | None = None
+    transect_id: int | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -70,6 +73,7 @@ class ImageMetadata(DBbase):
     fov_deg: float
     terrain_elev_m: float
     agl_m: float
+    transect_id: int
     created: datetime
     modified: datetime
     uuid: UUID
@@ -95,6 +99,7 @@ class ImageMetadata(DBbase):
         fov_deg: float
         terrain_elev_m: float
         agl_m: float
+        transect_id: int
         created: datetime
         modified: datetime
         uuid: UUID
@@ -104,16 +109,18 @@ class ImageMetadata(DBbase):
     # -----------------------------------------------------------------------------------------------------------------------
 
     @classmethod
-    def _create(cls, cursor: Cursor[Self], req: CreateImageMetadataReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+    def _create(
+        cls, cursor: Cursor[Self], req: CreateImageMetadataReq
+    ) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.image_metadata (
                 image_id, captured_at, gps_lon, gps_lat, gps_alt_msl_m,
-                yaw_deg, pitch_deg, fov_deg, terrain_elev_m, agl_m
+                yaw_deg, pitch_deg, fov_deg, terrain_elev_m, agl_m, transect_id
             )
             VALUES (
                 %(image_id)s, %(captured_at)s, %(gps_lon)s, %(gps_lat)s, %(gps_alt_msl_m)s,
-                %(yaw_deg)s, %(pitch_deg)s, %(fov_deg)s, %(terrain_elev_m)s, %(agl_m)s
+                %(yaw_deg)s, %(pitch_deg)s, %(fov_deg)s, %(terrain_elev_m)s, %(agl_m)s, %(transect_id)s
             )
             RETURNING *;
         """)

@@ -4,8 +4,7 @@
 
 from typing import TYPE_CHECKING, Any
 
-import psycopg.sql as sql
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row, tuple_row
 
 from database.object_models.base import Keyring

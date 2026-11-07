@@ -7,9 +7,8 @@ from datetime import datetime
 from typing import ClassVar, Self
 from uuid import UUID
 
-import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase
@@ -61,7 +60,6 @@ class Role(DBbase):
         Returns:
             Optional tuple containing created Role and SpiceDB relationship updates, or None.
         """
-        ...
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

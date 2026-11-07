@@ -8,9 +8,8 @@ from enum import StrEnum
 from typing import ClassVar, Self
 from uuid import UUID
 
-import psycopg.sql as sql
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict
 

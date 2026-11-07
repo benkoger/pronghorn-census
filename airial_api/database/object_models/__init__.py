@@ -8,6 +8,7 @@ from .user_management import Organization, Role, User
 from .verifier import ApproveAnnotationsReq
 
 __all__ = [
+    "SCHEMA_GRAPH",
     "Annotation",
     "ApproveAnnotationsReq",
     "AutoCropReq",
@@ -22,7 +23,6 @@ __all__ = [
     "Project",
     "ReviewedArea",
     "Role",
-    "SCHEMA_GRAPH",
     "Schema",
     "Survey",
     "User",
