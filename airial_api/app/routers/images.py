@@ -564,7 +564,7 @@ def update(body: UpdateImageReq, image_id: int | UUID):
         Tuple containing the serialized updated image and HTTP status 200.
 
     ---
-    paramete:qrsrs:
+    parameters:
             - name: image_id
             in: path
             type: string
