@@ -28,7 +28,7 @@ from database.object_models.core import (
     UpdateImageReq,
 )
 from database.object_models.core.images import (
-    AbortMulitPartUploadReq,
+    AbortMultiPartUploadReq,
     CompleteMultiPartUploadReq,
     CreateImageMultiPartUploadReq,
     PresignedImageGetReq,
@@ -413,7 +413,7 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @login_required
 @permission_required("access")
 @validate()
-def abort_upload(body: AbortMulitPartUploadReq):
+def abort_upload(body: AbortMultiPartUploadReq):
     """
     Aborts a multipart upload.
     ---

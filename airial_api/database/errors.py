@@ -118,5 +118,5 @@ class MissingImageData(AirialError):
         Args:
             image_id: Identifier for image object.
         """
-        self.mesage = f"Image: {image_id} does not have any data loaded!"
+        self.message = f"Image: {image_id} does not have any data loaded!"
         super().__init__("No Image Data", 500, self.message)

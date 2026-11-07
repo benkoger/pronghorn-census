@@ -31,9 +31,9 @@ from .image_metadata import (
     UpdateImageMetadataReq,
 )
 from .images import (
-    AbortMulitPartUploadReq,
+    AbortMultiPartUploadReq,
     CompleteMultiPartUploadReq,
-    CrateReviewedAreaPresignedGetReq,
+    CreateReviewedAreaPresignedGetReq,
     CreateImageMultiPartUploadReq,
     CreateImageReq,
     CreatePredictionCropReq,
@@ -57,7 +57,7 @@ from .predictions import (
 from .proposal_generations import CreateProposalGenerationReq, ProposalGeneration
 
 __all__ = [
-    "AbortMulitPartUploadReq",
+    "AbortMultiPartUploadReq",
     "ActivityType",
     "AmUnit",
     "Annotation",
@@ -67,7 +67,7 @@ __all__ = [
     "BulkDeleteAnnotationsReq",
     "BulkUpdateAnnotationsReq",
     "CompleteMultiPartUploadReq",
-    "CrateReviewedAreaPresignedGetReq",
+    "CreateReviewedAreaPresignedGetReq",
     "CreateAmUnitReq",
     "CreateAnnotationReq",
     "CreateImageFootprintReq",

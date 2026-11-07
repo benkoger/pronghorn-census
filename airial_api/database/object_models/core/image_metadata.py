@@ -17,7 +17,7 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
-NO_TRANSECT = -1
+NO_TRANSECT = -1 # transect_id of an image that is on no flight line.
 
 
 class CreateImageMetadataReq(BaseModel):
@@ -33,6 +33,7 @@ class CreateImageMetadataReq(BaseModel):
     fov_deg: float
     terrain_elev_m: float
     agl_m: float
+    transect_id: int = NO_TRANSECT
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

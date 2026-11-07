@@ -141,7 +141,7 @@ class CreateImageMultiPartUploadReq(BaseModel):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class AbortMulitPartUploadReq(BaseModel):
+class AbortMultiPartUploadReq(BaseModel):
     """Request schema for aborting multipart upload."""
 
     image_key: str
@@ -272,7 +272,7 @@ class UpdateReviewedAreaReq(BaseModel):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-class CrateReviewedAreaPresignedGetReq(BaseModel):
+class CreateReviewedAreaPresignedGetReq(BaseModel):
     """Request schema for getting a presigned GET URL for a reviewed area."""
 
     reviewed_area_id: UUID
