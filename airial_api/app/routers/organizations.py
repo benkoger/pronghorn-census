@@ -1,8 +1,5 @@
 """Endpoints for managing organizations in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------#
-
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate

@@ -1,8 +1,5 @@
 """Endpoints for managing active measurements in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 from flask import Blueprint
@@ -18,7 +15,9 @@ from database.object_models.project_management.active_measurements import (
     UpdateActiveMeasurement,
 )
 
-activeMeasBp = Blueprint("active_measurements", __name__, url_prefix="/api/v1/active-measurements")
+activeMeasBp = Blueprint(
+    "active_measurements", __name__, url_prefix="/api/v1/active-measurements"
+)
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # GET

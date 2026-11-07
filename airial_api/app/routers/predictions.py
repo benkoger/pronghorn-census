@@ -1,8 +1,5 @@
 """Endpoints for managing model predictions in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 from flask import Blueprint

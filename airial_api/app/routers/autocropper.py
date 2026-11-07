@@ -1,8 +1,5 @@
 """Endpoints for the automated crop generator utility."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 import io
 from typing import cast
 
@@ -80,7 +77,9 @@ def auto_crop_image(body: AutoCropReq):
     image_data = cache.get(image.uuid)
 
     if not image_data:
-        image_data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)["Body"].read()
+        image_data = s3.get_object(
+            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
+        )["Body"].read()
         cache.set(image.uuid, image_data, 500)
 
     image.set_image(image_data)
@@ -94,7 +93,9 @@ def auto_crop_image(body: AutoCropReq):
         crop = base.insert(ReviewedArea, crop_req)
 
         for annotation_req in annotation_reqs:
-            annotation_req.reviewed_area_ids = Keyring(pkey=crop.reviewed_area_id, uuid=crop.uuid)
+            annotation_req.reviewed_area_ids = Keyring(
+                pkey=crop.reviewed_area_id, uuid=crop.uuid
+            )
 
             base.insert(Annotation, annotation_req, u_key, h_key)
 

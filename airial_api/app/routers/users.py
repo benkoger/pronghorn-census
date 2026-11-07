@@ -1,8 +1,5 @@
 """Endpoints for managing users and user authentication sessions in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID, uuid4
 
 from authzed.api.v1 import CheckPermissionResponse
@@ -327,7 +324,9 @@ def create_super(body: CreateUserReq):
 
     user = base.insert(User, body)
 
-    base.write_spice_relationships([create_spice_update("platform", uuid4(), "user", user.uuid, "root")])
+    base.write_spice_relationships(
+        [create_spice_update("platform", uuid4(), "user", user.uuid, "root")]
+    )
 
     login_user(user)
     return user.serialize(), 200
@@ -373,12 +372,14 @@ def set_org(body: SetActiveOrgReq):
     if not organization:
         abort(404, "Organization not found.")
 
-    res = base.check_permission("organization", str(organization.uuid), str(current_user.uuid), "access")
+    res = base.check_permission(
+        "organization", str(organization.uuid), str(current_user.uuid), "access"
+    )
 
     if res.permissionship == CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION:
         session["active_org_uuid"] = str(organization.uuid)
 
-        user_key = f"user_{str(current_user.uuid)}"
+        user_key = f"user_{current_user.uuid!s}"
         cache.delete(user_key)
 
         session[f"org_{organization.uuid}"] = organization.to_cache()

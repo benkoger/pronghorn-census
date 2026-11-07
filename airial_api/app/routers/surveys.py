@@ -1,8 +1,5 @@
 """Endpoints for managing surveys in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from datetime import datetime
 from uuid import UUID
 

@@ -1,8 +1,5 @@
 """Endpoints for managing AM units in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from typing import cast
 from uuid import UUID
 

@@ -1,8 +1,5 @@
 """Endpoints for managing image footprints in the API."""
 
-# Authors: Michael B. Lance, Antigravity
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 from flask import Blueprint
@@ -17,7 +14,9 @@ from database.object_models.core.image_footprints import (
     UpdateImageFootprintReq,
 )
 
-imageFootprintBp = Blueprint("image_footprints", __name__, url_prefix="/api/v1/image-footprints")
+imageFootprintBp = Blueprint(
+    "image_footprints", __name__, url_prefix="/api/v1/image-footprints"
+)
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # GET

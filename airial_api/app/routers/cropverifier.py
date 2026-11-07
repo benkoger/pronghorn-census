@@ -1,8 +1,5 @@
 """Endpoints for crop verification in the API."""
 
-# Authors: Michael B. Lance, Antigravity
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from typing import cast
 
 from flask import Blueprint

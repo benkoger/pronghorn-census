@@ -1,8 +1,5 @@
 """Endpoints for managing image metadata in the API."""
 
-# Authors: Michael B. Lance, Antigravity
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 from flask import Blueprint
@@ -17,7 +14,9 @@ from database.object_models.core.image_metadata import (
     UpdateImageMetadataReq,
 )
 
-imageMetadataBp = Blueprint("image_metadata", __name__, url_prefix="/api/v1/image-metadata")
+imageMetadataBp = Blueprint(
+    "image_metadata", __name__, url_prefix="/api/v1/image-metadata"
+)
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # GET

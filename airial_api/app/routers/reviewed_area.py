@@ -1,15 +1,12 @@
 """Endpoints for managing reviewed areas in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from typing import Any
 from uuid import UUID
 
-import psycopg.sql as sql
 from flask import Blueprint, current_app
 from flask_login import current_user, login_required
 from flask_pydantic import validate
+from psycopg import sql
 
 from app.decorators import permission_required
 from app.extensions import base, s3
@@ -231,7 +228,9 @@ def get_annotations(reviewed_area_id: int | UUID):
         reviewed_area = base.get(ReviewedArea, reviewed_area_id)
         reviewed_area_id = reviewed_area.reviewed_area_id
 
-    annotations = base.get_related(AnnotationsReviewedArea, Annotation, {"reviewed_area_id": reviewed_area_id})
+    annotations = base.get_related(
+        AnnotationsReviewedArea, Annotation, {"reviewed_area_id": reviewed_area_id}
+    )
 
     return [annot.serialize() for annot in annotations], 200
 

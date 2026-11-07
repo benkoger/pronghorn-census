@@ -1,9 +1,5 @@
 """Core router package registering API blueprints."""
 
-# Author: Michael B. Lance
-
-# ---------------------------------------------------------------------------------------------------------------------------#
-
 from flask import Blueprint
 
 from .active_measurements import activeMeasBp

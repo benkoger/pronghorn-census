@@ -1,8 +1,5 @@
 """Endpoints for managing images in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 import cv2
@@ -533,7 +530,9 @@ def get_prediciton(body: CreatePredictionCropReq):
     image_data = cache.get(image.uuid)
 
     if not image_data:
-        image_data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)["Body"].read()
+        image_data = s3.get_object(
+            Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key
+        )["Body"].read()
 
         cache.set(image.uuid, image_data, 500)
 

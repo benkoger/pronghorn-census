@@ -1,8 +1,5 @@
 """Endpoints for managing labels in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from uuid import UUID
 
 from flask import Blueprint

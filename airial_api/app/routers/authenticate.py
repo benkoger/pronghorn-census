@@ -1,6 +1,5 @@
 """Endpoints for integrating OAuth2 and legacy password authentication."""
 
-# Author: Michael B. Lance
 # Special thanks to Miguel Grinberg for the excellent guide:
 # https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -51,7 +50,9 @@ def oauth2_authorize(provider: str):
     query_string = urlencode(
         {
             "client_id": provider_data["client_id"],
-            "redirect_uri": url_for(".oauth2_callback", provider=provider, _external=True),
+            "redirect_uri": url_for(
+                ".oauth2_callback", provider=provider, _external=True
+            ),
             "response_type": "code",
             "scope": " ".join(provider_data["scopes"]),
             "state": session["oauth2_state"],
@@ -97,7 +98,9 @@ def oauth2_callback(provider: str):
             "client_secret": provider_data["client_secret"],
             "code": request.args["code"],
             "grant_type": "authorization_code",
-            "redirect_uri": url_for(".oauth2_callback", provider=provider, _external=True),
+            "redirect_uri": url_for(
+                ".oauth2_callback", provider=provider, _external=True
+            ),
         },
         headers={"Accept": "application/json"},
     )

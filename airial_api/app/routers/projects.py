@@ -1,8 +1,5 @@
 """Endpoints for managing projects in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
-
 from typing import cast
 from uuid import UUID
 
@@ -27,7 +24,11 @@ from database.object_models.project_management.projectmanagement_bindings import
 from database.object_models.project_management.projects import createProjectReq
 from database.object_models.project_management.schemas import Schema
 from database.object_models.project_management.surveys import Survey
-from database.object_models.user_management import Organization, OrganizationProject, User
+from database.object_models.user_management import (
+    Organization,
+    OrganizationProject,
+    User,
+)
 from database.object_models.user_management.roles import Role
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
@@ -204,7 +205,9 @@ def get_herd_units(project_id: int | UUID):
         project = base.get(Project, project_id)
         project_id = project.project_id
 
-    herd_units = base.get_related(ProjectsHerdUnits, HerdUnit, {"project_id": project_id})
+    herd_units = base.get_related(
+        ProjectsHerdUnits, HerdUnit, {"project_id": project_id}
+    )
 
     return [herd_unit.serialize() for herd_unit in herd_units], 200
 

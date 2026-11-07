@@ -1,7 +1,5 @@
 """Endpoints for managing models and their artifacts in the API."""
 
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------
 from uuid import UUID
 
 from flask import Blueprint
@@ -15,8 +13,6 @@ from database.object_models.project_management.models import Model, UpdateModelR
 from database.object_models.project_management.schemas import Schema
 
 modelBp = Blueprint("models", __name__, url_prefix="/api/v1/models")
-
-# TODO: These endpoints require propper organizational and project checking
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # GET
