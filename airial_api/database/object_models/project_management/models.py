@@ -24,7 +24,6 @@ class ModelType(StrEnum):
     DETECTION = "detection"
     REGRESSION = "regression"
     DEPTH_ESTIMATION = "depth estimation"
-    REGRESION = "regression"
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
