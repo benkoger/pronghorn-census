@@ -31,7 +31,6 @@ class CreateAmUnitReq(BaseModel):
     human_count: int
     current_count: float
     current_ci_lower: float | None = None
-    curent_ci_lower: float | None = None
     current_ci_upper: float
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -121,10 +120,6 @@ class AmUnit(DBbase):
         if not reviewed_area_key:
             raise ValueError("reviewed_area_ids is required")
 
-        ci_lower = req.current_ci_lower if req.current_ci_lower is not None else req.curent_ci_lower
-        if ci_lower is None:
-            raise ValueError("current_ci_lower is required")
-
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.am_units (
@@ -155,7 +150,7 @@ class AmUnit(DBbase):
                 "reg_model_id": req.reg_model_ids.pkey,
                 "dect_model_id": req.dect_model_ids.pkey,
                 "created_by_user_id": user_key.pkey,
-                "current_ci_lower": ci_lower,
+                "current_ci_lower": req.current_ci_lower,
             },
         )
 
