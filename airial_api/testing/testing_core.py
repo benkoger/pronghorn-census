@@ -1,17 +1,17 @@
+import io
 from contextlib import contextmanager
 from typing import Any
 from unittest.mock import patch
-from moto import mock_aws
+
 import pytest
+from moto import mock_aws
+from PIL import Image as PILImage
+
 from app import create_app
 from app.extensions import base
 
-import io
-from PIL import Image as PILImage
-
 
 class APITester:
-
     @staticmethod
     def _generate_jpeg_bytes(
         width: int = 500, height: int = 500, color: str = "red"
@@ -47,7 +47,7 @@ class APITester:
             )
 
             with app.app_context():
-                s3_client: Any = getattr(app, "s3")
+                s3_client: Any = app.s3
                 bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
                 s3_client.create_bucket(Bucket=bucket_name)
 
@@ -64,7 +64,7 @@ class APITester:
             yield client
 
     @pytest.fixture
-    def auth_client(self, client, app):
+    def auth_client(self, client):
         client.post(
             "/api/v1/authenticate",
             json={"email": "tester@local.host", "password": "Learning2Count"},

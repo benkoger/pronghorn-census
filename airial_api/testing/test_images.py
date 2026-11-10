@@ -2,24 +2,23 @@
 # Author Michael B. Lance
 
 import hashlib
+import io
 from uuid import uuid4
 
-from pydantic import TypeAdapter
 import pytest
+from PIL import Image as PILImage
+from pydantic import TypeAdapter
+from testing_core import APITester
 
+from app.extensions import cache
 from database.object_models.core.annotations import Annotation
 from database.object_models.core.image_footprints import ImageFootprint
 from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.images import Image, ReviewedArea
 from database.object_models.core.predictions import Prediction
-from testing_core import APITester
-from app.extensions import cache
-import io
-from PIL import Image as PILImage
 
 
 class TestImages(APITester):
-
     # -------------------------------------------------------------------------
     # 1. GET Single & List Endpoint Schema Validation
     # -------------------------------------------------------------------------
@@ -210,7 +209,7 @@ class TestImages(APITester):
     # -------------------------------------------------------------------------
 
     def test_get_prediction_crop_not_found(self, auth_client):
-        res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{str(uuid4())}")
+        res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{uuid4()!r}")
         assert res_404.status_code == 404
 
     def test_create_prediction_crops_cache_miss_success(self, auth_client):
