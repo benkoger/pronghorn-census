@@ -59,7 +59,12 @@ STORED = ("am_unit", "active_measurement")
 # Tiles are dropped one batch of images per statement.
 IMAGES_PER_STATEMENT = 250
 # Cache keys of a measurement, by uuid.
-CACHE_KEYS = ("am_state_{uuid}", "am_terms_{uuid}", "am_area_{uuid}")
+CACHE_KEYS = (
+    "am_state_{uuid}",
+    "am_terms_{uuid}",
+    "am_area_{uuid}",
+    "am_threshold_{uuid}",
+)
 
 
 class Refused(Exception):

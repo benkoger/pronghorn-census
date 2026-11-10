@@ -10,10 +10,13 @@
 from uuid import uuid4
 
 import io
+import numpy as np
 import pytest
 from PIL import Image as PILImage
+from psycopg.rows import tuple_row
 from pydantic import TypeAdapter
 
+from ais import Proposal
 from app import proposal_store
 from app.extensions import base, cache
 from database.modules import activemeasurement as am
@@ -34,7 +37,12 @@ IMAGE_ID = 1047
 IMAGE_UUID = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
 IMAGE_SIZE = (8256, 5504)  # the sample image's declared size: tiles are cut from it
 
-CACHE_KEYS = ("am_state_{uuid}", "am_terms_{uuid}", "am_area_{uuid}")
+CACHE_KEYS = (
+    "am_state_{uuid}",
+    "am_terms_{uuid}",
+    "am_area_{uuid}",
+    "am_threshold_{uuid}",
+)
 
 
 def _sql(statement: str, params: dict | None = None) -> None:
@@ -311,7 +319,8 @@ class TestActiveMeasurements(APITester):
         unit = first.get_json()
         ReviewedArea.Response.model_validate(unit)
         assert unit["reviewed_area_id"] in tile_ids
-        assert unit["draft_threshold"] == am.DRAFT_THRESHOLD
+        # drafted at the generation's threshold: a detector score
+        assert 0 < unit["draft_threshold"] <= 1
         assert unit["n_boxes"] >= 0
         assert unit["expected_count"] >= 0
 
@@ -396,6 +405,35 @@ class TestActiveMeasurements(APITester):
             proposal_store.release(row)
             assert cache.get(key) is None
 
+    def test_threshold_cached_per_generation(
+        self, app, auth_client, measurement, tiles, proposal
+    ):
+        """The draft threshold is computed once and dropped when a generation lands."""
+        with app.app_context():
+            row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
+            state = proposal_store.load(row)
+            key = f"am_threshold_{row.uuid}"
+            cache.delete(key)
+            threshold = proposal_store.load_threshold(row, state)
+            assert 0 < threshold <= 1
+            assert cache.get(key) is not None
+            assert proposal_store.load_threshold(row, state) == threshold
+
+            ids = state.reviewed_area_ids
+            proposal_store.save(
+                row,
+                Proposal(
+                    generation=1,
+                    n_labels=1,
+                    reviewed_area_ids=ids,
+                    raw=np.full(len(ids), 100.0),
+                    proposal=np.ones(len(ids)),
+                ),
+            )
+            assert cache.get(key) is None
+            # a far larger expected total admits more boxes: a lower score
+            assert proposal_store.load_threshold(row, proposal_store.load(row)) <= threshold
+
     def test_area_cached_once(self, app, auth_client, measurement, tiles, proposal):
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
@@ -412,15 +450,51 @@ class TestActiveMeasurements(APITester):
     # 7. Module functions behind the routes
     # -------------------------------------------------------------------------
 
+    def test_draft_threshold(self, app, auth_client, measurement, tiles):
+        """The k-th highest detector score of the label on the tiled images."""
+        with app.app_context():
+            row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
+
+            def scores(cursor, db):
+                detector = am.get_detection_model(cursor, db, row.survey_id)
+                cursor.row_factory = tuple_row
+                cursor.execute(
+                    """
+                    SELECT p.score
+                    FROM core.predictions p
+                    JOIN projectmanagement.labels l ON l.label = p.label
+                    WHERE p.model_id = %(m)s AND l.label_id = %(l)s
+                      AND p.image_id IN (
+                          SELECT ra.image_id FROM core.reviewed_area ra
+                          JOIN core.images i ON i.image_id = ra.image_id
+                          WHERE i.survey_id = %(s)s AND ra.type = 'active measurement')
+                    ORDER BY p.score DESC;
+                    """,
+                    {"m": detector.model_id, "l": row.label_id, "s": row.survey_id},
+                )
+                return [float(r[0]) for r in cursor.fetchall()]
+
+            ranked = base.execute(scores)
+            assert ranked, "the sample survey has detector boxes on its tiled images"
+
+            assert base.execute(am.draft_threshold, row, 0.0) == am.NO_DRAFTS
+            assert base.execute(am.draft_threshold, row, 0.4) == am.NO_DRAFTS
+            assert base.execute(am.draft_threshold, row, 1.0) == ranked[0]
+            k = min(5, len(ranked))
+            assert base.execute(am.draft_threshold, row, float(k)) == ranked[k - 1]
+            # more animals expected than boxes: every box is drafted
+            assert base.execute(am.draft_threshold, row, len(ranked) + 10.0) == ranked[-1]
+
     def test_detector_expectation(self, app, auth_client, measurement, tiles):
+        threshold = 0.5
         preds = auth_client.get(f"/api/v1/images/{IMAGE_UUID}/predictions").get_json()
-        above = [p for p in preds if p["score"] >= am.DRAFT_THRESHOLD]
+        above = [p for p in preds if p["score"] >= threshold]
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
             total_boxes = 0
             for tile in tiles:
                 expected, n_boxes = base.execute(
-                    am.detector_expectation, row, tile["reviewed_area_id"]
+                    am.detector_expectation, row, tile["reviewed_area_id"], threshold
                 )
                 assert expected >= 0 and n_boxes >= 0
                 assert expected <= n_boxes  # every counted score is at most 1

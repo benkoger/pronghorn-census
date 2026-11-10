@@ -90,13 +90,12 @@ AREA_TIMEOUT_MS = 120_000
 SPICE_BATCH = 500
 IMAGES_PER_STATEMENT = 250
 NO_MODEL_ID = 0
-# Detector boxes at or above this score are drafted onto a served unit. The
-# score a survey's map draws estimated detections at is the lowest score
-# among the boxes that fill the gap between the annotated count and the
-# estimate (0.984 for PR527 with the October detector), which a new survey
-# does not have until its map is placed. Until the survey map supplies the
-# survey's own value, this round figure stands in for it.
-DRAFT_THRESHOLD = 0.95
+# Detector boxes at or above the measurement's draft threshold are drafted
+# onto a served unit. The threshold is the score at which the detector's box
+# count over the units equals the regressor's expected total (`draft_threshold`
+# below); it is kept per generation by `proposal_store.load_threshold`.
+# A unit with no box at or above it is served clean.
+NO_DRAFTS = 1.0
 # The first units, drawn where the detector found animals.
 DETECTION_CHECK = "detection check"
 # Every unit after that.
@@ -201,9 +200,10 @@ def detector_expectation(
     db: "Database",
     measurement: ActiveMeasurement,
     reviewed_area_id: int,
+    threshold: float,
 ) -> tuple[float, int]:
     """The detector's expected count of a unit: the sum of its boxes' scores
-    at or above ``DRAFT_THRESHOLD``, and the number of those boxes.
+    at or above `threshold`, and the number of those boxes.
 
     A box belongs to the unit its center lies on, as when it is drafted.
     """
@@ -229,11 +229,64 @@ def detector_expectation(
             "reviewed_area_id": reviewed_area_id,
             "model_id": detector.model_id,
             "label_id": measurement.label_id,
-            "threshold": DRAFT_THRESHOLD,
+            "threshold": threshold,
         },
     )
     total, n_boxes = cursor.fetchone() or (0.0, 0)
     return float(total), int(n_boxes)
+
+
+def draft_threshold(
+    cursor: Cursor[Any],
+    db: "Database",
+    measurement: ActiveMeasurement,
+    expected_total: float,
+) -> float:
+    """The detector score at which its box count over the measurement's units
+    equals the regressor's expected total.
+
+    With `k` the expected total rounded to a count, the threshold is the k-th
+    highest score among the detector's boxes of the measurement's label on
+    the units' images, so exactly k boxes score at or above it (ties aside).
+    `NO_DRAFTS` when k is zero; the lowest score when k exceeds the boxes.
+    """
+    k = int(round(expected_total))
+    if k <= 0:
+        return NO_DRAFTS
+
+    detector = get_detection_model(cursor, db, measurement.survey_id)
+    stmt = sql.SQL("""
+        WITH scores AS (
+            SELECT p.score
+            FROM core.predictions p
+            JOIN projectmanagement.labels l ON l.label = p.label
+            WHERE p.model_id = %(model_id)s
+              AND l.label_id = %(label_id)s
+              AND p.image_id IN (
+                  SELECT DISTINCT ra.image_id
+                  FROM core.reviewed_area ra
+                  JOIN core.images i ON i.image_id = ra.image_id
+                  WHERE i.survey_id = %(survey_id)s AND ra.type = %(type)s
+              )
+        )
+        SELECT COALESCE(
+            (SELECT score FROM scores ORDER BY score DESC OFFSET %(offset)s LIMIT 1),
+            (SELECT MIN(score) FROM scores)
+        );
+    """)
+    cursor.row_factory = tuple_row
+    cursor.execute(
+        stmt,
+        {
+            "model_id": detector.model_id,
+            "label_id": measurement.label_id,
+            "survey_id": measurement.survey_id,
+            "type": ActivityType.ACTIVE_MEASUREMENT,
+            "offset": k - 1,
+        },
+    )
+    row = cursor.fetchone()
+    return float(row[0]) if row and row[0] is not None else NO_DRAFTS
 
 
 def get_unit_states(
@@ -680,10 +733,12 @@ def create_draft_annotations(
     db: "Database",
     measurement: ActiveMeasurement,
     detector: Model,
+    threshold: float,
     reviewed_area_ids: Keyring,
     user: User,
 ) -> int:
-    """Drafts the detector's boxes on a unit as annotations.
+    """Drafts the detector's boxes at or above `threshold` on a unit as
+    annotations.
 
     The annotations carry the measurement's label and link to the boxes they
     came from. A box belongs to the unit its center lies on.
@@ -717,7 +772,7 @@ def create_draft_annotations(
             "reviewed_area_id": reviewed_area_ids.pkey,
             "model_id": detector.model_id,
             "label_id": measurement.label_id,
-            "threshold": DRAFT_THRESHOLD,
+            "threshold": threshold,
         },
     )
     boxes = cursor.fetchall()
@@ -799,6 +854,7 @@ def next_unit(
     state: MeasurementState | None,
     user: User,
     vectors: Vectors,
+    threshold: float,
 ) -> Keyring | None:
     """Returns the Keyring of the next reviewed area to annotate.
 
@@ -806,8 +862,8 @@ def next_unit(
     replacement with probability proportional to the proposal in force. A unit
     that has been served but not yet marked reviewed is returned again, so the
     call is safe to repeat. Serving a new unit records it in core.am_units,
-    linked to the unit served before it, and drafts the detector's boxes onto
-    it.
+    linked to the unit served before it, and drafts the detector's boxes at
+    or above `threshold` onto it.
 
     Returns:
         The next unit, or None when the measurement is finished.
@@ -918,7 +974,7 @@ def next_unit(
         )
 
     create_draft_annotations(
-        cursor, db, measurement, detector, reviewed_area_ids, user
+        cursor, db, measurement, detector, threshold, reviewed_area_ids, user
     )
 
     return reviewed_area_ids

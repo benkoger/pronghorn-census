@@ -8,6 +8,7 @@ import { useImage } from "vue-konva";
 import {
   boxWidth,
   boxHeight,
+  resolutionText,
   ActivityType,
   type Annotation,
   type Label,
@@ -104,6 +105,17 @@ const gridLines = computed(() => {
 // ] moves to the next cell, [ to the previous, Reset View returns to the whole image.
 const gridCell = ref(-1);
 const gridCellCount = computed(() => (props.grid ?? 0) ** 2);
+// The source image's size and ground resolution, then how many camera pixels one pixel of the
+// display shows at the current zoom (the stage scale maps camera pixels to CSS pixels; the device
+// pixel ratio maps those to the display's), as one line in the header
+const resolutionLabel = computed(() => {
+  const resolution = resolutionText(activeItem.value?.resolution);
+  const scale = stageTransform.value.scale * (window.devicePixelRatio || 1);
+  if (!(scale > 0)) return resolution;
+  const perDisplayPx = 1 / scale;
+  const zoom = `${perDisplayPx >= 10 ? perDisplayPx.toFixed(0) : perDisplayPx.toFixed(2)} camera px per screen px`;
+  return resolution ? `${resolution} · ${zoom}` : zoom;
+});
 const gridCellRect = computed(() => {
   const n = props.grid ?? 0;
   const size = imageSize.value;
@@ -1305,6 +1317,15 @@ onBeforeUnmount(async () => {
                 <span style="font-size: 0.72rem;">Reset View</span>
               </BButton>
             </div>
+          </div>
+          <!-- Image resolution: size, ground resolution, camera pixels per screen pixel -->
+          <div
+            v-if="resolutionLabel"
+            class="small text-secondary mt-1"
+            style="font-size: 0.72rem;"
+            title="The source image's size, its ground resolution when the camera record is known, and how many of its pixels one screen pixel shows at this zoom"
+          >
+            {{ resolutionLabel }}
           </div>
         </div>
 

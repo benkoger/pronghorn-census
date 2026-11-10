@@ -15,6 +15,10 @@
 #                                 units' images, the union of their
 #                                 footprints. Fixed for a measurement and
 #                                 seconds to compute, so computed once.
+#   am_threshold_<measurement uuid>
+#                                 msgpacked float: the detector score the
+#                                 current generation drafts boxes at. Dropped
+#                                 when a generation is posted.
 #
 # Nothing is held in the process: every worker reads the same keys and the
 # same rows.
@@ -46,6 +50,10 @@ def _terms_key(measurement: ActiveMeasurement) -> str:
 
 def _area_key(measurement: ActiveMeasurement) -> str:
     return f"am_area_{measurement.uuid}"
+
+
+def _threshold_key(measurement: ActiveMeasurement) -> str:
+    return f"am_threshold_{measurement.uuid}"
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -82,6 +90,7 @@ def save(measurement: ActiveMeasurement, proposal: Proposal) -> Proposal:
     """Stores the next generation and refreshes the serving state."""
     base.execute(activemeasurement.create_generation, measurement, proposal)
     cache.delete(_state_key(measurement))
+    cache.delete(_threshold_key(measurement))
     load(measurement)
     return proposal
 
@@ -121,8 +130,29 @@ def load_area(
     return area
 
 
+def load_threshold(
+    measurement: ActiveMeasurement, state: MeasurementState
+) -> float:
+    """Returns the detector score the current generation drafts boxes at.
+
+    The score at which the detector's box count over the units equals the
+    generation's expected total, the sum of its regressor counts. Computed on
+    a miss and kept until the next generation is posted.
+    """
+    if (cached := cache.get(_threshold_key(measurement))) is not None:
+        return float(unpackb(cached))
+
+    threshold = base.execute(
+        activemeasurement.draft_threshold, measurement, float(state.raw.sum())
+    )
+    cache.set(_threshold_key(measurement), packb(threshold), timeout=NO_EXPIRY)
+    return threshold
+
+
 def release(measurement: ActiveMeasurement) -> None:
-    """Drops the cached state, terms and area once the measurement has finished."""
+    """Drops the cached state, terms, area and threshold once the measurement
+    has finished."""
     cache.delete(_state_key(measurement))
     cache.delete(_terms_key(measurement))
     cache.delete(_area_key(measurement))
+    cache.delete(_threshold_key(measurement))

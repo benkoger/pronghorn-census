@@ -2,7 +2,7 @@
 // Author: Michael B. Lance / Antigravity
 // ---------------------------------------------------------------------------------------------------------------------------
 
-import type { Annotation, konvaBoxConf, Label, updateAnnotationOptions } from "@/models";
+import type { Annotation, ImageResolution, konvaBoxConf, Label, updateAnnotationOptions } from "@/models";
 
 export interface VerifierDimensions {
   top_left: { x: number; y: number };
@@ -14,6 +14,8 @@ export interface VerifierItem {
   imageUrl: string;
   dimensions?: VerifierDimensions;
   annotations: Record<string, Annotation>;
+  // The source image's size and ground resolution, shown with the item
+  resolution?: ImageResolution;
   rawItem?: unknown;
 }
 

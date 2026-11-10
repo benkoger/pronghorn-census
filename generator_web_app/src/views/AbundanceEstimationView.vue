@@ -114,7 +114,7 @@ const expectedText = computed(() => {
 // The score the drafted boxes cleared, as the API reports it with each tile
 const draftThreshold = computed(() => activeTile.value?.draft_threshold ?? null);
 const thresholdText = computed(() =>
-  draftThreshold.value === null ? "" : ` higher than ${draftThreshold.value} probability`,
+  draftThreshold.value === null ? "" : ` higher than ${draftThreshold.value.toFixed(3)} probability`,
 );
 
 // The count and its interval are withheld during the detection check and until the minimum
@@ -266,39 +266,28 @@ onBeforeUnmount(() => {
 <template>
   <!-- Reviewing Mode -->
   <div v-if="isReviewing && adapter" class="abundance-review h-100 d-flex flex-column flex-grow-1 overflow-hidden w-100" style="min-height: 0;">
-    <!-- Running Estimate Strip -->
+    <!-- Running Estimate Strip: one line, so the tile below gets the height -->
     <div
-      class="estimate-strip bg-body-secondary border border-secondary-subtle rounded-3 px-3 py-2 mb-2 shadow-sm d-flex align-items-center gap-4 flex-shrink-0"
+      class="estimate-strip bg-body-secondary border border-secondary-subtle rounded-3 px-3 py-1 mb-2 shadow-sm d-flex align-items-center flex-wrap gap-3 flex-shrink-0 small"
     >
-      <div class="d-flex align-items-center gap-2">
-        <Icon icon="gis:measure-area" class="text-primary fs-4" />
-        <span class="fw-bold">Abundance Estimation</span>
-      </div>
-      <div class="strip-stat">
-        <span class="strip-label">Tiles reviewed</span>
-        <span class="strip-value font-monospace">
-          {{ whole(estimate?.n_reviewed) }} / {{ whole(estimate?.n_units) }}
-        </span>
-      </div>
-      <div class="strip-stat" :title="figuresNote">
-        <span class="strip-label">Estimated count</span>
-        <span class="strip-value font-monospace" :class="precisionClass">
-          {{ showFigures ? whole(estimate?.count) : "–" }}
-        </span>
-      </div>
-      <div class="strip-stat" :title="figuresNote">
-        <span class="strip-label">95% interval</span>
-        <span class="strip-value font-monospace">
-          {{ showFigures ? `${whole(estimate?.ci_lower)} – ${whole(estimate?.ci_upper)}` : "–" }}
-        </span>
-      </div>
-      <div class="strip-stat" :title="figuresNote">
+      <Icon icon="gis:measure-area" class="text-primary fs-5" />
+      <span class="strip-stat">
+        <span class="strip-label">Tiles</span>
+        <span class="font-monospace">{{ whole(estimate?.n_reviewed) }} / {{ whole(estimate?.n_units) }}</span>
+      </span>
+      <span class="strip-stat" :title="figuresNote">
+        <span class="strip-label">Count</span>
+        <span class="font-monospace fw-bold" :class="precisionClass">{{ showFigures ? whole(estimate?.count) : "–" }}</span>
+      </span>
+      <span class="strip-stat" :title="figuresNote">
+        <span class="strip-label">95%</span>
+        <span class="font-monospace">{{ showFigures ? `${whole(estimate?.ci_lower)} – ${whole(estimate?.ci_upper)}` : "–" }}</span>
+      </span>
+      <span class="strip-stat" :title="figuresNote">
         <span class="strip-label">Interval / target</span>
-        <span class="strip-value font-monospace">
-          {{ showFigures ? `±${percent(estimate?.relative_ci)}` : "–" }} / ±{{ percent(estimate?.target) }}
-        </span>
-      </div>
-      <span v-if="figuresNote" class="small text-secondary fst-italic">{{ figuresNote }}</span>
+        <span class="font-monospace">{{ showFigures ? `±${percent(estimate?.relative_ci)}` : "–" }} / ±{{ percent(estimate?.target) }}</span>
+      </span>
+      <span v-if="figuresNote" class="text-secondary fst-italic">{{ figuresNote }}</span>
       <BBadge
         v-if="phaseLabel"
         :variant="estimate?.phase === 'detection check' ? 'info' : 'secondary'"
@@ -337,21 +326,14 @@ onBeforeUnmount(() => {
       @done="onVerifierDone"
       @update:active-crop="onActiveCrop"
     >
-      <template #above-stage>
-        <div class="expected-note small mb-2 px-1">
-          <Icon icon="material-symbols:psychology-outline" class="me-1 text-primary" />
-          <strong v-if="expectedText">{{ expectedText }}</strong>
-          <span v-else class="text-secondary">The detector's expectation for this tile is not known.</span>
-        </div>
-      </template>
       <template #below-stage>
-        <div class="search-reminder small text-secondary mt-2 px-1 flex-shrink-0">
-          <Icon icon="material-symbols:search" class="me-1" />
-          <strong class="text-body">Search the whole tile, not only the boxes.</strong>
-          The boxes mark where the detector scored{{ thresholdText }}. Some are not animals, and
-          some animals have no box: delete the first, draw the second, and check every part of
-          the image before you submit. Press B to hide the boxes and look under them, and ] and [
-          to step through the grid's cells one at a time.
+        <div class="search-reminder small text-secondary mt-1 px-1 flex-shrink-0">
+          <Icon icon="material-symbols:psychology-outline" class="me-1 text-primary" />
+          <strong v-if="expectedText" class="text-body">{{ expectedText }}</strong>
+          <span v-else>The detector's expectation for this tile is not known.</span>
+          The boxes mark where the detector scored{{ thresholdText }}: delete the ones that are not
+          animals, draw the animals it missed, and search the whole tile, not only the boxes. B hides
+          the boxes; ] and [ step through the grid's cells.
         </div>
       </template>
     </Verifier>
@@ -631,9 +613,10 @@ onBeforeUnmount(() => {
 }
 
 .strip-stat {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
 }
 
 .strip-label,
@@ -641,10 +624,6 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--bs-secondary-color);
-}
-
-.strip-value {
-  font-weight: 700;
 }
 
 .stat-tile {

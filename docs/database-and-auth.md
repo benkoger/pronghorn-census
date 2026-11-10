@@ -148,5 +148,6 @@ Python objects are stored msgpack-serialised (`packb` / `unpackb`), never pickle
 | `am_state_<measurement uuid>` | msgpacked `MeasurementState`: unit order, serving order, latest expected counts | `load` on a miss, `save` after a new generation | finish, delete, the reset tool |
 | `am_terms_<measurement uuid>` | msgpacked `SurveyTerms` of the abundance | survey terms preparation | finish, delete, the reset tool |
 | `am_area_<measurement uuid>` | msgpacked float: the ground area of the units' images, the union of their footprints | the first estimate that needs it | finish, delete, the reset tool |
+| `am_threshold_<measurement uuid>` | msgpacked float: the detector score the current generation drafts boxes at | the first served unit of a generation | a posted generation, finish, delete, the reset tool |
 
 Neither key expires. Losing them (a Valkey restart, no persistence in production) costs one rebuild from the rows on the next request.

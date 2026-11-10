@@ -17,6 +17,7 @@ import {
   type createAnnotationOptions,
 } from "@/models";
 import type { VerifierAdapter, VerifierItem, VerifierChanges } from "@/types/verifier";
+import { ImageRecords } from "./imageRecord";
 
 export interface AbundanceAdapterOptions {
   surveyUuid: string;
@@ -51,7 +52,7 @@ export class AbundanceAdapter implements VerifierAdapter {
   private session: number = 0;
 
   private areaCache = new Map<string, { reviewedArea: ReviewedArea; presignedUrl: string }>();
-  private imageUuidCache = new Map<number, string>();
+  private images = new ImageRecords();
 
   constructor(options: AbundanceAdapterOptions) {
     this.surveyUuid = options.surveyUuid;
@@ -115,14 +116,7 @@ export class AbundanceAdapter implements VerifierAdapter {
       this.areaCache.set(uuid, cached);
     }
 
-    if (!this.imageUuidCache.has(cached.reviewedArea.image_id)) {
-      const img = await api
-        .get<{ uuid: string }>(`images/${cached.reviewedArea.image_id}`)
-        .catch(() => null);
-      if (img?.uuid) {
-        this.imageUuidCache.set(cached.reviewedArea.image_id, img.uuid);
-      }
-    }
+    const image = await this.images.get(cached.reviewedArea.image_id);
 
     const annotationsList = (await api.get<Annotation[]>(`reviewed-area/${uuid}/annotations`)) ?? [];
     const annotMap: Record<string, Annotation> = {};
@@ -135,6 +129,7 @@ export class AbundanceAdapter implements VerifierAdapter {
       imageUrl: cached.presignedUrl,
       dimensions: cached.reviewedArea.dimensions,
       annotations: annotMap,
+      resolution: image?.resolution,
       rawItem: cached.reviewedArea,
     };
   }
@@ -199,12 +194,7 @@ export class AbundanceAdapter implements VerifierAdapter {
     const tile = changes.item.rawItem as ReviewedArea;
     if (!tile) return;
 
-    let imageUuid = this.imageUuidCache.get(tile.image_id);
-    if (!imageUuid) {
-      const img = await api.get<{ uuid: string }>(`images/${tile.image_id}`).catch(() => null);
-      imageUuid = img?.uuid ?? "";
-      if (imageUuid) this.imageUuidCache.set(tile.image_id, imageUuid);
-    }
+    const imageUuid = await this.images.uuid(tile.image_id);
 
     const createReq: bulkCreateAnnotationsOptions = {
       reviewed_area_id: tile.uuid,

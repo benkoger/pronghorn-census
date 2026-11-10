@@ -79,6 +79,14 @@ def get_next_unit(query: ActiveMeasurementQuery):
         activemeasurement.get_active_measurement, survey_ids
     )
     state = proposal_store.load(measurement)
+    # The score boxes are drafted at: where the detector's box count over the
+    # units meets the regressor's expected total. Nothing is drafted without
+    # a proposal, which next_unit refuses anyway.
+    threshold = (
+        proposal_store.load_threshold(measurement, state)
+        if state is not None
+        else activemeasurement.NO_DRAFTS
+    )
 
     reviewed_area_ids = base.execute(
         activemeasurement.next_unit,
@@ -88,6 +96,7 @@ def get_next_unit(query: ActiveMeasurementQuery):
         lambda: proposal_store.vectors(
             measurement, cast(MeasurementState, state)
         ),
+        threshold,
     )
 
     if reviewed_area_ids is None:
@@ -104,12 +113,13 @@ def get_next_unit(query: ActiveMeasurementQuery):
         activemeasurement.detector_expectation,
         measurement,
         reviewed_area.reviewed_area_id,
+        threshold,
     )
     return {
         **reviewed_area.serialize(),
         "expected_count": expected,
         "n_boxes": n_boxes,
-        "draft_threshold": activemeasurement.DRAFT_THRESHOLD,
+        "draft_threshold": threshold,
     }, 200
 
 

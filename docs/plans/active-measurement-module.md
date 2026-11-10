@@ -1,8 +1,7 @@
 # Feature Specification: Active Measurement Module
 
-Branch `active-measurement-module`, stacked on `ais-package` until that merges, then
-rebased onto `origin/indev`. Part of the series in
-[active-measurement-rebuild.md](active-measurement-rebuild.md).
+Branch `active-measurement-module`, rebased onto `origin/indev` after the `ais-package`
+and `database-google-docs` branches merged.
 
 ## 1. Overview
 
@@ -40,16 +39,25 @@ after this one; here the estimate is a count, an interval and a density.
   so every gunicorn worker serves the same next unit and reports the same estimate.
 - Nothing at module level changes between requests. No S3 for proposals or state; S3 holds
   only the tile crops, which are images.
-- One detection score constant, `DRAFT_THRESHOLD`, exported for the survey map PR. The
-  threshold a survey's map draws estimated detections at is the lowest score among the
-  boxes placed to fill the gap between the annotated count and the estimate, which a new
-  survey does not have yet. Until the survey map PR supplies the live value, boxes are
-  drafted at 0.95, a round figure near PR527's 0.984. `next-unit` echoes the threshold so
-  the view's text follows it.
+- The draft threshold is the detector score at which its box count over the units equals
+  the regressor's expected total, the sum of the current generation's expected counts
+  rounded to a whole number: the k-th highest score of the detector's boxes of the
+  measurement's label on the units' images (`draft_threshold`). It is computed once per
+  generation and kept under `am_threshold_<uuid>`, dropped when a generation is posted.
+  `next-unit` echoes it so the view's text follows it. The survey map draws estimated
+  detections at the same score. The expected counts are the regressor's predictions,
+  which are counts only for a regressor trained with the Poisson objective; the survey
+  repo's `Proposal` refuses a proposal-objective model, whose output is relative. The API
+  does not rescale what is posted.
 - The regressor's output under a proposal objective is relative, in (0, 1] with the
   likeliest tile at 1, not a count, so the view does not show it. `next-unit` reports the
   detector's expected count of the tile instead: the sum of its boxes' scores above the
   draft threshold, with the number of those boxes.
+- The verifier's header shows the source image's size and, when its camera record is
+  stored, its ground resolution in centimetres per pixel: twice the height above ground
+  times the tangent of half the field of view, over the image's width in pixels, with the
+  field of view taken across the long side. Both the crop verifier and the abundance
+  view show it, from the image record each adapter already fetches.
 - The reviewer can hide the boxes (button or the B key) to search under them, and a red
   4 x 4 grid over the tile keeps them oriented while zoomed in. The ] and [ keys zoom to
   the grid's cells one after another, the current cell outlined and named in the header;
@@ -76,7 +84,7 @@ after this one; here the estimate is a count, an interval and a density.
 - **Unit.** A row of `core.am_units` for each served tile, linked to the unit before and
   after it, with the regressor's expected count and, once closed, the reviewer's count and
   the running estimate at that step.
-- **Draft annotations.** The detector's boxes at or above `DRAFT_THRESHOLD` whose center
+- **Draft annotations.** The detector's boxes at or above the draft threshold whose center
   lies on the tile, inserted as annotations of the measurement's label and type
   `active measurement` when the tile is served. What is on the tile when it is marked
   reviewed is its count.
@@ -164,10 +172,12 @@ inside the transaction first, so the tests see the survey as the sample database
       loop with the image seeded (the same unit until reviewed, its crop cut, the boxes
       drafted, the next unit, the units listing, the estimate's phase and masking fields);
       review to exhaustion finishing with a count and the state dropped.
-- [x] The proposal store rebuilding the state from the rows and caching the area once.
-- [x] Module functions: the detector's expectation per tile, the empty estimate, the
-      preparation steps; the prediction routes (bulk get, by id, 404, create, 400).
-- [x] 50 tests pass with `test_images.py`, run from the API image on the host network:
+- [x] The proposal store rebuilding the state from the rows, caching the area once, and
+      caching the draft threshold until the next generation lands.
+- [x] Module functions: the draft threshold at zero, one, k and more than the boxes; the
+      detector's expectation per tile; the empty estimate; the preparation steps; the
+      prediction routes (bulk get, by id, 404, create, 400).
+- [x] 52 tests pass with `test_images.py`, run from the API image on the host network:
       `podman run --rm --network host --add-host prong_dev_valkey:127.0.0.1 -v ./airial_api:/app -w /app --entrypoint "" localhost/airial-core-infrastructure_pronghorn-api-dev:latest .venv/bin/python -m pytest testing -q`
       (the test env names the database at localhost and Valkey by its container name).
 
