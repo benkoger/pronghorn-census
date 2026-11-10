@@ -173,7 +173,7 @@ export default defineComponent({
         // array to hold image part numbers and Etags
         const partArray = [];
 
-        // Initiate Mutiipart upload
+        // Initiate Multipart upload
         let uploadId: string;
         try {
           uploadId = await api.post<string>("images/create-multipart-upload", {
