@@ -25,7 +25,7 @@ This is a documentation and code-quality refactor with zero runtime, database sc
 - **Docstring Format**: All router modules and route functions use Google Python Style Guide docstring format:
   - Single-line summary sentence ending with a period.
   - Multi-line descriptions with separated sections: `Args:`, `Returns:`, `Raises:` where appropriate.
-  - OpenAPI/Swagger YAML blocks (`---`) preserved where present for existing documentation tooling.
+  - OpenAPI/Swagger YAML blocks (`---`) standardized and completed across all public endpoints for Swagger/OpenAPI tooling integration, including dual-identifier (`oneOf`: integer ID / UUID) parameter schemas.
 - **Import Ordering**: Grouped and separated by blank lines according to PEP 8 and Google style:
   1. Standard library imports (e.g., `import io`, `from datetime import UTC, datetime`, `from uuid import UUID`).
   2. Third-party packages (e.g., `flask`, `flask_login`, `flask_pydantic`, `authzed`).
@@ -67,6 +67,7 @@ Verified locally on 2026-11-06 on branch `google_style_routers`.
 
 - [x] All 22 router files in `airial_api/app/routers/` pass `py_compile` with zero syntax errors.
 - [x] Every public route handler in all router blueprints has a descriptive Google-style docstring detailing `Args:` and `Returns:` (and `Raises:` where explicit errors are raised).
+- [x] Standardized OpenAPI/Swagger specification YAML blocks (`---`) completed across all endpoints with consistent dual-identifier schemas, valid request parameters, and status responses.
 - [x] Imports across all 22 router files follow standard PEP 8 / Google grouping: standard library first, third-party libraries second, internal application modules third.
 - [x] Outdated author comments (`# Author: ...`) and stale TODO comments removed across router files.
 - [x] File mode of `airial_api/app/routers/__init__.py` normalized to 644 (from 755).

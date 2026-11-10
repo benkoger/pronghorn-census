@@ -183,3 +183,8 @@ When modifying this repository, follow these principles:
 5. **Handle images carefully**: Large image payloads belong in S3 (or Valkey cache for ephemeral crops); never store raw image bytes in PostgreSQL.
 6. **No module-level mutable state in the API**: it runs under gunicorn with several worker processes, so a process-level cache or registry is invisible to the other workers. Shared state belongs in Valkey (msgpack-serialised via `packb` / `unpackb`) or PostgreSQL.
 7. **When you encounter a typo, fix it**: Never attempt to apply some sort of "backwards-compatible" patch that ends up muddying up the code.
+8. **Enforce Swagger/OpenAPI Docstrings on Routers**:
+   Every endpoint handler in `airial_api/app/routers/` must include a complete docstring combining:
+   * Google Python Style Guide summary, `Args:`, `Returns:`, and `Raises:` where appropriate.
+   * Standardized Flasgger/OpenAPI YAML specification block separated by `---` defining all `parameters:` (path, query, body with types, schemas, and descriptions) and `responses:` (HTTP status codes with descriptions).
+   * Dual-identifier path routes (`<int:id>` and `<uuid:id>`) must declare parameter schemas using `schema: oneOf: [- type: integer, - type: string, format: uuid]`.
