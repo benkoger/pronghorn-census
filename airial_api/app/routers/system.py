@@ -16,6 +16,13 @@ def check_bootstrapped():
 
     Returns:
         Tuple containing a dictionary with boolean result and HTTP status 200.
+
+    ---
+    responses:
+      200:
+        description: Bootstrap check result.
+      500:
+        description: Database error.
     """
     res = base.check_bootstrapped()
 
@@ -32,6 +39,15 @@ def finish_bootstrapp():
 
     Returns:
         Tuple containing empty string and HTTP status 204.
+
+    ---
+    responses:
+      204:
+        description: Application marked as bootstrapped successfully.
+      401:
+        description: User not authenticated.
+      500:
+        description: Database error.
     """
     base.set_bootstrapped()
 

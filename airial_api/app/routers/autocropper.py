@@ -41,6 +41,54 @@ def fetch_batch(query: AutoCropperBatchQuery):
 
     Returns:
         Tuple containing list of batch image and prediction payloads and HTTP status 200.
+
+    ---
+    parameters:
+      - name: survey_id
+        in: query
+        required: false
+        type: array
+        items:
+          type: string
+          format: uuid
+        description: Survey ID filter.
+      - name: herd_unit_id
+        in: query
+        required: false
+        type: array
+        items:
+          type: string
+          format: uuid
+        description: Herd unit ID filter.
+      - name: model_id
+        in: query
+        required: false
+        type: array
+        items:
+          type: string
+          format: uuid
+        description: Model ID filter.
+      - name: label_id
+        in: query
+        required: false
+        type: array
+        items:
+          type: integer
+        description: Label ID filter.
+      - name: batch_size
+        in: query
+        required: false
+        type: integer
+        description: Number of candidate items to fetch.
+    responses:
+      200:
+        description: Batch of images and predictions for auto-cropping.
+      400:
+        description: Invalid query parameters.
+      401:
+        description: User not authorized.
+      500:
+        description: Database error.
     """
     batch = base.get_auto_crop_batch(query, cast(User, current_user))
 
@@ -63,6 +111,23 @@ def auto_crop_image(body: AutoCropReq):
 
     Returns:
         Tuple containing empty string and HTTP status 201.
+
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: AutoCropReq
+        description: Request containing image ID, candidate predictions, and taxonomy label IDs.
+    responses:
+      201:
+        description: Crops and draft annotations generated successfully.
+      400:
+        description: Invalid request payload or validation failure.
+      401:
+        description: User not authorized.
+      500:
+        description: Image processing or database error.
     """
     image = base.get(Image, body.image_id)
     predictions = body.predictions

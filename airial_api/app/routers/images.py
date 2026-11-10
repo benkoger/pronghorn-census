@@ -52,17 +52,28 @@ def get_by_id(image_id: int | UUID):
 
     ---
     parameters:
-      - name: image_i
+      - name: image_id
         in: path
-        type: string
         required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image (integer ID or UUID).
     responses:
       200:
         description: The requested image was found.
       400:
-        description: Invalid id format provided.
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized to access this image.
       404:
         description: No image record found for the provided ID.
+      500:
+        description: Database error.
     """
     return base.get(Image, image_id).serialize(), 200
 
@@ -83,6 +94,23 @@ def get_prediction_crop(prediction_id: str):
 
     Raises:
         ObjectNotFound: If prediction crop is not found in cache.
+
+    ---
+    parameters:
+      - name: prediction_id
+        in: path
+        required: true
+        type: string
+        description: Unique string identifier of the cached prediction crop.
+    responses:
+      200:
+        description: Prediction crop image bytes (image/webp).
+      401:
+        description: User not authorized.
+      404:
+        description: Prediction crop not found in cache.
+      500:
+        description: Image encoding or storage error.
     """
     crop = cache.get(prediction_id)
     if crop is None:
@@ -108,9 +136,25 @@ def get_crops(image_id: int | UUID):
         Tuple containing list of serialized reviewed area crops and HTTP status 200.
 
     ---
+    parameters:
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image (integer ID or UUID).
     responses:
       200:
         description: List of crops (returns [] if parent exists but has no crops).
+      400:
+        description: Invalid ID format provided.
+      401:
+        description: User not authorized.
       404:
         description: Parent image not found.
       500:
@@ -190,6 +234,13 @@ def get_metadata(image_id: int | UUID):
       - name: image_id
         in: path
         required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
         description: Primary key of the image (integer ID or UUID).
     responses:
       200:
@@ -228,6 +279,13 @@ def get_footprints(image_id: int | UUID):
       - name: image_id
         in: path
         required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
         description: Primary key of the image (integer ID or UUID).
     responses:
       200:
@@ -308,18 +366,22 @@ def create(body: CreateImageReq):
 
     ---
     parameters:
-            - name: create image request
-            in: body
-            type: CreateImageReq
-            required: true
+      - name: body
+        in: body
+        required: true
+        type: CreateImageReq
+        description: Image creation request containing key, survey ID, and metadata.
     responses:
-            201:
-                    description: Created successfully.
-            409:
-                    description: Image already exists (Unique Violation).
-            400:
-            500:
-                    description: Database error.
+      201:
+        description: Created successfully.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized to create images.
+      409:
+        description: Image already exists (Unique Violation).
+      500:
+        description: Database error.
     """
     return base.insert(Image, body).serialize(), 201
 
@@ -341,15 +403,23 @@ def create_presigned_get(body: PresignedImageGetReq):
         Tuple containing presigned S3 GET URL and HTTP status 201.
 
     ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: PresignedImageGetReq
+        description: Request containing image ID.
     responses:
-            201:
-                    description: Presigned URL generated.
-            400:
-                    description: Invalid ID format.
-            404:
-                    description: Image record not found.
-            500:
-                    description: Storage or database error.
+      201:
+        description: Presigned URL generated.
+      400:
+        description: Invalid ID format.
+      401:
+        description: User not authorized.
+      404:
+        description: Image record not found.
+      500:
+        description: Storage or database error.
     """
     image = base.get(Image, body.image_id)
 
@@ -380,15 +450,23 @@ def create_chunk_presigned_put(body: CreatePresignedPutReq):
         Tuple containing presigned S3 upload part URL and HTTP status 201.
 
     ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreatePresignedPutReq
+        description: Request containing image ID, upload ID, part number, chunk size, and MD5.
     responses:
-            201:
-                    description: URL generated.
-            400:
-                    description: Missing data or invalid UUID.
-            404:
-                    description: Image not found.
-            500:
-                    description: Storage/Database error.
+      201:
+        description: URL generated.
+      400:
+        description: Missing data or invalid UUID.
+      401:
+        description: User not authorized.
+      404:
+        description: Image not found.
+      500:
+        description: Storage or database error.
     """
     data = body.model_dump()
 
@@ -427,11 +505,21 @@ def create_multipart_upload(body: CreateImageMultiPartUploadReq):
         Tuple containing initiated S3 upload ID and HTTP status 201.
 
     ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreateImageMultiPartUploadReq
+        description: Request containing S3 image key.
     responses:
-            201:
-                    description: Multipart upload started.
-            500:
-                    description: system error.
+      201:
+        description: Multipart upload started.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized.
+      500:
+        description: Storage or system error.
     """
     response = s3.create_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
@@ -459,11 +547,21 @@ def complete_upload(body: CompleteMultiPartUploadReq):
         Tuple containing S3 completion response dictionary and HTTP status 200.
 
     ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CompleteMultiPartUploadReq
+        description: Request containing image key, upload ID, and parts array.
     responses:
-            200:
-                    description: Multipart upload finished.
-            500:
-                    description: S3 or system error.
+      200:
+        description: Multipart upload finished.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized.
+      500:
+        description: S3 or system error.
     """
     response = s3.complete_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
@@ -483,14 +581,30 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @permission_required("access")
 @validate()
 def abort_upload(body: AbortMultiPartUploadReq):
-    """
-    Aborts a multipart upload.
+    """Abort an ongoing multipart upload.
+
+    Args:
+        body: Request containing image key and upload ID.
+
+    Returns:
+        Tuple containing S3 abort response dictionary and HTTP status 200.
+
     ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: AbortMultiPartUploadReq
+        description: Request containing image key and upload ID.
     responses:
-            200:
-                    description: Multipart upload aborted.
-            500:
-                    description: S3 or system error.
+      200:
+        description: Multipart upload aborted.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized.
+      500:
+        description: S3 or system error.
     """
     response = s3.abort_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
@@ -516,6 +630,23 @@ def get_prediciton(body: CreatePredictionCropReq):
 
     Returns:
         List of serialized prediction crop responses.
+
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: CreatePredictionCropReq
+        description: Request containing image ID and prediction IDs to crop.
+    responses:
+      200:
+        description: List of serialized prediction crops.
+      400:
+        description: Validation error or invalid payload.
+      401:
+        description: User not authorized.
+      500:
+        description: Image processing or cache error.
     """
     image = base.get(Image, body.image_id)
     req = BulkRequest(object_ids=body.prediction_id)  # pyright: ignore
@@ -559,19 +690,33 @@ def update(body: UpdateImageReq, image_id: int | UUID):
 
     ---
     parameters:
-            - name: image_id
-            in: path
-            type: string
-            required: true
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image to update.
+      - name: body
+        in: body
+        required: true
+        type: UpdateImageReq
+        description: Image update payload.
     responses:
-            200:
-                    description: Image updated successfully.
-            400:
-                    description: Invalid UUID.
-            404:
-                    description: Image not found.
-            500:
-                    description: Database error.
+      200:
+        description: Image updated successfully.
+      400:
+        description: Validation error or invalid ID format.
+      401:
+        description: User not authorized.
+      404:
+        description: Image not found.
+      500:
+        description: Database error.
     """
     return base.update(Image, image_id, body).serialize(), 200
 
@@ -587,6 +732,15 @@ def close_user_images():
 
     Returns:
         Tuple containing dictionary with rows affected count and HTTP status 200.
+
+    ---
+    responses:
+      200:
+        description: Images closed successfully with rows affected count.
+      401:
+        description: User not authorized.
+      500:
+        description: Database error.
     """
     req = UpdateImageReq(opened_by_user_id=0)
 
@@ -615,6 +769,31 @@ def delete_image(image_id: int | UUID):
 
     Returns:
         Tuple containing empty string and HTTP status 204.
+
+    ---
+    parameters:
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the image to delete.
+    responses:
+      204:
+        description: Image deleted successfully.
+      400:
+        description: Invalid ID format.
+      401:
+        description: User not authorized.
+      404:
+        description: Image not found.
+      500:
+        description: Storage or database error.
     """
     image = base.get(Image, image_id)
 

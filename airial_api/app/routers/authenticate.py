@@ -39,6 +39,19 @@ def oauth2_authorize(provider: str):
 
     Returns:
         Redirect response directing user to provider's login portal.
+
+    ---
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        type: string
+        description: Name of the OAuth2 provider (e.g., 'google').
+    responses:
+      302:
+        description: Redirect response directing user to provider's login portal.
+      404:
+        description: OAuth provider not found.
     """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
@@ -74,6 +87,33 @@ def oauth2_callback(provider: str):
 
     Returns:
         Redirect response directing user to frontend application.
+
+    ---
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        type: string
+        description: Name of the OAuth2 provider processing the callback.
+      - name: code
+        in: query
+        required: false
+        type: string
+        description: Authorization code returned by the OAuth2 provider.
+      - name: state
+        in: query
+        required: false
+        type: string
+        description: OAuth2 state string for CSRF validation.
+    responses:
+      302:
+        description: Redirect response directing user to frontend application.
+      401:
+        description: Invalid state, missing authorization code, or token exchange failure.
+      404:
+        description: OAuth provider or user not found.
+      500:
+        description: OAuth provider returned an error.
     """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
@@ -170,6 +210,21 @@ def authenticate(body: LegacyAuthReq):
 
     Raises:
         AuthenticationFailure: If user does not exist or credentials do not match.
+
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: LegacyAuthReq
+        description: Login credentials containing email and password.
+    responses:
+      200:
+        description: User authenticated successfully.
+      400:
+        description: User account is not configured for password authentication.
+      401:
+        description: Invalid credentials or authentication failure.
     """
     users = base.where(User, {"email": body.email})
     if not users:
@@ -204,6 +259,13 @@ def logout():
 
     Returns:
         Tuple containing empty string and HTTP status 200.
+
+    ---
+    responses:
+      200:
+        description: User session logged out successfully and locks released.
+      401:
+        description: User not authenticated.
     """
     base.bulk_update(
         Image,

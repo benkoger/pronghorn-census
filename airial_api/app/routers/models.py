@@ -398,18 +398,18 @@ def create_train_json(model_id: str):
 @modelBp.post("/<string:model_id>/val")
 @login_required
 @permission_required("access")
-def create_val_json(mdoel_id: str):
+def create_val_json(model_id: str):
     """Upload or initialize validation dataset JSON on S3 for a model.
 
     Args:
-        mdoel_id: Model identifier.
+        model_id: Model identifier.
 
     Returns:
         Empty string response.
 
     ---
     parameters:
-      - name: mdoel_id
+      - name: model_id
         in: path
         required: true
         type: string
@@ -431,18 +431,18 @@ def create_val_json(mdoel_id: str):
 @modelBp.post("/<string:model_id>/weights")
 @login_required
 @permission_required("access")
-def create_weights(mdoel_id: str):
+def create_weights(model_id: str):
     """Upload model weights file to S3.
 
     Args:
-        mdoel_id: Model identifier.
+        model_id: Model identifier.
 
     Returns:
         Empty string response.
 
     ---
     parameters:
-      - name: mdoel_id
+      - name: model_id
         in: path
         required: true
         type: string
@@ -629,18 +629,18 @@ def replace_val_json(model_id: str):
 @modelBp.post("/<string:model_id>/weights")
 @login_required
 @permission_required("access")
-def replace_weights(mdoel_id: str):
+def replace_weights(model_id: str):
     """Replace weights artifact on S3.
 
     Args:
-        mdoel_id: Model identifier.
+        model_id: Model identifier.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
-      - name: mdoel_id
+      - name: model_id
         in: path
         required: true
         type: string
@@ -662,18 +662,18 @@ def replace_weights(mdoel_id: str):
 @modelBp.post("/<string:model_id>/config")
 @login_required
 @permission_required("access")
-def replace_config(mdoel_id: str):
+def replace_config(model_id: str):
     """Replace configuration artifact on S3.
 
     Args:
-        mdoel_id: Model identifier.
+        model_id: Model identifier.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
 
     ---
     parameters:
-      - name: mdoel_id
+      - name: model_id
         in: path
         required: true
         type: string

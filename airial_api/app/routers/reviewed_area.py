@@ -244,8 +244,14 @@ def get_annotations(reviewed_area_id: int | UUID):
 @permission_required("access")
 @validate()
 def create_ra_presigned_get(body: CreateReviewedAreaPresignedGetReq):
-    """
-    Generate a presigned GET URL for downloading a reviewed area crop.
+    """Generate a presigned GET URL for downloading a reviewed area crop.
+
+    Args:
+        body: Payload containing the reviewed_area_id.
+
+    Returns:
+        Tuple containing the presigned GET URL string and HTTP status 201.
+
     ---
     parameters:
       - name: body
