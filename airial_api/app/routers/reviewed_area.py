@@ -15,7 +15,7 @@ from database.object_models.core import UpdateReviewedAreaReq
 from database.object_models.core.annotations import Annotation
 from database.object_models.core.core_bindings import AnnotationsReviewedArea
 from database.object_models.core.images import (
-    CrateReviewedAreaPresignedGetReq,
+    CreateReviewedAreaPresignedGetReq,
     RAQuery,
     ReviewedArea,
 )
@@ -103,7 +103,7 @@ def get(query: RAQuery):
     if query.type is not None:
         scope["type"] = query.type
 
-    where_clauses = []
+    where_clauses: list[sql.Composable] = []
     placeholders = {}
     if query.search:
         where_clauses.append(
@@ -243,21 +243,15 @@ def get_annotations(reviewed_area_id: int | UUID):
 @login_required
 @permission_required("access")
 @validate()
-def create_ra_presigned_get(body: CrateReviewedAreaPresignedGetReq):
-    """Generate a presigned GET URL for downloading a reviewed area crop.
-
-    Args:
-        body: Payload containing the reviewed_area_id.
-
-    Returns:
-        Tuple containing presigned S3 URL string and HTTP status 201.
-
+def create_ra_presigned_get(body: CreateReviewedAreaPresignedGetReq):
+    """
+    Generate a presigned GET URL for downloading a reviewed area crop.
     ---
     parameters:
       - name: body
         in: body
         required: true
-        type: CrateReviewedAreaPresignedGetReq
+        type: CreateReviewedAreaPresignedGetReq
         description: Payload containing the reviewed_area_id.
     responses:
       201:

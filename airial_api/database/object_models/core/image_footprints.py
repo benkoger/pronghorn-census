@@ -1,20 +1,19 @@
-# Class definition for ImageFootprint objects in the database
-# Authors: Michael B. Lance, Antigravity
+"""Image footprint database models and schemas."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
-import json
-from typing import Any, ClassVar, Optional, Self
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
-from authzed.api.v1 import RelationshipUpdate
-import psycopg.sql as sql
-from psycopg import Cursor
-from psycopg.rows import class_row
-from pydantic import BaseModel, ConfigDict, field_validator
 import shapely
 import shapely.geometry
+from authzed.api.v1 import RelationshipUpdate
+from psycopg import Cursor, sql
+from psycopg.rows import class_row
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from database.object_models.base import DBbase, Keyring, create_spice_update
 
@@ -22,10 +21,12 @@ from database.object_models.base import DBbase, Keyring, create_spice_update
 
 
 class CreateImageFootprintReq(BaseModel):
+    """Request schema for creating an image footprint."""
+
     image_ids: Keyring
-    footprint: Optional[dict[str, Any]] = None
+    footprint: dict[str, Any] | None = None
     has_detection: bool = False
-    footprint_metadata: Optional[dict[str, Any]] = None
+    footprint_metadata: dict[str, Any] | None = None
     bbox_wsen: list[float]
     footprint_partial: bool
     area_m2: float
@@ -57,32 +58,34 @@ class CreateImageFootprintReq(BaseModel):
 
 
 class UpdateImageFootprintReq(BaseModel):
-    footprint: Optional[dict[str, Any]] = None
-    has_detection: Optional[bool] = None
-    footprint_metadata: Optional[dict[str, Any]] = None
-    bbox_wsen: Optional[list[float]] = None
-    footprint_partial: Optional[bool] = None
-    area_m2: Optional[float] = None
-    area_geodesic_m2: Optional[float] = None
-    area_sigma_m2: Optional[float] = None
-    area_q05_m2: Optional[float] = None
-    area_q95_m2: Optional[float] = None
-    dem_name: Optional[str] = None
-    georef_status: Optional[str] = None
-    n_ties: Optional[int] = None
-    tie_residual_before_m: Optional[float] = None
-    rmse_h_m: Optional[float] = None
-    rmse_p50_m: Optional[float] = None
-    rmse_p90_m: Optional[float] = None
-    n_checkpoints: Optional[int] = None
-    pose_delta: Optional[list[float]] = None
-    pose_sigma: Optional[list[float]] = None
-    pose_free: Optional[list[str]] = None
-    pose_cond: Optional[float] = None
-    prior_source: Optional[str] = None
-    gcps: Optional[dict[str, Any] | list[Any]] = None
-    overlay_uri: Optional[str] = None
-    georef_modified: Optional[datetime] = None
+    """Request schema for updating an image footprint."""
+
+    footprint: dict[str, Any] | None = None
+    has_detection: bool | None = None
+    footprint_metadata: dict[str, Any] | None = None
+    bbox_wsen: list[float] | None = None
+    footprint_partial: bool | None = None
+    area_m2: float | None = None
+    area_geodesic_m2: float | None = None
+    area_sigma_m2: float | None = None
+    area_q05_m2: float | None = None
+    area_q95_m2: float | None = None
+    dem_name: str | None = None
+    georef_status: str | None = None
+    n_ties: int | None = None
+    tie_residual_before_m: float | None = None
+    rmse_h_m: float | None = None
+    rmse_p50_m: float | None = None
+    rmse_p90_m: float | None = None
+    n_checkpoints: int | None = None
+    pose_delta: list[float] | None = None
+    pose_sigma: list[float] | None = None
+    pose_free: list[str] | None = None
+    pose_cond: float | None = None
+    prior_source: str | None = None
+    gcps: dict[str, Any] | list[Any] | None = None
+    overlay_uri: str | None = None
+    georef_modified: datetime | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -90,6 +93,8 @@ class UpdateImageFootprintReq(BaseModel):
 
 @dataclass
 class ImageFootprint(DBbase):
+    """Database representation of an image footprint."""
+
     footprint_id: int
     image_id: int
     has_detection: bool
@@ -119,8 +124,8 @@ class ImageFootprint(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
-    footprint: Optional[Any] = None
-    footprint_metadata: Optional[Any] = None
+    footprint: Any | None = None
+    footprint_metadata: Any | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "image_footprints")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("footprint_id")
@@ -128,13 +133,15 @@ class ImageFootprint(DBbase):
     # -----------------------------------------------------------------------------------------------------------------------
 
     class Response(BaseModel):
+        """Response schema for an image footprint."""
+
         model_config = ConfigDict(from_attributes=True)
 
         footprint_id: int
         image_id: int
-        footprint: Optional[dict[str, Any]] = None
+        footprint: dict[str, Any] | None = None
         has_detection: bool
-        footprint_metadata: Optional[dict[str, Any]] = None
+        footprint_metadata: dict[str, Any] | None = None
         bbox_wsen: list[float]
         footprint_partial: bool
         area_m2: float
@@ -164,18 +171,19 @@ class ImageFootprint(DBbase):
 
         @field_validator("footprint", "footprint_metadata", mode="before")
         @classmethod
-        def parse_geometry(cls, v: Any) -> Optional[dict[str, Any]]:
+        def parse_geometry(cls, v: Any) -> dict[str, Any] | None:
+            """Parse WKB/GeoJSON geometry into a dictionary."""
             if v is None or isinstance(v, dict):
                 return v
             raw = bytes.fromhex(v) if isinstance(v, str) else bytes(v)
             return shapely.geometry.mapping(shapely.from_wkb(raw))
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # -----------------------------------------------------------------------------------------------------------------------
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateImageFootprintReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateImageFootprintReq) -> tuple[Self, list[RelationshipUpdate]] | None:
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             INSERT INTO core.image_footprints (
@@ -212,14 +220,15 @@ class ImageFootprint(DBbase):
             )
             RETURNING *;
         """)
-
         cursor.execute(
             query,
             {
                 **req.model_dump(),
                 "image_id": req.image_ids.pkey,
                 "footprint_json": json.dumps(req.footprint) if req.footprint is not None else None,
-                "footprint_metadata_json": json.dumps(req.footprint_metadata) if req.footprint_metadata is not None else None,
+                "footprint_metadata_json": (
+                    json.dumps(req.footprint_metadata) if req.footprint_metadata is not None else None
+                ),
                 "gcps_json": json.dumps(req.gcps) if req.gcps is not None else None,
             },
         )
@@ -242,4 +251,9 @@ class ImageFootprint(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize image footprint to a dictionary.
+
+        Returns:
+            Dictionary representation conforming to ImageFootprint.Response schema.
+        """
         return ImageFootprint.Response.model_validate(self).model_dump(mode="json")

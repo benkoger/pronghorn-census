@@ -182,3 +182,4 @@ When modifying this repository, follow these principles:
 4. **Maintain SpiceDB consistency**: If you add new hierarchical entities or relationships, update `schema.zed` and ensure relationship writes occur on record creation.
 5. **Handle images carefully**: Large image payloads belong in S3 (or Valkey cache for ephemeral crops); never store raw image bytes in PostgreSQL.
 6. **No module-level mutable state in the API**: it runs under gunicorn with several worker processes, so a process-level cache or registry is invisible to the other workers. Shared state belongs in Valkey (msgpack-serialised via `packb` / `unpackb`) or PostgreSQL.
+7. **When you encounter a typo, fix it**: Never attempt to apply some sort of "backwards-compatible" patch that ends up muddying up the code.

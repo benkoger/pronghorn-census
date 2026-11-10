@@ -2,7 +2,6 @@
 # Authors: Michael B. Lance, Antigravity
 
 from collections import deque
-from typing import Optional
 
 SCHEMA_GRAPH: dict[tuple[str, str], list[tuple[tuple[str, str], str]]] = {
     ("core", "predictions"): [(("core", "images"), "image_id")],
@@ -33,12 +32,12 @@ SCHEMA_GRAPH: dict[tuple[str, str], list[tuple[tuple[str, str], str]]] = {
 def find_relationship_path(
     start_table: tuple[str, ...],
     end_table: tuple[str, ...],
-) -> Optional[list[tuple[tuple[str, ...], tuple[str, ...], str]]]:
+) -> list[tuple[tuple[str, ...], tuple[str, ...], str]] | None:
     """Finds the shortest path of (from_table, to_table, fk_col) from start to end."""
     if start_table == end_table:
         return []
 
-    queue: deque[list[tuple[tuple[str, ...], Optional[tuple[str, ...]], Optional[str]]]] = deque(
+    queue: deque[list[tuple[tuple[str, ...], tuple[str, ...] | None, str | None]]] = deque(
         [[(start_table, None, None)]]
     )
     visited = {start_table}

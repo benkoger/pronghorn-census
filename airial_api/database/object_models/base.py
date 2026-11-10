@@ -1,18 +1,20 @@
+"""Base classes, interfaces, and utilities for database object models."""
+
 from abc import ABC, abstractmethod
-from msgpack import packb
 from datetime import datetime
-from typing import Any, ClassVar, Type, TypeVar, NamedTuple, Optional
-from pydantic import BaseModel, field_validator
-from psycopg import Cursor
-import numpy as np
+from typing import Any, ClassVar, NamedTuple, TypeVar
 from uuid import UUID
-import psycopg.sql as sql
+
+import numpy as np
 from authzed.api.v1 import (
-    RelationshipUpdate,
-    Relationship,
     ObjectReference,
+    Relationship,
+    RelationshipUpdate,
     SubjectReference,
 )
+from msgpack import packb
+from psycopg import Cursor, sql
+from pydantic import BaseModel, field_validator
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -30,7 +32,18 @@ def create_spice_update(
     subject_id: UUID,
     relation: str,
 ) -> RelationshipUpdate:
-    """ """
+    """Create a RelationshipUpdate object for SpiceDB.
+
+    Args:
+        object_type: SpiceDB target resource type name.
+        object_id: Target resource UUID.
+        subject_type: SpiceDB subject resource type name.
+        subject_id: Subject resource UUID.
+        relation: Name of the relation connecting subject to resource.
+
+    Returns:
+        Configured SpiceDB RelationshipUpdate object.
+    """
     return RelationshipUpdate(
         operation=RelationshipUpdate.Operation.OPERATION_CREATE,
         relationship=Relationship(
@@ -50,6 +63,8 @@ def create_spice_update(
 
 
 class Keyring(NamedTuple):
+    """Dual-ID key pair containing integer primary key and public UUID."""
+
     pkey: int
     uuid: UUID
 
@@ -59,11 +74,21 @@ class Keyring(NamedTuple):
 
 
 class BulkRequest(BaseModel):
+    """Request container for filtering or retrieving records by IDs."""
+
     object_ids: list[PrimaryKey]
 
     @field_validator("object_ids", mode="before")
     @classmethod
     def ensure_list(cls, value):
+        """Ensure incoming identifier value is converted to a list.
+
+        Args:
+            value: Raw input value or list of primary key identifiers.
+
+        Returns:
+            Normalized list of primary keys.
+        """
         if isinstance(value, list):
             return value
         if value is None or value == "":
@@ -72,6 +97,8 @@ class BulkRequest(BaseModel):
 
 
 class BulkRequestModel(BaseModel):
+    """Request wrapper for bulk model operations."""
+
     requests: list[Any]
 
 
@@ -79,25 +106,43 @@ class BulkRequestModel(BaseModel):
 
 
 class DBbase(ABC):
+    """Abstract base class for all PostgreSQL database models."""
+
     __table__: ClassVar[sql.Identifier]
     __pk__: ClassVar[sql.Identifier]
 
-    Response: ClassVar[Type[BaseModel]]
+    Response: ClassVar[type[BaseModel]]
 
     @abstractmethod
-    def serialize(self) -> dict: ...
+    def serialize(self) -> dict:
+        """Serialize database entity to dictionary.
+
+        Returns:
+            Serialized dictionary representation of the entity.
+        """
+        ...
 
     @classmethod
     @abstractmethod
-    def _create(
-        cls, cursor: Cursor[T], *args: Any, **kwargs: Any
-    ) -> Optional[tuple[T, list[RelationshipUpdate]]]: ...
+    def _create(cls, cursor: Cursor[T], *args: Any, **kwargs: Any) -> tuple[T, list[RelationshipUpdate]] | None: ...
 
     def to_cache(self):
+        """Serialize database entity to msgpack byte format.
+
+        Returns:
+            Packed msgpack bytes.
+        """
         return packb(self.serialize())
 
     def fmt_date(self, dt: datetime | None):
-        """Convert datetime object to a string for serialization"""
+        """Convert datetime object to a string for serialization.
+
+        Args:
+            dt: Optional datetime object to format.
+
+        Returns:
+            Formatted datetime string, or None if dt is not a datetime.
+        """
         return dt.strftime("%Y-%m-%d %H:%M:%S%z") if isinstance(dt, datetime) else None
 
 
@@ -105,12 +150,17 @@ class DBbase(ABC):
 
 
 class Relationbase(ABC):
+    """Pure interface for database junction models."""
+
     __table__: ClassVar[sql.Identifier]
     __key__: tuple[str, ...]
-    """Pure interface for junction models"""
 
     def to_lookup_dict(self) -> dict[str, Any]:
-        """Convert key attributes into query params for base.where()."""
+        """Convert key attributes into query params for base.where().
+
+        Returns:
+            Dictionary mapping key column names to entity attribute values.
+        """
         return {key: getattr(self, key) for key in self.__key__}
 
 
@@ -118,15 +168,26 @@ class Relationbase(ABC):
 
 
 class Box:
-    """A Box contains dimensional data for crops and predictions"""
+    """A Box contains dimensional data for crops and predictions."""
 
     def __init__(self, top_left: tuple[int, int], bottom_right: tuple[int, int]):
+        """Initialize Box with top-left and bottom-right corner coordinates.
+
+        Args:
+            top_left: (x, y) coordinates of the top-left corner.
+            bottom_right: (x, y) coordinates of the bottom-right corner.
+        """
         self.top_left = top_left
         self.bottom_right = bottom_right
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getCenter(self) -> tuple:
+        """Calculate geometric center point of the box.
+
+        Returns:
+            Tuple of (center_x, center_y).
+        """
         x = np.mean([self.top_left[0], self.bottom_right[0]])
         y = np.mean([self.top_left[1], self.bottom_right[1]])
 
@@ -135,6 +196,11 @@ class Box:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def getPoints(self) -> list[int]:
+        """Return coordinates as [x1, y1, x2, y2].
+
+        Returns:
+            List of 4 integer coordinates [x1, y1, x2, y2].
+        """
         return [
             self.top_left[0],
             self.top_left[1],
@@ -145,6 +211,14 @@ class Box:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def calcIou(self, box_2) -> float:
+        """Calculate Intersection-over-Union (IoU) with another Box.
+
+        Args:
+            box_2: Another Box instance to calculate overlap against.
+
+        Returns:
+            Float IoU score between 0.0 and 1.0.
+        """
         # Slightly modified from https://machinelearningspace.com/intersection-over-union-iou-a-comprehensive-guide/
         # Extract bounding boxes coordinates
         x0_A, y0_A, x1_A, y1_A = self.getPoints()
@@ -160,8 +234,8 @@ class Box:
         height_I = y1_I - y0_I
 
         # Handle the negative value width or height of the intersection area
-        width_I = 0 if width_I < 0 else width_I
-        height_I = 0 if height_I < 0 else height_I
+        width_I = max(width_I, 0)
+        height_I = max(height_I, 0)
         # Calculate the intersection area:
         intersection = width_I * height_I
         # Calculate the union area:
@@ -174,6 +248,11 @@ class Box:
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, dict[str, int]]:
+        """Serialize Box coordinates to dictionary.
+
+        Returns:
+            Dictionary with top_left and bottom_right coordinate mappings.
+        """
         return {
             "top_left": {"x": self.top_left[0], "y": self.top_left[1]},
             "bottom_right": {"x": self.bottom_right[0], "y": self.bottom_right[1]},
@@ -184,4 +263,6 @@ class Box:
 
 
 class JunctionRelation(NamedTuple):
+    """Container specifying junction table relationships."""
+
     table_name: str

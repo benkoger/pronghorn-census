@@ -25,7 +25,7 @@ from database.object_models.core import (
     UpdateImageReq,
 )
 from database.object_models.core.images import (
-    AbortMulitPartUploadReq,
+    AbortMultiPartUploadReq,
     CompleteMultiPartUploadReq,
     CreateImageMultiPartUploadReq,
     PresignedImageGetReq,
@@ -482,21 +482,16 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @login_required
 @permission_required("access")
 @validate()
-def abort_upload(body: AbortMulitPartUploadReq):
-    """Aborts a multipart upload.
-
-    Args:
-        body: Request containing image key and upload ID to abort.
-
-    Returns:
-        Tuple containing S3 abort response dictionary and HTTP status 200.
-
-    ---
-    responses:
-            200:
-                    description: Multipart upload aborted.
-            500:
-                    description: S3 or system error.
+def abort_upload(body: AbortMultiPartUploadReq):
+    """
+        Aborts a multipart upload.
+    >>>>>>> origin/indev
+        ---
+        responses:
+                200:
+                        description: Multipart upload aborted.
+                500:
+                        description: S3 or system error.
     """
     response = s3.abort_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],

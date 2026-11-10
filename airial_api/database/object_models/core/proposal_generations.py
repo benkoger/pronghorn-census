@@ -1,5 +1,4 @@
 # Class definition for ProposalGeneration objects in the database
-# Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
@@ -8,10 +7,9 @@ from typing import Any, ClassVar, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
 from pydantic import BaseModel, ConfigDict, model_validator
-import psycopg.sql as sql
 
 from database.object_models.base import DBbase, Keyring
 
@@ -77,9 +75,7 @@ class ProposalGeneration(DBbase):
     model_id: int | None = None
     alpha: float | None = None
 
-    __table__: ClassVar[sql.Identifier] = sql.Identifier(
-        "core", "proposal_generations"
-    )
+    __table__: ClassVar[sql.Identifier] = sql.Identifier("core", "proposal_generations")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("proposal_generation_id")
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +95,8 @@ class ProposalGeneration(DBbase):
         created: datetime
         modified: datetime
         uuid: UUID
+
+    Response: ClassVar[type[BaseModel]] = Response
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -151,6 +149,4 @@ class ProposalGeneration(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
-        return ProposalGeneration.Response.model_validate(self).model_dump(
-            mode="json"
-        )
+        return ProposalGeneration.Response.model_validate(self).model_dump(mode="json")
