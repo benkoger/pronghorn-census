@@ -1,17 +1,17 @@
 # Pytest runner for the surveys router in the Airial API
 # Author Michael B. Lance
 
-from datetime import datetime, timezone
 import urllib.parse
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from pydantic import BaseModel, TypeAdapter
 import pytest
+from pydantic import BaseModel, TypeAdapter
+from testing_core import APITester
 
 from database.object_models.core.annotations import Annotation
 from database.object_models.core.images import Image
-from database.object_models.project_management import HerdUnit, Survey, SurveyStatus
-from testing_core import APITester
+from database.object_models.project_management import HerdUnit, Survey
 
 
 class PaginatedImagesResponse(BaseModel):
@@ -125,18 +125,15 @@ class TestSurveys(APITester):
         data = response.get_json()
         validated = PaginatedImagesResponse.model_validate(data)
         assert validated.page == 1
-        assert validated.per_page >= 1 #pyright: ignore
+        assert validated.per_page is not None and validated.per_page >= 1  # pyright: ignore
 
     def test_get_survey_images_no_pagination(self, auth_client):
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
-        response = auth_client.get(
-                f"/api/v1/surveys/{survey_uuid}/images"
-                )
+        response = auth_client.get(f"/api/v1/surveys/{survey_uuid}/images")
 
         assert response.status_code == 200
         data = response.get_json()
         PaginatedImagesResponse.model_validate(data)
-
 
     def test_get_survey_annotated_images_with_filters(self, auth_client):
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
