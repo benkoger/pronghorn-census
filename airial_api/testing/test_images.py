@@ -1,13 +1,13 @@
-# Pytest runner for the images router in the Airial API
-# Author Michael B. Lance
+"""Integration and unit tests for the Images API endpoints."""
 
 import hashlib
 import io
+from typing import Any
 from uuid import uuid4
 
 import pytest
 from PIL import Image as PILImage
-from pydantic import TypeAdapter
+from pydantic import BaseModel
 from testing_core import APITester
 
 from app.extensions import cache
@@ -19,6 +19,12 @@ from database.object_models.core.predictions import Prediction
 
 
 class TestImages(APITester):
+    """Test suite covering the `/api/v1/images` REST endpoints.
+
+    Inherits from `APITester` to provide authenticated Flask test clients, mocked S3
+    buckets, and automatic database transaction rollbacks for isolation.
+    """
+
     # -------------------------------------------------------------------------
     # 1. GET Single & List Endpoint Schema Validation
     # -------------------------------------------------------------------------
@@ -59,14 +65,29 @@ class TestImages(APITester):
         ],
     )
     def test_get_endpoints_schema_success(
-        self, auth_client, endpoint, expected_schema, is_list
-    ):
+        self,
+        auth_client: Any,
+        endpoint: str,
+        expected_schema: type[BaseModel],
+        is_list: bool,
+    ) -> None:
+        """Validates that GET image endpoints return 200 OK and match expected schemas.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+            endpoint (str): The API endpoint path to request.
+            expected_schema (type[BaseModel]): Pydantic model class used to validate
+                the payload structure.
+            is_list (bool): Flag indicating whether the expected response payload
+                is a list of records or a single object.
+        """
         response = auth_client.get(endpoint)
         assert response.status_code == 200
 
         data = response.get_json()
         if is_list:
-            TypeAdapter(list[expected_schema]).validate_python(data)
+            for item in data:
+                expected_schema.model_validate(item)
         else:
             expected_schema.model_validate(data)
 
@@ -81,7 +102,14 @@ class TestImages(APITester):
             "/predictions",
         ],
     )
-    def test_get_image_not_found(self, auth_client, path_suffix):
+    def test_get_image_not_found(self, auth_client: Any, path_suffix: str) -> None:
+        """Verifies that requesting a non-existent image UUID returns a 404 status.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+            path_suffix (str): Additional endpoint sub-path appended to the non-existent
+                image UUID (e.g., "" or "/predictions").
+        """
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/images/{random_uuid}{path_suffix}")
         assert response.status_code == 404
@@ -156,7 +184,21 @@ class TestImages(APITester):
             ),
         ],
     )
-    def test_post_endpoints(self, auth_client, endpoint, payload, expected_status):
+    def test_post_endpoints(
+        self,
+        auth_client: Any,
+        endpoint: str,
+        payload: dict[str, Any],
+        expected_status: int,
+    ) -> None:
+        """Tests POST endpoints for image creation, presigned URLs, and multipart setup.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+            endpoint (str): The API endpoint path to which the POST request is sent.
+            payload (dict[str, Any]): JSON payload body sent in the request.
+            expected_status (int): The expected HTTP status code of the response.
+        """
         response = auth_client.post(endpoint, json=payload)
         assert response.status_code == expected_status
 
@@ -164,7 +206,15 @@ class TestImages(APITester):
     # 4. State-Mutating Lifecycles (PATCH & DELETE)
     # -------------------------------------------------------------------------
 
-    def test_update_image_success(self, auth_client):
+    def test_update_image_success(self, auth_client: Any) -> None:
+        """Tests updating image metadata via the PATCH endpoint.
+
+        Verifies that an existing image can be fetched, updated with a new name,
+        and that the returned JSON payload confirms the modification.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
         new_name = f"updated_{uuid4().hex[:4]}"
 
@@ -176,7 +226,16 @@ class TestImages(APITester):
         assert response.status_code == 200
         assert response.get_json()["name"] == new_name
 
-    def test_delete_image_lifecycle(self, auth_client):
+    def test_delete_image_lifecycle(self, auth_client: Any) -> None:
+        """Tests the full lifecycle of creating and subsequently deleting an image.
+
+        Ensures that a newly created image responds with 201 Created, can be retrieved
+        with 200 OK, is successfully deleted with 204 No Content, and is subsequently
+        unreachable via GET (returning 404 Not Found).
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         payload = {
             "name": f"pronghorn_{uuid4().hex[:6]}",
             "herd_unit_ids": {
@@ -208,11 +267,25 @@ class TestImages(APITester):
     # 5. Coverage for Prediction Crops & Cache Routes
     # -------------------------------------------------------------------------
 
-    def test_get_prediction_crop_not_found(self, auth_client):
+    def test_get_prediction_crop_not_found(self, auth_client: Any) -> None:
+        """Verifies that requesting a non-existent prediction crop returns 404 Not Found.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{uuid4()!r}")
         assert res_404.status_code == 404
 
-    def test_create_prediction_crops_cache_miss_success(self, auth_client):
+    def test_create_prediction_crops_cache_miss_success(self, auth_client: Any) -> None:
+        """Tests prediction crop creation on cache miss, fetching from S3 and populating cache.
+
+        Simulates an initial cache miss by clearing Valkey, seeds mock S3 with image
+        bytes, requests crop generation, verifies that the raw image is cached, and
+        validates that the resulting crop is stored and returned as a valid WebP image.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
 
         img_res = auth_client.get(f"/api/v1/images/{img_id}")
@@ -253,7 +326,16 @@ class TestImages(APITester):
         assert decoded_img.width > 0
         assert decoded_img.height > 0
 
-    def test_create_prediction_crops_cache_hit_success(self, auth_client):
+    def test_create_prediction_crops_cache_hit_success(self, auth_client: Any) -> None:
+        """Tests prediction crop generation when source image bytes are already cached.
+
+        Pre-populates the cache with raw JPEG image bytes to simulate a cache hit,
+        invokes the crop generation endpoint, and verifies that the resulting crop
+        is created without needing to fetch from S3 and is returned as a valid WebP image.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         img_id = "26be495e-3ec2-41c8-ba14-d0b65726bb67"
 
         img_res = auth_client.get(f"/api/v1/images/{img_id}")
@@ -286,7 +368,15 @@ class TestImages(APITester):
     # 6. Coverage for Multipart Complete & Abort
     # -------------------------------------------------------------------------
 
-    def test_abort_multipart_upload_success(self, auth_client):
+    def test_abort_multipart_upload_success(self, auth_client: Any) -> None:
+        """Tests aborting an active S3 multipart upload session.
+
+        Initializes a multipart upload session and verifies that sending an abort
+        request returns 200 OK and cleans up the upload state.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         key = f"uploads/test_abort_{uuid4().hex[:6]}.jpg"
 
         upload_res = auth_client.post(
@@ -307,7 +397,16 @@ class TestImages(APITester):
 
         assert response.status_code == 200
 
-    def test_complete_multipart_upload_success(self, auth_client):
+    def test_complete_multipart_upload_success(self, auth_client: Any) -> None:
+        """Tests the complete multipart upload flow including part upload and completion.
+
+        Initializes an upload session, requests a presigned PUT URL for a part chunk,
+        uploads the part chunk directly to mock S3, and sends the completion payload
+        verifying that the server responds with 200 OK.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         key = f"uploads/test_complete_{uuid4().hex[:6]}.jpg"
 
         init_res = auth_client.post(
@@ -361,6 +460,14 @@ class TestImages(APITester):
     # 7. Coverage for Closing User Images
     # -------------------------------------------------------------------------
 
-    def test_close_user_images_success(self, auth_client):
+    def test_close_user_images_success(self, auth_client: Any) -> None:
+        """Tests closing active image viewer sessions for the authenticated user.
+
+        Sends a PATCH request to close any open images associated with the user
+        and asserts that the operation succeeds with a 200 OK status.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         response = auth_client.patch("/api/v1/images/close-user-images")
         assert response.status_code == 200
