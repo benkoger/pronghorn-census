@@ -1,18 +1,16 @@
-# Class definition for Survey objects in the database
-# Author: Michael B. Lance
-# ---------------------------------------------------------------------------------------------------------------------------#
+"""Survey database models and schemas."""
+
+# ---------------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar, Optional, Self
+from enum import StrEnum
+from typing import ClassVar, Self
 from uuid import UUID
 
 from authzed.api.v1 import RelationshipUpdate
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.rows import class_row
-import psycopg.sql as sql
-
-from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from ..base import DBbase, Keyring, create_spice_update
@@ -21,6 +19,8 @@ from ..base import DBbase, Keyring, create_spice_update
 
 
 class SurveyStatus(StrEnum):
+    """Enumeration of survey statuses."""
+
     UPLOADED = "uploaded"
     PREPARING = "preparing"
     READY_FOR_MEASUREMENT = "ready for measurement"
@@ -32,29 +32,35 @@ class SurveyStatus(StrEnum):
 
 
 class CreateSurveyReq(BaseModel):
+    """Request schema for creating a survey."""
+
     project_ids: Keyring
     herd_unit_ids: Keyring
     survey_date: datetime
     name: str
-    additional_info: Optional[str] = None
-    status: Optional[SurveyStatus] = None
-    survey_area: Optional[float] = None
+    additional_info: str | None = None
+    status: SurveyStatus | None = None
+    survey_area: float | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
 class UpdateSurveyReq(BaseModel):
-    survey_date: Optional[datetime] = None
-    name: Optional[str] = None
-    additional_info: Optional[str] = None
-    status: Optional[SurveyStatus] = None
-    survey_area: Optional[float] = None
+    """Request schema for updating a survey."""
+
+    survey_date: datetime | None = None
+    name: str | None = None
+    additional_info: str | None = None
+    status: SurveyStatus | None = None
+    survey_area: float | None = None
 
 
 class SurveyImageQuery(BaseModel):
-    page: Optional[int] = None
-    per_page: Optional[int] = None
+    """Query parameters for survey images pagination."""
+
+    page: int | None = None
+    per_page: int | None = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -62,7 +68,7 @@ class SurveyImageQuery(BaseModel):
 
 @dataclass
 class Survey(DBbase):
-    """Dataclass for representing Surveys from the database"""
+    """Dataclass for representing surveys from the database."""
 
     survey_id: int
     survey_date: datetime
@@ -71,8 +77,8 @@ class Survey(DBbase):
     created: datetime
     modified: datetime
     uuid: UUID
-    status: Optional[SurveyStatus] = None
-    survey_area: Optional[float] = None
+    status: SurveyStatus | None = None
+    survey_area: float | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "surveys")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("survey_id")
@@ -80,24 +86,35 @@ class Survey(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a survey."""
+
         model_config = ConfigDict(from_attributes=True)
 
         survey_id: int
         survey_date: datetime
         name: str
-        status: Optional[SurveyStatus] = None
-        survey_area: Optional[float] = None
+        status: SurveyStatus | None = None
+        survey_area: float | None = None
         additional_info: str | None
         created: datetime
         modified: datetime
         uuid: UUID
 
+    Response: ClassVar[type[BaseModel]] = Response
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @classmethod
-    def _create(
-        cls, cursor: Cursor[Self], req: CreateSurveyReq
-    ) -> Optional[tuple[Self, list[RelationshipUpdate]]]:
+    def _create(cls, cursor: Cursor[Self], req: CreateSurveyReq) -> tuple[Self, list[RelationshipUpdate]] | None:
+        """Create a new survey record and associate it with project and herd unit.
+
+        Args:
+            cursor: Active database cursor.
+            req: Survey creation request containing survey details and parent IDs.
+
+        Returns:
+            Optional tuple containing created Survey and SpiceDB relationship updates, or None.
+        """
         cursor.row_factory = class_row(cls)
         query = sql.SQL("""
             WITH new_survey AS (
@@ -151,4 +168,9 @@ class Survey(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict:
+        """Serialize survey model to a dictionary.
+
+        Returns:
+            dict: Serialized survey representation.
+        """
         return Survey.Response.model_validate(self).model_dump(mode="json")
