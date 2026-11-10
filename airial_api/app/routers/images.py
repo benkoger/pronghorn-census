@@ -484,14 +484,13 @@ def complete_upload(body: CompleteMultiPartUploadReq):
 @validate()
 def abort_upload(body: AbortMultiPartUploadReq):
     """
-        Aborts a multipart upload.
-    >>>>>>> origin/indev
-        ---
-        responses:
-                200:
-                        description: Multipart upload aborted.
-                500:
-                        description: S3 or system error.
+    Aborts a multipart upload.
+    ---
+    responses:
+            200:
+                    description: Multipart upload aborted.
+            500:
+                    description: S3 or system error.
     """
     response = s3.abort_multipart_upload(
         Bucket=current_app.config["BUCKET_NAME"],
