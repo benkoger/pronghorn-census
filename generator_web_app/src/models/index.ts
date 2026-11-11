@@ -5,6 +5,7 @@
 export * from "./common";
 export * from "./project";
 export * from "./image";
+export * from "./imageRecord";
 export * from "./user";
 export * from "./autocropper";
 export * from "./verifier";

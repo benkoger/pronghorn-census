@@ -7,17 +7,17 @@
 
 import { api, API_BASE } from "@/api";
 import {
-  ActivityType,
   type AbundanceEstimate,
+  ActivityType,
   type Annotation,
-  type ReviewedArea,
   type bulkCreateAnnotationsOptions,
-  type bulkUpdateAnnotationOptions,
   type bulkDeleteAnnotationsOptions,
+  type bulkUpdateAnnotationOptions,
   type createAnnotationOptions,
+  ImageLookup,
+  type ReviewedArea,
 } from "@/models";
 import type { VerifierAdapter, VerifierItem, VerifierChanges } from "@/types/verifier";
-import { ImageRecords } from "./imageRecord";
 
 export interface AbundanceAdapterOptions {
   surveyUuid: string;
@@ -52,7 +52,7 @@ export class AbundanceAdapter implements VerifierAdapter {
   private session: number = 0;
 
   private areaCache = new Map<string, { reviewedArea: ReviewedArea; presignedUrl: string }>();
-  private images = new ImageRecords();
+  private images = new ImageLookup();
 
   constructor(options: AbundanceAdapterOptions) {
     this.surveyUuid = options.surveyUuid;

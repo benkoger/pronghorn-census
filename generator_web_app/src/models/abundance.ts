@@ -60,9 +60,21 @@ export interface AbundancePreparation {
   images: number;
   images_with_predictions: number;
   images_with_footprints: number;
+  images_with_metadata: number;
   tiles: number;
+  images_with_tiles: number;
   tiles_reviewed: number;
   measurement: Record<string, unknown> | null;
+  label: string | null;
+  detector: { name: string; uuid: string; boxes: number; images: number } | null;
+  proposal: {
+    generations: number;
+    n_units: number;
+    expected_total: number;
+    first_alpha: number | null;
+    alpha: number | null;
+    n_labels: number;
+  } | null;
   proposal_generations: number;
   steps: AbundancePreparationStep[];
   ready: boolean;

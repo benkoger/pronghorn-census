@@ -1322,7 +1322,6 @@ onBeforeUnmount(async () => {
           <div
             v-if="resolutionLabel"
             class="small text-secondary mt-1"
-            style="font-size: 0.72rem;"
             title="The source image's size, its ground resolution when the camera record is known, and how many of its pixels one screen pixel shows at this zoom"
           >
             {{ resolutionLabel }}

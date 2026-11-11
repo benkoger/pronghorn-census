@@ -6,14 +6,14 @@ import { api } from "@/api";
 import {
   ActivityType,
   type Annotation,
-  type ReviewedArea,
   type bulkCreateAnnotationsOptions,
-  type bulkUpdateAnnotationOptions,
   type bulkDeleteAnnotationsOptions,
+  type bulkUpdateAnnotationOptions,
   type createAnnotationOptions,
+  ImageLookup,
+  type ReviewedArea,
 } from "@/models";
 import type { VerifierAdapter, VerifierItem, VerifierChanges } from "@/types/verifier";
-import { ImageRecords } from "./imageRecord";
 
 export interface CropVerifierAdapterOptions {
   herdUnitUuid?: string;
@@ -36,7 +36,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
 
   // Cached metadata for visited areas (dimensions, image URL, image ID)
   private areaCache = new Map<string, { reviewedArea: ReviewedArea; presignedUrl: string }>();
-  private images = new ImageRecords();
+  private images = new ImageLookup();
 
   constructor(options: CropVerifierAdapterOptions) {
     this.herdUnitUuid = options.herdUnitUuid;

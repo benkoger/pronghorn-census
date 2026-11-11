@@ -6,7 +6,7 @@
 # the proposal generations. The caller hands in the compact serving state and a
 # way to load the generations' vectors.
 #
-#   get_active_measurement(survey)    -> the survey's current measurement
+#   get_recent_measurement(survey)    -> the survey's current measurement
 #   get_preparation(survey)           -> what has been prepared so far
 #   next_unit(measurement, state, ...)     -> Keyring of the next reviewed area
 #   live_estimate(measurement, state, ...) -> running count and interval so far
@@ -130,7 +130,7 @@ class UnitState:
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
-def get_active_measurement(
+def get_recent_measurement(
     cursor: Cursor[Any],
     db: "Database",
     survey_ids: Keyring,
@@ -333,8 +333,49 @@ def get_unit_states(
     return [UnitState(**row) for row in cursor.fetchall()]
 
 
+def _detections_detail(status: dict) -> str:
+    detector = status.get("detector")
+    if not detector:
+        return "Predictions generated"
+    return detector["name"]
+
+
+def _footprints_detail(status: dict) -> str:
+    return f"{status['images_with_footprints']:,} images georeferenced"
+
+
+def _tiles_detail(status: dict) -> str:
+    return f"{status['tiles']:,} tiles, eight per image"
+
+
+def _measurement_detail(status: dict) -> str:
+    measurement = status["measurement"]
+    cadence = measurement["retraining_cadence"]
+    parts = [
+        status.get("label") or "label unknown",
+        "frozen proposal" if cadence <= 0 else f"refit every {cadence:,} tiles",
+    ]
+    if (target := measurement.get("target_percentage")) is not None:
+        parts.append(f"target ±{100 * target:.0f}%")
+    parts.append(f"created {str(measurement['created'])[:10]}")
+    return ", ".join(parts)
+
+
+def _proposal_detail(status: dict) -> str:
+    proposal = status.get("proposal")
+    if not proposal:
+        return "Sampling proposal ready"
+    return (
+        f"expected total {proposal['expected_total']:,.0f} animals over "
+        f"{proposal['n_units']:,} tiles"
+    )
+
+
 def preparation_steps(status: dict) -> list[dict]:
-    """The preparation steps of a survey, each with whether it is done.
+    """The preparation steps of a survey, each with whether it is done and,
+    once done, where its piece came from: the detector, the images
+    georeferenced, the tiles, the measurement's settings and the proposal's
+    expected total.
 
     A step is done when its process has run; the sentences do not say how
     many images succeeded.
@@ -344,14 +385,14 @@ def preparation_steps(status: dict) -> list[dict]:
             "detections",
             "Detections",
             status["images_with_predictions"] > 0,
-            "Predictions generated",
+            _detections_detail(status),
             "Predictions have not been generated yet",
         ),
         (
             "footprints",
             "Footprints",
             status["images_with_footprints"] > 0,
-            "Images georeferenced",
+            _footprints_detail(status),
             "Images have not been georeferenced yet",
         ),
         (
@@ -359,21 +400,21 @@ def preparation_steps(status: dict) -> list[dict]:
             "Tiles",
             status["tiles"] > 0
             and status["georeferenced_images_without_tiles"] == 0,
-            "Tiles cut",
+            _tiles_detail(status),
             "Tiles have not been cut yet",
         ),
         (
             "measurement",
             "Measurement",
             status["measurement"] is not None,
-            "Measurement created",
+            _measurement_detail(status) if status["measurement"] else "",
             "Measurement has not been created yet",
         ),
         (
             "proposal",
             "Sampling proposal",
             status["proposal_generations"] > 0,
-            "Sampling proposal ready",
+            _proposal_detail(status),
             "Waiting for the sampling proposal",
         ),
     ]
@@ -413,6 +454,18 @@ def get_preparation(
                 JOIN core.images i ON i.image_id = p.image_id
                 WHERE i.survey_id = s.survey_id
             ) AS images_with_predictions,
+            (
+                SELECT COUNT(DISTINCT m.image_id)
+                FROM core.image_metadata m
+                JOIN core.images i ON i.image_id = m.image_id
+                WHERE i.survey_id = s.survey_id
+            ) AS images_with_metadata,
+            (
+                SELECT COUNT(DISTINCT ra.image_id)
+                FROM core.reviewed_area ra
+                JOIN core.images i ON i.image_id = ra.image_id
+                WHERE i.survey_id = s.survey_id AND ra.type = %(type)s
+            ) AS images_with_tiles,
             (
                 SELECT COUNT(DISTINCT f.image_id)
                 FROM core.image_footprints f
@@ -455,13 +508,23 @@ def get_preparation(
         raise ObjectNotFound("Survey", str(survey_ids.uuid))
 
     try:
-        measurement = get_active_measurement(cursor, db, survey_ids)
+        measurement = get_recent_measurement(cursor, db, survey_ids)
     except ObjectNotFound:
         measurement = None
 
     preparation["measurement"] = (
         measurement.serialize() if measurement else None
     )
+    preparation["label"] = None
+    if measurement:
+        cursor.row_factory = tuple_row
+        cursor.execute(
+            "SELECT name FROM projectmanagement.labels "
+            "WHERE label_id = %(label_id)s;",
+            {"label_id": measurement.label_id},
+        )
+        row = cursor.fetchone()
+        preparation["label"] = row[0] if row else None
     return preparation
 
 
@@ -726,6 +789,22 @@ def get_detection_model(
     cursor.execute(stmt, {"survey_id": survey_id, "no_model": NO_MODEL_ID})
     res = cursor.fetchone()
     return db._get(cursor, Model, int(res[0]) if res else NO_MODEL_ID)
+
+
+def count_detections(
+    cursor: Cursor[Any], db: "Database", survey_id: int, model_id: int
+) -> tuple[int, int]:
+    """The model's boxes on the survey's images, and the images with any."""
+    stmt = sql.SQL("""
+        SELECT COUNT(*), COUNT(DISTINCT p.image_id)
+        FROM core.predictions p
+        JOIN core.images i ON i.image_id = p.image_id
+        WHERE i.survey_id = %(survey_id)s AND p.model_id = %(model_id)s;
+    """)
+    cursor.row_factory = tuple_row
+    cursor.execute(stmt, {"survey_id": survey_id, "model_id": model_id})
+    boxes, images = cursor.fetchone() or (0, 0)
+    return int(boxes), int(images)
 
 
 def create_draft_annotations(

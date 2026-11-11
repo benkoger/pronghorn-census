@@ -6,14 +6,14 @@
 // ---------------------------------------------------------------------------------------------------------------------------
 
 import { api } from "@/api";
-import { imageResolution, type Image, type ImageMetadata, type ImageResolution } from "@/models";
+import { imageResolution, type Image, type ImageMetadata, type ImageResolution } from "./image";
 
 export interface ImageRecord {
   uuid: string;
   resolution: ImageResolution;
 }
 
-export class ImageRecords {
+export class ImageLookup {
   private records = new Map<number, ImageRecord>();
 
   /**

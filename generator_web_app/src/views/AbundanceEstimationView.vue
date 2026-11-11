@@ -265,26 +265,26 @@ onBeforeUnmount(() => {
 
 <template>
   <!-- Reviewing Mode -->
-  <div v-if="isReviewing && adapter" class="abundance-review h-100 d-flex flex-column flex-grow-1 overflow-hidden w-100" style="min-height: 0;">
+  <div v-if="isReviewing && adapter" class="h-100 w-100 d-flex flex-column flex-grow-1 overflow-hidden" style="min-height: 0; flex: 1 1 0;">
     <!-- Running Estimate Strip: one line, so the tile below gets the height -->
     <div
-      class="estimate-strip bg-body-secondary border border-secondary-subtle rounded-3 px-3 py-1 mb-2 shadow-sm d-flex align-items-center flex-wrap gap-3 flex-shrink-0 small"
+      class="bg-body-secondary border border-secondary-subtle rounded-3 px-3 py-1 mb-2 shadow-sm d-flex align-items-center flex-wrap gap-3 flex-shrink-0 small"
     >
       <Icon icon="gis:measure-area" class="text-primary fs-5" />
-      <span class="strip-stat">
-        <span class="strip-label">Tiles</span>
+      <span class="d-inline-flex align-items-baseline gap-1 text-nowrap">
+        <span class="fw-semibold text-secondary">Tiles</span>
         <span class="font-monospace">{{ whole(estimate?.n_reviewed) }} / {{ whole(estimate?.n_units) }}</span>
       </span>
-      <span class="strip-stat" :title="figuresNote">
-        <span class="strip-label">Count</span>
+      <span class="d-inline-flex align-items-baseline gap-1 text-nowrap" :title="figuresNote">
+        <span class="fw-semibold text-secondary">Count</span>
         <span class="font-monospace fw-bold" :class="precisionClass">{{ showFigures ? whole(estimate?.count) : "–" }}</span>
       </span>
-      <span class="strip-stat" :title="figuresNote">
-        <span class="strip-label">95%</span>
+      <span class="d-inline-flex align-items-baseline gap-1 text-nowrap" :title="figuresNote">
+        <span class="fw-semibold text-secondary">95%</span>
         <span class="font-monospace">{{ showFigures ? `${whole(estimate?.ci_lower)} – ${whole(estimate?.ci_upper)}` : "–" }}</span>
       </span>
-      <span class="strip-stat" :title="figuresNote">
-        <span class="strip-label">Interval / target</span>
+      <span class="d-inline-flex align-items-baseline gap-1 text-nowrap" :title="figuresNote">
+        <span class="fw-semibold text-secondary">Interval / target</span>
         <span class="font-monospace">{{ showFigures ? `±${percent(estimate?.relative_ci)}` : "–" }} / ±{{ percent(estimate?.target) }}</span>
       </span>
       <span v-if="figuresNote" class="text-secondary fst-italic">{{ figuresNote }}</span>
@@ -327,7 +327,7 @@ onBeforeUnmount(() => {
       @update:active-crop="onActiveCrop"
     >
       <template #below-stage>
-        <div class="search-reminder small text-secondary mt-1 px-1 flex-shrink-0">
+        <div class="small text-secondary mt-1 px-1 flex-shrink-0">
           <Icon icon="material-symbols:psychology-outline" class="me-1 text-primary" />
           <strong v-if="expectedText" class="text-body">{{ expectedText }}</strong>
           <span v-else>The detector's expectation for this tile is not known.</span>
@@ -340,16 +340,17 @@ onBeforeUnmount(() => {
   </div>
 
   <!-- Overview Mode -->
-  <div v-else class="abundance-config d-flex flex-row flex-nowrap gap-3 w-100">
+  <BRow v-else g="3" class="mx-0 w-100 flex-grow-1 overflow-y-auto align-items-start" style="min-height: 0;">
     <!-- LEFT MENU: Context & Session Controls -->
+    <BCol cols="12" lg="4" xl="3">
     <div
-      class="left-menu-panel bg-body-secondary border border-secondary-subtle rounded-3 p-3 shadow-sm d-flex flex-column gap-3 overflow-y-auto"
+      class="bg-body-secondary border border-secondary-subtle rounded-3 p-3 shadow-sm d-flex flex-column gap-3"
     >
       <div class="d-flex align-items-center gap-2 flex-shrink-0">
         <Icon icon="gis:measure-area" class="text-primary fs-3" />
         <div>
           <h5 class="mb-0 fw-bold">Abundance Estimation</h5>
-          <small class="text-secondary" style="font-size: 0.75rem;">
+          <small class="text-secondary">
             Review sampled tiles to estimate the survey count
           </small>
         </div>
@@ -395,7 +396,7 @@ onBeforeUnmount(() => {
       >
         <div>
           <div class="small fw-semibold text-secondary">Tiles Reviewed</div>
-          <small class="text-muted" style="font-size: 0.72rem;">
+          <small class="text-muted">
             of {{ whole(estimate?.n_units) }} in the survey
           </small>
         </div>
@@ -426,16 +427,17 @@ onBeforeUnmount(() => {
         <div
           v-if="!canReview && reviewDisabledReason"
           class="text-muted small mt-2 text-center"
-          style="font-size: 0.75rem;"
         >
           {{ reviewDisabledReason }}
         </div>
       </div>
     </div>
+    </BCol>
 
     <!-- RIGHT MAIN: Estimate & Guide -->
+    <BCol cols="12" lg="8" xl="9">
     <div
-      class="right-content-panel d-flex flex-column overflow-y-auto bg-body-tertiary rounded-3 border border-secondary-subtle shadow-sm p-4 gap-4"
+      class="d-flex flex-column bg-body-tertiary rounded-3 border border-secondary-subtle shadow-sm p-4 gap-4"
     >
       <!-- Running Estimate Card -->
       <BCard class="border-secondary-subtle shadow-sm bg-body flex-shrink-0" no-body>
@@ -465,40 +467,40 @@ onBeforeUnmount(() => {
           <template v-else-if="estimate">
             <BRow g="3" class="mb-3">
               <BCol cols="12" md="4">
-                <div class="stat-tile">
-                  <div class="stat-label">Estimated count</div>
+                <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
+                  <div class="small fw-semibold text-secondary">Estimated count</div>
                   <template v-if="showFigures">
-                    <div class="stat-value font-monospace" :class="precisionClass">{{ whole(estimate.count) }}</div>
-                    <div class="stat-note">
+                    <div class="fs-2 fw-bold font-monospace" :class="precisionClass || 'text-primary'">{{ whole(estimate.count) }}</div>
+                    <div class="small text-secondary">
                       95% interval {{ whole(estimate.ci_lower) }} – {{ whole(estimate.ci_upper) }}
                     </div>
                   </template>
                   <template v-else>
-                    <div class="stat-value font-monospace">–</div>
-                    <div class="stat-note">{{ figuresNote }}</div>
+                    <div class="fs-2 fw-bold text-primary font-monospace">–</div>
+                    <div class="small text-secondary">{{ figuresNote }}</div>
                   </template>
-                </div>
+                </BCard>
               </BCol>
               <BCol cols="12" md="4">
-                <div class="stat-tile">
-                  <div class="stat-label">Density</div>
-                  <div class="stat-value font-monospace">
+                <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
+                  <div class="small fw-semibold text-secondary">Density</div>
+                  <div class="fs-2 fw-bold text-primary font-monospace">
                     {{ decimal(estimate.density_per_km2, 2) }}
-                    <span class="stat-unit">per km²</span>
+                    <span class="fs-6 fw-semibold text-secondary">per km²</span>
                   </div>
-                  <div class="stat-note">
+                  <div class="small text-secondary">
                     {{ decimal(estimate.density_ci_lower_per_km2, 2) }} –
                     {{ decimal(estimate.density_ci_upper_per_km2, 2) }} over
                     {{ estimate.area_m2 === null ? "—" : decimal(estimate.area_m2 / 1e6, 1) }} km²
                   </div>
-                </div>
+                </BCard>
               </BCol>
               <BCol cols="12" md="4">
-                <div class="stat-tile">
-                  <div class="stat-label">Interval half-width</div>
-                  <div class="stat-value font-monospace">±{{ percent(estimate.relative_ci) }}</div>
-                  <div class="stat-note">target ±{{ percent(estimate.target) }}</div>
-                </div>
+                <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
+                  <div class="small fw-semibold text-secondary">Interval half-width</div>
+                  <div class="fs-2 fw-bold text-primary font-monospace">±{{ percent(estimate.relative_ci) }}</div>
+                  <div class="small text-secondary">target ±{{ percent(estimate.target) }}</div>
+                </BCard>
               </BCol>
             </BRow>
 
@@ -532,15 +534,18 @@ onBeforeUnmount(() => {
             <BListGroupItem
               v-for="step in preparation.steps"
               :key="step.key"
-              class="d-flex align-items-center gap-3 py-2 px-3 bg-body-tertiary"
+              class="d-flex align-items-start gap-3 py-2 px-3 bg-body-tertiary"
             >
               <Icon
                 :icon="step.done ? 'material-symbols:check-circle-rounded' : 'material-symbols:pending-outline'"
                 :class="step.done ? 'text-success' : 'text-warning'"
                 width="22"
+                class="flex-shrink-0"
               />
-              <span class="small fw-semibold">{{ step.label }}</span>
-              <span class="small text-secondary ms-auto">{{ step.detail }}</span>
+              <div class="d-flex flex-column">
+                <span class="small fw-semibold">{{ step.label }}</span>
+                <span class="small text-secondary">{{ step.detail }}</span>
+              </div>
             </BListGroupItem>
           </BListGroup>
         </BCardBody>
@@ -562,7 +567,7 @@ onBeforeUnmount(() => {
           <BCardText class="text-secondary">
             Each tile opens with the detector's boxes already drawn. Delete the boxes that are not
             animals, adjust the ones that are, and search the whole tile for animals the detector
-            missed. Then press <kbd class="guide-kbd">Enter</kbd> to submit and load the next tile.
+            missed. Then press <kbd>Enter</kbd> to submit and load the next tile.
             Every box left on the tile is counted as an animal, so a tile with no animals is
             submitted with no boxes. Reviewing stops when the interval reaches its target.
           </BCardText>
@@ -578,80 +583,6 @@ onBeforeUnmount(() => {
         </BCardBody>
       </BCard>
     </div>
-  </div>
+    </BCol>
+  </BRow>
 </template>
-
-<style scoped>
-/* Both modes scroll as a whole when the window is too short for them; nothing is clipped */
-.abundance-review,
-.abundance-config {
-  height: 100%;
-  width: 100%;
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.abundance-config {
-  align-items: flex-start;
-}
-
-.left-menu-panel {
-  width: 350px;
-  min-width: 300px;
-  max-width: 380px;
-  flex: 0 0 350px;
-  height: 100%;
-  min-height: 0;
-}
-
-.right-content-panel {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-}
-
-.strip-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  white-space: nowrap;
-}
-
-.strip-label,
-.stat-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--bs-secondary-color);
-}
-
-.stat-tile {
-  height: 100%;
-  padding: 1rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.5rem;
-  background: var(--bs-tertiary-bg);
-}
-
-.stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--bs-primary);
-}
-
-.stat-unit {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--bs-secondary-color);
-}
-
-.stat-note {
-  font-size: 0.78rem;
-  color: var(--bs-secondary-color);
-}
-
-.guide-kbd {
-  font-size: 0.75rem;
-}
-</style>

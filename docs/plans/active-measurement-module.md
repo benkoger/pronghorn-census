@@ -19,6 +19,9 @@ after this one; here the estimate is a count, an interval and a density.
 - A reviewer can start a survey's abundance estimation from the dashboard or the nav,
   review tiles one at a time with the detector's boxes drafted, and watch the running
   estimate and its interval tighten.
+- The preparation card says where each piece came from: the detector by name, the images
+  georeferenced, the tiles cut, the measurement's label, cadence, target and date, and the
+  regressor's expected total over the tiles.
 - The page says what phase the review is in, when the detection check ends, and why
   reviewing is not possible yet when the survey is not prepared. The count and its
   interval are withheld during the detection check, whose draws sit on tiles where the

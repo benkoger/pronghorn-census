@@ -76,7 +76,7 @@ def get_next_unit(query: ActiveMeasurementQuery):
     survey_ids = Keyring(survey.survey_id, survey.uuid)
 
     measurement = base.execute(
-        activemeasurement.get_active_measurement, survey_ids
+        activemeasurement.get_recent_measurement, survey_ids
     )
     state = proposal_store.load(measurement)
     # The score boxes are drafted at: where the detector's box count over the
@@ -159,7 +159,7 @@ def get_estimate(query: ActiveMeasurementQuery):
 
     try:
         measurement = base.execute(
-            activemeasurement.get_active_measurement, survey_ids
+            activemeasurement.get_recent_measurement, survey_ids
         )
     except ObjectNotFound:
         return activemeasurement.empty_estimate(survey.survey_id), 200
@@ -210,8 +210,9 @@ def get_status(query: ActiveMeasurementQuery):
       200:
         description: >
           Counts of images, predictions, footprints and tiles, the measurement
-          if one exists, the number of proposal generations, and the steps with
-          their state.
+          if one exists with its label, the detector, the proposal's
+          generations and expected total, and the steps with their state and
+          provenance.
       401:
         description: Unauthorized.
       404:
@@ -224,15 +225,40 @@ def get_status(query: ActiveMeasurementQuery):
 
     status = base.execute(activemeasurement.get_preparation, survey_ids)
 
-    generations = 0
+    status["detector"] = None
+    if status["images_with_predictions"] > 0:
+        model = base.execute(
+            activemeasurement.get_detection_model, survey.survey_id
+        )
+        boxes, images = base.execute(
+            activemeasurement.count_detections, survey.survey_id, model.model_id
+        )
+        status["detector"] = {
+            "name": model.name,
+            "uuid": str(model.uuid),
+            "boxes": boxes,
+            "images": images,
+        }
+
+    state = None
     if status["measurement"]:
         measurement = base.get(
             ActiveMeasurement, status["measurement"]["active_measurement_id"]
         )
         state = proposal_store.load(measurement)
-        generations = len(state.generations) if state else 0
 
-    status["proposal_generations"] = generations
+    status["proposal"] = None
+    if state is not None and state.generations:
+        latest = state.generations[-1]
+        status["proposal"] = {
+            "generations": len(state.generations),
+            "n_units": len(state.reviewed_area_ids),
+            "expected_total": float(state.raw.sum()),
+            "first_alpha": state.generations[0].alpha,
+            "alpha": latest.alpha,
+            "n_labels": latest.n_labels,
+        }
+    status["proposal_generations"] = len(state.generations) if state else 0
     status["steps"] = activemeasurement.preparation_steps(status)
     status["ready"] = all(step["done"] for step in status["steps"])
 

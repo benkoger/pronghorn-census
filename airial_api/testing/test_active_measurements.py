@@ -513,7 +513,9 @@ class TestActiveMeasurements(APITester):
     def test_preparation_steps(self):
         steps = am.preparation_steps(
             {
+                "images": 2,
                 "images_with_predictions": 1,
+                "detector": {"name": "det", "uuid": "u", "boxes": 7, "images": 1},
                 "images_with_footprints": 0,
                 "tiles": 0,
                 "georeferenced_images_without_tiles": 0,
@@ -522,6 +524,7 @@ class TestActiveMeasurements(APITester):
             }
         )
         done = {s["key"]: s["done"] for s in steps}
+        assert steps[0]["detail"] == "det"
         assert done == {
             "detections": True,
             "footprints": False,
