@@ -72,8 +72,11 @@ after this one; here the estimate is a count, an interval and a density.
   image, named `<image name>__r<row>c<col>`. Its crop is cut from the source image the first
   time it is served (`app/tile_crops.py`) and lives at its `ra_key`.
 - **Measurement.** A row of `projectmanagement.active_measurements`: label, seed,
-  retraining cadence, target interval, and the final count once finished. A measurement
-  with a final count serves no more units.
+  retraining cadence, target interval, and the final count once finished. The cadence
+  defaults to 0, a frozen proposal: the generations posted at preparation carry the whole
+  review and serving never waits on a refit. A cadence above 0 means a refit worker
+  outside the app posts a generation every that many reviewed units. A measurement with a
+  final count serves no more units.
 - **Proposal generation.** One fit of the sampling proposal: unit order, expected count
   per unit, shaped vector. Generation 0 is posted before any review with `n_labels = 0`;
   each later generation must keep the unit order and be fitted on more reviewed units

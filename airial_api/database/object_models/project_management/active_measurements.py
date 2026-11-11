@@ -23,7 +23,9 @@ class CreateActiveMeasurement(BaseModel):
     survey_ids: Keyring
     label_ids: Keyring
     random_seed: int
-    retraining_cadence: int
+    # Reviewed units between refits of the proposal; 0 freezes the proposal
+    # posted at preparation, so serving never waits on a refit.
+    retraining_cadence: int = 0
     target_percentage: float | None = None
     final_count: float | None = None
     final_ci_upper: float | None = None
