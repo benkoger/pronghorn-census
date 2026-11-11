@@ -484,21 +484,31 @@ onBeforeUnmount(() => {
               <BCol cols="12" md="4">
                 <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
                   <div class="small fw-semibold text-secondary">Density</div>
-                  <div class="fs-2 fw-bold text-primary font-monospace">
-                    {{ decimal(estimate.density_per_km2, 2) }}
-                    <span class="fs-6 fw-semibold text-secondary">per km²</span>
-                  </div>
-                  <div class="small text-secondary">
-                    {{ decimal(estimate.density_ci_lower_per_km2, 2) }} –
-                    {{ decimal(estimate.density_ci_upper_per_km2, 2) }} over
-                    {{ estimate.area_m2 === null ? "—" : decimal(estimate.area_m2 / 1e6, 1) }} km²
-                  </div>
+                  <template v-if="showFigures">
+                    <div class="fs-2 fw-bold text-primary font-monospace">
+                      {{ decimal(estimate.density_per_km2, 2) }}
+                      <span class="fs-6 fw-semibold text-secondary">per km²</span>
+                    </div>
+                    <div class="small text-secondary">
+                      {{ decimal(estimate.density_ci_lower_per_km2, 2) }} –
+                      {{ decimal(estimate.density_ci_upper_per_km2, 2) }} over
+                      {{ estimate.area_m2 === null ? "—" : decimal(estimate.area_m2 / 1e6, 1) }} km²
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="fs-2 fw-bold text-primary font-monospace">–</div>
+                    <div class="small text-secondary">
+                      over {{ estimate.area_m2 === null ? "—" : decimal(estimate.area_m2 / 1e6, 1) }} km²
+                    </div>
+                  </template>
                 </BCard>
               </BCol>
               <BCol cols="12" md="4">
                 <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
                   <div class="small fw-semibold text-secondary">Interval half-width</div>
-                  <div class="fs-2 fw-bold text-primary font-monospace">±{{ percent(estimate.relative_ci) }}</div>
+                  <div class="fs-2 fw-bold text-primary font-monospace">
+                    {{ showFigures ? `±${percent(estimate.relative_ci)}` : "–" }}
+                  </div>
                   <div class="small text-secondary">target ±{{ percent(estimate.target) }}</div>
                 </BCard>
               </BCol>
@@ -511,7 +521,7 @@ onBeforeUnmount(() => {
             <BProgress :value="progress" :max="100" height="0.6rem" class="mb-3" />
 
             <div class="small fw-semibold text-secondary mb-1">Precision toward target</div>
-            <BProgress :value="precision" :max="100" variant="success" height="0.6rem" />
+            <BProgress :value="showFigures ? precision : 0" :max="100" variant="success" height="0.6rem" />
           </template>
         </BCardBody>
       </BCard>
