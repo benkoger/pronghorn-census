@@ -16,7 +16,7 @@ from PIL import Image as PILImage
 from psycopg.rows import tuple_row
 from pydantic import TypeAdapter
 
-from ais import Proposal
+from ais import Proposal, SurveyTerms
 from app import proposal_store
 from app.extensions import base, cache
 from database.modules import activemeasurement as am
@@ -208,6 +208,11 @@ class TestActiveMeasurements(APITester):
         res = auth_client.get(f"{AM}/next-unit", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 409
 
+    def test_proposals_listed_empty_before_generation_zero(self, auth_client, measurement):
+        res = auth_client.get(f"{AM}/{measurement['uuid']}/proposals")
+        assert res.status_code == 200
+        assert res.get_json() == []
+
     # -------------------------------------------------------------------------
     # 3. Tiles
     # -------------------------------------------------------------------------
@@ -283,6 +288,28 @@ class TestActiveMeasurements(APITester):
         rows = auth_client.get(f"{AM}/{measurement['uuid']}/proposals").get_json()
         assert len(rows) == 1
 
+    def test_proposal_rejected_before_check(self, auth_client, measurement, tiles):
+        """A payload the Proposal itself refuses is a 409 before any row is read."""
+        ids = [t["reviewed_area_id"] for t in tiles]
+        shapes = {
+            "raw shorter than the units": {"raw": [1.0] * (len(ids) - 1), "proposal": [1.0] * len(ids)},
+            "repeated unit": {"reviewed_area_ids": ids[:-1] + ids[:1]},
+            "negative proposal": {"proposal": [-1.0] + [1.0] * (len(ids) - 1)},
+        }
+        for reason, override in shapes.items():
+            body = {
+                "reviewed_area_ids": ids,
+                "raw": [1.0] * len(ids),
+                "proposal": [1.0] * len(ids),
+                "n_labels": 0,
+                "alpha": 0.5,
+                **override,
+            }
+            res = auth_client.post(f"{AM}/{measurement['uuid']}/proposals", json=body)
+            assert res.status_code == 409, reason
+
+        assert auth_client.get(f"{AM}/{measurement['uuid']}/proposals").get_json() == []
+
     def test_proposal_next_generation(self, auth_client, measurement, tiles, proposal):
         ids = [t["reviewed_area_id"] for t in tiles]
         res = auth_client.post(
@@ -353,6 +380,27 @@ class TestActiveMeasurements(APITester):
         assert est["phase"] == "full review"
         assert est["figures_from"] >= 100
         assert est["show_fraction"] == am.SHOW_FRACTION
+
+    def test_estimate_area_from_terms(
+        self, app, auth_client, measurement, tiles, proposal, source_image
+    ):
+        """With the survey terms stored, the density is over their surveyed area."""
+        survey = {"survey_id": SURVEY["uuid"]}
+        unit = auth_client.get(f"{AM}/next-unit", query_string=survey).get_json()
+        res = auth_client.patch(f"/api/v1/reviewed-area/{unit['uuid']}/set-reviewed")
+        assert res.status_code == 200
+
+        with app.app_context():
+            row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
+            proposal_store.save_terms(
+                row, SurveyTerms(habitable_area_m2=5.0e6, surveyed_area_m2=2.0e6)
+            )
+
+        est = auth_client.get(f"{AM}/estimate", query_string=survey).get_json()
+        assert est["n_reviewed"] == 1
+        assert est["area_m2"] == 2.0e6
+        if est["count"] is not None:
+            assert est["density_per_km2"] == pytest.approx(est["count"] / 2.0)
 
     def test_review_to_exhaustion(self, auth_client, measurement, tiles, proposal, source_image):
         """Every unit served and reviewed: the measurement finishes with a count."""
