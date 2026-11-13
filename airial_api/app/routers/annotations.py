@@ -2,12 +2,6 @@
 
 from uuid import UUID
 
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app.decorators import permission_required
-from app.extensions import base
 from database.object_models.base import Keyring
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
@@ -17,6 +11,12 @@ from database.object_models.core.annotations import (
     BulkUpdateAnnotationsReq,
 )
 from database.object_models.project_management import HerdUnit
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app.decorators import permission_required
+from app.extensions import base
 
 annotBp = Blueprint("annotations", __name__, url_prefix="/api/v1/annotations")
 

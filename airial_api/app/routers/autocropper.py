@@ -3,12 +3,6 @@
 import io
 from typing import cast
 
-from flask import Blueprint, current_app
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app.decorators import permission_required
-from app.extensions import base, cache, s3
 from crop_generator import auto_crop
 from database.object_models import (
     AutoCropperBatchQuery,
@@ -22,6 +16,12 @@ from database.object_models.core.predictions import Prediction, UpdatePrediction
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.labels import Label
 from database.object_models.user_management import User
+from flask import Blueprint, current_app
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app.decorators import permission_required
+from app.extensions import base, cache, s3
 
 cropBp = Blueprint("autocropper", __name__, url_prefix="/api/v1/autocropper")
 

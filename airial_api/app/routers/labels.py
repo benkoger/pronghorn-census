@@ -2,14 +2,14 @@
 
 from uuid import UUID
 
+from database.object_models.project_management import CreateLabelReq
+from database.object_models.project_management.labels import Label
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.project_management import CreateLabelReq
-from database.object_models.project_management.labels import Label
 
 labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 

@@ -1,12 +1,12 @@
 """Endpoints for managing organizations in the API."""
 
+from database.object_models.user_management import Organization, createOrganizationReq
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.user_management import Organization, createOrganizationReq
 
 orgBp = Blueprint("organizations", __name__, url_prefix="/api/v1/organizations")
 

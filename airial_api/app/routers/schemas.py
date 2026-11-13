@@ -2,15 +2,15 @@
 
 from uuid import UUID
 
+from database.object_models.project_management.labels import Label
+from database.object_models.project_management.models import Model
+from database.object_models.project_management.schemas import Schema, createSchemaReq
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.project_management.labels import Label
-from database.object_models.project_management.models import Model
-from database.object_models.project_management.schemas import Schema, createSchemaReq
 
 schemaBp = Blueprint("schemas", __name__, url_prefix="/api/v1/schemas")
 

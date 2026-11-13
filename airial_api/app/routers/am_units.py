@@ -3,12 +3,6 @@
 from typing import cast
 from uuid import UUID
 
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app.decorators import permission_required
-from app.extensions import base
 from database.object_models.base import Keyring
 from database.object_models.core.am_units import (
     AmUnit,
@@ -16,6 +10,12 @@ from database.object_models.core.am_units import (
     UpdateAmUnitReq,
 )
 from database.object_models.user_management.users import User
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app.decorators import permission_required
+from app.extensions import base
 
 amUnitBp = Blueprint("am_units", __name__, url_prefix="/api/v1/am-units")
 

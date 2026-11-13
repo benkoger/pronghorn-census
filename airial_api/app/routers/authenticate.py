@@ -9,12 +9,6 @@ from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import requests
-from flask import Blueprint, abort, current_app, redirect, request, session, url_for
-from flask_login import current_user, login_required, login_user, logout_user
-from flask_pydantic import validate
-from werkzeug.security import check_password_hash
-
-from app.extensions import base
 from database import AuthenticationFailure
 from database.object_models.core import Image, UpdateImageReq
 from database.object_models.user_management import (
@@ -23,6 +17,12 @@ from database.object_models.user_management import (
     UpdateUserReq,
     User,
 )
+from flask import Blueprint, abort, current_app, redirect, request, session, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+from flask_pydantic import validate
+from werkzeug.security import check_password_hash
+
+from app.extensions import base
 
 authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 

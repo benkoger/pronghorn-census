@@ -2,17 +2,17 @@
 
 from uuid import UUID
 
+from database.object_models.core.image_footprints import (
+    CreateImageFootprintReq,
+    ImageFootprint,
+    UpdateImageFootprintReq,
+)
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.core.image_footprints import (
-    CreateImageFootprintReq,
-    ImageFootprint,
-    UpdateImageFootprintReq,
-)
 
 imageFootprintBp = Blueprint(
     "image_footprints", __name__, url_prefix="/api/v1/image-footprints"

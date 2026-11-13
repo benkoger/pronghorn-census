@@ -2,17 +2,17 @@
 
 from uuid import UUID
 
+from database.object_models.base import BulkRequest
+from database.object_models.core import (
+    CreatePredictionReq,
+)
+from database.object_models.core.predictions import Prediction
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.base import BulkRequest
-from database.object_models.core import (
-    CreatePredictionReq,
-)
-from database.object_models.core.predictions import Prediction
 
 predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 
