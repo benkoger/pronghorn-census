@@ -16,7 +16,7 @@ This is a documentation and code-quality refactor with zero runtime, database sc
 **Engineering.**
 - Standardize all 22 router files in `airial_api/app/routers/` to Google Python Style Guide conventions.
 - Provide structured, descriptive Google-style docstrings (`Args:`, `Returns:`, `Raises:` where applicable) for every endpoint handler and helper function across all router blueprints.
-- Organize imports consistently: standard library, third-party packages, internal project modules (database models, extensions, decorators).
+- Organize imports consistently: Organize imports alphabetically.
 - Clean up obsolete boilerplate: eliminate redundant author tags (`# Author: ...`), obsolete `# TODO` comments, and normalize file permissions.
 - Ensure strict zero-regression behavior: no modifications to endpoint paths, decorator stacks, status codes, payload structures, or query handling.
 
