@@ -10,8 +10,7 @@ $enable-negative-margins: true;
 }
 
 #app {
-  min-height: 100vh;
-  max-height: 100vh;
+  height: 100vh; /* definite, so that main's h-100 and the h-100 chains below it resolve */
 }
 
 main {

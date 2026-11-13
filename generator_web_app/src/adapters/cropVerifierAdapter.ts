@@ -6,11 +6,12 @@ import { api } from "@/api";
 import {
   ActivityType,
   type Annotation,
-  type ReviewedArea,
   type bulkCreateAnnotationsOptions,
-  type bulkUpdateAnnotationOptions,
   type bulkDeleteAnnotationsOptions,
+  type bulkUpdateAnnotationOptions,
   type createAnnotationOptions,
+  ImageLookup,
+  type ReviewedArea,
 } from "@/models";
 import type { VerifierAdapter, VerifierItem, VerifierChanges } from "@/types/verifier";
 
@@ -35,7 +36,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
 
   // Cached metadata for visited areas (dimensions, image URL, image ID)
   private areaCache = new Map<string, { reviewedArea: ReviewedArea; presignedUrl: string }>();
-  private imageUuidCache = new Map<number, string>();
+  private images = new ImageLookup();
 
   constructor(options: CropVerifierAdapterOptions) {
     this.herdUnitUuid = options.herdUnitUuid;
@@ -90,12 +91,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
       this.areaCache.set(uuid, cached);
     }
 
-    if (!this.imageUuidCache.has(cached.reviewedArea.image_id)) {
-      const img = await api.get<{ uuid: string }>(`images/${cached.reviewedArea.image_id}`).catch(() => null);
-      if (img?.uuid) {
-        this.imageUuidCache.set(cached.reviewedArea.image_id, img.uuid);
-      }
-    }
+    const image = await this.images.get(cached.reviewedArea.image_id);
 
     // Always refetch annotations fresh from the database on navigation
     const annotationsList = (await api.get<Annotation[]>(`reviewed-area/${uuid}/annotations`)) ?? [];
@@ -109,6 +105,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
       imageUrl: cached.presignedUrl,
       dimensions: cached.reviewedArea.dimensions,
       annotations: annotMap,
+      resolution: image?.resolution,
       rawItem: cached.reviewedArea,
     };
   }
@@ -208,16 +205,7 @@ export class CropVerifierAdapter implements VerifierAdapter {
     const crop = changes.item.rawItem as ReviewedArea;
     if (!crop) return;
 
-    let imageUuid = this.imageUuidCache.get(crop.image_id);
-    if (!imageUuid) {
-      try {
-        const img = await api.get<{ uuid: string }>(`images/${crop.image_id}`);
-        imageUuid = img?.uuid ?? "";
-        if (imageUuid) this.imageUuidCache.set(crop.image_id, imageUuid);
-      } catch (err) {
-        console.error(`Failed to resolve image UUID for image_id ${crop.image_id}:`, err);
-      }
-    }
+    const imageUuid = await this.images.uuid(crop.image_id);
 
     const createReq: bulkCreateAnnotationsOptions = {
       reviewed_area_id: crop.uuid,
