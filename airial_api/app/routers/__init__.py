@@ -15,6 +15,7 @@ from .images import imageBp
 from .labels import labelBp
 from .models import modelBp
 from .organizations import orgBp
+from .predictions import predBp
 from .projects import projectBp
 from .reviewed_area import raBp
 from .roles import roleBp
@@ -55,3 +56,5 @@ bp.register_blueprint(labelBp)
 
 bp.register_blueprint(activeMeasBp)
 bp.register_blueprint(amUnitBp)
+
+bp.register_blueprint(predBp)

@@ -120,3 +120,14 @@ class MissingImageData(AirialError):
         """
         self.message = f"Image: {image_id} does not have any data loaded!"
         super().__init__("No Image Data", 500, self.message)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
+class MeasurementBlocked(AirialError):
+    """Raised when an active measurement cannot serve its next unit yet."""
+
+    def __init__(self, reason: str):
+        self.message = reason
+        super().__init__("Conflict", 409, self.message)
