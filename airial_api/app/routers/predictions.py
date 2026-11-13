@@ -1,21 +1,18 @@
-# Endpoints for managing predictions in the API
-# Author: Michael B. Lance
-
-# ---------------------------------------------------------------------------------------------------------------------------
+"""Endpoints for managing model predictions in the API."""
 
 from uuid import UUID
 
+from database.object_models.base import BulkRequest
+from database.object_models.core import (
+    CreatePredictionReq,
+)
+from database.object_models.core.predictions import Prediction
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
 from app.extensions import base
-from database.object_models.base import BulkRequest
-from database.object_models.core import (
-    CreatePredictionReq,
-)
-from database.object_models.core.predictions import Prediction
 
 predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 
@@ -28,8 +25,14 @@ predBp = Blueprint("predictions", __name__, url_prefix="/api/v1/predictions")
 @permission_required("access")
 @validate()
 def get_predictions(query: BulkRequest):
-    """
-    Retrieve multiple prediction objects by a list of integer IDs or UUIDs.
+    """Retrieve multiple prediction objects by a list of integer IDs or UUIDs.
+
+    Args:
+        query: Bulk request containing list of prediction IDs.
+
+    Returns:
+        Tuple containing list of serialized predictions and HTTP status 200.
+
     ---
     parameters:
       - name: object_ids
@@ -52,7 +55,6 @@ def get_predictions(query: BulkRequest):
       500:
         description: Database error.
     """
-
     predictions = base.bulk_get(Prediction, query)
 
     return [pred.serialize() for pred in predictions], 200
@@ -66,8 +68,14 @@ def get_predictions(query: BulkRequest):
 @permission_required("access")
 @login_required
 def get_prediction_by_id(prediction_id: int | UUID):
-    """
-    Retrieve a single prediction by its integer ID or UUID.
+    """Retrieve a single prediction by its integer ID or UUID.
+
+    Args:
+        prediction_id: Primary key of the prediction (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized prediction and HTTP status 200.
+
     ---
     parameters:
       - name: prediction_id
@@ -93,7 +101,6 @@ def get_prediction_by_id(prediction_id: int | UUID):
       500:
         description: Database error.
     """
-
     return base.get(Prediction, prediction_id).serialize(), 200
 
 
@@ -106,8 +113,14 @@ def get_prediction_by_id(prediction_id: int | UUID):
 @permission_required("access")
 @validate()
 def create_prediction(body: CreatePredictionReq):
-    """
-    Create a new prediction record.
+    """Create a new prediction record.
+
+    Args:
+        body: Prediction creation payload.
+
+    Returns:
+        Tuple containing the serialized created prediction and HTTP status 200.
+
     ---
     parameters:
       - name: body
@@ -125,5 +138,4 @@ def create_prediction(body: CreatePredictionReq):
       500:
         description: Database error.
     """
-
     return base.insert(Prediction, body).serialize(), 200

@@ -1,19 +1,9 @@
-# Endpoints for managing active measurements in the API
-# Author: Michael B. Lance
-
-# ---------------------------------------------------------------------------------------------------------------------------
+"""Endpoints for managing active measurements in the API."""
 
 from typing import cast
 from uuid import UUID
 
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
 from ais import MeasurementState, Proposal
-from app import proposal_store, tile_crops
-from app.decorators import permission_required
-from app.extensions import base
 from database.errors import MeasurementBlocked, ObjectNotFound
 from database.modules import activemeasurement
 from database.object_models.base import Keyring
@@ -29,6 +19,13 @@ from database.object_models.project_management.active_measurements import (
 )
 from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management import User
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app import proposal_store, tile_crops
+from app.decorators import permission_required
+from app.extensions import base
 
 activeMeasBp = Blueprint(
     "active_measurements", __name__, url_prefix="/api/v1/active-measurements"
@@ -75,9 +72,7 @@ def get_next_unit(query: ActiveMeasurementQuery):
     survey = base.get(Survey, query.survey_id)
     survey_ids = Keyring(survey.survey_id, survey.uuid)
 
-    measurement = base.execute(
-        activemeasurement.get_recent_measurement, survey_ids
-    )
+    measurement = base.execute(activemeasurement.get_recent_measurement, survey_ids)
     state = proposal_store.load(measurement)
     # The score boxes are drafted at: where the detector's box count over the
     # units meets the regressor's expected total. Nothing is drafted without
@@ -93,9 +88,7 @@ def get_next_unit(query: ActiveMeasurementQuery):
         measurement,
         state,
         cast(User, current_user),
-        lambda: proposal_store.vectors(
-            measurement, cast(MeasurementState, state)
-        ),
+        lambda: proposal_store.vectors(measurement, cast(MeasurementState, state)),
         threshold,
     )
 
@@ -158,9 +151,7 @@ def get_estimate(query: ActiveMeasurementQuery):
     survey_ids = Keyring(survey.survey_id, survey.uuid)
 
     try:
-        measurement = base.execute(
-            activemeasurement.get_recent_measurement, survey_ids
-        )
+        measurement = base.execute(activemeasurement.get_recent_measurement, survey_ids)
     except ObjectNotFound:
         return activemeasurement.empty_estimate(survey.survey_id), 200
 
@@ -180,9 +171,7 @@ def get_estimate(query: ActiveMeasurementQuery):
         activemeasurement.live_estimate,
         measurement,
         state,
-        lambda: proposal_store.vectors(
-            measurement, cast(MeasurementState, state)
-        ),
+        lambda: proposal_store.vectors(measurement, cast(MeasurementState, state)),
         area,
     )
     return estimate, 200
@@ -227,9 +216,7 @@ def get_status(query: ActiveMeasurementQuery):
 
     status["detector"] = None
     if status["images_with_predictions"] > 0:
-        model = base.execute(
-            activemeasurement.get_detection_model, survey.survey_id
-        )
+        model = base.execute(activemeasurement.get_detection_model, survey.survey_id)
         boxes, images = base.execute(
             activemeasurement.count_detections, survey.survey_id, model.model_id
         )
@@ -358,8 +345,14 @@ def get_proposals(active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_by_id(active_measurement_id: int | UUID):
-    """
-    Retrieve an active measurement by its integer ID or UUID.
+    """Retrieve an active measurement by its integer ID or UUID.
+
+    Args:
+        active_measurement_id: Primary key of the active measurement (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized active measurement and HTTP status 200.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -396,8 +389,14 @@ def get_by_id(active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_am_units(active_measurement_id: int | UUID):
-    """
-    Retrieve all AM units associated with an active measurement.
+    """Retrieve all AM units associated with an active measurement.
+
+    Args:
+        active_measurement_id: Primary key of the parent active measurement (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized AM units and HTTP status 200.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -423,9 +422,7 @@ def get_am_units(active_measurement_id: int | UUID):
       500:
         description: Database error.
     """
-    am_units = base.get_children(
-        AmUnit, ActiveMeasurement, active_measurement_id
-    )
+    am_units = base.get_children(AmUnit, ActiveMeasurement, active_measurement_id)
     return [unit.serialize() for unit in am_units], 200
 
 
@@ -438,8 +435,14 @@ def get_am_units(active_measurement_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateActiveMeasurement):
-    """
-    Create a new active measurement.
+    """Create a new active measurement.
+
+    Args:
+        body: Active measurement creation payload.
+
+    Returns:
+        Tuple containing the serialized created active measurement and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -498,9 +501,7 @@ def create_tiles(body: CreateTilesReq):
     survey = base.get(Survey, body.survey_id)
     survey_ids = Keyring(survey.survey_id, survey.uuid)
 
-    tiles = base.execute(
-        activemeasurement.create_tiles, survey_ids, body.image_ids
-    )
+    tiles = base.execute(activemeasurement.create_tiles, survey_ids, body.image_ids)
     return tiles, 201
 
 
@@ -622,8 +623,14 @@ def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(active_measurement_id: int | UUID):
-    """
-    Delete an active measurement by integer ID or UUID.
+    """Delete an active measurement by integer ID or UUID.
+
+    Args:
+        active_measurement_id: Primary key of the active measurement to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: active_measurement_id

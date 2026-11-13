@@ -1,18 +1,8 @@
-# Endpoints for managing reviewed areas in the API
-# Author: Michael B. Lance
-
-# ---------------------------------------------------------------------------------------------------------------------------
+"""Endpoints for managing reviewed areas in the API."""
 
 from typing import Any
 from uuid import UUID
 
-from flask import Blueprint, current_app
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-import psycopg.sql as sql
-from app.decorators import permission_required
-from app.extensions import base, s3
 from database.object_models.base import PrimaryKey
 from database.object_models.core import UpdateReviewedAreaReq
 from database.object_models.core.annotations import Annotation
@@ -24,6 +14,13 @@ from database.object_models.core.images import (
 )
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.surveys import Survey
+from flask import Blueprint, current_app
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+from psycopg import sql
+
+from app.decorators import permission_required
+from app.extensions import base, s3
 
 raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 
@@ -36,8 +33,14 @@ raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 @permission_required("access")
 @validate()
 def get(query: RAQuery):
-    """
-    Retrieve reviewed areas filtered by query criteria with optional pagination.
+    """Retrieve reviewed areas filtered by query criteria with optional pagination.
+
+    Args:
+        query: Query parameters with survey/herd filters, pagination, and activity type.
+
+    Returns:
+        Tuple containing list of serialized reviewed areas or paginated dictionary and HTTP status 200.
+
     ---
     parameters:
       - name: herd_unit_id
@@ -96,13 +99,11 @@ def get(query: RAQuery):
         parent_cls = HerdUnit
         parent_pk = query.herd_unit_id[0]
 
-    scope: dict[str, Any] = (
-        {} if query.include_reviewed else {"reviewed_by_user_id": 0}
-    )
+    scope: dict[str, Any] = {} if query.include_reviewed else {"reviewed_by_user_id": 0}
     if query.type is not None:
         scope["type"] = query.type
 
-    where_clauses = []
+    where_clauses: list[sql.Composable] = []
     placeholders = {}
     if query.search:
         where_clauses.append(
@@ -146,8 +147,14 @@ def get(query: RAQuery):
 @login_required
 @permission_required("access")
 def get_by_id(reviewed_area_id: int | UUID):
-    """
-    Request a reviewed area object from the database using its integer PK or UUID.
+    """Request a reviewed area object from the database using its integer PK or UUID.
+
+    Args:
+        reviewed_area_id: Primary key of the reviewed area (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized reviewed area and HTTP status 200.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -184,8 +191,14 @@ def get_by_id(reviewed_area_id: int | UUID):
 @login_required
 @permission_required("access")
 def get_annotations(reviewed_area_id: int | UUID):
-    """
-    Retrieve all annotations associated with a specific reviewed area.
+    """Retrieve all annotations associated with a specific reviewed area.
+
+    Args:
+        reviewed_area_id: Primary key of the reviewed area (integer ID or UUID).
+
+    Returns:
+        Tuple containing list of serialized annotations and HTTP status 200.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -211,7 +224,6 @@ def get_annotations(reviewed_area_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(reviewed_area_id, UUID):
         reviewed_area = base.get(ReviewedArea, reviewed_area_id)
         reviewed_area_id = reviewed_area.reviewed_area_id
@@ -232,8 +244,14 @@ def get_annotations(reviewed_area_id: int | UUID):
 @permission_required("access")
 @validate()
 def create_ra_presigned_get(body: CreateReviewedAreaPresignedGetReq):
-    """
-    Generate a presigned GET URL for downloading a reviewed area crop.
+    """Generate a presigned GET URL for downloading a reviewed area crop.
+
+    Args:
+        body: Payload containing the reviewed_area_id.
+
+    Returns:
+        Tuple containing the presigned GET URL string and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -274,8 +292,15 @@ def create_ra_presigned_get(body: CreateReviewedAreaPresignedGetReq):
 @permission_required("access")
 @validate()
 def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UUID):
-    """
-    Update a reviewed area in the database.
+    """Update a reviewed area in the database.
+
+    Args:
+        body: Reviewed area update payload.
+        reviewed_area_id: Primary key of the reviewed area to update.
+
+    Returns:
+        Tuple containing the serialized updated reviewed area and HTTP status 200.
+
     ---
     parameters:
       - name: reviewed_area_id
@@ -306,7 +331,6 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UU
       500:
         description: Unexpected error.
     """
-
     return base.update(ReviewedArea, reviewed_area_id, body).serialize(), 200
 
 
@@ -319,8 +343,14 @@ def update_reviewed_area(body: UpdateReviewedAreaReq, reviewed_area_id: int | UU
 @permission_required("access")
 @validate()
 def set_reviewed(reviewed_area_id: PrimaryKey):
-    """
-    Mark a reviewed area as reviewed by the currently authenticated user.
+    """Mark a reviewed area as reviewed by the currently authenticated user.
+
+    Args:
+        reviewed_area_id: Primary key of the reviewed area.
+
+    Returns:
+        Tuple containing the serialized updated reviewed area and HTTP status 200.
+
     ---
     parameters:
       - name: reviewed_area_id

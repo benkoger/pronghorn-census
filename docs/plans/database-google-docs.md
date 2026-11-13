@@ -15,18 +15,9 @@ This is a documentation and code-quality update with zero runtime, schema, or fu
 
 **Engineering.**
 - Provide consistent Google-style docstrings (`Args:`, `Returns:`, `Raises:`) across all query builders, object models, and database access methods.
-- Standardize import ordering across all 35 database source files into standard library, third-party, and local application blocks.
 - Modernize collection typing (e.g., `collections.abc.Callable`, `collections.abc.Iterable`) and clean up unused imports (`Optional`, `Type`, redundant `UUID` bindings).
 - Keep lines within 126-column formatting limits where practical without compromising readability.
 
-## 3. Core Concepts
-
-- **Google Style Docstrings.** Triple-quoted docstrings with `Args:`, `Returns:`, and `Raises:` sections for functions and methods, and class docstrings detailing responsibilities and attributes.
-- **Import Ordering.** Three distinct blocks separated by single blank lines:
-  1. Standard library imports.
-  2. Third-party packages (`psycopg`, `pydantic`, `authzed`).
-  3. Internal project modules (`database.query_builder`, `database.object_models`).
-- **Typing Modernization.** Replacement of deprecated `typing` constructs with standard library equivalents and pruning of unreferenced imports.
 
 **Invariants.**
 - Zero SQL query modifications: all queries, placeholders, and parameters remain identical.
