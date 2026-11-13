@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from flask import FlaskClient
 from PIL import Image as PILImage
 from pydantic import BaseModel
 from testing_core import APITester
@@ -66,7 +67,7 @@ class TestImages(APITester):
     )
     def test_get_endpoints_schema_success(
         self,
-        auth_client: Any,
+        auth_client: FlaskClient,
         endpoint: str,
         expected_schema: type[BaseModel],
         is_list: bool,
@@ -102,7 +103,9 @@ class TestImages(APITester):
             "/predictions",
         ],
     )
-    def test_get_image_not_found(self, auth_client: Any, path_suffix: str) -> None:
+    def test_get_image_not_found(
+        self, auth_client: FlaskClient, path_suffix: str
+    ) -> None:
         """Verifies that requesting a non-existent image UUID returns a 404 status.
 
         Args:
@@ -186,7 +189,7 @@ class TestImages(APITester):
     )
     def test_post_endpoints(
         self,
-        auth_client: Any,
+        auth_client: FlaskClient,
         endpoint: str,
         payload: dict[str, Any],
         expected_status: int,
@@ -206,7 +209,7 @@ class TestImages(APITester):
     # 4. State-Mutating Lifecycles (PATCH & DELETE)
     # -------------------------------------------------------------------------
 
-    def test_update_image_success(self, auth_client: Any) -> None:
+    def test_update_image_success(self, auth_client: FlaskClient) -> None:
         """Tests updating image metadata via the PATCH endpoint.
 
         Verifies that an existing image can be fetched, updated with a new name,
@@ -226,7 +229,7 @@ class TestImages(APITester):
         assert response.status_code == 200
         assert response.get_json()["name"] == new_name
 
-    def test_delete_image_lifecycle(self, auth_client: Any) -> None:
+    def test_delete_image_lifecycle(self, auth_client: FlaskClient) -> None:
         """Tests the full lifecycle of creating and subsequently deleting an image.
 
         Ensures that a newly created image responds with 201 Created, can be retrieved
@@ -267,16 +270,18 @@ class TestImages(APITester):
     # 5. Coverage for Prediction Crops & Cache Routes
     # -------------------------------------------------------------------------
 
-    def test_get_prediction_crop_not_found(self, auth_client: Any) -> None:
+    def test_get_prediction_crop_not_found(self, auth_client: FlaskClient) -> None:
         """Verifies that requesting a non-existent prediction crop returns 404 Not Found.
 
         Args:
             auth_client (FlaskClient): Authenticated test client fixture.
         """
-        res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{uuid4()!r}")
+        res_404 = auth_client.get(f"/api/v1/images/prediction_crops/{uuid4()!s}")
         assert res_404.status_code == 404
 
-    def test_create_prediction_crops_cache_miss_success(self, auth_client: Any) -> None:
+    def test_create_prediction_crops_cache_miss_success(
+        self, auth_client: FlaskClient
+    ) -> None:
         """Tests prediction crop creation on cache miss, fetching from S3 and populating cache.
 
         Simulates an initial cache miss by clearing Valkey, seeds mock S3 with image
@@ -326,7 +331,9 @@ class TestImages(APITester):
         assert decoded_img.width > 0
         assert decoded_img.height > 0
 
-    def test_create_prediction_crops_cache_hit_success(self, auth_client: Any) -> None:
+    def test_create_prediction_crops_cache_hit_success(
+        self, auth_client: FlaskClient
+    ) -> None:
         """Tests prediction crop generation when source image bytes are already cached.
 
         Pre-populates the cache with raw JPEG image bytes to simulate a cache hit,
@@ -368,7 +375,7 @@ class TestImages(APITester):
     # 6. Coverage for Multipart Complete & Abort
     # -------------------------------------------------------------------------
 
-    def test_abort_multipart_upload_success(self, auth_client: Any) -> None:
+    def test_abort_multipart_upload_success(self, auth_client: FlaskClient) -> None:
         """Tests aborting an active S3 multipart upload session.
 
         Initializes a multipart upload session and verifies that sending an abort
@@ -397,7 +404,7 @@ class TestImages(APITester):
 
         assert response.status_code == 200
 
-    def test_complete_multipart_upload_success(self, auth_client: Any) -> None:
+    def test_complete_multipart_upload_success(self, auth_client: FlaskClient) -> None:
         """Tests the complete multipart upload flow including part upload and completion.
 
         Initializes an upload session, requests a presigned PUT URL for a part chunk,
@@ -460,7 +467,7 @@ class TestImages(APITester):
     # 7. Coverage for Closing User Images
     # -------------------------------------------------------------------------
 
-    def test_close_user_images_success(self, auth_client: Any) -> None:
+    def test_close_user_images_success(self, auth_client: FlaskClient) -> None:
         """Tests closing active image viewer sessions for the authenticated user.
 
         Sends a PATCH request to close any open images associated with the user
