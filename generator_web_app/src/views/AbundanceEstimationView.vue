@@ -11,6 +11,7 @@ import { AbundanceAdapter } from "@/adapters/abundanceAdapter";
 import Verifier from "@/components/verifier/Verifier.vue";
 import type { AbundanceEstimate, AbundancePreparation, ReviewedArea } from "@/models";
 import type { VerifierItem } from "@/types/verifier";
+import { decimal, figuresShown, maskedNote, percent, whole } from "@/utils/abundance";
 
 const pStore = useSystemStore();
 
@@ -117,22 +118,9 @@ const thresholdText = computed(() =>
   draftThreshold.value === null ? "" : ` higher than ${draftThreshold.value.toFixed(3)} probability`,
 );
 
-// The count and its interval are withheld during the detection check and until the minimum
-// sample the stop rule itself waits for: before that, one animal found in a tile the proposal
-// thought empty moves the count by hundreds and the interval by thousands of percent, which
-// is the estimator being honest about a tiny sample, not a result worth reading.
-const showFigures = computed(() => {
-  const e = estimate.value;
-  if (!e || e.phase === "detection check") return false;
-  return e.figures_from === null || e.n_reviewed >= e.figures_from;
-});
-const figuresNote = computed(() => {
-  const e = estimate.value;
-  if (!e || showFigures.value) return "";
-  const share = `${Math.round(e.show_fraction * 100)}%`;
-  const from = e.figures_from === null ? "" : ` (${e.figures_from.toLocaleString()} tiles)`;
-  return `Statistics masked until ${share} of tiles reviewed${from}`;
-});
+// The figures are withheld during the detection check and until figures_from tiles
+const showFigures = computed(() => figuresShown(estimate.value));
+const figuresNote = computed(() => maskedNote(estimate.value));
 
 const phaseLabel = computed(() => {
   const e = estimate.value;
@@ -150,19 +138,7 @@ const precisionClass = computed(() => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// Formatting
-
-function whole(value: number | null | undefined): string {
-  return value === null || value === undefined ? "—" : Math.round(value).toLocaleString();
-}
-
-function decimal(value: number | null | undefined, digits: number): string {
-  return value === null || value === undefined ? "—" : value.toFixed(digits);
-}
-
-function percent(value: number | null | undefined): string {
-  return value === null || value === undefined ? "—" : `${(100 * value).toFixed(1)}%`;
-}
+// Progress
 
 const progress = computed(() => {
   if (!estimate.value || estimate.value.n_units === 0) return 0;
@@ -526,6 +502,87 @@ onBeforeUnmount(() => {
         </BCardBody>
       </BCard>
 
+      <!-- Overall Abundance Card -->
+      <BCard
+        v-if="estimate?.abundance && showFigures"
+        class="border-secondary-subtle shadow-sm bg-body flex-shrink-0"
+        no-body
+      >
+        <BCardBody class="p-4">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <Icon icon="material-symbols:landscape-outline" class="text-primary fs-3" />
+            <BCardTitle class="mb-0 fw-bold" title-tag="h5">Overall Abundance</BCardTitle>
+          </div>
+          <BRow g="3" class="mb-3">
+            <BCol cols="12" md="6">
+              <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
+                <div class="small fw-semibold text-secondary">Abundance</div>
+                <div class="fs-2 fw-bold text-primary font-monospace">
+                  {{ whole(estimate.abundance.abundance) }}
+                </div>
+                <div class="small text-secondary">
+                  95% interval {{ whole(estimate.abundance.ci_lower) }} –
+                  {{ whole(estimate.abundance.ci_upper) }} over
+                  {{ decimal(estimate.abundance.habitable_area_m2 / 1e6, 0) }} km² of habitat
+                </div>
+              </BCard>
+            </BCol>
+            <BCol cols="12" md="6">
+              <BCard class="h-100 bg-body-tertiary border-secondary-subtle" body-class="p-3">
+                <div class="small fw-semibold text-secondary">Animals in the surveyed area</div>
+                <div class="fs-2 fw-bold text-primary font-monospace">
+                  {{ whole(estimate.abundance.count.value) }}
+                </div>
+                <div class="small text-secondary">
+                  the estimated count after an overlap factor of
+                  {{ decimal(estimate.abundance.overlap_factor, 3) }} for animals seen twice
+                </div>
+              </BCard>
+            </BCol>
+          </BRow>
+          <BTableSimple small responsive class="mb-0 small">
+            <BThead>
+              <BTr>
+                <BTh>Source of uncertainty</BTh>
+                <BTh class="text-end">Alone</BTh>
+                <BTh class="text-end">Abundance interval from it alone</BTh>
+              </BTr>
+            </BThead>
+            <BTbody>
+              <BTr>
+                <BTd>Count, from the tiles reviewed</BTd>
+                <BTd class="text-end font-monospace">±{{ percent(estimate.abundance.count.relative_sigma) }}</BTd>
+                <BTd class="text-end font-monospace">
+                  {{ whole(estimate.abundance.count.abundance_interval[0]) }} –
+                  {{ whole(estimate.abundance.count.abundance_interval[1]) }}
+                </BTd>
+              </BTr>
+              <BTr>
+                <BTd>Surveyed area, from the georeferencing</BTd>
+                <BTd class="text-end font-monospace">±{{ percent(estimate.abundance.area.relative_sigma) }}</BTd>
+                <BTd class="text-end font-monospace">
+                  {{ whole(estimate.abundance.area.abundance_interval[0]) }} –
+                  {{ whole(estimate.abundance.area.abundance_interval[1]) }}
+                </BTd>
+              </BTr>
+              <BTr>
+                <BTd>
+                  Representation, {{ estimate.abundance.representation.n_transects }} transects
+                  standing for the habitat
+                </BTd>
+                <BTd class="text-end font-monospace">
+                  ±{{ percent(estimate.abundance.representation.relative_sigma) }}
+                </BTd>
+                <BTd class="text-end font-monospace">
+                  {{ whole(estimate.abundance.representation.abundance_interval[0]) }} –
+                  {{ whole(estimate.abundance.representation.abundance_interval[1]) }}
+                </BTd>
+              </BTr>
+            </BTbody>
+          </BTableSimple>
+        </BCardBody>
+      </BCard>
+
       <!-- Preparation Card -->
       <BCard
         v-if="preparation"
@@ -548,12 +605,15 @@ onBeforeUnmount(() => {
             >
               <Icon
                 :icon="step.done ? 'material-symbols:check-circle-rounded' : 'material-symbols:pending-outline'"
-                :class="step.done ? 'text-success' : 'text-warning'"
+                :class="step.done ? 'text-success' : step.optional ? 'text-secondary' : 'text-warning'"
                 width="22"
                 class="flex-shrink-0"
               />
               <div class="d-flex flex-column">
-                <span class="small fw-semibold">{{ step.label }}</span>
+                <span class="small fw-semibold">
+                  {{ step.label }}
+                  <BBadge v-if="step.optional" variant="secondary" class="ms-1">optional</BBadge>
+                </span>
                 <span class="small text-secondary">{{ step.detail }}</span>
               </div>
             </BListGroupItem>

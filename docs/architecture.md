@@ -48,6 +48,9 @@ Airial is an aerial wildlife census and abundance estimation platform designed f
   * `autocropper.py`: Batch retrieval, K-Means crop triggering, reviewed area and annotation generation.
   * `cropverifier.py`: Single prediction chip serving and review status tracking.
   * `images.py`: Image metadata, S3 presigned GET/PUT URLs, multipart upload coordination.
+  * `image_footprints.py`, `image_metadata.py`: Georeferenced footprints and flight telemetry, posted by the survey preparation tooling.
+  * `active_measurements.py`: Abundance estimation: tiles, proposal generations, the next tile to review, the running estimate, the survey terms and the preparation status.
+  * `survey_maps.py`: The survey map: footprints as GeoJSON, the detections placed on the ground, and images drawn onto the ground.
   * `projects.py`, `surveys.py`, `herd_units.py`, `models.py`, `schemas.py`, `labels.py`: Hierarchy management.
   * `authenticate.py`, `users.py`, `roles.py`, `organizations.py`: User identity and session management.
 

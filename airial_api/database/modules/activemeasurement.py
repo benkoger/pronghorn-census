@@ -102,6 +102,8 @@ DETECTION_CHECK = "detection check"
 FULL_REVIEW = "full review"
 # The estimate's status for a survey that has no measurement yet.
 NOT_PREPARED = "not prepared"
+# Preparation steps reviewing can start without.
+OPTIONAL_STEPS = ("terms",)
 Z95 = 1.959963985
 
 # The proposal vector of every generation, oldest first.
@@ -361,6 +363,16 @@ def _measurement_detail(status: dict) -> str:
     return ", ".join(parts)
 
 
+def _terms_detail(status: dict) -> str:
+    terms = status.get("terms")
+    if not terms:
+        return "Survey terms posted"
+    return (
+        f"habitable area {terms['habitable_area_m2'] / 1e6:,.0f} km², "
+        f"{terms['transects']:,} transects"
+    )
+
+
 def _proposal_detail(status: dict) -> str:
     proposal = status.get("proposal")
     if not proposal:
@@ -374,11 +386,12 @@ def _proposal_detail(status: dict) -> str:
 def preparation_steps(status: dict) -> list[dict]:
     """The preparation steps of a survey, each with whether it is done and,
     once done, where its piece came from: the detector, the images
-    georeferenced, the tiles, the measurement's settings and the proposal's
-    expected total.
+    georeferenced, the tiles, the measurement's settings, the proposal's
+    expected total and the survey terms.
 
     A step is done when its process has run; the sentences do not say how
-    many images succeeded.
+    many images succeeded. An optional step is not needed to start reviewing:
+    without the terms, the estimate is a count without an abundance.
     """
     steps = [
         (
@@ -417,6 +430,13 @@ def preparation_steps(status: dict) -> list[dict]:
             _proposal_detail(status),
             "Waiting for the sampling proposal",
         ),
+        (
+            "terms",
+            "Survey terms",
+            status.get("terms") is not None,
+            _terms_detail(status),
+            "Not posted; the estimate is a count without an abundance",
+        ),
     ]
 
     return [
@@ -424,6 +444,7 @@ def preparation_steps(status: dict) -> list[dict]:
             "key": key,
             "label": label,
             "done": done,
+            "optional": key in OPTIONAL_STEPS,
             "detail": said if done else unsaid,
         }
         for key, label, done, said, unsaid in steps
@@ -1113,6 +1134,7 @@ def empty_estimate(survey_id: int) -> dict[str, Any]:
         "density_per_km2": None,
         "density_ci_lower_per_km2": None,
         "density_ci_upper_per_km2": None,
+        "abundance": None,
     }
 
 

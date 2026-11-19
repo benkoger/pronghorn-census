@@ -79,26 +79,31 @@ class SurveyTerms:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def as_dict(self) -> dict[str, Any]:
+        """Returns the terms as a plain dict, arrays as lists.
+
+        The shape stored on the measurement row and packed for the cache.
+        """
+        return {
+            "habitable_area_m2": self.habitable_area_m2,
+            "surveyed_area_m2": self.surveyed_area_m2,
+            "area_sigma_m2": self.area_sigma_m2,
+            "area_draws": self.area_draws.tolist(),
+            "transects": self.transects,
+            "transect_areas_m2": self.transect_areas_m2.tolist(),
+            "overlap_factor": self.overlap_factor,
+            "representation_sigma": self.representation_sigma,
+            "representation_draws": self.representation_draws.tolist(),
+            "n_units": self.n_units,
+        }
+
     def to_cache(self) -> bytes:
         """Packs the terms with msgpack for the cache.
 
         Returns:
-            The msgpack bytes of a plain dict, arrays as lists.
+            The msgpack bytes of ``as_dict``.
         """
-        return packb(
-            {
-                "habitable_area_m2": self.habitable_area_m2,
-                "surveyed_area_m2": self.surveyed_area_m2,
-                "area_sigma_m2": self.area_sigma_m2,
-                "area_draws": self.area_draws.tolist(),
-                "transects": self.transects,
-                "transect_areas_m2": self.transect_areas_m2.tolist(),
-                "overlap_factor": self.overlap_factor,
-                "representation_sigma": self.representation_sigma,
-                "representation_draws": self.representation_draws.tolist(),
-                "n_units": self.n_units,
-            }
-        )
+        return packb(self.as_dict())
 
     @classmethod
     def from_cache(cls, data: bytes) -> "SurveyTerms":
@@ -120,28 +125,29 @@ class SurveyTerms:
 class PlacedBoxes:
     """The detector's boxes of a survey placed on the ground, highest score first.
 
-    image_ids and reviewed_area_ids are the image and the unit each box is on, east_m and
-    north_m its position in meters. The boxes and their positions do not change during a
-    measurement, so they are placed once, when the survey is prepared.
+    image_ids, reviewed_area_ids and prediction_uuids are the image, the unit and the
+    prediction of each box, and lon and lat its position. The boxes and their positions do not
+    change while a generation's draft threshold is in force.
     """
 
     image_ids: np.ndarray
     reviewed_area_ids: np.ndarray
+    prediction_uuids: list[str]
     scores: np.ndarray
-    east_m: np.ndarray
-    north_m: np.ndarray
+    lon: np.ndarray
+    lat: np.ndarray
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def __post_init__(self):
         self.image_ids = np.asarray(self.image_ids, dtype=np.int64)
         self.reviewed_area_ids = np.asarray(self.reviewed_area_ids, dtype=np.int64)
-        self.scores = np.asarray(self.scores, dtype=float)
-        self.east_m = np.asarray(self.east_m, dtype=float)
-        self.north_m = np.asarray(self.north_m, dtype=float)
+        self.prediction_uuids = [str(uuid) for uuid in self.prediction_uuids]
+        for name in ("scores", "lon", "lat"):
+            setattr(self, name, np.asarray(getattr(self, name), dtype=float))
 
-        fields = (self.image_ids, self.reviewed_area_ids, self.scores, self.east_m, self.north_m)
-        if {len(v) for v in fields} != {len(self.image_ids)}:
+        lengths = {len(getattr(self, name)) for name in self.__dataclass_fields__}
+        if lengths != {len(self.image_ids)}:
             raise ValueError("every field of the placed boxes must be the same length")
 
     def __len__(self) -> int:
@@ -157,11 +163,8 @@ class PlacedBoxes:
         """
         return packb(
             {
-                "image_ids": self.image_ids.tolist(),
-                "reviewed_area_ids": self.reviewed_area_ids.tolist(),
-                "scores": self.scores.tolist(),
-                "east_m": self.east_m.tolist(),
-                "north_m": self.north_m.tolist(),
+                name: value.tolist() if isinstance(value, np.ndarray) else value
+                for name, value in vars(self).items()
             }
         )
 

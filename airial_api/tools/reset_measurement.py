@@ -64,6 +64,7 @@ CACHE_KEYS = (
     "am_terms_{uuid}",
     "am_area_{uuid}",
     "am_threshold_{uuid}",
+    "am_boxes_{uuid}",
 )
 
 

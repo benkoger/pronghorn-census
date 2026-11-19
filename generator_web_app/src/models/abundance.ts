@@ -17,6 +17,35 @@ export type AbundanceStatus =
 //   false positives and false negatives
 export type AbundancePhase = "detection check" | "full review";
 
+// One source of the abundance's uncertainty. abundance_interval is the 95% interval of the
+// abundance with this source alone varying
+export interface AbundanceSource {
+  relative_sigma: number;
+  abundance_interval: [number, number];
+}
+
+// The abundance over the habitable area: overlap factor x count / surveyed area x habitable
+// area. The overlap factor and the representation start from the detector's boxes and are
+// taken from the review as it goes; the _prepared values are the ones before review
+export interface OverallAbundance {
+  abundance: number;
+  ci_lower: number;
+  ci_upper: number;
+  sigma: number;
+  habitable_area_m2: number;
+  overlap_factor: number;
+  overlap_factor_prepared: number;
+  // Animals in the surveyed area: the estimated count after the overlap factor
+  count: AbundanceSource & { value: number; sigma: number };
+  area: AbundanceSource & { value_m2: number; sigma_m2: number };
+  representation: AbundanceSource & {
+    n_transects: number;
+    n_units: number;
+    sigma: number;
+    relative_sigma_prepared: number;
+  };
+}
+
 export interface AbundanceEstimate {
   // null while the survey has no measurement (status 'not prepared')
   active_measurement_id: number | null;
@@ -46,12 +75,16 @@ export interface AbundanceEstimate {
   figures_from: number | null;
   // The share of tiles behind figures_from
   show_fraction: number;
+  // null until the survey terms are posted and a reviewed tile gives a positive count
+  abundance: OverallAbundance | null;
 }
 
 export interface AbundancePreparationStep {
-  key: "detections" | "footprints" | "tiles" | "measurement" | "proposal";
+  key: "detections" | "footprints" | "tiles" | "measurement" | "proposal" | "terms";
   label: string;
   done: boolean;
+  // Reviewing can start without an optional step
+  optional: boolean;
   detail: string;
 }
 
@@ -76,6 +109,13 @@ export interface AbundancePreparation {
     n_labels: number;
   } | null;
   proposal_generations: number;
+  terms: {
+    habitable_area_m2: number;
+    surveyed_area_m2: number;
+    transects: number;
+    overlap_factor: number;
+    representation_sigma: number;
+  } | null;
   steps: AbundancePreparationStep[];
   ready: boolean;
 }

@@ -57,6 +57,14 @@ function getRouteIcon(target: RouteLocationRaw) {
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Abundance Estimation</span>
       </BNavItem>
       <BNavItem
+        to="/survey-map/"
+        :active="$route.path.startsWith('/survey-map')"
+        class="text-nowrap"
+      >
+        <Icon :icon="getRouteIcon('/survey-map/')" width="24" height="24" />
+        <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Survey Map</span>
+      </BNavItem>
+      <BNavItem
         v-if="sStore.is_admin"
         to="/upload"
         :active="$route.path.startsWith('/upload')"
