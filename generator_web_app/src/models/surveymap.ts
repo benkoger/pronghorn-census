@@ -31,6 +31,8 @@ export type DetectionKind = "annotated" | "estimated";
 
 export interface MapDetection {
   image_id: number;
+  // The tile (reviewed area) it lies on
+  reviewed_area_id: number;
   kind: DetectionKind;
   // The detector's score and prediction; null for an annotated detection
   score: number | null;
@@ -39,6 +41,11 @@ export interface MapDetection {
   box: [number, number, number, number] | null;
   lon: number;
   lat: number;
+  // The overlap weight: 1 / the number of images whose footprints cover it
+  weight: number;
+  // The box's corners on the ground as [longitude, latitude]: top left, top right, bottom
+  // right, bottom left, placed as the image's overlay is drawn
+  corners: [number, number][];
 }
 
 export interface MapDetections {
@@ -55,4 +62,14 @@ export interface ImageOverlay {
   url: string;
   // [[south, west], [north, east]]
   bounds: [[number, number], [number, number]];
+}
+
+// A crop of an image's annotated animals, grouped as the auto cropper groups predictions
+export interface ImageCrop {
+  // A WebP data URL
+  image: string;
+  // The crop's window in image pixels: left, top, right, bottom
+  window: [number, number, number, number];
+  // The annotated boxes inside it, in the crop's pixels
+  boxes: [number, number, number, number][];
 }

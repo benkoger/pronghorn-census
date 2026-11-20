@@ -7,7 +7,11 @@ from database.errors import ObjectNotFound
 from database.modules import activemeasurement, surveymap
 from database.object_models.base import Keyring
 from database.object_models.core.images import Image
-from database.object_models.core.survey_maps import OverlayQuery, SurveyMapQuery
+from database.object_models.core.survey_maps import (
+    ImageCropsQuery,
+    OverlayQuery,
+    SurveyMapQuery,
+)
 from database.object_models.project_management.surveys import Survey
 from flask import Blueprint
 from flask_login import login_required
@@ -104,9 +108,11 @@ def get_detections(query: SurveyMapQuery):
       200:
         description: >
           How many detections are annotated, estimated and left unplaced, the
-          draft threshold, and each detection with its image, kind, score and
-          prediction (estimated only), box in image pixels and position. Empty
-          without a measurement or a proposal.
+          draft threshold, and each detection with its image, tile, kind, score
+          and prediction (estimated only), box in image pixels (annotated
+          only), position, the box's corners on the ground and overlap weight
+          (1 / the images covering it). Empty without a measurement or a
+          proposal.
       401:
         description: Unauthorized.
       404:
@@ -183,3 +189,61 @@ def get_overlay(query: OverlayQuery):
     """
     image = base.get(Image, query.image_id)
     return overlays.get_overlay(image), 200
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@surveyMapBp.get("/image-crops")
+@login_required
+@permission_required("access")
+@validate()
+def get_image_crops(query: ImageCropsQuery):
+    """Retrieve an image's annotated animals, zoomed.
+
+    The animals are grouped as the auto cropper groups predictions, and each
+    group is cut from the source image.
+
+    Args:
+        query: The image.
+
+    Returns:
+        Tuple of the crops and HTTP status 200.
+
+    ---
+    parameters:
+      - name: image_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Image whose annotated animals are shown.
+    responses:
+      200:
+        description: >
+          Each crop as a WebP data URL, its window in image pixels (left, top,
+          right, bottom) and the annotated boxes inside it in the crop's
+          pixels. Empty when the survey has no measurement or the image no
+          annotated animal.
+      401:
+        description: Unauthorized.
+      404:
+        description: Image not found.
+      500:
+        description: Storage or database error.
+    """
+    image = base.get(Image, query.image_id)
+    survey = base.get(Survey, image.survey_id)
+
+    try:
+        measurement = base.execute(
+            activemeasurement.get_recent_measurement,
+            Keyring(survey.survey_id, survey.uuid),
+        )
+    except ObjectNotFound:
+        return {"crops": []}, 200
+
+    boxes = base.execute(surveymap.get_annotated_boxes, measurement, image.image_id)
+    return {"crops": overlays.annotated_crops(image, boxes)}, 200
+

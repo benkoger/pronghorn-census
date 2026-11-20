@@ -30,7 +30,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import psycopg.sql as sql
-import shapely
 from psycopg import Cursor
 from psycopg.rows import dict_row, tuple_row
 from psycopg.types.json import Jsonb
@@ -184,20 +183,30 @@ def place_boxes(
         threshold: Its draft threshold.
 
     Returns:
-        The boxes placed in longitude and latitude, highest score first. A
-        box on an image with no ground control is left out.
+        The boxes placed in longitude and latitude, with their corners,
+        highest score first. A box on an image with no ground control is
+        left out.
     """
     boxes = surveymap.candidates(cursor, db, measurement, threshold)
-    lonlat = surveymap.locate(cursor, boxes)
-    placed = [(box, at) for box, at in zip(boxes, lonlat) if at is not None]
+    found = surveymap.locators(cursor, [box["image_id"] for box in boxes])
+    placed = [
+        (box, at, corners)
+        for box, at, corners in zip(
+            boxes,
+            surveymap.locate(boxes, found),
+            surveymap.outline(boxes, found),
+        )
+        if at is not None and corners is not None
+    ]
 
     return PlacedBoxes(
-        image_ids=[box["image_id"] for box, _ in placed],
-        reviewed_area_ids=[box["reviewed_area_id"] for box, _ in placed],
-        prediction_uuids=[str(box["prediction_uuid"]) for box, _ in placed],
-        scores=[float(box["score"]) for box, _ in placed],
-        lon=[at[0] for _, at in placed],
-        lat=[at[1] for _, at in placed],
+        image_ids=[box["image_id"] for box, _, _ in placed],
+        reviewed_area_ids=[box["reviewed_area_id"] for box, _, _ in placed],
+        prediction_uuids=[str(box["prediction_uuid"]) for box, _, _ in placed],
+        scores=[float(box["score"]) for box, _, _ in placed],
+        lon=[at[0] for _, at, _ in placed],
+        lat=[at[1] for _, at, _ in placed],
+        corners=[corners for _, _, corners in placed],
     )
 
 
@@ -228,41 +237,6 @@ def _animals(
 # The two terms that depend on where the animals are
 
 
-def _covering(
-    cursor: Cursor[Any],
-    survey_id: int,
-    image_of: list[int],
-    positions: list[tuple[float, float]],
-) -> np.ndarray:
-    """Returns how many images other than its own cover each animal.
-
-    An image covers an animal when its latest footprint contains the
-    animal's longitude and latitude. The footprints have no spatial index,
-    so they are read once and searched with a tree here.
-    """
-    stmt = sql.SQL("""
-        SELECT DISTINCT ON (f.image_id) f.image_id, ST_AsBinary(f.footprint)
-        FROM core.image_footprints f
-        JOIN core.images i ON i.image_id = f.image_id
-        WHERE i.survey_id = %(survey_id)s
-          AND f.footprint IS NOT NULL
-        ORDER BY f.image_id ASC, f.footprint_id DESC;
-    """)
-
-    cursor.row_factory = tuple_row
-    cursor.execute(stmt, {"survey_id": survey_id})
-    rows = cursor.fetchall()
-
-    footprint_of = np.asarray([row[0] for row in rows])
-    tree = shapely.STRtree(shapely.from_wkb([bytes(row[1]) for row in rows]))
-    animal, footprint = tree.query(shapely.points(positions), predicate="within")
-
-    others = np.zeros(len(positions))
-    other = footprint_of[footprint] != np.asarray(image_of)[animal]
-    np.add.at(others, animal[other], 1)
-    return others
-
-
 def _weighted(
     cursor: Cursor[Any],
     survey_id: int,
@@ -290,7 +264,7 @@ def _weighted(
 
     images = [i for i, _ in shown]
     weights = coverage_weights(
-        _covering(cursor, survey_id, images, [at for _, at in shown])
+        surveymap.covering(cursor, survey_id, images, [at for _, at in shown])
     )
 
     per_image: dict[int, float] = {}

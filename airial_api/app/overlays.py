@@ -1,4 +1,4 @@
-# Image overlays for the survey map: an image drawn onto the ground
+# Images for the survey map: overlays on the ground, and annotated animals zoomed
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 # The overlay of an image is the image resampled onto a longitude/latitude grid
@@ -6,8 +6,13 @@
 # reach. It is drawn from the source image and the footprint's ground control
 # points the first time it is asked for and stored in the bucket next to the
 # image's tiles; the footprint's overlay_uri then holds its key.
+#
+# The annotated animals of an image are shown in crops grouped as the auto
+# cropper groups predictions (crop_generator.cluster_windows), cut from the
+# source image when asked for and returned inline.
 # ---------------------------------------------------------------------------------------------------------------------------
 
+from base64 import b64encode
 from math import cos, radians
 from typing import Any
 
@@ -17,7 +22,8 @@ import shapely
 from flask import current_app
 from scipy.interpolate import LinearNDInterpolator
 
-from app.extensions import base, s3
+from app.extensions import base, cache, s3
+from crop_generator import cluster_windows
 from database.errors import ObjectNotFound
 from database.modules import surveymap
 from database.object_models.core.images import Image
@@ -31,6 +37,12 @@ OVERLAY_WIDTH_PX = 1024
 SOURCE_REDUCTION = 4
 WEBP_QUALITY = 85
 URL_SECONDS = 3600
+
+# A crop of annotated animals: the side of its window in source pixels, as for the
+# prediction crops (crop_generator.create_subcrop)
+CROP_PX = 300
+# How long a source image stays cached, as for the prediction crops
+SOURCE_SECONDS = 500
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -157,3 +169,73 @@ def get_overlay(image: Image) -> dict[str, Any]:
         ExpiresIn=URL_SECONDS,
     )
     return {"url": url, "bounds": [[south, west], [north, east]]}
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# Annotated animals, zoomed
+
+
+def _source(image: Image) -> bytes:
+    """Returns the image's encoded bytes, from the cache the prediction crops share."""
+    if data := cache.get(image.uuid):
+        return data
+    data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)[
+        "Body"
+    ].read()
+    cache.set(image.uuid, data, SOURCE_SECONDS)
+    return data
+
+
+def annotated_crops(image: Image, boxes: list[list[int]]) -> list[dict[str, Any]]:
+    """Returns crops of the image around its annotated animals.
+
+    Args:
+        image: The image.
+        boxes: The animals' boxes as left, top, right, bottom in image pixels.
+
+    Returns:
+        Each crop as a WebP data URL, its window in image pixels (left, top,
+        right, bottom) and the boxes inside it in the crop's pixels.
+
+    Raises:
+        ValueError: The image could not be decoded or a crop encoded.
+    """
+    if not boxes:
+        return []
+
+    source = cv2.imdecode(
+        np.frombuffer(_source(image), dtype=np.uint8), cv2.IMREAD_COLOR
+    )
+    if source is None:
+        raise ValueError("could not decode the source image")
+
+    boxes = [
+        [min(b[0], b[2]), min(b[1], b[3]), max(b[0], b[2]), max(b[1], b[3])]
+        for b in boxes
+    ]
+    height, width = source.shape[:2]
+
+    crops = []
+    for left, top, right, bottom in cluster_windows(
+        np.asarray(boxes), width, height, CROP_PX
+    ):
+        ok, encoded = cv2.imencode(
+            ".webp",
+            source[top:bottom, left:right],
+            [cv2.IMWRITE_WEBP_QUALITY, WEBP_QUALITY],
+        )
+        if not ok:
+            raise ValueError("could not encode a crop")
+        crops.append(
+            {
+                "image": "data:image/webp;base64,"
+                + b64encode(encoded.tobytes()).decode(),
+                "window": [left, top, right, bottom],
+                "boxes": [
+                    [b[0] - left, b[1] - top, b[2] - left, b[3] - top]
+                    for b in boxes
+                    if b[0] >= left and b[1] >= top and b[2] <= right and b[3] <= bottom
+                ],
+            }
+        )
+    return crops

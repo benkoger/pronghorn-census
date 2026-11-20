@@ -21,3 +21,10 @@ class OverlayQuery(BaseModel):
     """The image to draw onto the ground."""
 
     image_id: UUID
+
+
+class ImageCropsQuery(BaseModel):
+    """The image whose annotated animals are shown."""
+
+    image_id: UUID
+

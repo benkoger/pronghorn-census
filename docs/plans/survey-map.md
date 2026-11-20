@@ -18,8 +18,20 @@ then on the estimate carries the abundance over the herd unit with its uncertain
 - A Survey Map page, from the nav, shows the selected survey's footprints coloured by state
   (a tile reviewed, a detection, neither), the annotated and estimated detections, and the
   running estimate and abundance under the same masking as the Abundance Estimation page.
-- Clicking an image offers to draw it onto the ground; clicking an estimated detection shows
-  the image around the detector's box.
+- The detections are drawn as one circle per tile and kind. Tiles of different images with
+  detections within 15 m of each other, where another image covers them, show the same
+  animals and are joined into one circle, annotated when any of them was reviewed. A
+  circle's area is proportional to its animals after the overlap weights (each detection
+  weighs 1 / the images covering it), so joining changes the drawing, not the total.
+- Clicking an image shows its annotated animals, across all its tiles, zoomed in crops
+  grouped as the auto cropper groups predictions, and offers to draw it onto the ground.
+  Clicking a circle's estimated detections shows the image around each of the detector's
+  boxes, and its annotated detections the crops holding them.
+- Once an image is drawn onto the ground, "Show pronghorn in image" draws its detections'
+  boxes on it. Each box's corners are placed through the image's ground control points, the
+  mapping the overlay is drawn with, so the boxes lie on the animals of the drawn image.
+  The detections carry the corners: the estimated boxes' are placed with the boxes, once
+  per generation, and the annotated boxes' with their positions.
 - The Abundance Estimation page shows an Overall Abundance card once the terms are posted and
   the figures are unmasked: the abundance and its interval over the habitable area, the
   animals in the surveyed area after the overlap factor, and each source of uncertainty alone.
@@ -45,8 +57,14 @@ then on the estimate carries the abundance over the herd unit with its uncertain
 - An image's overlay is drawn from the source image the first time it is asked for and stored
   in the bucket at `images/<image uuid>/overlay/ground.webp`; the footprint's `overlay_uri`
   then holds that key.
-- Estimated detections' crops come from the images router's prediction crops; no crop module
-  is added.
+- Estimated detections' crops come from the images router's prediction crops, one request
+  per tile and image.
+- An image's annotated animals come from `GET /survey-maps/image-crops`: the measurement's
+  annotated boxes on the image, grouped by `crop_generator.cluster_windows` (the auto
+  cropper's clustering: KMeans on the box centers, clusters added until every box lies in
+  a 300 px window, the prediction crops' size), each window cut from the source image and returned inline as a WebP
+  with the boxes inside it. The source image is cached under its uuid as the prediction
+  crops cache it.
 
 ## 3. Core Concepts
 

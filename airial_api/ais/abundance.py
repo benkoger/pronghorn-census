@@ -126,8 +126,9 @@ class PlacedBoxes:
     """The detector's boxes of a survey placed on the ground, highest score first.
 
     image_ids, reviewed_area_ids and prediction_uuids are the image, the unit and the
-    prediction of each box, and lon and lat its position. The boxes and their positions do not
-    change while a generation's draft threshold is in force.
+    prediction of each box, lon and lat its position, and corners the longitude and latitude of
+    its top left, top right, bottom right and bottom left corners (n, 8). The boxes and their
+    positions do not change while a generation's draft threshold is in force.
     """
 
     image_ids: np.ndarray
@@ -136,6 +137,7 @@ class PlacedBoxes:
     scores: np.ndarray
     lon: np.ndarray
     lat: np.ndarray
+    corners: np.ndarray
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -145,6 +147,7 @@ class PlacedBoxes:
         self.prediction_uuids = [str(uuid) for uuid in self.prediction_uuids]
         for name in ("scores", "lon", "lat"):
             setattr(self, name, np.asarray(getattr(self, name), dtype=float))
+        self.corners = np.asarray(self.corners, dtype=float).reshape(-1, 8)
 
         lengths = {len(getattr(self, name)) for name in self.__dataclass_fields__}
         if lengths != {len(self.image_ids)}:

@@ -16,6 +16,8 @@ import type {
   ImageOverlay,
   MapDetection,
   MapDetections,
+  ImageCrop,
+  BoxCoordinates,
 } from "@/models";
 import { decimal, figuresShown, maskedNote, percent, whole } from "@/utils/abundance";
 
@@ -27,6 +29,13 @@ let map: L.Map | null = null;
 let footprintLayer: L.GeoJSON | null = null;
 let detectionLayer: L.LayerGroup | null = null;
 let overlayLayer: L.LayerGroup | null = null;
+// The images drawn onto the ground, by image uuid
+const overlayOf = new Map<string, L.ImageOverlay>();
+// The boxes of the drawn images, by image uuid
+let boxLayer: L.LayerGroup | null = null;
+const boxesOf = new Map<string, L.LayerGroup>();
+// The images lie in a pane under the shapes' canvas, so their boxes and the detections show
+const IMAGE_PANE = "images";
 
 // Survey
 const loading = ref(false);
@@ -61,6 +70,48 @@ const KINDS = {
   estimated: { label: "Estimated", color: "#fd7e14" },
 };
 
+// A circle has an area proportional to its animals after the overlap weights: one animal
+// is drawn at RADIUS_PX, n at RADIUS_PX * sqrt(n), between MIN_RADIUS_PX and MAX_RADIUS_PX.
+const RADIUS_PX = 4;
+const MIN_RADIUS_PX = 3;
+const MAX_RADIUS_PX = 24;
+// Crops shown in a popup
+const MAX_CROPS = 6;
+// Detections from different images this close, where another image covers them, are the
+// same animal; their tiles are drawn as one circle
+const SAME_ANIMAL_M = 15;
+
+function radiusOf(animals: number): number {
+  return Math.min(MAX_RADIUS_PX, Math.max(MIN_RADIUS_PX, RADIUS_PX * Math.sqrt(animals)));
+}
+
+// The detections of one kind on one tile
+interface TileDetections {
+  kind: MapDetection["kind"];
+  reviewed_area_id: number;
+  image_id: number;
+  lat: number;
+  lon: number;
+  detections: MapDetection[];
+}
+
+// One circle: a tile's detections, with those of the same animals seen from other images.
+// Annotated when any of its tiles was reviewed.
+interface Sighting {
+  kind: MapDetection["kind"];
+  tiles: TileDetections[];
+  lat: number;
+  lon: number;
+  // The animals after the overlap weights
+  animals: number;
+}
+
+function metersBetween(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const north = (a.lat - b.lat) * 111_320;
+  const east = (a.lon - b.lon) * 111_320 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180);
+  return Math.hypot(north, east);
+}
+
 // The detections on each image
 const detectionsByImage = computed(() => {
   const byImage = new Map<number, MapDetection[]>();
@@ -70,6 +121,72 @@ const detectionsByImage = computed(() => {
     byImage.set(detection.image_id, onImage);
   }
   return byImage;
+});
+
+// The detections grouped by tile and kind
+const detectionsByTile = computed<TileDetections[]>(() => {
+  const byTile = new Map<string, MapDetection[]>();
+  for (const detection of detections.value?.detections ?? []) {
+    const key = `${detection.kind}:${detection.reviewed_area_id}`;
+    const onTile = byTile.get(key) ?? [];
+    onTile.push(detection);
+    byTile.set(key, onTile);
+  }
+  return [...byTile.values()].map((onTile) => ({
+    kind: onTile[0].kind,
+    reviewed_area_id: onTile[0].reviewed_area_id,
+    image_id: onTile[0].image_id,
+    lat: onTile.reduce((sum, d) => sum + d.lat, 0) / onTile.length,
+    lon: onTile.reduce((sum, d) => sum + d.lon, 0) / onTile.length,
+    detections: onTile,
+  }));
+});
+
+// The tiles joined where they show the same animal from different images, of either kind, the
+// largest first so smaller circles lie on top. Joining changes the drawing only: a circle's
+// animals are the sum of its detections' overlap weights either way.
+const sightings = computed<Sighting[]>(() => {
+  const tiles = detectionsByTile.value;
+  const parent = tiles.map((_, i) => i);
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i])));
+
+  // Only a detection another image covers can have been seen twice
+  const overlapped = tiles.flatMap((tile, i) =>
+    tile.detections.filter((d) => d.weight < 1).map((d) => ({ d, tile: i })),
+  );
+  for (let i = 0; i < overlapped.length; i++) {
+    for (let j = i + 1; j < overlapped.length; j++) {
+      const [a, b] = [overlapped[i], overlapped[j]];
+      if (a.d.image_id !== b.d.image_id && metersBetween(a.d, b.d) <= SAME_ANIMAL_M) {
+        parent[root(b.tile)] = root(a.tile);
+      }
+    }
+  }
+
+  const joined = new Map<number, TileDetections[]>();
+  tiles.forEach((tile, i) => joined.set(root(i), [...(joined.get(root(i)) ?? []), tile]));
+  return [...joined.values()]
+    .map((group): Sighting => {
+      const all = group.flatMap((tile) => tile.detections);
+      const animals = all.reduce((sum, d) => sum + d.weight, 0);
+      return {
+        kind: group.some((tile) => tile.kind === "annotated") ? "annotated" : "estimated",
+        tiles: group,
+        lat: all.reduce((sum, d) => sum + d.weight * d.lat, 0) / animals,
+        lon: all.reduce((sum, d) => sum + d.weight * d.lon, 0) / animals,
+        animals,
+      };
+    })
+    .sort((a, b) => b.animals - a.animals);
+});
+
+// The name of each image, from the footprints
+const imageNameOf = computed(() => {
+  const out = new Map<number, string>();
+  for (const feature of footprints.value?.features ?? []) {
+    out.set(feature.properties.image_id, feature.properties.name);
+  }
+  return out;
 });
 
 // The uuid of each image, from the footprints
@@ -111,56 +228,229 @@ function element(tag: string, className: string, text = ""): HTMLElement {
   return node;
 }
 
-function kindLine(d: MapDetection): HTMLElement {
-  const kind = KINDS[d.kind];
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+function sightingLabel(sighting: Sighting): string {
+  const animals = Math.round(sighting.animals * 10) / 10;
+  const seen = { annotated: 0, estimated: 0 };
+  for (const tile of sighting.tiles) seen[tile.kind] += tile.detections.length;
+  if (sighting.tiles.length === 1 && animals === seen[sighting.kind]) {
+    const kind = KINDS[sighting.kind].label.toLowerCase();
+    return `${plural(animals, `${kind} animal`, `${kind} animals`)} on this tile`;
+  }
+  const kinds = (["annotated", "estimated"] as const)
+    .filter((kind) => seen[kind] > 0)
+    .map((kind) => `${seen[kind]} ${kind}`)
+    .join(", ");
+  const images = new Set(sighting.tiles.map((tile) => tile.image_id)).size;
+  return `${plural(animals, "animal", "animals")} after overlap: ${kinds}, in ${plural(images, "image", "images")}`;
+}
+
+function kindLine(sighting: Sighting): HTMLElement {
   const line = element("div", "d-flex align-items-center gap-2 mb-1");
   const dot = element("span", "", "●");
-  dot.style.color = kind.color;
-  line.append(dot, element("strong", "", kind.label));
-  if (d.score !== null) {
-    line.append(element("span", "font-monospace text-secondary", `score ${d.score.toFixed(3)}`));
-  }
+  dot.style.color = KINDS[sighting.kind].color;
+  line.append(dot, element("strong", "", sightingLabel(sighting)));
   return line;
 }
 
-// An estimated detection's crop comes from the images router's prediction crops
-async function loadCrop(d: MapDetection, holder: HTMLElement) {
-  const imageUuid = imageUuidOf.value.get(d.image_id);
-  if (!imageUuid || !d.prediction_uuid) {
-    holder.textContent = "No image for this detection.";
+const SVG = "http://www.w3.org/2000/svg";
+
+// An image `widthPx` wide with boxes drawn over it. The crop is `width` by `height` pixels and
+// the boxes (left, top, right, bottom) are in its pixels; the viewBox scales them with the image.
+function boxedImage(
+  src: string,
+  width: number,
+  height: number,
+  boxes: number[][],
+  color: string,
+  widthPx: number,
+  alt: string,
+): HTMLElement {
+  const frame = element("div", "position-relative rounded-2 border border-secondary-subtle overflow-hidden");
+  frame.style.width = `${widthPx}px`;
+  frame.style.aspectRatio = `${width} / ${height}`;
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = alt;
+  img.className = "w-100 h-100 d-block";
+
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("class", "position-absolute top-0 start-0 w-100 h-100");
+  for (const [x0, y0, x1, y1] of boxes) {
+    const rect = document.createElementNS(SVG, "rect");
+    rect.setAttribute("x", String(Math.min(x0, x1)));
+    rect.setAttribute("y", String(Math.min(y0, y1)));
+    rect.setAttribute("width", String(Math.abs(x1 - x0)));
+    rect.setAttribute("height", String(Math.abs(y1 - y0)));
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("stroke", color);
+    rect.setAttribute("stroke-width", "2");
+    rect.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.append(rect);
+  }
+  frame.append(img, svg);
+  return frame;
+}
+
+// The window and box of a prediction crop, as the images router returns them
+interface PredictionCrop {
+  uuid: string;
+  dimensions: BoxCoordinates;
+  boundingBox: BoxCoordinates;
+}
+
+function failed(holder: HTMLElement, err: unknown) {
+  holder.textContent = err instanceof Error ? err.message : "Could not load the image";
+}
+
+// An estimated tile's crops come from the images router's prediction crops, cut from the
+// source image in one request since a tile's boxes all lie on one image
+async function loadEstimatedCrops(shown: MapDetection[], holders: HTMLElement[]) {
+  const imageUuid = imageUuidOf.value.get(shown[0].image_id);
+  if (!imageUuid) {
+    holders.forEach((holder) => (holder.textContent = "No image for this detection."));
     return;
   }
   try {
-    const [crop] = await api.post<{ uuid: string }[]>("images/prediction_crops", {
+    const crops = await api.post<PredictionCrop[]>("images/prediction_crops", {
       image_id: imageUuid,
-      prediction_id: [d.prediction_uuid],
+      prediction_id: shown.map((d) => d.prediction_uuid),
     });
-    const res = await fetch(`${API_BASE}/images/prediction_crops/${crop.uuid}`, {
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(await res.blob());
-    img.width = 300;
-    img.height = 300;
-    img.alt = "Estimated detection";
-    img.className = "rounded-2 border border-secondary-subtle";
-    holder.replaceChildren(img);
+    const byUuid = new Map(crops.map((crop) => [crop.uuid, crop]));
+    await Promise.all(
+      shown.map(async (d, i) => {
+        try {
+          const crop = byUuid.get(d.prediction_uuid ?? "");
+          if (!crop) throw new Error("No image for this detection.");
+          const res = await fetch(`${API_BASE}/images/prediction_crops/${crop.uuid}`, {
+            credentials: "include",
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const { top_left, bottom_right } = crop.boundingBox;
+          holders[i].replaceChildren(
+            boxedImage(
+              URL.createObjectURL(await res.blob()),
+              Math.abs(crop.dimensions.bottom_right.x - crop.dimensions.top_left.x),
+              Math.abs(crop.dimensions.bottom_right.y - crop.dimensions.top_left.y),
+              [[top_left.x, top_left.y, bottom_right.x, bottom_right.y]],
+              KINDS.estimated.color,
+              150,
+              "Estimated detection",
+            ),
+          );
+        } catch (err) {
+          failed(holders[i], err);
+        }
+      }),
+    );
   } catch (err) {
-    holder.textContent = err instanceof Error ? err.message : "Could not load the image";
+    holders.forEach((holder) => failed(holder, err));
   }
 }
 
-function detectionPopup(d: MapDetection): HTMLElement {
-  const root = element("div", "");
-  root.append(kindLine(d));
-  if (d.kind === "annotated") {
-    root.append(element("div", "small text-secondary", "On a reviewed tile, as the reviewer left it."));
-    return root;
+// An image's annotated animals, in crops grouped as the auto cropper groups predictions, with
+// the boxes drawn over them. With `only`, just the crops holding one of those boxes (in image
+// pixels).
+async function loadImageCrops(imageUuid: string, holder: HTMLElement, only?: number[][]) {
+  try {
+    const { crops } = await api.get<{ crops: ImageCrop[] }>("survey-maps/image-crops", { image_id: imageUuid });
+    const holds = (crop: ImageCrop) => {
+      const [left, top, right, bottom] = crop.window;
+      return (only ?? []).some(([x0, y0, x1, y1]) => x0 >= left && y0 >= top && x1 <= right && y1 <= bottom);
+    };
+    const shown = only ? crops.filter(holds) : crops;
+    if (shown.length === 0) {
+      holder.textContent = "No annotated animal on this image.";
+      return;
+    }
+
+    const list = element("div", "d-flex flex-wrap gap-2");
+    for (const crop of shown) {
+      const [left, top, right, bottom] = crop.window;
+      list.append(
+        boxedImage(crop.image, right - left, bottom - top, crop.boxes, KINDS.annotated.color, 150, "Annotated animals"),
+      );
+    }
+    holder.replaceChildren(list);
+  } catch (err) {
+    failed(holder, err);
   }
-  const holder = element("div", "small text-secondary", "Loading the image…");
-  root.append(holder);
-  loadCrop(d, holder);
+}
+
+// One image's crops in a sighting: its annotated animals, zoomed, then its estimated boxes,
+// the highest scoring first
+function imageCrops(imageId: number, tiles: TileDetections[], estimated: MapDetection[]): HTMLElement {
+  const group = element("div", "d-flex flex-column gap-2");
+  const imageUuid = imageUuidOf.value.get(imageId);
+  if (!imageUuid) {
+    group.append(element("div", "small text-secondary", "No image for these detections."));
+    return group;
+  }
+
+  const boxes = tiles
+    .filter((tile) => tile.kind === "annotated")
+    .flatMap((tile) => tile.detections.map((d) => d.box ?? []));
+  if (boxes.length > 0) {
+    const holder = element("div", "small text-secondary", "Loading the animals…");
+    group.append(holder);
+    loadImageCrops(imageUuid, holder, boxes);
+  }
+
+  if (estimated.length > 0) {
+    const grid = element("div", "d-flex flex-wrap gap-2");
+    const holders = estimated.map((d) => {
+      const cell = element("div", "small text-secondary");
+      const holder = element("div", "", "Loading the image…");
+      cell.append(holder, element("div", "font-monospace", `score ${(d.score ?? 0).toFixed(3)}`));
+      grid.append(cell);
+      return holder;
+    });
+    group.append(grid);
+    loadEstimatedCrops(estimated, holders);
+  }
+  return group;
+}
+
+function sightingPopup(sighting: Sighting): HTMLElement {
+  const root = element("div", "");
+  root.append(kindLine(sighting));
+
+  // The estimated boxes shown: the highest scoring of the sighting
+  const all = sighting.tiles.filter((tile) => tile.kind === "estimated").flatMap((tile) => tile.detections);
+  const shown = [...all].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, MAX_CROPS);
+
+  // The crops by image; outlined and numbered when the animals were seen in more than one
+  const images = [...new Set(sighting.tiles.map((tile) => tile.image_id))];
+  const list = element("div", "d-flex flex-column gap-2");
+  images.forEach((imageId, i) => {
+    const crops = imageCrops(
+      imageId,
+      sighting.tiles.filter((tile) => tile.image_id === imageId),
+      shown.filter((d) => d.image_id === imageId),
+    );
+    if (images.length === 1) {
+      list.append(crops);
+      return;
+    }
+    const outline = element("div", "border border-secondary rounded-3 p-2");
+    const heading = element("div", "d-flex align-items-baseline gap-2 mb-1 small");
+    const name = imageNameOf.value.get(imageId) ?? "";
+    const label = element("span", "text-secondary text-truncate", name);
+    label.title = name;
+    heading.append(element("strong", "", `Image ${i + 1}`), label);
+    outline.append(heading, crops);
+    list.append(outline);
+  });
+  root.append(list);
+
+  if (all.length > shown.length) {
+    root.append(element("div", "small text-secondary mt-1", `${all.length - shown.length} more not shown.`));
+  }
   return root;
 }
 
@@ -183,9 +473,33 @@ function footprintPopup(p: FootprintProperties): HTMLElement {
     ),
   );
 
-  const button = element("button", "btn btn-sm btn-primary w-100", "Show image on map");
-  button.onclick = () => showOverlay(p, button as HTMLButtonElement);
+  // The annotated animals across the image's tiles, zoomed
+  if (counts.annotated > 0) {
+    const holder = element("div", "small text-secondary mb-2", "Loading the animals…");
+    root.append(holder);
+    loadImageCrops(p.image_uuid, holder);
+  }
+
+  const shown = overlayOf.has(p.image_uuid);
+  const button = element(
+    "button",
+    `btn btn-sm w-100 ${shown ? "btn-outline-primary" : "btn-primary"}`,
+    shown ? "Hide image on map" : "Show image on map",
+  );
+  button.onclick = () => toggleOverlay(p, button as HTMLButtonElement);
   root.append(button);
+
+  // Once the image is drawn, its detections can be boxed on it
+  if (shown && onImage.length > 0) {
+    const boxed = boxesOf.has(p.image_uuid);
+    const boxes = element(
+      "button",
+      `btn btn-sm w-100 mt-1 ${boxed ? "btn-outline-danger" : "btn-danger"}`,
+      boxed ? "Hide pronghorn in image" : "Show pronghorn in image",
+    );
+    boxes.onclick = () => toggleBoxes(p);
+    root.append(boxes);
+  }
   return root;
 }
 
@@ -211,8 +525,10 @@ function createMap() {
   L.control.layers({ "USGS Imagery": imagery, "USGS Topo": topo }, {}, { position: "topleft" }).addTo(map);
   L.control.scale({ imperial: false }).addTo(map);
 
+  map.createPane(IMAGE_PANE).style.zIndex = "350";
   overlayLayer = L.layerGroup().addTo(map);
   detectionLayer = L.layerGroup().addTo(map);
+  boxLayer = L.layerGroup().addTo(map);
 }
 
 function drawFootprints() {
@@ -228,7 +544,8 @@ function drawFootprints() {
     },
     onEachFeature: (feature, layer) => {
       layer.bindPopup(() => footprintPopup(feature.properties as FootprintProperties), {
-        maxWidth: 280,
+        maxWidth: 340,
+        maxHeight: 480,
       });
     },
   }).addTo(map);
@@ -241,33 +558,46 @@ function drawDetections() {
   detectionLayer.clearLayers();
   if (!showDetections.value) return;
 
-  for (const d of detections.value?.detections ?? []) {
-    const kind = KINDS[d.kind];
-    L.circleMarker([d.lat, d.lon], {
-      radius: 4,
+  for (const sighting of sightings.value) {
+    L.circleMarker([sighting.lat, sighting.lon], {
+      radius: radiusOf(sighting.animals),
       color: "#000000",
       weight: 1,
-      fillColor: kind.color,
-      fillOpacity: 0.95,
+      fillColor: KINDS[sighting.kind].color,
+      fillOpacity: 0.85,
     })
-      .bindTooltip(d.score === null ? kind.label : `${kind.label}, score ${d.score.toFixed(3)}`)
-      .bindPopup(() => detectionPopup(d), { maxWidth: 340 })
+      .bindTooltip(sightingLabel(sighting))
+      .bindPopup(() => sightingPopup(sighting), { maxWidth: 340, maxHeight: 480 })
       .addTo(detectionLayer);
   }
 }
 
-async function showOverlay(p: FootprintProperties, button: HTMLButtonElement) {
+// Draws the image onto the ground, or removes it when it is drawn already
+async function toggleOverlay(p: FootprintProperties, button: HTMLButtonElement) {
   if (!map || !overlayLayer || loadingOverlay.value) return;
+
+  const drawn = overlayOf.get(p.image_uuid);
+  if (drawn) {
+    overlayLayer.removeLayer(drawn);
+    overlayOf.delete(p.image_uuid);
+    hideBoxes(p.image_uuid);
+    overlaysShown.value = overlayOf.size;
+    map.closePopup();
+    return;
+  }
+
   loadingOverlay.value = true;
   button.disabled = true;
   button.textContent = "Drawing image…";
   try {
     const overlay = await api.get<ImageOverlay>("survey-maps/overlay", { image_id: p.image_uuid });
-    L.imageOverlay(overlay.url, overlay.bounds, {
+    const layer = L.imageOverlay(overlay.url, overlay.bounds, {
+      pane: IMAGE_PANE,
       opacity: overlayOpacity.value,
       interactive: false,
     }).addTo(overlayLayer);
-    overlaysShown.value++;
+    overlayOf.set(p.image_uuid, layer);
+    overlaysShown.value = overlayOf.size;
     map.closePopup();
   } catch (err) {
     button.disabled = false;
@@ -277,8 +607,36 @@ async function showOverlay(p: FootprintProperties, button: HTMLButtonElement) {
   }
 }
 
+function hideBoxes(imageUuid: string) {
+  const boxes = boxesOf.get(imageUuid);
+  if (boxes) boxLayer?.removeLayer(boxes);
+  boxesOf.delete(imageUuid);
+}
+
+// Draws the image's detections as boxes on its drawn image, or removes them
+function toggleBoxes(p: FootprintProperties) {
+  if (!map || !boxLayer) return;
+  map.closePopup();
+  if (boxesOf.has(p.image_uuid)) {
+    hideBoxes(p.image_uuid);
+    return;
+  }
+  const boxes = L.layerGroup(
+    (detectionsByImage.value.get(p.image_id) ?? []).map((d) =>
+      L.polygon(
+        d.corners.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
+        { color: KINDS[d.kind].color, weight: 2, fill: false, interactive: false },
+      ),
+    ),
+  ).addTo(boxLayer);
+  boxesOf.set(p.image_uuid, boxes);
+}
+
 function clearOverlays() {
   overlayLayer?.clearLayers();
+  overlayOf.clear();
+  boxLayer?.clearLayers();
+  boxesOf.clear();
   overlaysShown.value = 0;
 }
 
@@ -336,9 +694,14 @@ watch(overlayOpacity, (opacity) => {
   overlayLayer?.eachLayer((layer) => (layer as L.ImageOverlay).setOpacity(Number(opacity)));
 });
 watch(showOverlays, (shown) => {
-  if (!map || !overlayLayer) return;
-  if (shown) overlayLayer.addTo(map);
-  else overlayLayer.remove();
+  if (!map || !overlayLayer || !boxLayer) return;
+  if (shown) {
+    overlayLayer.addTo(map);
+    boxLayer.addTo(map);
+  } else {
+    overlayLayer.remove();
+    boxLayer.remove();
+  }
 });
 
 let resizeObserver: ResizeObserver | null = null;

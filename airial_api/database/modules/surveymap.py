@@ -39,8 +39,10 @@ import psycopg.sql as sql
 from psycopg import Cursor
 from psycopg.rows import dict_row, tuple_row
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
+import shapely
 
 from ais import MeasurementState, PlacedBoxes
+from ais.overlap import coverage_weights
 from database.errors import ObjectNotFound
 from database.modules.activemeasurement import get_detection_model
 from database.object_models.core.activity import ActivityType
@@ -177,21 +179,22 @@ def ground_position(gcps: list[list[float]]) -> Locator | None:
     return position
 
 
-def locate(
+def locators(
     cursor: Cursor[Any],
-    rows: list[dict[str, Any]],
-) -> list[tuple[float, float] | None]:
-    """Returns the longitude and latitude of each row's box center.
+    image_ids: list[int],
+) -> dict[int, Locator | None]:
+    """Returns each image's function from pixels to longitude and latitude.
 
     Args:
         cursor: Active database cursor.
-        rows: Boxes with image_id, center_x and center_y in image pixels.
+        image_ids: Primary keys of the images.
 
     Returns:
-        One position per row, None where its image has no ground control.
+        The function of each image's latest footprint (`ground_position`),
+        None or missing where it has no ground control.
     """
-    image_ids = sorted({row["image_id"] for row in rows})
-    locators: dict[int, Locator | None] = {}
+    image_ids = sorted(set(image_ids))
+    found: dict[int, Locator | None] = {}
 
     cursor.row_factory = dict_row
     for start in range(0, len(image_ids), IMAGES_PER_STATEMENT):
@@ -205,17 +208,63 @@ def locate(
             {"image_ids": image_ids[start : start + IMAGES_PER_STATEMENT]},
         )
         for row in cursor.fetchall():
-            locators[row["image_id"]] = ground_position(row["gcps"])
+            found[row["image_id"]] = ground_position(row["gcps"])
+    return found
 
+
+def locate(
+    rows: list[dict[str, Any]],
+    found: dict[int, Locator | None],
+) -> list[tuple[float, float] | None]:
+    """Returns the longitude and latitude of each row's box center.
+
+    Args:
+        rows: Boxes with image_id, center_x and center_y in image pixels.
+        found: The `locators` of the rows' images.
+
+    Returns:
+        One position per row, None where its image has no ground control.
+    """
     positions: list[tuple[float, float] | None] = []
     for row in rows:
-        if (position := locators.get(row["image_id"])) is None:
+        if (position := found.get(row["image_id"])) is None:
             positions.append(None)
             continue
         positions.append(
             position(float(row["center_x"]), float(row["center_y"]))
         )
     return positions
+
+
+def outline(
+    rows: list[dict[str, Any]],
+    found: dict[int, Locator | None],
+) -> list[list[float] | None]:
+    """Returns the corners of each row's box on the ground.
+
+    The corners are placed through the image's ground control points, the
+    mapping its overlay is drawn with, so they lie on the drawn image.
+
+    Args:
+        rows: Boxes with image_id and box_tx, box_ty, box_bx and box_by in
+            image pixels.
+        found: The `locators` of the rows' images.
+
+    Returns:
+        One box per row as the longitude and latitude of its top left, top
+        right, bottom right and bottom left corners, flattened; None where its
+        image has no ground control.
+    """
+    corners: list[list[float] | None] = []
+    for row in rows:
+        if (position := found.get(row["image_id"])) is None:
+            corners.append(None)
+            continue
+        left, right = sorted((float(row["box_tx"]), float(row["box_bx"])))
+        top, bottom = sorted((float(row["box_ty"]), float(row["box_by"])))
+        around = ((left, top), (right, top), (right, bottom), (left, bottom))
+        corners.append([value for x, y in around for value in position(x, y)])
+    return corners
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -233,11 +282,12 @@ def annotated(
         measurement: The active measurement.
 
     Returns:
-        Each annotation's image, box center and box in image pixels.
+        Each annotation's image, tile, box center and box in image pixels.
     """
     stmt = sql.SQL("""
         SELECT DISTINCT ON (a.annotation_id)
             a.image_id,
+            t.reviewed_area_id,
             (a.box_tx + a.box_bx) / 2.0 AS center_x,
             (a.box_ty + a.box_by) / 2.0 AS center_y,
             a.box_tx, a.box_ty, a.box_bx, a.box_by
@@ -249,7 +299,7 @@ def annotated(
         WHERE u.active_measurement_id = %(active_measurement_id)s
           AND t.reviewed_by_user_id <> 0
           AND a.label_id = %(label_id)s
-        ORDER BY a.annotation_id ASC;
+        ORDER BY a.annotation_id ASC, t.reviewed_area_id ASC;
     """)
 
     cursor.row_factory = dict_row
@@ -261,6 +311,31 @@ def annotated(
         },
     )
     return cursor.fetchall()
+
+
+def get_annotated_boxes(
+    cursor: Cursor[Any],
+    db: "Database",
+    measurement: ActiveMeasurement,
+    image_id: int,
+) -> list[list[int]]:
+    """Returns the boxes of an image's annotated animals.
+
+    Args:
+        cursor: Active database cursor.
+        db: The database.
+        measurement: The active measurement.
+        image_id: Primary key of the image.
+
+    Returns:
+        The boxes of the measurement's label on its reviewed tiles of the
+        image, in image pixels (left, top, right, bottom).
+    """
+    return [
+        [int(row[key]) for key in PIXELS]
+        for row in annotated(cursor, measurement)
+        if row["image_id"] == image_id
+    ]
 
 
 def reviewed_tiles(
@@ -309,14 +384,15 @@ def candidates(
         threshold: The lowest score kept, the measurement's draft threshold.
 
     Returns:
-        Each box's prediction, image, tile, score and center in pixels,
-        highest score first.
+        Each box's prediction, image, tile, score, box and center in
+        pixels, highest score first.
     """
     detector = get_detection_model(cursor, db, measurement.survey_id)
 
     stmt = sql.SQL("""
         SELECT p.uuid AS prediction_uuid, p.image_id, p.score,
                t.reviewed_area_id,
+               p.box_tx, p.box_ty, p.box_bx, p.box_by,
                (p.box_tx + p.box_bx) / 2.0 AS center_x,
                (p.box_ty + p.box_by) / 2.0 AS center_y
         FROM core.predictions p
@@ -426,8 +502,12 @@ def shown(
         The annotated animals and the boxes picked for the rest.
     """
     seen = annotated(cursor, measurement)
-    for row, at in zip(seen, locate(cursor, seen)):
+    found = locators(cursor, [row["image_id"] for row in seen])
+    for row, at, corners in zip(
+        seen, locate(seen, found), outline(seen, found)
+    ):
         row["lon"], row["lat"] = at if at is not None else (None, None)
+        row["corners"] = corners
 
     reviewed = reviewed_tiles(cursor, measurement)
     unseen = [
@@ -442,6 +522,58 @@ def shown(
     picked = place_estimated(unseen, expected, wanted)
 
     return Shown(seen, [box["at"] for box in picked], wanted)
+
+
+def covering(
+    cursor: Cursor[Any],
+    survey_id: int,
+    image_of: list[int],
+    positions: list[tuple[float, float]],
+) -> np.ndarray:
+    """Returns how many images other than its own cover each animal.
+
+    An image covers an animal when its latest footprint contains the
+    animal's longitude and latitude. The footprints have no spatial index,
+    so they are read once and searched with a tree here.
+
+    Args:
+        cursor: Active database cursor.
+        survey_id: Primary key of the survey.
+        image_of: The image each animal was placed from.
+        positions: Each animal's longitude and latitude.
+
+    Returns:
+        The number of other images covering each animal.
+    """
+    if not positions:
+        return np.zeros(0)
+
+    stmt = sql.SQL("""
+        SELECT DISTINCT ON (f.image_id) f.image_id, ST_AsBinary(f.footprint)
+        FROM core.image_footprints f
+        JOIN core.images i ON i.image_id = f.image_id
+        WHERE i.survey_id = %(survey_id)s
+          AND f.footprint IS NOT NULL
+        ORDER BY f.image_id ASC, f.footprint_id DESC;
+    """)
+
+    cursor.row_factory = tuple_row
+    cursor.execute(stmt, {"survey_id": survey_id})
+    rows = cursor.fetchall()
+
+    footprint_of = np.asarray([row[0] for row in rows])
+    tree = shapely.STRtree(shapely.from_wkb([bytes(row[1]) for row in rows]))
+    animal, footprint = tree.query(shapely.points(positions), predicate="within")
+
+    others = np.zeros(len(positions))
+    other = footprint_of[footprint] != np.asarray(image_of)[animal]
+    np.add.at(others, animal[other], 1)
+    return others
+
+
+def _pairs(corners: list[float]) -> list[list[float]]:
+    """Returns flattened corners as [longitude, latitude] pairs."""
+    return [corners[at : at + 2] for at in range(0, len(corners), 2)]
 
 
 def get_detections(
@@ -467,35 +599,52 @@ def get_detections(
     Returns:
         How many are annotated, estimated and left unplaced (no box was left
         to stand in for them), the threshold, and each detection with its
-        image, kind, score and prediction (estimated only), box in pixels
-        (annotated only) and position.
+        image, tile, kind, score and prediction (estimated only), box in
+        pixels (annotated only), position, the box's corners on the ground
+        and overlap weight.
     """
     on_map = shown(cursor, measurement, state, boxes, count)
 
     detections = [
         {
             "image_id": row["image_id"],
+            "reviewed_area_id": row["reviewed_area_id"],
             "kind": "annotated",
             "score": None,
             "prediction_uuid": None,
             "box": [int(row[key]) for key in PIXELS],
             "lon": row["lon"],
             "lat": row["lat"],
+            "corners": _pairs(row["corners"]),
         }
         for row in on_map.annotated
         if row["lon"] is not None
     ] + [
         {
             "image_id": int(boxes.image_ids[at]),
+            "reviewed_area_id": int(boxes.reviewed_area_ids[at]),
             "kind": "estimated",
             "score": float(boxes.scores[at]),
             "prediction_uuid": boxes.prediction_uuids[at],
             "box": None,
             "lon": float(boxes.lon[at]),
             "lat": float(boxes.lat[at]),
+            "corners": _pairs(boxes.corners[at].tolist()),
         }
         for at in on_map.picked
     ]
+
+    # Each detection's overlap weight: 1 / the images covering it
+    weights = coverage_weights(
+        covering(
+            cursor,
+            measurement.survey_id,
+            [d["image_id"] for d in detections],
+            [(d["lon"], d["lat"]) for d in detections],
+        )
+    )
+    for detection, weight in zip(detections, weights.tolist()):
+        detection["weight"] = weight
 
     return {
         "annotated": len(on_map.annotated),

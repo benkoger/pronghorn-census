@@ -10,7 +10,7 @@
 
 import io
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 import pytest
@@ -21,7 +21,9 @@ from ais import PlacedBoxes, SurveyTerms
 from app import overlays, proposal_store
 from app.extensions import base, cache
 from app.routers.survey_maps import NO_DETECTIONS
+from crop_generator import cluster_windows
 from database.modules import abundance, surveymap
+from database.object_models.core.images import Image
 from database.object_models.project_management.active_measurements import (
     ActiveMeasurement,
 )
@@ -51,6 +53,12 @@ def _gcps() -> list[list[float]]:
         for row in np.linspace(0, height, GRID).tolist()
         for col in np.linspace(0, width, GRID).tolist()
     ]
+
+
+def _jpeg(size: tuple[int, int]) -> bytes:
+    buf = io.BytesIO()
+    PILImage.new("RGB", size, color="olive").save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def _inside(lon: float, lat: float) -> bool:
@@ -184,7 +192,7 @@ class TestSurveyMaps(MeasurementFixtures):
         assert feature["properties"]["tiles_reviewed"] == 0
 
     def test_footprints_unknown_survey(self, auth_client):
-        from uuid import uuid4
+        from uuid import UUID, uuid4
 
         res = auth_client.get(f"{MAPS}/footprints", query_string={"survey_id": str(uuid4())})
         assert res.status_code == 404
@@ -219,9 +227,18 @@ class TestSurveyMaps(MeasurementFixtures):
         assert len(annotated) == unit["animals"]
         for d in annotated:
             assert d["image_id"] == IMAGE_ID
+            assert d["reviewed_area_id"] == unit["reviewed_area_id"]
             assert _inside(d["lon"], d["lat"])
             assert d["score"] is None and d["prediction_uuid"] is None
             assert len(d["box"]) == 4
+            # The box on the ground: north up and west left as the ground
+            # control runs, centered where the animal is placed.
+            (west, north), (east, _), (_, south), _ = d["corners"]
+            assert west < east and south < north
+            assert sum(c[0] for c in d["corners"]) / 4 == pytest.approx(d["lon"])
+            assert sum(c[1] for c in d["corners"]) / 4 == pytest.approx(d["lat"])
+            # No other image covers the sample image's ground.
+            assert d["weight"] == 1.0
 
         # The rest stand in for the animals the estimate expects elsewhere.
         estimated = [d for d in shown["detections"] if d["kind"] == "estimated"]
@@ -229,6 +246,9 @@ class TestSurveyMaps(MeasurementFixtures):
         for d in estimated:
             assert d["score"] >= shown["threshold"]
             assert d["prediction_uuid"] and d["box"] is None
+            assert 0 < d["weight"] <= 1
+            assert len(d["corners"]) == 4
+            assert d["reviewed_area_id"] != unit["reviewed_area_id"]
 
         est = auth_client.get(
             f"{AM}/estimate", query_string={"survey_id": SURVEY["uuid"]}
@@ -307,6 +327,80 @@ class TestSurveyMaps(MeasurementFixtures):
         res = auth_client.get(f"{MAPS}/overlay", query_string={"image_id": IMAGE_UUID})
         assert res.status_code == 200
         assert drawn == [1]
+
+    def test_image_crops(
+        self, app, auth_client, georeferenced, measurement, tiles, proposal, source_image
+    ):
+        crops_of = f"{MAPS}/image-crops"
+        query = {"image_id": IMAGE_UUID}
+        # The source image is cached by uuid; drop any copy of another run's.
+        with app.app_context():
+            cache.delete(UUID(IMAGE_UUID))
+
+        # No annotated animal before a review.
+        res = auth_client.get(crops_of, query_string=query)
+        assert res.status_code == 200
+        assert res.get_json() == {"crops": []}
+
+        self._review_one(auth_client)
+        shown = auth_client.get(
+            f"{MAPS}/detections", query_string={"survey_id": SURVEY["uuid"]}
+        ).get_json()
+        boxes = [d["box"] for d in shown["detections"] if d["kind"] == "annotated"]
+
+        # Twice: the second from the cached source image.
+        for _ in range(2):
+            crops = auth_client.get(crops_of, query_string=query).get_json()["crops"]
+            assert crops
+            for crop in crops:
+                assert crop["image"].startswith("data:image/webp;base64,")
+                left, top, right, bottom = crop["window"]
+                assert right - left == overlays.CROP_PX
+                assert bottom - top == overlays.CROP_PX
+
+            # Every annotated animal is in a crop, at its place in the crop.
+            for left, top, right, bottom in boxes:
+                assert any(
+                    [left - c["window"][0], top - c["window"][1],
+                     right - c["window"][0], bottom - c["window"][1]] in c["boxes"]
+                    for c in crops
+                )
+
+    def test_image_crops_without_measurement(self, auth_client, bare_survey):
+        res = auth_client.get(f"{MAPS}/image-crops", query_string={"image_id": IMAGE_UUID})
+        assert res.status_code == 200
+        assert res.get_json() == {"crops": []}
+
+    def test_image_crops_refuse(self, app, monkeypatch):
+        monkeypatch.setattr(overlays, "_source", lambda image: b"not an image")
+        with app.app_context():
+            image = base.get(Image, UUID(IMAGE_UUID))
+            with pytest.raises(ValueError):
+                overlays.annotated_crops(image, [[0, 0, 10, 10]])
+        monkeypatch.setattr(
+            overlays.cv2, "imencode", lambda *args, **kwargs: (False, None)
+        )
+        monkeypatch.setattr(overlays, "_source", lambda image: _jpeg((64, 64)))
+        with app.app_context():
+            with pytest.raises(ValueError):
+                overlays.annotated_crops(image, [[0, 0, 10, 10]])
+
+    def test_cluster_windows(self):
+        assert cluster_windows([], 1000, 1000, 100) == []
+
+        # Two animals close together: one window around both.
+        near = [[100, 100, 120, 120], [150, 150, 170, 170]]
+        assert cluster_windows(near, 1000, 1000, 100) == [(85, 85, 185, 185)]
+
+        # Far apart: a window each, kept inside the image.
+        far = [[0, 0, 20, 20], [950, 950, 990, 990]]
+        windows = sorted(cluster_windows(far, 1000, 1000, 100))
+        assert windows == [(0, 0, 100, 100), (900, 900, 1000, 1000)]
+
+        # A box larger than a window: a window at each box's center.
+        assert cluster_windows([[0, 0, 300, 300]], 1000, 1000, 100) == [
+            (100, 100, 200, 200)
+        ]
 
     def test_render_refuses(self, monkeypatch):
         gcps, bbox = _gcps(), BBOX
@@ -443,7 +537,7 @@ class TestSurveyMaps(MeasurementFixtures):
 
     def test_terms_without_boxes(self, app, auth_client, georeferenced, measurement):
         """With no box on the ground, the terms keep their defaults."""
-        empty = PlacedBoxes([], [], [], [], [], [])
+        empty = PlacedBoxes([], [], [], [], [], [], [])
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
             terms = base.execute(abundance.prepare_terms, row, empty, 5.0e6, 0.0, [])
@@ -489,6 +583,12 @@ class TestSurveyMaps(MeasurementFixtures):
             )
         assert per_image == {IMAGE_ID: 1.5, other[0]: 0.5}
         assert factor == pytest.approx(2.0 / 3.0)
+
+        with app.app_context():
+            nothing = base.execute(
+                lambda cursor, db: surveymap.covering(cursor, SURVEY["pkey"], [], [])
+            )
+        assert len(nothing) == 0
 
     def test_transect_areas_without_footprints(self, app):
         with app.app_context():
@@ -541,13 +641,15 @@ class TestSurveyMaps(MeasurementFixtures):
             scores=[0.9, 0.8],
             lon=[-105.0, -105.1],
             lat=[41.0, 41.1],
+            corners=[[0.0] * 8, [1.0] * 8],
         )
         again = PlacedBoxes.from_cache(boxes.to_cache())
         assert again.prediction_uuids == ["a", "b"]
         assert again.lat.tolist() == [41.0, 41.1]
+        assert again.corners.tolist() == [[0.0] * 8, [1.0] * 8]
         assert len(again) == 2
         with pytest.raises(ValueError):
-            PlacedBoxes([1], [1], [], [0.5], [0.0], [0.0])
+            PlacedBoxes([1], [1], [], [0.5], [0.0], [0.0], [[0.0] * 8])
 
         terms = SurveyTerms(habitable_area_m2=5.0, surveyed_area_m2=1.0, transects=["0"],
                             transect_areas_m2=[1.0])
