@@ -295,7 +295,7 @@ def get_annotated_images(survey_id: int | UUID):
       500:
         description: Database error.
     """
-    date_range = request.args.get("date_range", None)
+    date_range = request.args.getlist("date_range") or None
     surveys = [base.get(Survey, survey_id).survey_id]
     labels = request.args.getlist("label", type=int)
     herd_units = request.args.getlist("herd_unit", type=int)

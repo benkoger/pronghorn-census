@@ -147,6 +147,23 @@ class TestSurveys(APITester):
         data = response.get_json()
         assert isinstance(data, list)
 
+    def test_get_survey_annotated_images_with_date_range(self, auth_client):
+        survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
+        params = [
+            ("label", 3),
+            ("herd_unit", 1),
+            ("date_range", "01/01/2020 00:00:00"),
+            ("date_range", "01/01/2030 00:00:00"),
+        ]
+        query_string = urllib.parse.urlencode(params)
+
+        response = auth_client.get(
+            f"/api/v1/surveys/{survey_uuid}/annotated_images?{query_string}"
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, list)
+
     # -------------------------------------------------------------------------
     # 3. GET Not Found / Edge Cases
     # -------------------------------------------------------------------------
