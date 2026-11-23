@@ -12,6 +12,7 @@
 
 import io
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -34,7 +35,7 @@ from app import overlays, proposal_store
 from app.extensions import base, cache
 from app.routers.survey_maps import NO_DETECTIONS
 from database.modules import abundance, surveymap
-from database.object_models.core.images import Image
+from database.object_models.core.image_metadata import NO_TRANSECT
 from database.object_models.project_management.active_measurements import (
     ActiveMeasurement,
 )
@@ -43,6 +44,9 @@ MAPS = "/api/v1/survey-maps"
 # The ground the sample image covers: west, south, east, north.
 BBOX = [-105.20, 41.000, -105.19, 41.005]
 GRID = 5  # ground control points per side
+# The sample survey's transect areas, by survey: the union of its footprints
+# takes seconds, and every test that posts terms sees the same footprints.
+_AREAS: dict[int, tuple[list[str], list[float], float]] = {}
 
 
 def _gcps() -> list[list[float]]:
@@ -141,6 +145,18 @@ class TestSurveyMaps(MeasurementFixtures):
         )
         assert res.status_code == 201
         return res.get_json()
+
+    @pytest.fixture
+    def areas_once(self, monkeypatch):
+        """The survey's transect areas, computed by the first test asking and reused by the rest."""
+        compute = abundance.get_transect_areas
+
+        def areas(cursor, db, survey_id):
+            if survey_id not in _AREAS:
+                _AREAS[survey_id] = compute(cursor, db, survey_id)
+            return _AREAS[survey_id]
+
+        monkeypatch.setattr(abundance, "get_transect_areas", areas)
 
     def _review_one(self, auth_client) -> dict:
         """Serves the next unit, adds an animal at its center to its drafts, and marks it reviewed."""
@@ -283,7 +299,7 @@ class TestSurveyMaps(MeasurementFixtures):
         assert res.status_code == 404
 
     def test_overlay_drawn_once(self, auth_client, georeferenced, source_image, monkeypatch):
-        """Verify the overlay is drawn and stored once, with its key on the footprint."""
+        """Verify the overlay is drawn and stored once, leaving the footprint as posted."""
         drawn = []
         render = overlays.render
         monkeypatch.setattr(overlays, "render", lambda *args: drawn.append(1) or render(*args))
@@ -310,7 +326,7 @@ class TestSurveyMaps(MeasurementFixtures):
             )
             return cursor.fetchone()[0]
 
-        assert base.execute(stored_key) == key
+        assert base.execute(stored_key) == ""
 
         # The second request finds it stored and does not draw again.
         res = auth_client.get(f"{MAPS}/overlay", query_string={"image_id": IMAGE_UUID})
@@ -321,20 +337,20 @@ class TestSurveyMaps(MeasurementFixtures):
         """Verify every annotated box lies in a crop of the prediction crops' size."""
         crops_of = f"{MAPS}/image-crops"
         query = {"image_id": IMAGE_UUID}
-        # The source image is cached by uuid; drop any copy of another run's.
-        with app.app_context():
-            cache.delete(UUID(IMAGE_UUID))
 
         # No annotated animal before a review.
         res = auth_client.get(crops_of, query_string=query)
         assert res.status_code == 200
         assert res.get_json() == {"crops": []}
 
-        self._review_one(auth_client)
+        unit = self._review_one(auth_client)
         shown = auth_client.get(f"{MAPS}/detections", query_string={"survey_id": SURVEY["uuid"]}).get_json()
         boxes = [d["box"] for d in shown["detections"] if d["kind"] == "annotated"]
+        # The tile's crop is cached by its uuid; drop any copy of another run's.
+        with app.app_context():
+            cache.delete(UUID(unit["uuid"]))
 
-        # Twice: the second from the cached source image.
+        # Twice: the second from the cached tile.
         for _ in range(2):
             crops = auth_client.get(crops_of, query_string=query).get_json()["crops"]
             assert crops
@@ -358,17 +374,17 @@ class TestSurveyMaps(MeasurementFixtures):
         assert res.status_code == 200
         assert res.get_json() == {"crops": []}
 
-    def test_image_crops_refuse(self, app, monkeypatch):
-        """Verify undecodable and unencodable images are refused."""
-        monkeypatch.setattr(overlays, "_source", lambda image: b"not an image")
-        with app.app_context():
-            image = base.get(Image, UUID(IMAGE_UUID))
-            with pytest.raises(ValueError):
-                overlays.annotated_crops(image, [[0, 0, 10, 10]])
+    def test_image_crops_refuse(self, monkeypatch):
+        """Verify undecodable and unencodable tiles are refused."""
+        tile = SimpleNamespace(reviewed_area_id=1, name="r1c1", area_tx=0, area_ty=0)
+        boxes = {1: [[0, 0, 10, 10]]}
+        monkeypatch.setattr(overlays, "_tile", lambda tile: b"not an image")
+        with pytest.raises(ValueError):
+            overlays.annotated_crops([tile], boxes)
         monkeypatch.setattr(overlays.cv2, "imencode", lambda *args, **kwargs: (False, None))
-        monkeypatch.setattr(overlays, "_source", lambda image: _jpeg((64, 64)))
-        with app.app_context(), pytest.raises(ValueError):
-            overlays.annotated_crops(image, [[0, 0, 10, 10]])
+        monkeypatch.setattr(overlays, "_tile", lambda tile: _jpeg((64, 64)))
+        with pytest.raises(ValueError):
+            overlays.annotated_crops([tile], boxes)
 
     def test_render_refuses(self, monkeypatch):
         """Verify the overlay refuses undecodable and unencodable images."""
@@ -396,22 +412,18 @@ class TestSurveyMaps(MeasurementFixtures):
         res = auth_client.post(f"{AM}/{measurement['uuid']}/terms", json={})
         assert res.status_code == 400
 
-    def test_terms_without_transect(self, auth_client, georeferenced, measurement, tiles, proposal):
+    def test_terms_without_transect(self, auth_client, georeferenced, measurement, tiles, proposal, monkeypatch):
         """Verify terms are refused when no image has a transect."""
-        _sql(
-            "UPDATE core.image_metadata m SET transect_id = -1 FROM core.images i "
-            "WHERE i.image_id = m.image_id AND i.survey_id = %(s)s;",
-            {"s": SURVEY["pkey"]},
-        )
+        monkeypatch.setattr(abundance, "get_transect_areas", lambda *args: ([str(NO_TRANSECT)], [1.0], 1.0))
         res = auth_client.post(f"{AM}/{measurement['uuid']}/terms", json={"habitable_area_m2": 5.0e6})
         assert res.status_code == 409
 
-    def test_terms_out_of_range(self, auth_client, georeferenced, measurement, tiles, proposal):
+    def test_terms_out_of_range(self, auth_client, georeferenced, measurement, tiles, proposal, areas_once):
         """Verify terms with a habitable area at or below zero are refused."""
         res = auth_client.post(f"{AM}/{measurement['uuid']}/terms", json={"habitable_area_m2": -1.0})
         assert res.status_code == 409
 
-    def test_terms_and_abundance(self, app, auth_client, georeferenced, measurement, tiles, proposal, source_image):
+    def test_terms_and_abundance(self, app, auth_client, georeferenced, measurement, tiles, proposal, source_image, areas_once):
         """Verify posted terms are stored and the estimate carries the abundance."""
         survey = {"survey_id": SURVEY["uuid"]}
 
@@ -452,7 +464,7 @@ class TestSurveyMaps(MeasurementFixtures):
         else:
             assert est["abundance"] is None
 
-    def test_terms_rebuilt_from_row(self, app, auth_client, georeferenced, measurement, tiles, proposal):
+    def test_terms_rebuilt_from_row(self, app, auth_client, georeferenced, measurement, tiles, proposal, areas_once):
         """Verify the terms are rebuilt from the measurement row after the cache is dropped."""
         res = auth_client.post(f"{AM}/{measurement['uuid']}/terms", json={"habitable_area_m2": 5.0e6})
         assert res.status_code == 201
@@ -465,7 +477,7 @@ class TestSurveyMaps(MeasurementFixtures):
             assert rebuilt.as_dict() == cached.as_dict()
             assert cache.get(f"am_terms_{row.uuid}") is not None
 
-    def test_live_abundance(self, app, auth_client, georeferenced, measurement, tiles, proposal):
+    def test_live_abundance(self, app, auth_client, georeferenced, measurement, tiles, proposal, areas_once):
         """Verify the live abundance from a count and the prepared terms."""
         auth_client.post(f"{AM}/{measurement['uuid']}/terms", json={"habitable_area_m2": 5.0e6})
         with app.app_context():
@@ -487,8 +499,8 @@ class TestSurveyMaps(MeasurementFixtures):
             assert result["ci_lower"] <= result["abundance"] <= result["ci_upper"]
             assert result["overlap_factor_prepared"] == terms.overlap_factor
 
-    def test_terms_without_boxes(self, app, auth_client, georeferenced, measurement):
-        """With no box on the ground, the terms keep their defaults."""
+    def test_terms_without_boxes(self, app, auth_client, georeferenced, measurement, areas_once):
+        """Verify the terms keep their defaults with no box on the ground."""
         empty = PlacedBoxes([], [], [], [], [], [], [])
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])

@@ -56,16 +56,17 @@ then on the estimate carries the abundance over the herd unit with its uncertain
   block, `abundance`, null until the terms are posted and a reviewed tile gives a positive
   count.
 - An image's overlay is drawn from the source image the first time it is asked for and stored
-  in the bucket at `images/<image uuid>/overlay/ground.webp`; the footprint's `overlay_uri`
-  then holds that key.
+  in the bucket at `images/<image uuid>/overlay/ground.webp`; a request finds it there. The
+  footprint's `overlay_uri` belongs to the survey preparation tooling and is never written.
 - Estimated detections' crops come from the images router's prediction crops, one request
   per tile and image.
 - An image's annotated animals come from `GET /survey-maps/image-crops`: the measurement's
   annotated boxes on the image, grouped by `crop_generator.cluster_windows` (the auto
   cropper's clustering: KMeans on the box centers, clusters added until every box lies in
-  a 300 px window, the prediction crops' size), each window cut from the source image and returned inline as a WebP
-  with the boxes inside it. The source image is cached under its uuid as the prediction
-  crops cache it.
+  a 300 px window, the prediction crops' size), each window cut from the crop of the
+  reviewed tile holding it and returned inline as a WebP with the boxes inside it. An
+  annotated animal is always on a reviewed tile, whose crop is in the bucket at its
+  `ra_key`: an eighth of the image to fetch. A tile's crop is cached under its uuid for 500 s.
 
 ## 3. Core Concepts
 
@@ -137,7 +138,7 @@ over a small box of ground with a 5 x 5 grid of ground control, and metadata on 
       ones at or above the threshold, and annotated plus estimated plus unplaced equal to the
       count; an annotation off the ground counted and not drawn.
 - [x] Overlays: 404 without a footprint and without ground control; drawn once, stored with
-      transparency, its key on the footprint; undecodable and unencodable images refused.
+      transparency, the footprint's `overlay_uri` left as posted; undecodable and unencodable images refused.
 - [x] Terms: 409 without a proposal, without a transect and out of range; 400 without a body;
       stored on the row and in the status; rebuilt from the row after the cache is dropped;
       the abundance on the estimate after a review; the defaults kept with no boxes.

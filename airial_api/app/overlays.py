@@ -7,11 +7,12 @@
 # over its footprint's bounding box, transparent where the image does not
 # reach. It is drawn from the source image and the footprint's ground control
 # points the first time it is asked for and stored in the bucket next to the
-# image's tiles; the footprint's overlay_uri then holds its key.
+# image's tiles, at a key fixed by the image. The footprint's overlay_uri is the
+# survey preparation tooling's and is left as posted.
 #
 # The annotated animals of an image are shown in crops grouped as the auto
 # cropper groups predictions (crop_generator.cluster_windows), cut from the
-# source image when asked for and returned inline.
+# crops of the reviewed tiles holding them when asked for and returned inline.
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from base64 import b64encode
@@ -24,11 +25,12 @@ import shapely
 from flask import current_app
 from scipy.interpolate import LinearNDInterpolator
 
+from app import tile_crops
 from app.extensions import base, cache, s3
 from crop_generator import cluster_windows
 from database.errors import ObjectNotFound
 from database.modules import surveymap
-from database.object_models.core.images import Image
+from database.object_models.core.images import Image, ReviewedArea
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -43,7 +45,7 @@ URL_SECONDS = 3600
 # A crop of annotated animals: the side of its window in source pixels, as for the
 # prediction crops (crop_generator.create_subcrop)
 CROP_PX = 300
-# How long a source image stays cached, as for the prediction crops
+# How long a tile's crop stays cached, as a source image does for the prediction crops
 SOURCE_SECONDS = 500
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -139,7 +141,7 @@ def get_overlay(image: Image) -> dict[str, Any]:
     bucket, key = current_app.config["BUCKET_NAME"], overlay_key(image)
 
     # Not drawn yet, or drawn by an earlier version of the drawing.
-    if source["overlay_uri"] != key:
+    if not tile_crops.exists(key):
         image_data = s3.get_object(Bucket=bucket, Key=image.img_key)["Body"].read()
         s3.put_object(
             Bucket=bucket,
@@ -152,7 +154,6 @@ def get_overlay(image: Image) -> dict[str, Any]:
             ),
             ContentType="image/webp",
         )
-        base.execute(surveymap.set_overlay_key, source["footprint_id"], key)
 
     west, south, east, north = source["bbox_wsen"]
     url = s3.generate_presigned_url(
@@ -167,57 +168,74 @@ def get_overlay(image: Image) -> dict[str, Any]:
 # Annotated animals, zoomed
 
 
-def _source(image: Image) -> bytes:
-    """Returns the image's encoded bytes, from the cache the prediction crops share."""
-    if data := cache.get(image.uuid):
+def _tile(tile: ReviewedArea) -> bytes:
+    """Returns the tile's encoded crop, cut on first use as serving cuts it."""
+    if data := cache.get(tile.uuid):
         return data
-    data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=image.img_key)["Body"].read()
-    cache.set(image.uuid, data, SOURCE_SECONDS)
+    tile_crops.ensure_crop(tile)
+    data = s3.get_object(Bucket=current_app.config["BUCKET_NAME"], Key=tile.ra_key)["Body"].read()
+    cache.set(tile.uuid, data, SOURCE_SECONDS)
     return data
 
 
-def annotated_crops(image: Image, boxes: list[list[int]]) -> list[dict[str, Any]]:
-    """Returns crops of the image around its annotated animals.
+def annotated_crops(tiles: list[ReviewedArea], boxes: dict[int, list[list[int]]]) -> list[dict[str, Any]]:
+    """Returns crops around an image's annotated animals, cut from their tiles.
+
+    An annotated animal lies on a reviewed tile, whose crop is in the bucket:
+    an eighth of the image to fetch and decode.
 
     Args:
-        image: The image.
-        boxes: The animals' boxes as left, top, right, bottom in image pixels.
+        tiles: The reviewed tiles holding the animals.
+        boxes: The animals' boxes on each tile, keyed by reviewed_area_id, as
+            left, top, right, bottom in image pixels.
 
     Returns:
         Each crop as a WebP data URL, its window in image pixels (left, top,
         right, bottom) and the boxes inside it in the crop's pixels.
 
     Raises:
-        ValueError: The image could not be decoded or a crop encoded.
+        ValueError: A tile could not be decoded or a crop encoded.
     """
-    if not boxes:
-        return []
-
-    source = cv2.imdecode(np.frombuffer(_source(image), dtype=np.uint8), cv2.IMREAD_COLOR)
-    if source is None:
-        raise ValueError("could not decode the source image")
-
-    boxes = [[min(b[0], b[2]), min(b[1], b[3]), max(b[0], b[2]), max(b[1], b[3])] for b in boxes]
-    height, width = source.shape[:2]
-
     crops = []
-    for left, top, right, bottom in cluster_windows(np.asarray(boxes), width, height, CROP_PX):
-        ok, encoded = cv2.imencode(
-            ".webp",
-            source[top:bottom, left:right],
-            [cv2.IMWRITE_WEBP_QUALITY, WEBP_QUALITY],
-        )
-        if not ok:
-            raise ValueError("could not encode a crop")
-        crops.append(
-            {
-                "image": "data:image/webp;base64," + b64encode(encoded.tobytes()).decode(),
-                "window": [left, top, right, bottom],
-                "boxes": [
-                    [b[0] - left, b[1] - top, b[2] - left, b[3] - top]
-                    for b in boxes
-                    if b[0] >= left and b[1] >= top and b[2] <= right and b[3] <= bottom
-                ],
-            }
-        )
+    for tile in tiles:
+        source = cv2.imdecode(np.frombuffer(_tile(tile), dtype=np.uint8), cv2.IMREAD_COLOR)
+        if source is None:
+            raise ValueError(f"could not decode tile {tile.name}")
+
+        # Boxes in the tile's pixels, held to the tile
+        height, width = source.shape[:2]
+        on_tile = [
+            [
+                min(max(min(b[0], b[2]) - tile.area_tx, 0), width),
+                min(max(min(b[1], b[3]) - tile.area_ty, 0), height),
+                min(max(max(b[0], b[2]) - tile.area_tx, 0), width),
+                min(max(max(b[1], b[3]) - tile.area_ty, 0), height),
+            ]
+            for b in boxes[tile.reviewed_area_id]
+        ]
+
+        for left, top, right, bottom in cluster_windows(np.asarray(on_tile), width, height, CROP_PX):
+            ok, encoded = cv2.imencode(
+                ".webp",
+                source[top:bottom, left:right],
+                [cv2.IMWRITE_WEBP_QUALITY, WEBP_QUALITY],
+            )
+            if not ok:
+                raise ValueError("could not encode a crop")
+            crops.append(
+                {
+                    "image": "data:image/webp;base64," + b64encode(encoded.tobytes()).decode(),
+                    "window": [
+                        left + tile.area_tx,
+                        top + tile.area_ty,
+                        right + tile.area_tx,
+                        bottom + tile.area_ty,
+                    ],
+                    "boxes": [
+                        [b[0] - left, b[1] - top, b[2] - left, b[3] - top]
+                        for b in on_tile
+                        if b[0] >= left and b[1] >= top and b[2] <= right and b[3] <= bottom
+                    ],
+                }
+            )
     return crops

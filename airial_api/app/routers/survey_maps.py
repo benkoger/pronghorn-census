@@ -13,7 +13,7 @@ from app.extensions import base
 from database.errors import ObjectNotFound
 from database.modules import activemeasurement, surveymap
 from database.object_models.base import Keyring
-from database.object_models.core.images import Image
+from database.object_models.core.images import Image, ReviewedArea
 from database.object_models.core.survey_maps import (
     ImageCropsQuery,
     OverlayQuery,
@@ -202,7 +202,7 @@ def get_image_crops(query: ImageCropsQuery):
     """Retrieve an image's annotated animals, zoomed.
 
     The animals are grouped as the auto cropper groups predictions, and each
-    group is cut from the source image.
+    group is cut from the crop of the reviewed tile holding it.
 
     Args:
         query: The image.
@@ -230,6 +230,10 @@ def get_image_crops(query: ImageCropsQuery):
         description: Unauthorized.
       404:
         description: Image not found.
+      409:
+        description: >
+          A tile's crop is not in the bucket and its source image is not
+          there to cut it from.
       500:
         description: Storage or database error.
     """
@@ -245,4 +249,5 @@ def get_image_crops(query: ImageCropsQuery):
         return {"crops": []}, 200
 
     boxes = base.execute(surveymap.get_annotated_boxes, measurement, image.image_id)
-    return {"crops": overlays.annotated_crops(image, boxes)}, 200
+    tiles = [base.get(ReviewedArea, reviewed_area_id) for reviewed_area_id in boxes]
+    return {"crops": overlays.annotated_crops(tiles, boxes)}, 200

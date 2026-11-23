@@ -8,7 +8,6 @@
 #   get_footprints(survey)            -> GeoJSON of the survey's image footprints
 #   get_detections(measurement, ...)  -> the detections the map shows, on the ground
 #   get_overlay_source(image)         -> what drawing an image onto the ground needs
-#   set_overlay_key(footprint, key)   -> where an image's overlay is stored
 #
 # The detections come from the abundance estimation, so the map shows none
 # before a measurement has a proposal. They are
@@ -318,8 +317,8 @@ def get_annotated_boxes(
     db: "Database",
     measurement: ActiveMeasurement,
     image_id: int,
-) -> list[list[int]]:
-    """Returns the boxes of an image's annotated animals.
+) -> dict[int, list[list[int]]]:
+    """Returns the boxes of an image's annotated animals, by reviewed tile.
 
     Args:
         cursor: Active database cursor.
@@ -328,10 +327,15 @@ def get_annotated_boxes(
         image_id: Primary key of the image.
 
     Returns:
-        The boxes of the measurement's label on its reviewed tiles of the
-        image, in image pixels (left, top, right, bottom).
+        The boxes of the measurement's label on each reviewed tile of the
+        image, in image pixels (left, top, right, bottom), keyed by the
+        tile's reviewed_area_id.
     """
-    return [[int(row[key]) for key in PIXELS] for row in annotated(cursor, measurement) if row["image_id"] == image_id]
+    boxes: dict[int, list[list[int]]] = {}
+    for row in annotated(cursor, measurement):
+        if row["image_id"] == image_id:
+            boxes.setdefault(row["reviewed_area_id"], []).append([int(row[key]) for key in PIXELS])
+    return boxes
 
 
 def reviewed_tiles(
@@ -664,16 +668,15 @@ def get_overlay_source(
         image_id: Primary key of the image.
 
     Returns:
-        Its latest footprint's id, bounding box (west, south, east, north),
-        ground control points, stored overlay key and outline (WKB), or None
-        when the footprint has no ground control to draw with.
+        Its latest footprint's bounding box (west, south, east, north),
+        ground control points and outline (WKB), or None when the footprint
+        has no ground control to draw with.
 
     Raises:
         ObjectNotFound: The image has no footprint.
     """
     stmt = sql.SQL("""
-        SELECT f.footprint_id, f.bbox_wsen, f.gcps, f.overlay_uri,
-               ST_AsBinary(f.footprint) AS footprint
+        SELECT f.bbox_wsen, f.gcps, ST_AsBinary(f.footprint) AS footprint
         FROM core.image_footprints f
         WHERE f.image_id = %(image_id)s
         ORDER BY f.footprint_id DESC
@@ -689,27 +692,3 @@ def get_overlay_source(
     if not source["gcps"] or len(source["bbox_wsen"]) != 4:
         return None
     return source
-
-
-def set_overlay_key(
-    cursor: Cursor[Any],
-    db: "Database",
-    footprint_id: int,
-    key: str,
-) -> None:
-    """Records the bucket key an image's overlay is stored under.
-
-    Args:
-        cursor: Active database cursor.
-        db: The database.
-        footprint_id: Primary key of the footprint drawn.
-        key: The overlay's bucket key.
-    """
-    cursor.execute(
-        sql.SQL("""
-            UPDATE core.image_footprints
-            SET overlay_uri = %(key)s, modified = CURRENT_TIMESTAMP
-            WHERE footprint_id = %(footprint_id)s;
-        """),
-        {"key": key, "footprint_id": footprint_id},
-    )

@@ -17,7 +17,8 @@ from database.object_models.core.images import Image, ReviewedArea
 MISSING = ("NoSuchKey", "404", "NotFound")
 
 
-def _exists(key: str) -> bool:
+def exists(key: str) -> bool:
+    """Returns whether the bucket holds an object under the key."""
     try:
         s3.head_object(Bucket=current_app.config["BUCKET_NAME"], Key=key)
     except ClientError as error:
@@ -40,7 +41,7 @@ def ensure_crop(reviewed_area: ReviewedArea) -> bool:
         ImageReadError: the source image payload could not be read or decoded
             into pixel data.
     """
-    if not reviewed_area.ra_key or _exists(reviewed_area.ra_key):
+    if not reviewed_area.ra_key or exists(reviewed_area.ra_key):
         return False
 
     bucket = current_app.config["BUCKET_NAME"]
