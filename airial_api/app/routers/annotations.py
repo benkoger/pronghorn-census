@@ -1,26 +1,22 @@
-# Endpoints for managing annotations in the API
-# Author: Michael B. Lance
+"""Endpoints for managing annotations in the API."""
 
-# ---------------------------------------------------------------------------------------------------------------------------
+from uuid import UUID
 
-from typing import cast
-
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-from app.decorators import permission_required
-from app.extensions import base
 from database.object_models.base import Keyring
 from database.object_models.core import CreateAnnotationReq, UpdateAnnotationReq
 from database.object_models.core.annotations import (
     Annotation,
     BulkCreateAnnotationReq,
-    BulkUpdateAnnotationsReq,
     BulkDeleteAnnotationsReq,
+    BulkUpdateAnnotationsReq,
 )
 from database.object_models.project_management import HerdUnit
-from database.object_models.user_management import User
-from uuid import UUID
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app.decorators import permission_required
+from app.extensions import base
 
 annotBp = Blueprint("annotations", __name__, url_prefix="/api/v1/annotations")
 
@@ -33,15 +29,22 @@ annotBp = Blueprint("annotations", __name__, url_prefix="/api/v1/annotations")
 @permission_required("access")
 @validate()
 def create(body: CreateAnnotationReq):
-    """
-    Create a new annotation object.
+    """Create a new annotation object.
+
+    Args:
+        body: Annotation creation payload.
+
+    Returns:
+        Tuple containing the serialized annotation and HTTP status 201.
+
     ---
     parameters:
       - name: body
         in: body
         required: true
         type: CreateAnnotationReq
-        description: Annotation creation payload with box coordinates, label_id, image_id, and optional prediction_ids/reviewed_area_ids.
+        description: >-
+          Annotation creation payload with box coordinates, label_id, image_id, and optional prediction/review IDs.
     responses:
       201:
         description: Annotation created successfully.
@@ -70,8 +73,14 @@ def create(body: CreateAnnotationReq):
 @login_required
 @permission_required("access")
 def import_annotation(body: BulkCreateAnnotationReq):
-    """
-    Bulk import multiple annotation records.
+    """Bulk import multiple annotation records.
+
+    Args:
+        body: Batch request containing list of annotations to create.
+
+    Returns:
+        Tuple containing list of serialized annotations and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -89,7 +98,6 @@ def import_annotation(body: BulkCreateAnnotationReq):
       500:
         description: Database error.
     """
-
     if not body.requests:
         return [], 201
 
@@ -115,8 +123,15 @@ def import_annotation(body: BulkCreateAnnotationReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
-    """
-    Update an annotation object in the database by its integer ID or UUID.
+    """Update an annotation object in the database by its integer ID or UUID.
+
+    Args:
+        body: Annotation update payload.
+        annotation_id: Primary key of the annotation to update.
+
+    Returns:
+        Tuple containing the serialized updated annotation and HTTP status 200.
+
     ---
     parameters:
       - name: annotation_id
@@ -147,7 +162,6 @@ def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
       500:
         description: Database error.
     """
-
     annotation = base.update(Annotation, annotation_id, body)
 
     return annotation.serialize(), 200
@@ -161,8 +175,14 @@ def update(body: UpdateAnnotationReq, annotation_id: int | UUID):
 @permission_required("access")
 @validate()
 def bulk_update(body: BulkUpdateAnnotationsReq):
-    """
-    Update several annotation objects in the database in a batch.
+    """Update several annotation objects in the database in a batch.
+
+    Args:
+        body: Batch request containing list of annotations to update.
+
+    Returns:
+        Tuple containing list of serialized updated annotations and HTTP status 200.
+
     ---
     parameters:
       - name: body
@@ -182,7 +202,6 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
       500:
         description: Database error.
     """
-
     annotations = []
 
     for req in body.requests:
@@ -203,8 +222,14 @@ def bulk_update(body: BulkUpdateAnnotationsReq):
 @login_required
 @permission_required("access")
 def delete(annotation_id: int | UUID):
-    """
-    Delete an annotation by its integer ID or UUID.
+    """Delete an annotation by its integer ID or UUID.
+
+    Args:
+        annotation_id: Primary key of the annotation to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: annotation_id
@@ -230,7 +255,6 @@ def delete(annotation_id: int | UUID):
       500:
         description: Database error.
     """
-
     base.delete(Annotation, annotation_id)
 
     return "", 204
@@ -244,8 +268,14 @@ def delete(annotation_id: int | UUID):
 @permission_required("access")
 @validate()
 def bulk_delete(body: BulkDeleteAnnotationsReq):
-    """
-    Delete multiple annotations in a batch.
+    """Delete multiple annotations in a batch.
+
+    Args:
+        body: Batch request containing list of annotations to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: body

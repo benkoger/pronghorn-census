@@ -1,19 +1,15 @@
-# Endpoints for managing labels in the API
-# Author: Michael B. Lance
+"""Endpoints for managing labels in the API."""
 
-# ---------------------------------------------------------------------------------------------------------------------------
+from uuid import UUID
 
+from database.object_models.project_management import CreateLabelReq
+from database.object_models.project_management.labels import Label
 from flask import Blueprint
 from flask_login import login_required
 from flask_pydantic import validate
 
 from app.decorators import permission_required
-from uuid import UUID
-
-from database.object_models.project_management import CreateLabelReq
-
 from app.extensions import base
-from database.object_models.project_management.labels import Label
 
 labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 
@@ -26,8 +22,14 @@ labelBp = Blueprint("labels", __name__, url_prefix="/api/v1/labels")
 @permission_required("access")
 @validate()
 def create(body: CreateLabelReq):
-    """
-    Create a new label object.
+    """Create a new label object.
+
+    Args:
+        body: Label creation payload.
+
+    Returns:
+        Tuple containing the serialized created label and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -47,7 +49,6 @@ def create(body: CreateLabelReq):
       500:
         description: Database error.
     """
-
     return base.insert(Label, body).serialize(), 201
 
 
@@ -60,8 +61,14 @@ def create(body: CreateLabelReq):
 @login_required
 @permission_required("access")
 def delete(label_id: int | UUID):
-    """
-    Delete a label by its integer ID or UUID.
+    """Delete a label by its integer ID or UUID.
+
+    Args:
+        label_id: Primary key of the label to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: label_id
@@ -87,7 +94,6 @@ def delete(label_id: int | UUID):
       500:
         description: Database error.
     """
-
     base.delete(Label, label_id)
 
     return "", 204

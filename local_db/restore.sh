@@ -6,6 +6,10 @@ BACKUP_DIR="/pct_b"
 
 pg_restore -v -d "$POSTGRES_DB" -U "$POSTGRES_USER" "$BACKUP_DIR"
 
+# pg_restore loads no planner statistics; without them the first queries over
+# the predictions pick plans that take seconds and hit the API's statement timeout
+psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ANALYZE;"
+
 # Clean up default PostGIS tiger/topology schemas that are not used by Airial
 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
     DROP EXTENSION IF EXISTS postgis_tiger_geocoder CASCADE;

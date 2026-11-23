@@ -1,13 +1,14 @@
-# Crop Verifier Specialized Database Operations
-# Author: Michael B. Lance / Antigravity
+"""Specialized database operations for crop verifier workflow."""
+
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from typing import TYPE_CHECKING, Any
-import psycopg.sql as sql
-from psycopg import Cursor
+
+from psycopg import Cursor, sql
 from psycopg.rows import class_row, tuple_row
 
 from database.object_models.base import Keyring
+from database.object_models.core.activity import ActivityType
 from database.object_models.core.images import RAQuery, ReviewedArea
 from database.object_models.user_management.users import User
 
@@ -22,9 +23,19 @@ def get_available_crops(
     query: RAQuery,
     user: User,
 ) -> list[ReviewedArea]:
-    """
-    Finds an available image with eligible crops in the survey, atomically locks it
-    for the current user, and returns all candidate crops on that image in a single query.
+    """Find an available image with eligible crops, atomically lock it, and return candidate crops.
+
+    Locks for the current user and returns all candidate crops on that image in a single query.
+
+    Args:
+        cursor: Active Psycopg database cursor.
+        db: Database abstraction layer instance.
+        survey_ids: Keyring with integer primary key and UUID for the target survey.
+        query: Crop query parameters controlling review status inclusion.
+        user: Authenticated User model acquiring the image lock.
+
+    Returns:
+        List of candidate ReviewedArea models associated with the locked image.
     """
     stmt = sql.SQL("""
         WITH available_image AS (
@@ -35,6 +46,7 @@ def get_available_crops(
               AND EXISTS (
                   SELECT 1 FROM core.reviewed_area ra
                   WHERE ra.image_id = i.image_id
+                    AND ra.type = %(type)s
                     AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
               )
             ORDER BY i.image_id ASC
@@ -50,7 +62,8 @@ def get_available_crops(
         SELECT ra.*
         FROM core.reviewed_area ra
         JOIN locked_image ON locked_image.image_id = ra.image_id
-        WHERE (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
+        WHERE ra.type = %(type)s
+          AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
         ORDER BY ra.reviewed_area_id ASC;
     """)
 
@@ -58,6 +71,7 @@ def get_available_crops(
         "survey_id": survey_ids.pkey,
         "user_id": user.user_id,
         "include_reviewed": bool(query.include_reviewed),
+        "type": ActivityType.AUTO_CROPPER,
     }
 
     cursor.row_factory = class_row(ReviewedArea)
@@ -71,12 +85,23 @@ def get_selection_count(
     survey_ids: Keyring,
     query: RAQuery,
 ) -> int:
-    """Counts crops in the survey matching review and opened criteria."""
+    """Counts crops in the survey matching review and opened criteria.
+
+    Args:
+        cursor: Active Psycopg database cursor.
+        db: Database abstraction layer instance.
+        survey_ids: Keyring with integer primary key and UUID for the target survey.
+        query: Crop query parameters controlling review and opened status filters.
+
+    Returns:
+        Total count of matching reviewed area records.
+    """
     stmt = sql.SQL("""
         SELECT COUNT(ra.reviewed_area_id)
         FROM core.reviewed_area ra
         JOIN core.images i ON i.image_id = ra.image_id
         WHERE i.survey_id = %(survey_id)s
+          AND ra.type = %(type)s
           AND (%(include_reviewed)s OR ra.reviewed_by_user_id = 0)
           AND (%(include_opened)s OR i.opened_by_user_id = 0);
     """)
@@ -85,6 +110,7 @@ def get_selection_count(
         "survey_id": survey_ids.pkey,
         "include_reviewed": bool(query.include_reviewed),
         "include_opened": bool(query.include_opened),
+        "type": ActivityType.AUTO_CROPPER,
     }
 
     cursor.row_factory = tuple_row

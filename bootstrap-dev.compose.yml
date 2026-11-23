@@ -16,7 +16,7 @@ services:
       - type: bind 
         source: ./local_db/bootstrap.sh
         target: /docker-entrypoint-initdb.d/bootstrap.sh
-      - ./docs/database/schemas/airial1-1.sql:/db_definitions.sql:Z
+      - ./docs/database/schemas/airial1-2.sql:/db_definitions.sql:Z
     networks:
       - dev_pronghorn_app_network
     ports:
@@ -69,6 +69,9 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       VALKEY_HOST: ${VALKEY_HOST}
       SESSION_REDIS: ${SESSION_REDIS}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE}
+      SESSION_PERMANENT: ${SESSION_PERMANENT}
       VALKEY_PASS: ${VALKEY_PASS}
       AWS_ENDPOINT_URL_S3: ${AWS_ENDPOINT_URL_S3}
       DB_HOST: ${DB_HOST}

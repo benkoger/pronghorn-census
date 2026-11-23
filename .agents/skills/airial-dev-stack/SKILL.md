@@ -20,7 +20,7 @@ podman compose -f development.compose.yml up -d
 ```
 
 ### Clean Bootstrap Mode (Fresh Schema)
-Initializes an empty schema using `local_db/db_definitions.sql` and writes the SpiceDB schema from `airial_api/database/spicedb_schema/schema.zed`:
+Initializes an empty schema using `docs/database/schemas/airial1-2.sql` (mounted as `/db_definitions.sql`) and writes the SpiceDB schema from `airial_api/database/spicedb_schema/schema.zed`:
 ```bash
 podman compose -f bootstrap-dev.compose.yml up -d
 ```

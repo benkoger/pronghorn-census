@@ -1,29 +1,28 @@
-# Endpoints for integrating oauth2.0
-# Special thanks to Miguel Grinberg for the excellent guide
-# https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
-# Author: Michael B. Lance
+"""Endpoints for integrating OAuth2 and legacy password authentication."""
 
-# ---------------------------------------------------------------------------------------------------------------------------#
+# Special thanks to Miguel Grinberg for the excellent guide:
+# https://blog.miguelgrinberg.com/post/oauth-authentication-with-flask-in-2023
+# ---------------------------------------------------------------------------------------------------------------------------
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import requests
+from database import AuthenticationFailure
+from database.object_models.core import Image, UpdateImageReq
+from database.object_models.user_management import (
+    LegacyAuthReq,
+    Organization,
+    UpdateUserReq,
+    User,
+)
 from flask import Blueprint, abort, current_app, redirect, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_pydantic import validate
 from werkzeug.security import check_password_hash
 
 from app.extensions import base
-from database import AuthenticationFailure
-from database.object_models.core import Image, UpdateImageReq
-from database.object_models.user_management import (
-    LegacyAuthReq,
-    Organization,
-    User,
-    UpdateUserReq,
-)
 
 authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
@@ -33,7 +32,27 @@ authBp = Blueprint("oauth2", __name__, url_prefix="/api/v1/")
 
 @authBp.get("/authorize/<string:provider>")
 def oauth2_authorize(provider: str):
-    """Initiate OAuth2 authorization redirect"""
+    """Initiate OAuth2 authorization redirect.
+
+    Args:
+        provider: Name of the OAuth2 provider (e.g., 'google').
+
+    Returns:
+        Redirect response directing user to provider's login portal.
+
+    ---
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        type: string
+        description: Name of the OAuth2 provider (e.g., 'google').
+    responses:
+      302:
+        description: Redirect response directing user to provider's login portal.
+      404:
+        description: OAuth provider not found.
+    """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -61,7 +80,41 @@ def oauth2_authorize(provider: str):
 
 @authBp.get("/callback/<string:provider>")
 def oauth2_callback(provider: str):
-    """OAuth2 callback handler"""
+    """OAuth2 callback handler.
+
+    Args:
+        provider: Name of the OAuth2 provider processing the callback.
+
+    Returns:
+        Redirect response directing user to frontend application.
+
+    ---
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        type: string
+        description: Name of the OAuth2 provider processing the callback.
+      - name: code
+        in: query
+        required: false
+        type: string
+        description: Authorization code returned by the OAuth2 provider.
+      - name: state
+        in: query
+        required: false
+        type: string
+        description: OAuth2 state string for CSRF validation.
+    responses:
+      302:
+        description: Redirect response directing user to frontend application.
+      401:
+        description: Invalid state, missing authorization code, or token exchange failure.
+      404:
+        description: OAuth provider or user not found.
+      500:
+        description: OAuth provider returned an error.
+    """
     provider_data = current_app.config["OAUTH2_PROVIDERS"].get(provider)
     if not provider_data:
         abort(404, "Oauth Provider not found")
@@ -124,13 +177,11 @@ def oauth2_callback(provider: str):
                 status="active",
                 external_auth_provider=provider,
                 external_auth_id=response.json().get("sub"),
-                last_login=datetime.now(timezone.utc),
+                last_login=datetime.now(UTC),
             ),
         )
     else:
-        base.update(
-            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
-        )
+        base.update(User, user.user_id, UpdateUserReq(last_login=datetime.now(UTC)))
 
     login_user(user)
 
@@ -149,8 +200,32 @@ def oauth2_callback(provider: str):
 @authBp.post("/authenticate")
 @validate()
 def authenticate(body: LegacyAuthReq):
-    """Basic email/password authentication"""
+    """Basic email/password authentication.
 
+    Args:
+        body: Login credentials containing email and password.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
+    Raises:
+        AuthenticationFailure: If user does not exist or credentials do not match.
+
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        type: LegacyAuthReq
+        description: Login credentials containing email and password.
+    responses:
+      200:
+        description: User authenticated successfully.
+      400:
+        description: User account is not configured for password authentication.
+      401:
+        description: Invalid credentials or authentication failure.
+    """
     users = base.where(User, {"email": body.email})
     if not users:
         raise AuthenticationFailure()
@@ -160,9 +235,7 @@ def authenticate(body: LegacyAuthReq):
         abort(400, "User account is not configured for password authentication.")
 
     if check_password_hash(user.password_hash, body.password):
-        base.update(
-            User, user.user_id, UpdateUserReq(last_login=datetime.now(timezone.utc))
-        )
+        base.update(User, user.user_id, UpdateUserReq(last_login=datetime.now(UTC)))
     else:
         raise AuthenticationFailure()
 
@@ -182,7 +255,18 @@ def authenticate(body: LegacyAuthReq):
 @authBp.post("/deauthenticate")
 @login_required
 def logout():
-    """Logout current user session and release any locked images."""
+    """Logout current user session and release any locked images.
+
+    Returns:
+        Tuple containing empty string and HTTP status 200.
+
+    ---
+    responses:
+      200:
+        description: User session logged out successfully and locks released.
+      401:
+        description: User not authenticated.
+    """
     base.bulk_update(
         Image,
         UpdateImageReq(opened_by_user_id=0),

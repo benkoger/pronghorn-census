@@ -9,7 +9,7 @@ import { useSystemStore } from "@/stores/systemStore";
 import { api } from "@/api";
 import { CropVerifierAdapter } from "@/adapters/cropVerifierAdapter";
 import Verifier from "@/components/verifier/Verifier.vue";
-import type { ReviewedArea } from "@/models";
+import { ActivityType, type ReviewedArea } from "@/models";
 
 const pStore = useSystemStore();
 
@@ -110,6 +110,7 @@ async function fetchReviewedAreas() {
       include_reviewed: alreadyReviewed.value,
       page: currentPage.value,
       per_page: perPage.value,
+      type: ActivityType.AUTO_CROPPER,
     };
     if (searchQuery.value.trim()) {
       params.search = searchQuery.value.trim();

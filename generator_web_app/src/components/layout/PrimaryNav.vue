@@ -49,12 +49,12 @@ function getRouteIcon(target: RouteLocationRaw) {
         <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Verify</span>
       </BNavItem>
       <BNavItem
-        to="/active-measurement"
-        :active="$route.path.startsWith('/active-measurement')"
+        to="/abundance-estimation/"
+        :active="$route.path.startsWith('/abundance-estimation')"
         class="text-nowrap"
       >
-        <Icon :icon="getRouteIcon('/active-measurement')" width="24" height="24" />
-        <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Active Measurement</span>
+        <Icon :icon="getRouteIcon('/abundance-estimation/')" width="24" height="24" />
+        <span v-if="sStore.nav_toggled" class="ms-3 text-nowrap">Abundance Estimation</span>
       </BNavItem>
       <BNavItem
         v-if="sStore.is_admin"

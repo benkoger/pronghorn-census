@@ -1,17 +1,8 @@
-# Endpoints for managing AM units in the API
-# Author: Michael B. Lance
-
-# ---------------------------------------------------------------------------------------------------------------------------
+"""Endpoints for managing AM units in the API."""
 
 from typing import cast
 from uuid import UUID
 
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app.decorators import permission_required
-from app.extensions import base
 from database.object_models.base import Keyring
 from database.object_models.core.am_units import (
     AmUnit,
@@ -19,6 +10,12 @@ from database.object_models.core.am_units import (
     UpdateAmUnitReq,
 )
 from database.object_models.user_management.users import User
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
+from app.decorators import permission_required
+from app.extensions import base
 
 amUnitBp = Blueprint("am_units", __name__, url_prefix="/api/v1/am-units")
 
@@ -31,8 +28,14 @@ amUnitBp = Blueprint("am_units", __name__, url_prefix="/api/v1/am-units")
 @login_required
 @permission_required("access")
 def get_by_id(am_unit_id: int | UUID):
-    """
-    Retrieve an AM unit by its integer ID or UUID.
+    """Retrieve an AM unit by its integer ID or UUID.
+
+    Args:
+        am_unit_id: Primary key of the AM unit (integer ID or UUID).
+
+    Returns:
+        Tuple containing the serialized AM unit and HTTP status 200.
+
     ---
     parameters:
       - name: am_unit_id
@@ -70,8 +73,14 @@ def get_by_id(am_unit_id: int | UUID):
 @permission_required("access")
 @validate()
 def create(body: CreateAmUnitReq):
-    """
-    Create a new AM unit record.
+    """Create a new AM unit record.
+
+    Args:
+        body: AM unit creation payload.
+
+    Returns:
+        Tuple containing the serialized created AM unit and HTTP status 201.
+
     ---
     parameters:
       - name: body
@@ -106,8 +115,15 @@ def create(body: CreateAmUnitReq):
 @permission_required("access")
 @validate()
 def update(body: UpdateAmUnitReq, am_unit_id: int | UUID):
-    """
-    Update an AM unit by integer ID or UUID.
+    """Update an AM unit by integer ID or UUID.
+
+    Args:
+        body: AM unit update payload.
+        am_unit_id: Primary key of the AM unit to update.
+
+    Returns:
+        Tuple containing the serialized updated AM unit and HTTP status 200.
+
     ---
     parameters:
       - name: am_unit_id
@@ -150,8 +166,14 @@ def update(body: UpdateAmUnitReq, am_unit_id: int | UUID):
 @login_required
 @permission_required("access")
 def delete(am_unit_id: int | UUID):
-    """
-    Delete an AM unit by integer ID or UUID.
+    """Delete an AM unit by integer ID or UUID.
+
+    Args:
+        am_unit_id: Primary key of the AM unit to delete.
+
+    Returns:
+        Tuple containing empty string and HTTP status 204.
+
     ---
     parameters:
       - name: am_unit_id
