@@ -79,26 +79,31 @@ class SurveyTerms:
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def as_dict(self) -> dict[str, Any]:
+        """Returns the terms as a plain dict, arrays as lists.
+
+        The shape stored on the measurement row and packed for the cache.
+        """
+        return {
+            "habitable_area_m2": self.habitable_area_m2,
+            "surveyed_area_m2": self.surveyed_area_m2,
+            "area_sigma_m2": self.area_sigma_m2,
+            "area_draws": self.area_draws.tolist(),
+            "transects": self.transects,
+            "transect_areas_m2": self.transect_areas_m2.tolist(),
+            "overlap_factor": self.overlap_factor,
+            "representation_sigma": self.representation_sigma,
+            "representation_draws": self.representation_draws.tolist(),
+            "n_units": self.n_units,
+        }
+
     def to_cache(self) -> bytes:
         """Packs the terms with msgpack for the cache.
 
         Returns:
-            The msgpack bytes of a plain dict, arrays as lists.
+            The msgpack bytes of ``as_dict``.
         """
-        return packb(
-            {
-                "habitable_area_m2": self.habitable_area_m2,
-                "surveyed_area_m2": self.surveyed_area_m2,
-                "area_sigma_m2": self.area_sigma_m2,
-                "area_draws": self.area_draws.tolist(),
-                "transects": self.transects,
-                "transect_areas_m2": self.transect_areas_m2.tolist(),
-                "overlap_factor": self.overlap_factor,
-                "representation_sigma": self.representation_sigma,
-                "representation_draws": self.representation_draws.tolist(),
-                "n_units": self.n_units,
-            }
-        )
+        return packb(self.as_dict())
 
     @classmethod
     def from_cache(cls, data: bytes) -> "SurveyTerms":

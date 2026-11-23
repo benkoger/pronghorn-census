@@ -10,7 +10,8 @@
 #                                 the serving order and the latest expected
 #                                 counts. Rebuilt from the rows on a miss.
 #   am_terms_<measurement uuid>   msgpacked SurveyTerms of the abundance, once
-#                                 the survey map has produced them.
+#                                 stored. The measurement row holds them;
+#                                 rebuilt from it on a miss.
 #   am_area_<measurement uuid>    msgpacked float: the ground area of the
 #                                 units' images, the union of their
 #                                 footprints. Fixed for a measurement and
@@ -29,7 +30,7 @@ from msgpack import packb, unpackb
 
 from ais import MeasurementState, Proposal, SurveyTerms
 from app.extensions import base, cache
-from database.modules import activemeasurement
+from database.modules import abundance, activemeasurement
 from database.object_models.project_management.active_measurements import (
     ActiveMeasurement,
 )
@@ -96,16 +97,26 @@ def save(measurement: ActiveMeasurement, proposal: Proposal) -> Proposal:
 
 
 def load_terms(measurement: ActiveMeasurement) -> SurveyTerms | None:
-    """Returns the survey terms of the abundance, or None when not stored."""
-    if (cached := cache.get(_terms_key(measurement))) is None:
+    """Returns the survey terms of the abundance, or None when not stored.
+
+    Reads the cache first and the measurement row on a miss, writing the
+    terms back for the next request.
+    """
+    if (cached := cache.get(_terms_key(measurement))) is not None:
+        return SurveyTerms.from_cache(cached)
+    if measurement.terms is None:
         return None
-    return SurveyTerms.from_cache(cached)
+
+    terms = SurveyTerms(**measurement.terms)
+    cache.set(_terms_key(measurement), terms.to_cache(), timeout=NO_EXPIRY)
+    return terms
 
 
 def save_terms(
     measurement: ActiveMeasurement, terms: SurveyTerms
 ) -> SurveyTerms:
-    """Stores the survey terms, replacing any stored before."""
+    """Stores the survey terms on the measurement, replacing any before."""
+    base.execute(abundance.set_terms, measurement, terms)
     cache.set(_terms_key(measurement), terms.to_cache(), timeout=NO_EXPIRY)
     return terms
 
