@@ -157,8 +157,8 @@ class TestReviewedAreas(APITester):
         data = response.get_json()
         assert isinstance(data, list)
         for item in data:
-            validated = ReviewedArea.Response.model_validate(item)
-            assert validated.type.value == "auto cropper"
+            ReviewedArea.Response.model_validate(item)
+            assert item["type"] == "auto cropper"
 
     # -------------------------------------------------------------------------
     # 2. GET Single by ID (UUID and Integer ID)
@@ -177,9 +177,9 @@ class TestReviewedAreas(APITester):
         assert response.status_code == 200
 
         data = response.get_json()
-        validated = ReviewedArea.Response.model_validate(data)
-        assert str(validated.uuid) == sample_crop["uuid"]
-        assert validated.reviewed_area_id == sample_crop["reviewed_area_id"]
+        ReviewedArea.Response.model_validate(data)
+        assert data["uuid"] == sample_crop["uuid"]
+        assert data["reviewed_area_id"] == sample_crop["reviewed_area_id"]
 
     def test_get_reviewed_area_by_int_id(
         self, auth_client: FlaskClient, sample_crop: dict[str, Any]
@@ -194,9 +194,9 @@ class TestReviewedAreas(APITester):
         assert response.status_code == 200
 
         data = response.get_json()
-        validated = ReviewedArea.Response.model_validate(data)
-        assert validated.reviewed_area_id == sample_crop["reviewed_area_id"]
-        assert str(validated.uuid) == sample_crop["uuid"]
+        ReviewedArea.Response.model_validate(data)
+        assert data["reviewed_area_id"] == sample_crop["reviewed_area_id"]
+        assert data["uuid"] == sample_crop["uuid"]
 
     def test_get_reviewed_area_not_found(
         self, auth_client: FlaskClient
@@ -313,8 +313,8 @@ class TestReviewedAreas(APITester):
         assert response.status_code == 200
 
         data = response.get_json()
-        validated = ReviewedArea.Response.model_validate(data)
-        assert validated.name == new_name
+        ReviewedArea.Response.model_validate(data)
+        assert data["name"] == new_name
 
     def test_update_reviewed_area_by_int_id(
         self, auth_client: FlaskClient, sample_crop: dict[str, Any]
@@ -332,8 +332,8 @@ class TestReviewedAreas(APITester):
         assert response.status_code == 200
 
         data = response.get_json()
-        validated = ReviewedArea.Response.model_validate(data)
-        assert validated.name == new_name
+        ReviewedArea.Response.model_validate(data)
+        assert data["name"] == new_name
 
     def test_update_reviewed_area_not_found(
         self, auth_client: FlaskClient
