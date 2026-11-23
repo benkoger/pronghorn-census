@@ -224,3 +224,61 @@ def create_subcrop(
             cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 0, 0), 3)
 
     return crops
+
+
+def cluster_windows(
+    boxes: np.ndarray,
+    width: int,
+    height: int,
+    crop_size: int,
+) -> list[tuple[int, int, int, int]]:
+    """auto_crop's clustering for boxes alone, without the image or the labels.
+
+    Square windows of crop_size around the KMeans centers of the boxes' centers, with clusters
+    added until every box lies inside a window.
+
+    Args:
+                    boxes: (n, 4) boxes as left, top, right, bottom in image pixels
+                    width: image width in pixels
+                    height: image height in pixels
+                    crop_size: side of a window in pixels
+
+    Returns windows as left, top, right, bottom, kept inside the image
+    """
+    boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)
+    if len(boxes) == 0:
+        return []
+
+    centers = np.column_stack(
+        [(boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2]
+    )
+    side_x, side_y = min(crop_size, width), min(crop_size, height)
+
+    def window(center) -> tuple[int, int, int, int]:
+        left = int(min(max(0, center[0] - side_x // 2), width - side_x))
+        top = int(min(max(0, center[1] - side_y // 2), height - side_y))
+        return left, top, left + side_x, top + side_y
+
+    for num_clusters in range(1, len(boxes) + 1):
+        if num_clusters == 1:
+            spans = boxes[:, :2].min(axis=0), boxes[:, 2:].max(axis=0)
+            found = [(spans[0] + spans[1]) / 2]
+        else:
+            found = KMeans(n_clusters=num_clusters, n_init=10, random_state=0).fit(
+                centers
+            ).cluster_centers_
+
+        windows = [window(center) for center in found]
+        inside = np.zeros(len(boxes), dtype=bool)
+        for left, top, right, bottom in windows:
+            inside |= (
+                (boxes[:, 0] >= left)
+                & (boxes[:, 1] >= top)
+                & (boxes[:, 2] <= right)
+                & (boxes[:, 3] <= bottom)
+            )
+        if inside.all():
+            return windows
+
+    # A box larger than a window: one window around each box's center
+    return [window(center) for center in centers]

@@ -114,6 +114,8 @@ class ActiveMeasurement(DBbase):
     final_count: float | None = None
     final_ci_upper: float | None = None
     final_ci_lower: float | None = None
+    # The survey terms of the abundance (ais.SurveyTerms.as_dict), once stored.
+    terms: dict[str, Any] | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "active_measurements")
     __pk__: ClassVar[sql.Identifier] = sql.Identifier("active_measurement_id")

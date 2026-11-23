@@ -264,6 +264,7 @@ CREATE TABLE "projectmanagement"."active_measurements" (
   "final_count" double precision,
   "final_ci_upper" double precision,
   "final_ci_lower" double precision,
+  "terms" jsonb,
   "created" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   "modified" timestamptz NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   "uuid" uuid NOT NULL DEFAULT (gen_random_uuid())

@@ -20,8 +20,10 @@ from pydantic import TypeAdapter
 from testing_core import APITester
 
 from ais import Proposal, SurveyTerms
+from ais.overlap import coverage_weights
 from app import proposal_store
 from app.extensions import base, cache
+from crop_generator import cluster_windows
 from database.modules import activemeasurement as am
 from database.object_models.core.am_units import AmUnit
 from database.object_models.core.images import ReviewedArea
@@ -423,6 +425,25 @@ class TestActiveMeasurements(APITester):
         if est["count"] is not None:
             assert est["density_per_km2"] == pytest.approx(est["count"] / 2.0)
 
+    def test_terms_rebuilt_from_row(self, app, measurement):
+        """The terms are stored on the measurement row and rebuilt from it when the cache is dropped."""
+        terms = SurveyTerms(
+            habitable_area_m2=5.0e6,
+            surveyed_area_m2=2.0e6,
+            transects=["0", "1"],
+            transect_areas_m2=[1.5e6, 0.5e6],
+        )
+        with app.app_context():
+            row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
+            assert proposal_store.load_terms(row) is None
+            proposal_store.save_terms(row, terms)
+
+            cache.delete(f"am_terms_{row.uuid}")
+            row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
+            assert row.terms == terms.as_dict()
+            assert proposal_store.load_terms(row).as_dict() == terms.as_dict()
+            assert cache.get(f"am_terms_{row.uuid}") is not None
+
     def test_review_to_exhaustion(self, auth_client, measurement, tiles, proposal, source_image):
         """Every unit served and reviewed: the measurement finishes with a count."""
         survey = {"survey_id": SURVEY["uuid"]}
@@ -606,6 +627,29 @@ class TestActiveMeasurements(APITester):
             "measurement": False,
             "proposal": False,
         }
+
+    def test_coverage_weights(self):
+        """Verify an animal weighs 1 / (1 + the other images covering it)."""
+        assert coverage_weights([]).size == 0
+        assert coverage_weights([0, 1, 3]).tolist() == [1.0, 0.5, 0.25]
+
+    def test_cluster_windows(self):
+        """Verify the windows cover every box and stay inside the image."""
+        assert cluster_windows([], 1000, 1000, 100) == []
+
+        # Two animals close together: one window around both.
+        near = [[100, 100, 120, 120], [150, 150, 170, 170]]
+        assert cluster_windows(near, 1000, 1000, 100) == [(85, 85, 185, 185)]
+
+        # Far apart: a window each, kept inside the image.
+        far = [[0, 0, 20, 20], [950, 950, 990, 990]]
+        windows = sorted(cluster_windows(far, 1000, 1000, 100))
+        assert windows == [(0, 0, 100, 100), (900, 900, 1000, 1000)]
+
+        # A box larger than a window: a window at each box's center.
+        assert cluster_windows([[0, 0, 300, 300]], 1000, 1000, 100) == [
+            (100, 100, 200, 200)
+        ]
 
 
 class TestPredictions(APITester):
