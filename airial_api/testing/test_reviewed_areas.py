@@ -266,7 +266,7 @@ class TestReviewedAreas(APITester):
         response = auth_client.post(f"{RA_URL}/presigned-get-url", json=payload)
         assert response.status_code == 201
 
-        url = response.get_json()
+        url = response.text
         assert isinstance(url, str)
         assert url.startswith("http")
 
