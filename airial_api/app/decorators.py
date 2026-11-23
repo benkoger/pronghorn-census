@@ -1,3 +1,5 @@
+"""Authentication and authorization route decorators."""
+
 from functools import wraps
 from typing import cast
 
@@ -8,10 +10,10 @@ from pydantic import BaseModel
 
 from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
-from database.object_models.project_management import HerdUnit
-from database.object_models.core.images import Image
-from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.image_footprints import ImageFootprint
+from database.object_models.core.image_metadata import ImageMetadata
+from database.object_models.core.images import Image
+from database.object_models.project_management import HerdUnit
 from database.object_models.project_management.labels import Label
 from database.object_models.user_management.organizations import Organization
 from database.object_models.user_management.users import User
@@ -41,6 +43,7 @@ check_exist = {
 
 
 def roles_required(*roles):
+    """Enforce that the authenticated user possesses the specified roles."""
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
@@ -58,6 +61,7 @@ def roles_required(*roles):
 
 
 def permission_required(permission: str):
+    """Enforce SpiceDB relation-based access control (ReBAC) permissions."""
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
@@ -96,7 +100,7 @@ def permission_required(permission: str):
                                     )
                                 obj_id = str(getattr(db_obj, "uuid", db_obj))
                             except (ObjectNotFound, KeyError) as e:
-                                current_app.logger.exception(e)
+                                current_app.logger.exception("Could not resolve object identifier")
                                 abort(404, str(e))
                         else:
                             obj_id = str(value)

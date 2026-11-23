@@ -3,6 +3,13 @@
 from uuid import UUID, uuid4
 
 from authzed.api.v1 import CheckPermissionResponse
+from flask import Blueprint, abort, session
+from flask_login import current_user, login_required, login_user
+from flask_pydantic import validate
+from msgpack import unpackb
+
+from app.decorators import permission_required
+from app.extensions import base, cache, login_manager
 from database.object_models.base import create_spice_update
 from database.object_models.user_management import (
     CreateUserReq,
@@ -13,13 +20,6 @@ from database.object_models.user_management import (
     SetActiveOrgReq,
     User,
 )
-from flask import Blueprint, abort, session
-from flask_login import current_user, login_required, login_user
-from flask_pydantic import validate
-from msgpack import unpackb
-
-from app.decorators import permission_required
-from app.extensions import base, cache, login_manager
 
 userBp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 

@@ -129,5 +129,10 @@ class MeasurementBlocked(AirialError):
     """Raised when an active measurement cannot serve its next unit yet."""
 
     def __init__(self, reason: str):
+        """Initialize the MeasurementBlocked exception.
+
+        Args:
+            reason: Description of why the measurement is blocked.
+        """
         self.message = reason
         super().__init__("Conflict", 409, self.message)

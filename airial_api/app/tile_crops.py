@@ -1,4 +1,4 @@
-# Crops of active measurement tiles: cut from the source image when first served
+"""Crops of active measurement tiles cut from the source image when first served."""
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -7,6 +7,7 @@ import io
 from botocore.exceptions import ClientError
 from flask import current_app
 
+from app.errors import ImageReadError
 from app.extensions import base, s3
 from database.errors import MeasurementBlocked
 from database.object_models.core.images import Image, ReviewedArea
@@ -34,8 +35,10 @@ def ensure_crop(reviewed_area: ReviewedArea) -> bool:
 
     Raises:
         MeasurementBlocked: the source image is not in the bucket. The unit
-        stays pending and is served again once the image is there; it is
-        never skipped, since that would bias the sample.
+            stays pending and is served again once the image is there; it is
+            never skipped, since that would bias the sample.
+        ImageReadError: the source image payload could not be read or decoded
+            into pixel data.
     """
     if not reviewed_area.ra_key or _exists(reviewed_area.ra_key):
         return False
@@ -56,7 +59,7 @@ def ensure_crop(reviewed_area: ReviewedArea) -> bool:
         ) from error
     image.set_image(source)
     if (pixels := image.get_image()) is None:
-        raise Exception(f"could not read image {image.uuid}")
+        raise ImageReadError(str(image.uuid))
 
     reviewed_area.set_image(
         pixels[

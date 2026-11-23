@@ -1,4 +1,4 @@
-# Active measurement serving state: cached in Valkey, rebuilt from PostgreSQL
+"""Active measurement serving state cached in Valkey and rebuilt from PostgreSQL."""
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 # The durable record of a measurement is its rows in core.proposal_generations
@@ -150,8 +150,7 @@ def load_threshold(
 
 
 def release(measurement: ActiveMeasurement) -> None:
-    """Drops the cached state, terms, area and threshold once the measurement
-    has finished."""
+    """Drop the cached state, terms, area, and threshold once the measurement has finished."""
     cache.delete(_state_key(measurement))
     cache.delete(_terms_key(measurement))
     cache.delete(_area_key(measurement))
