@@ -43,7 +43,7 @@ class APITester:
         return buf.getvalue()
 
     @pytest.fixture
-    def app(self, monkeypatch: pytest.MonkeyPatch) -> Generator[Flask, None, None]:
+    def app(self, monkeypatch: pytest.MonkeyPatch) -> Generator[Flask]:
         """Creates and configures a Flask application instance for testing.
 
         Configures mock AWS S3 credentials and endpoint overrides, instantiates the
@@ -93,7 +93,7 @@ class APITester:
             base.close_pool()
 
     @pytest.fixture
-    def client(self, app: Flask) -> Generator[FlaskClient, None, None]:
+    def client(self, app: Flask) -> Generator[FlaskClient]:
         """Provides an unauthenticated Flask test client.
 
         Args:
@@ -106,7 +106,7 @@ class APITester:
             yield client
 
     @pytest.fixture
-    def auth_client(self, client: FlaskClient) -> Generator[FlaskClient, None, None]:
+    def auth_client(self, client: FlaskClient) -> Generator[FlaskClient]:
         """Provides an authenticated Flask test client session.
 
         Logs into the application using predefined test credentials via the
@@ -138,7 +138,7 @@ class APITester:
         return app.test_cli_runner()
 
     @pytest.fixture(scope="function", autouse=True)
-    def rollback_db_transaction(self, app: Flask) -> Generator[None, None, None]:
+    def rollback_db_transaction(self, app: Flask) -> Generator[None]:
         """Enforces database transaction isolation across individual test runs.
 
         Checks out a connection from the pool, disables autocommit, intercepts

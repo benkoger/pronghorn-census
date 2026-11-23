@@ -3,7 +3,14 @@
 from typing import cast
 from uuid import UUID
 
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
 from ais import MeasurementState, Proposal
+from app import proposal_store, tile_crops
+from app.decorators import permission_required
+from app.extensions import base
 from database.errors import MeasurementBlocked, ObjectNotFound
 from database.modules import activemeasurement
 from database.object_models.base import Keyring
@@ -19,13 +26,6 @@ from database.object_models.project_management.active_measurements import (
 )
 from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management import User
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app import proposal_store, tile_crops
-from app.decorators import permission_required
-from app.extensions import base
 
 activeMeasBp = Blueprint(
     "active_measurements", __name__, url_prefix="/api/v1/active-measurements"
@@ -41,8 +41,8 @@ activeMeasBp = Blueprint(
 @permission_required("access")
 @validate()
 def get_next_unit(query: ActiveMeasurementQuery):
-    """
-    Retrieve the next reviewed area to annotate for a survey's measurement.
+    """Retrieve the next reviewed area to annotate for a survey's measurement.
+
     ---
     parameters:
       - name: survey_id
@@ -124,8 +124,8 @@ def get_next_unit(query: ActiveMeasurementQuery):
 @permission_required("access")
 @validate()
 def get_estimate(query: ActiveMeasurementQuery):
-    """
-    Retrieve the live estimate for a survey's active measurement.
+    """Retrieve the live estimate for a survey's active measurement.
+
     ---
     parameters:
       - name: survey_id
@@ -185,8 +185,8 @@ def get_estimate(query: ActiveMeasurementQuery):
 @permission_required("access")
 @validate()
 def get_status(query: ActiveMeasurementQuery):
-    """
-    Retrieve how far a survey's preparation for abundance estimation has come.
+    """Retrieve how far a survey's preparation for abundance estimation has come.
+
     ---
     parameters:
       - name: survey_id
@@ -260,8 +260,8 @@ def get_status(query: ActiveMeasurementQuery):
 @permission_required("access")
 @validate()
 def get_tiles(query: ActiveMeasurementQuery):
-    """
-    Retrieve the active measurement reviewed areas (tiles) of a survey.
+    """Retrieve the active measurement reviewed areas (tiles) of a survey.
+
     ---
     parameters:
       - name: survey_id
@@ -294,8 +294,8 @@ def get_tiles(query: ActiveMeasurementQuery):
 @login_required
 @permission_required("access")
 def get_proposals(active_measurement_id: int | UUID):
-    """
-    Retrieve the proposal generations of an active measurement, oldest first.
+    """Retrieve the proposal generations of an active measurement, oldest first.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -475,8 +475,8 @@ def create(body: CreateActiveMeasurement):
 @permission_required("access")
 @validate()
 def create_tiles(body: CreateTilesReq):
-    """
-    Cut a survey's images into active measurement reviewed areas (tiles).
+    """Cut a survey's images into active measurement reviewed areas (tiles).
+
     ---
     parameters:
       - name: body
@@ -514,8 +514,8 @@ def create_tiles(body: CreateTilesReq):
 @permission_required("access")
 @validate()
 def create_proposal(body: CreateProposalReq, active_measurement_id: int | UUID):
-    """
-    Store the next proposal generation for an active measurement.
+    """Store the next proposal generation for an active measurement.
+
     ---
     parameters:
       - name: active_measurement_id
@@ -578,8 +578,8 @@ def create_proposal(body: CreateProposalReq, active_measurement_id: int | UUID):
 @permission_required("access")
 @validate()
 def update(body: UpdateActiveMeasurement, active_measurement_id: int | UUID):
-    """
-    Update an active measurement by integer ID or UUID (e.g. the cadence).
+    """Update an active measurement by integer ID or UUID (e.g. the cadence).
+
     ---
     parameters:
       - name: active_measurement_id

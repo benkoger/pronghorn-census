@@ -1,4 +1,5 @@
-# Schema relationship graph and traversal utilities
+"""Schema relationship graph and traversal utilities."""
+
 # Authors: Michael B. Lance, Antigravity
 
 from collections import deque

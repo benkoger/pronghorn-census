@@ -3,6 +3,13 @@
 from typing import cast
 from uuid import UUID
 
+from flask import Blueprint, session
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+from msgpack import unpackb
+
+from app.decorators import permission_required
+from app.extensions import base
 from database.object_models.project_management import (
     Project,
     ProjectsHerdUnits,
@@ -23,13 +30,6 @@ from database.object_models.user_management import (
     User,
 )
 from database.object_models.user_management.roles import Role
-from flask import Blueprint, session
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-from msgpack import unpackb
-
-from app.decorators import permission_required
-from app.extensions import base
 
 projectBp = Blueprint("projects", __name__, url_prefix="/api/v1/projects")
 

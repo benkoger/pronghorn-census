@@ -1,3 +1,5 @@
+"""Integration and unit tests for active measurements and predictions endpoints."""
+
 # Pytest runner for the active measurement and prediction routers in the Airial API
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -7,26 +9,26 @@
 # so the tests see the survey as the sample database has it, without one.
 # Cache keys written by the routes are dropped after each test.
 
+import io
 from uuid import uuid4
 
-import io
 import numpy as np
 import pytest
 from PIL import Image as PILImage
 from psycopg.rows import tuple_row
 from pydantic import TypeAdapter
+from testing_core import APITester
 
 from ais import Proposal, SurveyTerms
 from app import proposal_store
 from app.extensions import base, cache
 from database.modules import activemeasurement as am
 from database.object_models.core.am_units import AmUnit
-from database.object_models.core.images import Image, ReviewedArea
+from database.object_models.core.images import ReviewedArea
 from database.object_models.core.predictions import Prediction
 from database.object_models.project_management.active_measurements import (
     ActiveMeasurement,
 )
-from testing_core import APITester
 
 AM = "/api/v1/active-measurements"
 
@@ -53,6 +55,7 @@ def _sql(statement: str, params: dict | None = None) -> None:
 
 
 class TestActiveMeasurements(APITester):
+    """Test suite for the active measurements API endpoints and state lifecycle."""
 
     # -------------------------------------------------------------------------
     # Fixtures: the survey without a measurement, then one with
@@ -70,6 +73,7 @@ class TestActiveMeasurements(APITester):
 
     @pytest.fixture
     def measurement(self, auth_client, bare_survey):
+        """Creates an active measurement fixture for testing."""
         res = auth_client.post(
             AM,
             json={
@@ -128,6 +132,7 @@ class TestActiveMeasurements(APITester):
     # -------------------------------------------------------------------------
 
     def test_status_without_measurement(self, auth_client, bare_survey):
+        """Verify that survey status reflects absence of active measurement."""
         res = auth_client.get(f"{AM}/status", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 200
         status = res.get_json()
@@ -138,6 +143,7 @@ class TestActiveMeasurements(APITester):
         ]
 
     def test_estimate_not_prepared(self, auth_client, bare_survey):
+        """Verify estimate response when survey is not prepared."""
         res = auth_client.get(f"{AM}/estimate", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 200
         est = res.get_json()
@@ -146,6 +152,7 @@ class TestActiveMeasurements(APITester):
         assert est["count"] is None
 
     def test_status_and_estimate_unknown_survey(self, auth_client):
+        """Verify 404 responses for status and estimate on unknown survey UUID."""
         res = auth_client.get(f"{AM}/status", query_string={"survey_id": str(uuid4())})
         assert res.status_code == 404
         res = auth_client.get(f"{AM}/estimate", query_string={"survey_id": str(uuid4())})
@@ -156,16 +163,19 @@ class TestActiveMeasurements(APITester):
     # -------------------------------------------------------------------------
 
     def test_create_measurement_schema(self, measurement):
+        """Validate response schema for a created active measurement."""
         ActiveMeasurement.Response.model_validate(measurement)
         assert measurement["survey_id"] == SURVEY["pkey"]
         assert measurement["label_id"] == LABEL["pkey"]
         assert measurement["final_count"] is None
 
     def test_create_measurement_invalid(self, auth_client, bare_survey):
+        """Verify 400 response when creating measurement with invalid payload."""
         res = auth_client.post(AM, json={"survey_ids": SURVEY})
         assert res.status_code == 400
 
     def test_get_measurement(self, auth_client, measurement):
+        """Verify retrieving an active measurement by UUID and integer ID."""
         res = auth_client.get(f"{AM}/{measurement['uuid']}")
         assert res.status_code == 200
         assert res.get_json()["uuid"] == measurement["uuid"]
@@ -173,10 +183,12 @@ class TestActiveMeasurements(APITester):
         assert res.status_code == 200
 
     def test_get_measurement_not_found(self, auth_client):
+        """Verify 404 response when retrieving non-existent measurement."""
         res = auth_client.get(f"{AM}/{uuid4()}")
         assert res.status_code == 404
 
     def test_update_measurement(self, auth_client, measurement):
+        """Verify updating measurement fields such as target percentage."""
         res = auth_client.patch(
             f"{AM}/{measurement['uuid']}", json={"target_percentage": 0.05}
         )
@@ -184,12 +196,14 @@ class TestActiveMeasurements(APITester):
         assert res.get_json()["target_percentage"] == 0.05
 
     def test_delete_measurement(self, auth_client, measurement):
+        """Verify deleting an active measurement and dropping its cached state."""
         res = auth_client.delete(f"{AM}/{measurement['uuid']}")
         assert res.status_code == 204
         assert auth_client.get(f"{AM}/{measurement['uuid']}").status_code == 404
         assert cache.get(f"am_state_{measurement['uuid']}") is None
 
     def test_status_with_measurement(self, auth_client, measurement):
+        """Verify survey status reporting when an active measurement exists."""
         res = auth_client.get(f"{AM}/status", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 200
         status = res.get_json()
@@ -197,6 +211,7 @@ class TestActiveMeasurements(APITester):
         assert status["proposal_generations"] == 0
 
     def test_estimate_waiting_for_proposal(self, auth_client, measurement):
+        """Verify estimate status while waiting for initial proposal generation."""
         res = auth_client.get(f"{AM}/estimate", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 200
         est = res.get_json()
@@ -205,10 +220,12 @@ class TestActiveMeasurements(APITester):
         assert est["count"] is None
 
     def test_next_unit_before_proposal(self, auth_client, measurement):
+        """Verify 409 conflict when requesting next unit before proposal exists."""
         res = auth_client.get(f"{AM}/next-unit", query_string={"survey_id": SURVEY["uuid"]})
         assert res.status_code == 409
 
     def test_proposals_listed_empty_before_generation_zero(self, auth_client, measurement):
+        """Verify empty proposal list before initial generation is created."""
         res = auth_client.get(f"{AM}/{measurement['uuid']}/proposals")
         assert res.status_code == 200
         assert res.get_json() == []
@@ -244,6 +261,7 @@ class TestActiveMeasurements(APITester):
     # -------------------------------------------------------------------------
 
     def test_proposal_rows(self, app, auth_client, measurement, tiles, proposal):
+        """Verify stored proposal generations and their unit vectors."""
         assert proposal == {"generation": 0, "n_labels": 0}
 
         # the listing summarises the generations without their vectors
@@ -268,6 +286,7 @@ class TestActiveMeasurements(APITester):
         assert res.get_json()["proposal_generations"] == 1
 
     def test_proposal_duplicate_and_out_of_order(self, auth_client, measurement, tiles, proposal):
+        """Verify rejection of duplicate or out-of-order proposal generations."""
         ids = [t["reviewed_area_id"] for t in tiles]
         body = {
             "reviewed_area_ids": ids,
@@ -311,6 +330,7 @@ class TestActiveMeasurements(APITester):
         assert auth_client.get(f"{AM}/{measurement['uuid']}/proposals").get_json() == []
 
     def test_proposal_next_generation(self, auth_client, measurement, tiles, proposal):
+        """Verify posting subsequent proposal generations."""
         ids = [t["reviewed_area_id"] for t in tiles]
         res = auth_client.post(
             f"{AM}/{measurement['uuid']}/proposals",
@@ -338,6 +358,7 @@ class TestActiveMeasurements(APITester):
         assert "not in the bucket" in res.get_json()["message"]
 
     def test_serving_loop(self, auth_client, measurement, tiles, proposal, source_image):
+        """Verify unit serving loop, draft annotations, and estimate progression."""
         survey = {"survey_id": SURVEY["uuid"]}
         tile_ids = {t["reviewed_area_id"] for t in tiles}
 
@@ -435,6 +456,7 @@ class TestActiveMeasurements(APITester):
     # -------------------------------------------------------------------------
 
     def test_state_rebuilt_from_rows(self, app, auth_client, measurement, tiles, proposal):
+        """Verify serving state rebuilding from stored rows when cache is cleared."""
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
             key = f"am_state_{row.uuid}"
@@ -483,6 +505,7 @@ class TestActiveMeasurements(APITester):
             assert proposal_store.load_threshold(row, proposal_store.load(row)) <= threshold
 
     def test_area_cached_once(self, app, auth_client, measurement, tiles, proposal):
+        """Verify surveyed area calculation caching in proposal store."""
         with app.app_context():
             row = base.get(ActiveMeasurement, measurement["active_measurement_id"])
             state = proposal_store.load(row)
@@ -534,6 +557,7 @@ class TestActiveMeasurements(APITester):
             assert base.execute(am.draft_threshold, row, len(ranked) + 10.0) == ranked[-1]
 
     def test_detector_expectation(self, app, auth_client, measurement, tiles):
+        """Verify detector expected count across sample image tiles."""
         threshold = 0.5
         preds = auth_client.get(f"/api/v1/images/{IMAGE_UUID}/predictions").get_json()
         above = [p for p in preds if p["score"] >= threshold]
@@ -551,6 +575,7 @@ class TestActiveMeasurements(APITester):
         assert total_boxes <= len(above)
 
     def test_empty_estimate_shape(self, app):
+        """Verify structure and default values of empty survey estimate."""
         with app.app_context():
             est = am.empty_estimate(SURVEY["pkey"])
             assert est["status"] == "not prepared"
@@ -559,6 +584,7 @@ class TestActiveMeasurements(APITester):
                 assert est[key] is None
 
     def test_preparation_steps(self):
+        """Verify preparation steps parsing and completion status logic."""
         steps = am.preparation_steps(
             {
                 "images": 2,
@@ -583,6 +609,7 @@ class TestActiveMeasurements(APITester):
 
 
 class TestPredictions(APITester):
+    """Test suite for the predictions REST endpoints."""
 
     def _one(self, auth_client) -> dict:
         preds = auth_client.get(f"/api/v1/images/{IMAGE_UUID}/predictions").get_json()
@@ -590,6 +617,7 @@ class TestPredictions(APITester):
         return preds[0]
 
     def test_get_predictions_bulk(self, auth_client):
+        """Verify retrieving predictions in bulk by object ID query."""
         pred = self._one(auth_client)
         res = auth_client.get("/api/v1/predictions", query_string={"object_ids": pred["uuid"]})
         assert res.status_code == 200
@@ -598,6 +626,7 @@ class TestPredictions(APITester):
         assert rows[0]["uuid"] == pred["uuid"]
 
     def test_get_prediction_by_id(self, auth_client):
+        """Verify retrieving single prediction by UUID and handling 404s."""
         pred = self._one(auth_client)
         res = auth_client.get(f"/api/v1/predictions/{pred['uuid']}")
         assert res.status_code == 200
@@ -605,6 +634,7 @@ class TestPredictions(APITester):
         assert auth_client.get(f"/api/v1/predictions/{uuid4()}").status_code == 404
 
     def test_create_prediction(self, auth_client):
+        """Verify creating a prediction record with coordinates and score."""
         res = auth_client.post(
             "/api/v1/predictions",
             json={
@@ -629,5 +659,6 @@ class TestPredictions(APITester):
         assert auth_client.get(f"/api/v1/predictions/{created.uuid}").status_code == 200
 
     def test_create_prediction_invalid(self, auth_client):
+        """Verify 400 response when creating a prediction with missing fields."""
         res = auth_client.post("/api/v1/predictions", json={"score": 0.5})
         assert res.status_code == 400
