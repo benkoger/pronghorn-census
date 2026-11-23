@@ -154,7 +154,6 @@ def get_herd_units(survey_id: int | UUID):
       500:
         description: Database error.
     """
-
     if isinstance(survey_id, UUID):
         survey = base.get(Survey, survey_id)
         survey_id = survey.survey_id
