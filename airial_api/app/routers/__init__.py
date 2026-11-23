@@ -20,6 +20,7 @@ from .projects import projectBp
 from .reviewed_area import raBp
 from .roles import roleBp
 from .schemas import schemaBp
+from .survey_maps import surveyMapBp
 from .surveys import surveyBp
 from .system import systemBp
 from .users import userBp
@@ -38,6 +39,7 @@ bp.register_blueprint(projectBp)
 
 bp.register_blueprint(schemaBp)
 bp.register_blueprint(surveyBp)
+bp.register_blueprint(surveyMapBp)
 
 bp.register_blueprint(verifierBp)
 bp.register_blueprint(raBp)

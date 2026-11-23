@@ -10,3 +10,4 @@ export * from "./user";
 export * from "./autocropper";
 export * from "./verifier";
 export * from "./abundance";
+export * from "./surveymap";

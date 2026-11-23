@@ -10,8 +10,8 @@ created, proposal generations are posted and stored as rows, tiles are served on
 with the detector's boxes drafted on them, the reviewer submits them in the new Abundance
 Estimation view, and the estimate is replayed from the review log on every request. No
 process holds state: the serving state sits in Valkey as msgpack and is rebuilt from
-PostgreSQL whenever it is missing. The survey map and the abundance terms come in the PR
-after this one; here the estimate is a count, an interval and a density.
+PostgreSQL whenever it is missing. The survey map and the abundance terms are specified in
+[survey-map.md](survey-map.md).
 
 ## 2. Goals
 

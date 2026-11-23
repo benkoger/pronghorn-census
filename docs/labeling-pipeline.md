@@ -40,6 +40,15 @@ Airial implements an end-to-end **model-assisted labeling workflow** for aerial 
           +---> Abundance & Population Estimates
 ```
 
+Abundance estimation and the survey map are described in their specifications,
+`docs/plans/active-measurement-module.md` and `docs/plans/survey-map.md`. In short: each
+georeferenced image is cut into eight tiles; tiles are served for review one at a time, drawn
+where the regressor expects animals; the running estimate corrects for that choice; and the
+survey terms (habitable area, surveyed area, overlap between images, representation of the
+transects) turn the count into an abundance over the herd unit. The survey map draws the
+footprints, the reviewed animals, and the detector's boxes standing in for the animals on the
+tiles not yet reviewed.
+
 ---
 
 ## 2. Stage 1: Auto-Cropper

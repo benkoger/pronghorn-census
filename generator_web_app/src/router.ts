@@ -61,6 +61,16 @@ const router = createRouter({
       }
     },
     {
+      path: "/survey-map/",
+      name: "survey-map",
+      component: () => import("@/views/SurveyMapView.vue"),
+      meta: {
+        requiresAuth: true,
+        requiresNoLayout: false,
+        icon: "material-symbols:map-outline-rounded",
+      },
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("@/views/SettingsView.vue"),
