@@ -390,6 +390,7 @@ Table projectmanagement.active_measurements {
   final_count "double precision"
   final_ci_upper "double precision"
   final_ci_lower "double precision"
+  terms jsonb [note: 'survey terms of the abundance (ais.SurveyTerms), null until posted']
   created timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   modified timestamptz [not null, default: `CURRENT_TIMESTAMP`]
   uuid uuid [not null, default: `gen_random_uuid()`] 
