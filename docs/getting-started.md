@@ -153,7 +153,24 @@ Web app runs at `http://localhost:5173`.
 
 ---
 
-## 4. Helpful Commands
+## 4. Running the API Tests
+
+The tests run against the sample dataset of Option A: the database restored from `local_db/pct_b` and the permissions from `local_db/backup.zed`. They use its survey, model, image and login. S3 is mocked.
+
+Start the infrastructure containers:
+```bash
+podman compose -f development.compose.yml up -d db valkey spicedb spicedb-restore
+```
+
+Run the tests directly on the host using uv:
+```bash
+cd airial_api
+uv run pytest testing
+```
+
+---
+
+## 5. Helpful Commands
 
 ```bash
 # View running containers

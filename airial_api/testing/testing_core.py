@@ -1,7 +1,6 @@
 """Test harness core infrastructure for the Airial API test suite."""
 
 import io
-import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -14,7 +13,6 @@ from moto import mock_aws
 from PIL import Image as PILImage
 
 from app import create_app
-from app.extensions import base
 
 
 class APITester:
@@ -48,8 +46,8 @@ class APITester:
         """Creates and configures a Flask application instance for testing.
 
         Configures mock AWS S3 credentials and endpoint overrides, instantiates the
-        application with mocked S3 configurations, establishes a PostgreSQL connection
-        pool, creates the designated test bucket, and tears down the pool after tests.
+        application with mocked S3 configurations, and creates the designated test
+        bucket. The connection pool is the session's, opened in conftest.py.
 
         Args:
             monkeypatch (pytest.MonkeyPatch): Pytest fixture used to override AWS
@@ -67,9 +65,6 @@ class APITester:
         with mock_aws():
             with patch("config.s3_config", None):
                 app = create_app()
-
-            base._config["host"] = os.getenv("DB_HOST", "localhost")
-            base.create_pool()
 
             app.config.update(
                 {
@@ -90,8 +85,6 @@ class APITester:
                 self.bucket_name = bucket_name
 
             yield app
-
-            base.close_pool()
 
     @pytest.fixture
     def client(self, app: Flask) -> Generator[FlaskClient]:
