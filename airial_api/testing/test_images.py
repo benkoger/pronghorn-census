@@ -6,7 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from flask import FlaskClient
+from flask.testing import FlaskClient
 from PIL import Image as PILImage
 from pydantic import BaseModel
 from testing_core import APITester
