@@ -1,12 +1,13 @@
-# Pytest runner for the surveys router in the Airial API
-# Author Michael B. Lance
+"""Integration and unit tests for the Surveys API endpoints."""
 
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 import pytest
-from pydantic import BaseModel, TypeAdapter
+from flask.testing import FlaskClient
+from pydantic import BaseModel
 from testing_core import APITester
 
 from database.object_models.core.annotations import Annotation
@@ -15,6 +16,8 @@ from database.object_models.project_management import HerdUnit, Survey
 
 
 class PaginatedImagesResponse(BaseModel):
+    """Schema model for validating paginated image list responses from a survey."""
+
     images: list[Image.Response]
     total: int
     page: int | None = None
@@ -22,6 +25,12 @@ class PaginatedImagesResponse(BaseModel):
 
 
 class TestSurveys(APITester):
+    """Test suite covering the `/api/v1/surveys` REST endpoints.
+
+    Inherits from `APITester` to provide authenticated Flask test clients, mocked S3
+    buckets, and test database connectivity for verifying survey workflows.
+    """
+
     # -------------------------------------------------------------------------
     # 1. GET Single & List Endpoint Schema Validation
     # -------------------------------------------------------------------------
@@ -62,14 +71,29 @@ class TestSurveys(APITester):
         ],
     )
     def test_get_endpoints_schema_success(
-        self, auth_client, endpoint, expected_schema, is_list
-    ):
+        self,
+        auth_client: FlaskClient,
+        endpoint: str,
+        expected_schema: type[BaseModel],
+        is_list: bool,
+    ) -> None:
+        """Validates that GET survey endpoints return 200 OK and match expected schemas.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+            endpoint (str): The API endpoint path to request.
+            expected_schema (type[BaseModel]): Pydantic model class used to validate
+                the payload structure.
+            is_list (bool): Flag indicating whether the expected response payload
+                is a list of records or a single object.
+        """
         response = auth_client.get(endpoint)
         assert response.status_code == 200
 
         data = response.get_json()
         if is_list:
-            TypeAdapter(list[expected_schema]).validate_python(data)
+            for item in data:
+                expected_schema.model_validate(item)
         else:
             expected_schema.model_validate(data)
 
@@ -77,7 +101,18 @@ class TestSurveys(APITester):
     # 2. GET Paginated & Filtered Images
     # -------------------------------------------------------------------------
 
-    def test_get_survey_images_paginated_success(self, auth_client):
+    def test_get_survey_images_paginated_success(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests retrieving paginated images belonging to a specific survey.
+
+        Verifies that explicit pagination query parameters (page and per_page)
+        return HTTP 200, matching metadata in the response, and the expected
+        number of images.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         response = auth_client.get(
             f"/api/v1/surveys/{survey_uuid}/images?page=1&per_page=10"
@@ -91,7 +126,17 @@ class TestSurveys(APITester):
         assert validated.per_page == 10
         assert validated.total > 0
 
-    def test_get_survey_images_pagination_navigation(self, auth_client):
+    def test_get_survey_images_pagination_navigation(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Verifies multi-page navigation when requesting survey images.
+
+        Ensures that consecutive pages return distinct sets of images without
+        overlap between pages.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         res_page1 = auth_client.get(
             f"/api/v1/surveys/{survey_uuid}/images?page=1&per_page=5"
@@ -116,7 +161,17 @@ class TestSurveys(APITester):
         page2_uuids = {img.uuid for img in page2_data.images}
         assert page1_uuids.isdisjoint(page2_uuids)
 
-    def test_get_survey_images_clamped_query_bounds(self, auth_client):
+    def test_get_survey_images_clamped_query_bounds(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Verifies that out-of-bound pagination values are safely clamped to defaults.
+
+        Tests negative or zero values for page and per_page to ensure the API
+        gracefully clamps them to minimum valid bounds rather than erroring out.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         response = auth_client.get(
             f"/api/v1/surveys/{survey_uuid}/images?page=-1&per_page=0"
@@ -127,7 +182,17 @@ class TestSurveys(APITester):
         assert validated.page == 1
         assert validated.per_page is not None and validated.per_page >= 1  # pyright: ignore
 
-    def test_get_survey_images_no_pagination(self, auth_client):
+    def test_get_survey_images_no_pagination(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests fetching survey images without explicitly specifying pagination parameters.
+
+        Verifies that the endpoint applies default pagination parameters and returns
+        a valid paginated image response.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         response = auth_client.get(f"/api/v1/surveys/{survey_uuid}/images")
 
@@ -135,7 +200,17 @@ class TestSurveys(APITester):
         data = response.get_json()
         PaginatedImagesResponse.model_validate(data)
 
-    def test_get_survey_annotated_images_with_filters(self, auth_client):
+    def test_get_survey_annotated_images_with_filters(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests retrieving annotated survey images filtered by label and herd unit.
+
+        Ensures that filtering by label and herd unit query parameters returns
+        HTTP 200 and a list of matching annotated image records.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         params = [("label", 3), ("herd_unit", 1)]
         query_string = urllib.parse.urlencode(params)
@@ -147,7 +222,17 @@ class TestSurveys(APITester):
         data = response.get_json()
         assert isinstance(data, list)
 
-    def test_get_survey_annotated_images_with_date_range(self, auth_client):
+    def test_get_survey_annotated_images_with_date_range(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests retrieving annotated survey images filtered by a date range.
+
+        Verifies that providing lower and upper date range bounds in '%m/%d/%Y %H:%M:%S'
+        format parses successfully and filters annotated images.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         params = [
             ("label", 3),
@@ -168,16 +253,33 @@ class TestSurveys(APITester):
     # 3. GET Not Found / Edge Cases
     # -------------------------------------------------------------------------
 
-    def test_get_survey_not_found(self, auth_client):
+    def test_get_survey_not_found(self, auth_client: FlaskClient) -> None:
+        """Verifies that requesting a non-existent survey UUID returns 404 Not Found.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/surveys/{random_uuid}")
         assert response.status_code == 404
 
-    def test_get_survey_int_id_not_found(self, auth_client):
+    def test_get_survey_int_id_not_found(self, auth_client: FlaskClient) -> None:
+        """Verifies that requesting a non-existent survey integer ID returns 404 Not Found.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         response = auth_client.get("/api/v1/surveys/9999999")
         assert response.status_code == 404
 
-    def test_get_survey_annotated_images_not_found(self, auth_client):
+    def test_get_survey_annotated_images_not_found(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Verifies that requesting annotated images for a non-existent survey returns 404.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         random_uuid = str(uuid4())
         response = auth_client.get(f"/api/v1/surveys/{random_uuid}/annotated_images")
         assert response.status_code == 404
@@ -201,7 +303,7 @@ class TestSurveys(APITester):
                         "pkey": 1,
                         "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
                     },
-                    "survey_date": datetime.now(timezone.utc).isoformat(),
+                    "survey_date": datetime.now(UTC).isoformat(),
                     "name": f"survey_{uuid4().hex[:6]}",
                     "status": "uploaded",
                     "survey_area": 1500.5,
@@ -219,7 +321,24 @@ class TestSurveys(APITester):
             ),
         ],
     )
-    def test_post_endpoints(self, auth_client, endpoint, payload, expected_status):
+    def test_post_endpoints(
+        self,
+        auth_client: FlaskClient,
+        endpoint: str,
+        payload: dict[str, Any],
+        expected_status: int,
+    ) -> None:
+        """Tests POST endpoints for creating surveys with valid and invalid payloads.
+
+        Verifies that valid creation payloads return HTTP 201 with the created Survey
+        schema, while incomplete payloads return HTTP 400 Bad Request.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+            endpoint (str): The API endpoint path to which the POST request is sent.
+            payload (dict[str, Any]): JSON payload body sent in the request.
+            expected_status (int): The expected HTTP status code of the response.
+        """
         response = auth_client.post(endpoint, json=payload)
         assert response.status_code == expected_status
         if expected_status == 201:
@@ -230,7 +349,17 @@ class TestSurveys(APITester):
     # 5. State-Mutating Lifecycles (PATCH & DELETE)
     # -------------------------------------------------------------------------
 
-    def test_update_survey_by_uuid_success(self, auth_client):
+    def test_update_survey_by_uuid_success(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests updating survey fields via the PATCH endpoint using a survey UUID.
+
+        Verifies that updating a survey's name and status returns HTTP 200 and
+        reflects the updated values in the response payload.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         survey_uuid = "f4c0b5e0-af30-46fa-a276-6169932b6a34"
         new_name = f"updated_{uuid4().hex[:6]}"
 
@@ -243,7 +372,17 @@ class TestSurveys(APITester):
         assert data["name"] == new_name
         assert data["status"] == "measuring"
 
-    def test_update_survey_by_int_success(self, auth_client):
+    def test_update_survey_by_int_success(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Tests updating survey fields via the PATCH endpoint using an integer PK.
+
+        Verifies that updating a survey's name and survey_area returns HTTP 200 and
+        reflects the updated values in the response payload.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         new_name = f"updated_int_{uuid4().hex[:6]}"
 
         response = auth_client.patch(
@@ -255,7 +394,12 @@ class TestSurveys(APITester):
         assert data["name"] == new_name
         assert data["survey_area"] == 999.9
 
-    def test_update_survey_not_found(self, auth_client):
+    def test_update_survey_not_found(self, auth_client: FlaskClient) -> None:
+        """Verifies that attempting to update a non-existent survey returns 404 Not Found.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         random_uuid = str(uuid4())
         response = auth_client.patch(
             f"/api/v1/surveys/{random_uuid}",
@@ -263,7 +407,15 @@ class TestSurveys(APITester):
         )
         assert response.status_code == 404
 
-    def test_delete_survey_lifecycle(self, auth_client):
+    def test_delete_survey_lifecycle(self, auth_client: FlaskClient) -> None:
+        """Tests the full lifecycle of creating, verifying, and deleting a survey.
+
+        Ensures that a new survey is created with HTTP 201, verified via GET with HTTP 200,
+        successfully deleted with HTTP 204 No Content, and confirmed non-existent with HTTP 404.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
         payload = {
             "project_ids": {
                 "pkey": 1,
@@ -273,7 +425,7 @@ class TestSurveys(APITester):
                 "pkey": 1,
                 "uuid": "4317a307-9595-4116-be11-c7584561dd8d",
             },
-            "survey_date": datetime.now(timezone.utc).isoformat(),
+            "survey_date": datetime.now(UTC).isoformat(),
             "name": f"delete_me_{uuid4().hex[:6]}",
         }
 
