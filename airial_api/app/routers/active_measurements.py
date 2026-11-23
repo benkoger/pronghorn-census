@@ -3,7 +3,14 @@
 from typing import cast
 from uuid import UUID
 
+from flask import Blueprint
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+
 from ais import MeasurementState, Proposal
+from app import proposal_store, tile_crops
+from app.decorators import permission_required
+from app.extensions import base
 from database.errors import MeasurementBlocked, ObjectNotFound
 from database.modules import activemeasurement
 from database.object_models.base import Keyring
@@ -19,13 +26,6 @@ from database.object_models.project_management.active_measurements import (
 )
 from database.object_models.project_management.surveys import Survey
 from database.object_models.user_management import User
-from flask import Blueprint
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-
-from app import proposal_store, tile_crops
-from app.decorators import permission_required
-from app.extensions import base
 
 activeMeasBp = Blueprint(
     "active_measurements", __name__, url_prefix="/api/v1/active-measurements"

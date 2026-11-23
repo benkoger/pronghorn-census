@@ -8,10 +8,10 @@ from pydantic import BaseModel
 
 from app.extensions import base
 from database.errors import AuthorizationFailure, ObjectNotFound
-from database.object_models.project_management import HerdUnit
-from database.object_models.core.images import Image
-from database.object_models.core.image_metadata import ImageMetadata
 from database.object_models.core.image_footprints import ImageFootprint
+from database.object_models.core.image_metadata import ImageMetadata
+from database.object_models.core.images import Image
+from database.object_models.project_management import HerdUnit
 from database.object_models.project_management.labels import Label
 from database.object_models.user_management.organizations import Organization
 from database.object_models.user_management.users import User
@@ -96,7 +96,7 @@ def permission_required(permission: str):
                                     )
                                 obj_id = str(getattr(db_obj, "uuid", db_obj))
                             except (ObjectNotFound, KeyError) as e:
-                                current_app.logger.exception(e)
+                                current_app.logger.exception("Could not resolve object identifier")
                                 abort(404, str(e))
                         else:
                             obj_id = str(value)

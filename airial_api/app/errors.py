@@ -1,13 +1,35 @@
-# Error Handling for the Airial API
-# Author: Michael B. Lance
+"""Error handling and exception definitions for the Airial API."""
 
 # ---------------------------------------------------------------------------------------------------------------------------
 
 from flask import current_app
 from werkzeug.exceptions import HTTPException
+
 from database.errors import AirialError
 
 # ---------------------------------------------------------------------------------------------------------------------------
+# Application Exception Classes
+
+
+class AppError(AirialError):
+    """Base exception class for application-level API errors."""
+
+
+class ImageReadError(AppError):
+    """Raised when an image payload cannot be read or decoded into pixel data."""
+
+    def __init__(self, image_id: str):
+        """Initialize ImageReadError exception.
+
+        Args:
+            image_id: Identifier for the image that could not be read.
+        """
+        self.message = f"Could not read image {image_id}"
+        super().__init__("Image Read Error", 500, self.message)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# Error Handlers
 
 
 def handle_generic_http(error: HTTPException):

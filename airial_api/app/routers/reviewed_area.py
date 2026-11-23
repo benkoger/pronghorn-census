@@ -3,6 +3,13 @@
 from typing import Any
 from uuid import UUID
 
+from flask import Blueprint, current_app
+from flask_login import current_user, login_required
+from flask_pydantic import validate
+from psycopg import sql
+
+from app.decorators import permission_required
+from app.extensions import base, s3
 from database.object_models.base import PrimaryKey
 from database.object_models.core import UpdateReviewedAreaReq
 from database.object_models.core.annotations import Annotation
@@ -14,13 +21,6 @@ from database.object_models.core.images import (
 )
 from database.object_models.project_management.herd_units import HerdUnit
 from database.object_models.project_management.surveys import Survey
-from flask import Blueprint, current_app
-from flask_login import current_user, login_required
-from flask_pydantic import validate
-from psycopg import sql
-
-from app.decorators import permission_required
-from app.extensions import base, s3
 
 raBp = Blueprint("reviewed-area", __name__, url_prefix="/api/v1/reviewed-area")
 
