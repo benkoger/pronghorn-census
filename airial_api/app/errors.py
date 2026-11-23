@@ -33,6 +33,7 @@ class ImageReadError(AppError):
 
 
 def handle_generic_http(error: HTTPException):
+    """Handle generic Werkzeug HTTP exceptions and return JSON error payloads."""
     current_app.logger.error(f"HTTP {error.code}: {error.description}")
 
     status_code = error.code if error.code is not None else 500
@@ -47,6 +48,7 @@ def handle_generic_http(error: HTTPException):
 
 
 def handle_airial_error(error: AirialError):
+    """Handle custom AirialError exceptions and return structured JSON responses."""
     current_app.logger.error(str(error))
     return (
         {"error": error.name, "code": error.code, "message": error.message},
@@ -58,6 +60,7 @@ def handle_airial_error(error: AirialError):
 
 
 def internal_service_error(error: Exception):
+    """Handle unexpected internal exceptions and return a 500 error response."""
     current_app.logger.exception(error)
     return (
         {

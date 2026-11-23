@@ -148,3 +148,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-env>=1.2.0",
 ]
+
+[tool.ruff.lint]
+extend-select = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

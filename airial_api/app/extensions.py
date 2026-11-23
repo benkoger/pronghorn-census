@@ -1,3 +1,5 @@
+"""Application extensions, singletons, and service clients."""
+
 from flask import current_app
 from flask_caching import Cache
 from flask_login import LoginManager
@@ -19,6 +21,7 @@ health = HealthCheck()
 
 
 def first_run():
+    """Check whether the application database has been bootstrapped."""
     return base.check_bootstrapped(), "first_run"
 
 

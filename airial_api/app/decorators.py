@@ -1,3 +1,5 @@
+"""Authentication and authorization route decorators."""
+
 from functools import wraps
 from typing import cast
 
@@ -41,6 +43,7 @@ check_exist = {
 
 
 def roles_required(*roles):
+    """Enforce that the authenticated user possesses the specified roles."""
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):
@@ -58,6 +61,7 @@ def roles_required(*roles):
 
 
 def permission_required(permission: str):
+    """Enforce SpiceDB relation-based access control (ReBAC) permissions."""
     def wrapper(f):
         @wraps(f)
         def decorated_view(*args, **kwargs):

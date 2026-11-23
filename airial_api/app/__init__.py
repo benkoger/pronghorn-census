@@ -1,3 +1,5 @@
+"""Application factory and extension registration for the Airial API."""
+
 import os
 
 from boto3 import client
@@ -15,6 +17,7 @@ from database.errors import AirialError
 
 
 def create_app():
+    """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
     app.config.from_object(FlaskConfig)
 

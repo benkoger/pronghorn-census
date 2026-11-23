@@ -1,4 +1,4 @@
-# Crops of active measurement tiles: cut from the source image when first served
+"""Crops of active measurement tiles cut from the source image when first served."""
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
 
