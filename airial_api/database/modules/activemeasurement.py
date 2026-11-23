@@ -1,3 +1,5 @@
+"""Active measurement specialized database operations."""
+
 # Active Measurement Specialized Database Operations
 # Author: Owen Martin
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -31,14 +33,14 @@
 # confirmed.
 # ---------------------------------------------------------------------------------------------------------------------------
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil, isfinite
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import numpy as np
-import psycopg.sql as sql
-from psycopg import Cursor
+from psycopg import Cursor, sql
 from psycopg.errors import UniqueViolation
 from psycopg.rows import class_row, dict_row, tuple_row
 
@@ -202,10 +204,11 @@ def detector_expectation(
     reviewed_area_id: int,
     threshold: float,
 ) -> tuple[float, int]:
-    """The detector's expected count of a unit: the sum of its boxes' scores
-    at or above `threshold`, and the number of those boxes.
+    """Calculate the detector's expected count of a unit.
 
-    A box belongs to the unit its center lies on, as when it is drafted.
+    The sum of its boxes' scores at or above `threshold`, and the number of
+    those boxes. A box belongs to the unit its center lies on, as when it is
+    drafted.
     """
     detector = get_detection_model(cursor, db, measurement.survey_id)
     stmt = sql.SQL("""
@@ -242,15 +245,14 @@ def draft_threshold(
     measurement: ActiveMeasurement,
     expected_total: float,
 ) -> float:
-    """The detector score at which its box count over the measurement's units
-    equals the regressor's expected total.
+    """Calculate the detector score matching the regressor's expected total.
 
     With `k` the expected total rounded to a count, the threshold is the k-th
     highest score among the detector's boxes of the measurement's label on
     the units' images, so exactly k boxes score at or above it (ties aside).
     `NO_DRAFTS` when k is zero; the lowest score when k exceeds the boxes.
     """
-    k = int(round(expected_total))
+    k = round(expected_total)
     if k <= 0:
         return NO_DRAFTS
 
@@ -372,10 +374,11 @@ def _proposal_detail(status: dict) -> str:
 
 
 def preparation_steps(status: dict) -> list[dict]:
-    """The preparation steps of a survey, each with whether it is done and,
-    once done, where its piece came from: the detector, the images
-    georeferenced, the tiles, the measurement's settings and the proposal's
-    expected total.
+    """Retrieve the preparation steps and completion status of a survey.
+
+    Each step indicates whether it is done and, once done, where its piece came
+    from: the detector, the images georeferenced, the tiles, the measurement's
+    settings and the proposal's expected total.
 
     A step is done when its process has run; the sentences do not say how
     many images succeeded.
@@ -533,8 +536,10 @@ def get_tiles(
     db: "Database",
     survey_ids: Keyring,
 ) -> list[dict[str, Any]]:
-    """Returns the survey's measurement tiles, in image then grid order, with
-    their bounds in image pixels."""
+    """Returns the survey's measurement tiles in image then grid order.
+
+    Includes tile bounds in image pixels.
+    """
     stmt = sql.SQL("""
         SELECT ra.reviewed_area_id, ra.uuid, ra.image_id, ra.name,
                ra.area_tx, ra.area_ty, ra.area_bx, ra.area_by
@@ -816,8 +821,7 @@ def create_draft_annotations(
     reviewed_area_ids: Keyring,
     user: User,
 ) -> int:
-    """Drafts the detector's boxes at or above `threshold` on a unit as
-    annotations.
+    """Draft detector prediction boxes at or above threshold as annotations.
 
     The annotations carry the measurement's label and link to the boxes they
     came from. A box belongs to the unit its center lies on.

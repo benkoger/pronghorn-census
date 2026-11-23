@@ -1,3 +1,5 @@
+"""Database object model for active measurement proposal generations."""
+
 # Class definition for ProposalGeneration objects in the database
 # ---------------------------------------------------------------------------------------------------------------------------
 
@@ -81,6 +83,8 @@ class ProposalGeneration(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     class Response(BaseModel):
+        """Response schema for a proposal generation."""
+
         model_config = ConfigDict(from_attributes=True)
 
         proposal_generation_id: int
@@ -149,4 +153,9 @@ class ProposalGeneration(DBbase):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize proposal generation model to a dictionary.
+
+        Returns:
+            Dictionary representation of the proposal generation.
+        """
         return ProposalGeneration.Response.model_validate(self).model_dump(mode="json")
