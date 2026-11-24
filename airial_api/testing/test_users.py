@@ -5,10 +5,12 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 from authzed.api.v1 import CheckPermissionResponse
+from flask import Flask
 from flask.testing import FlaskClient
 from testing_core import APITester
 
 from app.extensions import base, cache
+from app.routers.users import load as load_user
 from database.object_models.user_management.organizations import Organization
 from database.object_models.user_management.roles import Role
 from database.object_models.user_management.users import User, UserStatus
@@ -103,6 +105,32 @@ class TestUsers(APITester):
             client (FlaskClient): Unauthenticated test client fixture.
         """
         assert client.get(f"{USERS_URL}/current-user").status_code == 401
+
+    def test_load_user_missing_and_default_org_fallback(
+        self, app: Flask, auth_client: FlaskClient
+    ) -> None:
+        """Verify user_loader returns None when missing and falls back to default_org_id.
+
+        Args:
+            app (Flask): Flask application fixture.
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
+        missing_uuid = str(uuid4())
+        cache.delete(f"user_{missing_uuid}")
+        with (
+            app.test_request_context(),
+            patch.object(base, "get", return_value=None),
+        ):
+            assert load_user(missing_uuid) is None
+
+        cache.delete(f"user_{TESTER_USER_UUID}")
+        with auth_client.session_transaction() as sess:
+            sess.pop("active_org_uuid", None)
+
+        res = auth_client.get(f"{USERS_URL}/current-user")
+        assert res.status_code == 200
+        assert res.get_json()["user_id"] == TESTER_USER_ID
+        cache.delete(f"user_{TESTER_USER_UUID}")
 
     # -------------------------------------------------------------------------
     # 2. GET User Organizations (UUID & Integer Primary Key)
@@ -286,6 +314,21 @@ class TestUsers(APITester):
             == 401
         )
 
+    def test_set_active_organization_none_returns_404(
+        self, auth_client: FlaskClient
+    ) -> None:
+        """Verify 404 when base.get returns None for organization lookup.
+
+        Args:
+            auth_client (FlaskClient): Authenticated test client fixture.
+        """
+        with patch.object(base, "get", return_value=None):
+            res = auth_client.patch(
+                f"{USERS_URL}/set-active-organization",
+                json={"org_id": ORG_UUID},
+            )
+        assert res.status_code == 404
+
     # -------------------------------------------------------------------------
     # 5. GET All Users in Active Organization
     # -------------------------------------------------------------------------
@@ -427,6 +470,32 @@ class TestUsers(APITester):
                 "password": "RootPassword123!",
             },
         )
+        assert response.status_code == 500
+
+    def test_create_super_user_missing_root_org_returns_500(
+        self, client: FlaskClient
+    ) -> None:
+        """Verify 500 response when unbootstrapped DB lacks Root organization.
+
+        Args:
+            client (FlaskClient): Unauthenticated test client fixture.
+        """
+        now = datetime.now(UTC)
+        root_role = Role(
+            role_id=99, name="root", created=now, modified=now, uuid=uuid4()
+        )
+        with (
+            patch.object(base, "check_bootstrapped", return_value=False),
+            patch.object(base, "where", side_effect=[[root_role], []]),
+        ):
+            response = client.post(
+                f"{USERS_URL}/super-user",
+                json={
+                    "username": "RootAdmin",
+                    "email": "root@local.host",
+                    "password": "RootPassword123!",
+                },
+            )
         assert response.status_code == 500
 
     def test_create_super_user_success_with_mocked_insert(
