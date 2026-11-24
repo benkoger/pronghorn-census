@@ -75,10 +75,11 @@ class Schema(DBbase):
                 INSERT INTO projectmanagement.schemas (name)
                 VALUES (%(name)s)
                 RETURNING *
+            ),
+            inserted_link AS (
+                INSERT INTO projectmanagement.projects_schemas (project_id, schema_id)
+                SELECT %(project_id)s, schema_id FROM new_schema
             )
-            INSERT INTO projectmanagement.projects_schemas (project_id, schema_id)
-            VALUES (%(project_id)s, (SELECT schema_id FROM new_schema));
-
             SELECT * FROM new_schema;
         """)
 

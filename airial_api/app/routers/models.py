@@ -65,8 +65,11 @@ def get_by_id(model_id: int | UUID):
 @modelBp.get("/<string:model_id>/json")
 @login_required
 @permission_required("access")
-def get_json_all():
+def get_json_all(model_id: str):
     """Retrieve all dataset JSON configurations for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -97,8 +100,11 @@ def get_json_all():
 @modelBp.get("/<string:model_id>/json/train")
 @login_required
 @permission_required("access")
-def get_json_train():
+def get_json_train(model_id: str):
     """Retrieve train dataset JSON for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -129,8 +135,11 @@ def get_json_train():
 @modelBp.get("/<string:model_id>/json/val")
 @login_required
 @permission_required("access")
-def get_json_test():
+def get_json_test(model_id: str):
     """Retrieve validation dataset JSON for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -161,8 +170,11 @@ def get_json_test():
 @modelBp.get("/<string:model_id>/weights")
 @login_required
 @permission_required("access")
-def get_weights():
+def get_weights(model_id: str):
     """Retrieve weights artifact file for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -193,8 +205,11 @@ def get_weights():
 @modelBp.get("/<string:model_id>/config")
 @login_required
 @permission_required("access")
-def get_config():
+def get_config(model_id: str):
     """Retrieve architecture configuration file for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -225,8 +240,11 @@ def get_config():
 @modelBp.get("/<string:model_id>/readme")
 @login_required
 @permission_required("access")
-def get_readme():
+def get_readme(model_id: str):
     """Retrieve documentation/readme artifact for a specific model from S3.
+
+    Args:
+        model_id: Model identifier or UUID.
 
     Returns:
         Tuple containing empty string and HTTP status 200.
@@ -626,7 +644,7 @@ def replace_val_json(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/weights")
+@modelBp.put("/<string:model_id>/weights")
 @login_required
 @permission_required("access")
 def replace_weights(model_id: str):
@@ -659,7 +677,7 @@ def replace_weights(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/config")
+@modelBp.put("/<string:model_id>/config")
 @login_required
 @permission_required("access")
 def replace_config(model_id: str):
@@ -692,7 +710,7 @@ def replace_config(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/readme")
+@modelBp.put("/<string:model_id>/readme")
 @login_required
 @permission_required("access")
 def replace_readme(model_id: str):
