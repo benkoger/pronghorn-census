@@ -644,7 +644,7 @@ def replace_val_json(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/weights")
+@modelBp.put("/<string:model_id>/weights")
 @login_required
 @permission_required("access")
 def replace_weights(model_id: str):
@@ -677,7 +677,7 @@ def replace_weights(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/config")
+@modelBp.put("/<string:model_id>/config")
 @login_required
 @permission_required("access")
 def replace_config(model_id: str):
@@ -710,7 +710,7 @@ def replace_config(model_id: str):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@modelBp.post("/<string:model_id>/readme")
+@modelBp.put("/<string:model_id>/readme")
 @login_required
 @permission_required("access")
 def replace_readme(model_id: str):

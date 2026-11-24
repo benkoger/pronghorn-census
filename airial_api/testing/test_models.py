@@ -161,8 +161,8 @@ class TestModels(APITester):
             assert auth_client.post(f"{MODELS_URL}/{MODEL_UUID}/{suffix}").status_code == 200
 
         assert auth_client.put(f"{MODELS_URL}/{MODEL_UUID}").status_code == 200
-        assert auth_client.put(f"{MODELS_URL}/{MODEL_UUID}/train").status_code == 200
-        assert auth_client.put(f"{MODELS_URL}/{MODEL_UUID}/val").status_code == 200
+        for suffix in ("train", "val", "weights", "config", "readme"):
+            assert auth_client.put(f"{MODELS_URL}/{MODEL_UUID}/{suffix}").status_code == 200
 
     def test_artifact_endpoints_unauthenticated(self, client: FlaskClient) -> None:
         """Verify 401 responses for artifact endpoints when unauthenticated.
