@@ -1,9 +1,13 @@
 """Pytest configuration and session-wide fixtures for Airial API testing."""
 
+import os
+
 import pytest
 from dotenv import load_dotenv
 
-load_dotenv(".env.test", override=True)
+# support running on runner or locally with .env.test
+if not os.getenv("CI"):
+    load_dotenv(".env.test", override=True)
 
 
 @pytest.fixture(scope="session", autouse=True)

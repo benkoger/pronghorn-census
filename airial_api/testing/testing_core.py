@@ -1,6 +1,7 @@
 """Test harness core infrastructure for the Airial API test suite."""
 
 import io
+import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -67,7 +68,7 @@ class APITester:
             with patch("config.s3_config", None):
                 app = create_app()
 
-            base._config["host"] = "localhost"
+            base._config["host"] = os.getenv("DB_HOST", "localhost")
             base.create_pool()
 
             app.config.update(
