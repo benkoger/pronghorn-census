@@ -9,45 +9,133 @@ workflow:
 stages:
   - test
 
-variables:
-  COMPOSE_FILE: testing.compose.yml
-  COMPOSE_PROJECT_NAME: airial-ci-${CI_PIPELINE_ID}
-
 test:api:
   stage: test
-  image: docker:27-cli
+  image: python:3.13-slim-trixie
+  services:
+    - name: docker.io/imresamu/postgis:17-3.5-bookworm
+      alias: db
+      command:
+        - "postgres"
+        - "-c"
+        - "listen_addresses=*"
+        - "-c"
+        - "shared_buffers=64MB"
+        - "-c"
+        - "work_mem=4MB"
+        - "-c"
+        - "maintenance_work_mem=32MB"
+        - "-c"
+        - "max_connections=25"
+    - name: docker.io/valkey/valkey:8.1.1
+      alias: valkey
+      command:
+        - "valkey-server"
+        - "--requirepass"
+        - "test_valkey_password"
+        - "--maxmemory"
+        - "64mb"
+        - "--maxmemory-policy"
+        - "allkeys-lru"
+        - "--save"
+        - ""
+    - name: authzed/spicedb:latest
+      alias: spicedb
+      command:
+        - "serve"
+  variables:
+    POSTGRES_USER: pronghorn_count
+    POSTGRES_PASSWORD: test_db_password
+    POSTGRES_DB: testing
+    DB_NAME: testing
+    DB_USER: pronghorn_count
+    DB_PASS: test_db_password
+    DB_HOST: db
+    DB_PORT: "5432"
+    VALKEY_HOST: valkey
+    VALKEY_PASS: test_valkey_password
+    SESSION_REDIS: redis://:test_valkey_password@valkey:6379/0
+    CACHE_REDIS: redis://:test_valkey_password@valkey:6379/1
+    SPICEDB_DATASTORE_ENGINE: memory
+    SPICEDB_GRPC_LOGLEVEL: warn
+    SPICEDB_DATASTORE_CONN_URI: postgres://pronghorn_count:test_db_password@db:5432/spicedb_testing?sslmode=disable
+    SPICEDB_GRPC_PRESHARED_KEY: test_spicedb_preshared_key
+    SPICE_URL: spicedb:50051
+    SECRET_KEY: ci-test-secret-key-not-for-production
+    SESSION_COOKIE_SAMESITE: Lax
+    SESSION_PERMANENT: "true"
+    SESSION_COOKIE_SECURE: "false"
+    SESSION_USE_SIGNER: "true"
+    ORIGIN_URL: http://localhost:5173
+    BUCKET_NAME: pronghorn-count-test
+    NUM_API_WORKERS: "1"
+    GOOGLE_CLIENT_ID: test-google-client-id
+    GOOGLE_CLIENT_SECRET: test-google-client-secret
+    DEMO_MODE: "false"
+    FLASK_APP: app.py
+    PYTHONUNBUFFERED: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+    MALLOC_ARENA_MAX: "2"
+    OMP_NUM_THREADS: "1"
+    OPENBLAS_NUM_THREADS: "1"
+  cache:
+    key:
+      prefix: ${CI_RUNNER_EXECUTABLE_ARCH}
+      files:
+        - airial_api/pyproject.toml
+        - airial_api/uv.lock
+    paths:
+      - airial_api/.venv/
   before_script:
+    - apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 curl ca-certificates gnupg
+    - curl -sS https://pkg.authzed.com/apt/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
+    - echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
+    - apt-get update && apt-get install -y --no-install-recommends zed && rm -rf /var/lib/apt/lists/*
+    - pip install --no-cache-dir uv
     - |
-      if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-        export COMPOSE_CMD="docker compose"
-      elif command -v podman >/dev/null 2>&1; then
-        export COMPOSE_CMD="podman compose"
-      else
-        echo "Neither docker compose nor podman compose is available on this runner."
-        exit 1
-      fi
+      for i in $(seq 1 60); do
+        if PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
+          break
+        fi
+        if [ "$i" -eq 60 ]; then
+          echo "Timed out waiting for PostgreSQL"
+          exit 1
+        fi
+        sleep 1
+      done
+    - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
+    - |
+      PGPASSWORD="$DB_PASS" psql -v ON_ERROR_STOP=1 -h db -U "$DB_USER" -d "$DB_NAME" <<-EOSQL
+        ANALYZE;
+        DROP EXTENSION IF EXISTS postgis_tiger_geocoder CASCADE;
+        DROP EXTENSION IF EXISTS postgis_topology CASCADE;
+        DROP EXTENSION IF EXISTS fuzzystrmatch CASCADE;
+        DROP SCHEMA IF EXISTS tiger CASCADE;
+        DROP SCHEMA IF EXISTS tiger_data CASCADE;
+        DROP SCHEMA IF EXISTS topology CASCADE;
+      EOSQL
+    - |
+      python3 - <<'EOF'
+      import socket, time
+      for host, port in [("spicedb", 50051), ("valkey", 6379)]:
+          for _ in range(60):
+              try:
+                  with socket.create_connection((host, port), timeout=1):
+                      break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit(f"Timed out waiting for {host}:{port}")
+      EOF
+    - ZED_ENDPOINT=spicedb:50051 ZED_TOKEN="$SPICEDB_GRPC_PRESHARED_KEY" ZED_INSECURE=true zed backup restore local_db/backup.zed
   script:
-    - $COMPOSE_CMD -f "$COMPOSE_FILE" build api-test
-    - $COMPOSE_CMD -f "$COMPOSE_FILE" up -d db valkey spicedb spicedb-restore
-    - >
-      $COMPOSE_CMD -f "$COMPOSE_FILE" run --name "${COMPOSE_PROJECT_NAME}-api" api-test
-      sh -c "uvx --no-cache ruff check app/ testing/ database/ &&
-      .venv/bin/coverage run -m pytest -v --junitxml=/tmp/junit.xml testing/ &&
-      .venv/bin/coverage report -m --include='app/routers/*' &&
-      .venv/bin/coverage xml --include='app/routers/*' -o /tmp/coverage.xml"
-      || TEST_EXIT=$?
-    - |
-      mkdir -p airial_api/reports
-      $COMPOSE_CMD -f "$COMPOSE_FILE" cp "${COMPOSE_PROJECT_NAME}-api:/tmp/junit.xml" airial_api/reports/junit.xml 2>/dev/null || true
-      $COMPOSE_CMD -f "$COMPOSE_FILE" cp "${COMPOSE_PROJECT_NAME}-api:/tmp/coverage.xml" airial_api/reports/coverage.xml 2>/dev/null || true
-      exit "${TEST_EXIT:-0}"
-  after_script:
-    - |
-      if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-        docker compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
-      elif command -v podman >/dev/null 2>&1; then
-        podman compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
-      fi
+    - cd airial_api
+    - uv sync --locked --no-cache
+    - uvx --no-cache ruff check app/ testing/ database/
+    - mkdir -p reports
+    - .venv/bin/coverage run -m pytest -v --junitxml=reports/junit.xml testing/
+    - .venv/bin/coverage report -m --include="app/routers/*"
+    - .venv/bin/coverage xml --include="app/routers/*" -o reports/coverage.xml
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
   artifacts:
     when: always
