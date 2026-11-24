@@ -7,11 +7,29 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "web"
 
 stages:
+  - lint
   - test
+
+lint:api:
+  stage: lint
+  image: ghcr.io/astral-sh/uv:python3.13-trixie-slim
+  variables:
+    UV_CACHE_DIR: .uv-cache
+  cache:
+    key:
+      prefix: ruff-${CI_RUNNER_EXECUTABLE_ARCH}
+      files:
+        - airial_api/pyproject.toml
+    paths:
+      - .uv-cache/
+      - airial_api/.ruff_cache/
+  script:
+    - cd airial_api
+    - uvx ruff check app/ database/ testing/
 
 test:api:
   stage: test
-  image: python:3.13-slim-trixie
+  image: ghcr.io/astral-sh/uv:python3.13-trixie-slim
   services:
     - name: docker.io/imresamu/postgis:17-3.5-bookworm
       alias: db
@@ -58,7 +76,6 @@ test:api:
     CACHE_REDIS: redis://:test_valkey_password@valkey:6379/1
     SPICEDB_DATASTORE_ENGINE: memory
     SPICEDB_GRPC_LOGLEVEL: warn
-    SPICEDB_DATASTORE_CONN_URI: postgres://pronghorn_count:test_db_password@db:5432/spicedb_testing?sslmode=disable
     SPICEDB_GRPC_PRESHARED_KEY: test_spicedb_preshared_key
     SPICE_URL: spicedb:50051
     SECRET_KEY: ci-test-secret-key-not-for-production
@@ -78,6 +95,7 @@ test:api:
     MALLOC_ARENA_MAX: "2"
     OMP_NUM_THREADS: "1"
     OPENBLAS_NUM_THREADS: "1"
+    UV_CACHE_DIR: .uv-cache
   cache:
     key:
       prefix: ${CI_RUNNER_EXECUTABLE_ARCH}
@@ -85,57 +103,24 @@ test:api:
         - airial_api/pyproject.toml
         - airial_api/uv.lock
     paths:
+      - .uv-cache/
       - airial_api/.venv/
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 curl ca-certificates gnupg
-    - curl -sS https://pkg.authzed.com/apt/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
-    - echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
-    - apt-get update && apt-get install -y --no-install-recommends zed && rm -rf /var/lib/apt/lists/*
-    - pip install --no-cache-dir uv
     - |
-      for i in $(seq 1 60); do
-        if PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
-          break
-        fi
-        if [ "$i" -eq 60 ]; then
-          echo "Timed out waiting for PostgreSQL"
-          exit 1
-        fi
-        sleep 1
-      done
+      apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 curl ca-certificates gnupg
+      curl -sS https://pkg.authzed.com/apt/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
+      apt-get update && apt-get install -y --no-install-recommends zed && rm -rf /var/lib/apt/lists/*
+    - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
     - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
-    - |
-      PGPASSWORD="$DB_PASS" psql -v ON_ERROR_STOP=1 -h db -U "$DB_USER" -d "$DB_NAME" <<-EOSQL
-        ANALYZE;
-        DROP EXTENSION IF EXISTS postgis_tiger_geocoder CASCADE;
-        DROP EXTENSION IF EXISTS postgis_topology CASCADE;
-        DROP EXTENSION IF EXISTS fuzzystrmatch CASCADE;
-        DROP SCHEMA IF EXISTS tiger CASCADE;
-        DROP SCHEMA IF EXISTS tiger_data CASCADE;
-        DROP SCHEMA IF EXISTS topology CASCADE;
-      EOSQL
-    - |
-      python3 - <<'EOF'
-      import socket, time
-      for host, port in [("spicedb", 50051), ("valkey", 6379)]:
-          for _ in range(60):
-              try:
-                  with socket.create_connection((host, port), timeout=1):
-                      break
-              except OSError:
-                  time.sleep(1)
-          else:
-              raise SystemExit(f"Timed out waiting for {host}:{port}")
-      EOF
     - ZED_ENDPOINT=spicedb:50051 ZED_TOKEN="$SPICEDB_GRPC_PRESHARED_KEY" ZED_INSECURE=true zed backup restore local_db/backup.zed
   script:
     - cd airial_api
-    - uv sync --locked --no-cache
-    - uvx --no-cache ruff check app/ testing/ database/
+    - uv sync --locked
     - mkdir -p reports
-    - .venv/bin/coverage run -m pytest -v --junitxml=reports/junit.xml testing/
-    - .venv/bin/coverage report -m --include="app/routers/*"
-    - .venv/bin/coverage xml --include="app/routers/*" -o reports/coverage.xml
+    - uv run coverage run -m pytest -v --junitxml=reports/junit.xml testing/
+    - uv run coverage report -m --include="app/routers/*"
+    - uv run coverage xml --include="app/routers/*" -o reports/coverage.xml
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
   artifacts:
     when: always
