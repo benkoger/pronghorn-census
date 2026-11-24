@@ -65,7 +65,7 @@ def get_by_id(herd_unit_id: int | UUID):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-@herdunitBp.get("/<string:herd_unit_id>/surveys")
+@herdunitBp.get("/<int:herd_unit_id>/surveys")
 @herdunitBp.get("/<uuid:herd_unit_id>/surveys")
 @login_required
 @permission_required("access")
