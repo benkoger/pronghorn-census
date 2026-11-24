@@ -1,0 +1,60 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "indev"
+    - if: $CI_COMMIT_BRANCH == "testing-core"
+    - if: $CI_COMMIT_BRANCH == "surveytesting"
+    - if: $CI_COMMIT_BRANCH =~ /^test-/
+
+stages:
+  - test
+
+variables:
+  COMPOSE_FILE: testing.compose.yml
+  COMPOSE_PROJECT_NAME: airial-ci-${CI_PIPELINE_ID}
+
+test:api:
+  stage: test
+  image: docker:27-cli
+  before_script:
+    - |
+      if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        export COMPOSE_CMD="docker compose"
+      elif command -v podman >/dev/null 2>&1; then
+        export COMPOSE_CMD="podman compose"
+      else
+        echo "Neither docker compose nor podman compose is available on this runner."
+        exit 1
+      fi
+  script:
+    - $COMPOSE_CMD -f "$COMPOSE_FILE" build api-test
+    - $COMPOSE_CMD -f "$COMPOSE_FILE" up -d db valkey spicedb spicedb-restore
+    - >
+      $COMPOSE_CMD -f "$COMPOSE_FILE" run --name "${COMPOSE_PROJECT_NAME}-api" api-test
+      sh -c "uvx --no-cache ruff check app/ testing/ database/ &&
+      .venv/bin/coverage run -m pytest -v --junitxml=/tmp/junit.xml testing/ &&
+      .venv/bin/coverage report -m --include='app/routers/*' &&
+      .venv/bin/coverage xml --include='app/routers/*' -o /tmp/coverage.xml"
+      || TEST_EXIT=$?
+    - |
+      mkdir -p airial_api/reports
+      $COMPOSE_CMD -f "$COMPOSE_FILE" cp "${COMPOSE_PROJECT_NAME}-api:/tmp/junit.xml" airial_api/reports/junit.xml 2>/dev/null || true
+      $COMPOSE_CMD -f "$COMPOSE_FILE" cp "${COMPOSE_PROJECT_NAME}-api:/tmp/coverage.xml" airial_api/reports/coverage.xml 2>/dev/null || true
+      exit "${TEST_EXIT:-0}"
+  after_script:
+    - |
+      if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        docker compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
+      elif command -v podman >/dev/null 2>&1; then
+        podman compose -f "$COMPOSE_FILE" down -v --remove-orphans || true
+      fi
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+  artifacts:
+    when: always
+    expire_in: 7 days
+    reports:
+      junit: airial_api/reports/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: airial_api/reports/coverage.xml

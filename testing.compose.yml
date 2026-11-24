@@ -1,0 +1,155 @@
+services:
+  db:
+    image: docker.io/imresamu/postgis:17-3.5-bookworm
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U pronghorn_count -d testing"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    environment:
+      POSTGRES_USER: pronghorn_count
+      POSTGRES_PASSWORD: ${DB_PASS:-test_db_password}
+      POSTGRES_DB: testing
+    volumes:
+      - type: bind
+        source: ./local_db/restore.sh
+        target: /docker-entrypoint-initdb.d/restore.sh
+      - ./local_db/pct_b:/pct_b:Z
+    networks:
+      - test_network
+    command:
+      [
+        "postgres",
+        "-c",
+        "listen_addresses=*",
+        "-c",
+        "shared_buffers=64MB",
+        "-c",
+        "work_mem=4MB",
+        "-c",
+        "maintenance_work_mem=32MB",
+        "-c",
+        "max_connections=25",
+      ]
+
+  valkey:
+    image: docker.io/valkey/valkey:8.1.1
+    mem_limit: 128m
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "VALKEYCLI_AUTH=\"${VALKEY_PASS:-test_valkey_password}\" valkey-cli ping | grep -q PONG",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_PASS:-test_valkey_password}",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+        "--save",
+        "",
+      ]
+    networks:
+      - test_network
+
+  spicedb:
+    image: authzed/spicedb:latest
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=localhost:50051"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    environment:
+      SPICEDB_GRPC_LOGLEVEL: ${SPICEDB_GRPC_LOGLEVEL:-warn}
+      SPICEDB_DATASTORE_ENGINE: memory
+      SPICEDB_DATASTORE_CONN_URI: postgres://pronghorn_count:${DB_PASS:-test_db_password}@db:5432/spicedb_testing?sslmode=disable
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY:-test_spicedb_preshared_key}
+      SPICEDB_DATASTORE_CONN_POOL_READ_MAX_OPEN: 2
+      SPICEDB_DATASTORE_CONN_POOL_READ_MIN_OPEN: 1
+      SPICEDB_DATASTORE_CONN_POOL_WRITE_MAX_OPEN: 2
+      SPICEDB_DATASTORE_CONN_POOL_WRITE_MIN_OPEN: 1
+    command: serve
+    networks:
+      - test_network
+
+  spicedb-restore:
+    image: authzed/zed:latest
+    mem_limit: 128m
+    depends_on:
+      spicedb:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      ZED_ENDPOINT: spicedb:50051
+      ZED_TOKEN: ${SPICEDB_GRPC_PRESHARED_KEY:-test_spicedb_preshared_key}
+      ZED_INSECURE: "true"
+    volumes:
+      - ./local_db/backup.zed:/etc/spicedb/backup.zed:Z
+    command: backup restore /etc/spicedb/backup.zed
+    networks:
+      - test_network
+
+  api-test:
+    build:
+      context: .
+      dockerfile: airial.containerfile
+    mem_limit: 1536m
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      spicedb-restore:
+        condition: service_completed_successfully
+    environment:
+      DB_NAME: testing
+      DB_USER: pronghorn_count
+      DB_PASS: ${DB_PASS:-test_db_password}
+      DB_HOST: db
+      DB_PORT: "5432"
+      VALKEY_HOST: valkey
+      VALKEY_PASS: ${VALKEY_PASS:-test_valkey_password}
+      SESSION_REDIS: redis://:${VALKEY_PASS:-test_valkey_password}@valkey:6379/0
+      CACHE_REDIS: redis://:${VALKEY_PASS:-test_valkey_password}@valkey:6379/1
+      SECRET_KEY: ${SECRET_KEY:-ci-test-secret-key-not-for-production}
+      SESSION_COOKIE_SAMESITE: Lax
+      SESSION_PERMANENT: "true"
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_USE_SIGNER: "true"
+      ORIGIN_URL: http://localhost:5173
+      BUCKET_NAME: pronghorn-count-test
+      NUM_API_WORKERS: "1"
+      AWS_ACCESS_KEY_ID: foobar_key
+      AWS_SECRET_ACCESS_KEY: foobar_secret
+      GOOGLE_CLIENT_ID: test-google-client-id
+      GOOGLE_CLIENT_SECRET: test-google-client-secret
+      SPICEDB_GRPC_PRESHARED_KEY: ${SPICEDB_GRPC_PRESHARED_KEY:-test_spicedb_preshared_key}
+      SPICE_URL: spicedb:50051
+      DEMO_MODE: "false"
+      FLASK_APP: /app/app.py
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      MALLOC_ARENA_MAX: "2"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    networks:
+      - test_network
+    command:
+      [
+        "sh",
+        "-c",
+        ".venv/bin/coverage run -m pytest -v testing/ && .venv/bin/coverage report -m --include='app/routers/*'",
+      ]
+
+networks:
+  test_network:
+    driver: bridge

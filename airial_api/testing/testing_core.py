@@ -1,5 +1,6 @@
 """Test harness core infrastructure for the Airial API test suite."""
 
+import gc
 import io
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -9,11 +10,7 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
-from moto import mock_aws
 from PIL import Image as PILImage
-
-from app import create_app
-from app.extensions import base
 
 
 class APITester:
@@ -42,55 +39,44 @@ class APITester:
         PILImage.new("RGB", (width, height), color=color).save(buf, format="JPEG")
         return buf.getvalue()
 
-    @pytest.fixture
-    def app(self, monkeypatch: pytest.MonkeyPatch) -> Generator[Flask]:
-        """Creates and configures a Flask application instance for testing.
+    @pytest.fixture(scope="function", autouse=True)
+    def isolate_s3_and_gc(self, app: Flask) -> Generator[None]:
+        """Bind mocked S3 helpers and purge test artifacts after each test.
 
-        Configures mock AWS S3 credentials and endpoint overrides, instantiates the
-        application with mocked S3 configurations, establishes a PostgreSQL connection
-        pool, creates the designated test bucket, and tears down the pool after tests.
+        Clears any objects or multipart uploads written to the session-scoped
+        mocked S3 bucket and runs garbage collection so large image/NumPy buffers
+        are released promptly on low-memory hosts.
 
         Args:
-            monkeypatch (pytest.MonkeyPatch): Pytest fixture used to override AWS
-                environment variables.
+            app (Flask): Session-scoped Flask application fixture.
 
         Yields:
-            Flask: The configured Flask application instance.
+            None: Per-test execution context with isolated S3 state.
         """
-        monkeypatch.delenv("AWS_ENDPOINT_URL_S3", raising=False)
-        monkeypatch.setenv("AWS_ACCESS_KEY_ID", "foobar_key")
-        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "foobar_secret")
-        monkeypatch.setenv("AWS_SECURITY_TOKEN", "foobar_token")
-        monkeypatch.setenv("AWS_SESSION_TOKEN", "foobar_token")
+        s3_client: Any = app.s3
+        bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
+        self.s3 = s3_client
+        self.bucket_name = bucket_name
 
-        with mock_aws():
-            with patch("config.s3_config", None):
-                app = create_app()
+        yield
 
-            base._config["host"] = "localhost"
-            base.create_pool()
-
-            app.config.update(
-                {
-                    "TESTING": True,
-                    "SESSION_COOKIE_SECURE": False,
-                    "SESSION_COOKIE_DOMAIN": None,
-                    "SESSION_COOKIE_HTTPONLY": False,
-                    "SERVER_NAME": "localhost",
-                }
+        listed = s3_client.list_objects_v2(Bucket=bucket_name)
+        contents = listed.get("Contents") or []
+        if contents:
+            s3_client.delete_objects(
+                Bucket=bucket_name,
+                Delete={"Objects": [{"Key": obj["Key"]} for obj in contents]},
             )
 
-            with app.app_context():
-                s3_client: Any = app.s3
-                bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
-                s3_client.create_bucket(Bucket=bucket_name)
+        uploads = s3_client.list_multipart_uploads(Bucket=bucket_name)
+        for upload in uploads.get("Uploads") or []:
+            s3_client.abort_multipart_upload(
+                Bucket=bucket_name,
+                Key=upload["Key"],
+                UploadId=upload["UploadId"],
+            )
 
-                self.s3 = s3_client
-                self.bucket_name = bucket_name
-
-            yield app
-
-            base.close_pool()
+        gc.collect()
 
     @pytest.fixture
     def client(self, app: Flask) -> Generator[FlaskClient]:
