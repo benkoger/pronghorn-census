@@ -1,0 +1,132 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+stages:
+  - lint
+  - test
+
+lint:api:
+  stage: lint
+  image: ghcr.io/astral-sh/uv:python3.13-trixie-slim
+  variables:
+    UV_CACHE_DIR: .uv-cache
+  cache:
+    key:
+      prefix: ruff-${CI_RUNNER_EXECUTABLE_ARCH}
+      files:
+        - airial_api/pyproject.toml
+    paths:
+      - .uv-cache/
+      - airial_api/.ruff_cache/
+  script:
+    - cd airial_api
+    - uvx ruff check app/ database/ testing/
+
+test:api:
+  stage: test
+  image: ghcr.io/astral-sh/uv:python3.13-trixie-slim
+  services:
+    - name: docker.io/imresamu/postgis:17-3.5-bookworm
+      alias: db
+      command:
+        - "postgres"
+        - "-c"
+        - "listen_addresses=*"
+        - "-c"
+        - "shared_buffers=64MB"
+        - "-c"
+        - "work_mem=4MB"
+        - "-c"
+        - "maintenance_work_mem=32MB"
+        - "-c"
+        - "max_connections=25"
+    - name: docker.io/valkey/valkey:8.1.1
+      alias: valkey
+      command:
+        - "valkey-server"
+        - "--requirepass"
+        - "test_valkey_password"
+        - "--maxmemory"
+        - "64mb"
+        - "--maxmemory-policy"
+        - "allkeys-lru"
+        - "--save"
+        - ""
+    - name: authzed/spicedb:latest
+      alias: spicedb
+      command:
+        - "serve"
+  variables:
+    POSTGRES_USER: pronghorn_count
+    POSTGRES_PASSWORD: test_db_password
+    POSTGRES_DB: testing
+    DB_NAME: testing
+    DB_USER: pronghorn_count
+    DB_PASS: test_db_password
+    DB_HOST: db
+    DB_PORT: "5432"
+    VALKEY_HOST: valkey
+    VALKEY_PASS: test_valkey_password
+    SESSION_REDIS: redis://:test_valkey_password@valkey:6379/0
+    CACHE_REDIS: redis://:test_valkey_password@valkey:6379/1
+    SPICEDB_DATASTORE_ENGINE: memory
+    SPICEDB_GRPC_LOGLEVEL: warn
+    SPICEDB_GRPC_PRESHARED_KEY: test_spicedb_preshared_key
+    SPICE_URL: spicedb:50051
+    SECRET_KEY: ci-test-secret-key-not-for-production
+    SESSION_COOKIE_SAMESITE: Lax
+    SESSION_PERMANENT: "true"
+    SESSION_COOKIE_SECURE: "false"
+    SESSION_USE_SIGNER: "true"
+    ORIGIN_URL: http://localhost:5173
+    BUCKET_NAME: pronghorn-count-test
+    NUM_API_WORKERS: "1"
+    GOOGLE_CLIENT_ID: test-google-client-id
+    GOOGLE_CLIENT_SECRET: test-google-client-secret
+    DEMO_MODE: "false"
+    FLASK_APP: app.py
+    PYTHONUNBUFFERED: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+    MALLOC_ARENA_MAX: "2"
+    OMP_NUM_THREADS: "1"
+    OPENBLAS_NUM_THREADS: "1"
+    UV_CACHE_DIR: .uv-cache
+  cache:
+    key:
+      prefix: ${CI_RUNNER_EXECUTABLE_ARCH}
+      files:
+        - airial_api/pyproject.toml
+        - airial_api/uv.lock
+    paths:
+      - .uv-cache/
+      - airial_api/.venv/
+  before_script:
+    - |
+      apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 curl ca-certificates gnupg
+      curl -sS https://pkg.authzed.com/apt/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
+      apt-get update && apt-get install -y --no-install-recommends zed && rm -rf /var/lib/apt/lists/*
+    - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
+    - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
+    - ZED_ENDPOINT=spicedb:50051 ZED_TOKEN="$SPICEDB_GRPC_PRESHARED_KEY" ZED_INSECURE=true zed backup restore local_db/backup.zed
+  script:
+    - cd airial_api
+    - uv sync --locked
+    - mkdir -p reports
+    - uv run coverage run -m pytest -v --junitxml=reports/junit.xml testing/
+    - uv run coverage report -m --include="app/routers/*"
+    - uv run coverage xml --include="app/routers/*" -o reports/coverage.xml
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+  artifacts:
+    when: always
+    expire_in: 7 days
+    reports:
+      junit: airial_api/reports/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: airial_api/reports/coverage.xml
