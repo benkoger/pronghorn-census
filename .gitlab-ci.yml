@@ -14,7 +14,7 @@ lint:api:
   stage: lint
   image: ghcr.io/astral-sh/uv:python3.13-trixie-slim
   variables:
-    UV_CACHE_DIR: .uv-cache
+    UV_CACHE_DIR: "${CI_PROJECT_DIR}/.uv-cache"
   cache:
     key:
       prefix: ruff-${CI_RUNNER_EXECUTABLE_ARCH}
@@ -95,7 +95,7 @@ test:api:
     MALLOC_ARENA_MAX: "2"
     OMP_NUM_THREADS: "1"
     OPENBLAS_NUM_THREADS: "1"
-    UV_CACHE_DIR: .uv-cache
+    UV_CACHE_DIR: "${CI_PROJECT_DIR}/.uv-cache"
   cache:
     key:
       prefix: ${CI_RUNNER_EXECUTABLE_ARCH}
@@ -105,22 +105,30 @@ test:api:
     paths:
       - .uv-cache/
       - airial_api/.venv/
+      - .bin/
   before_script:
     - |
-      apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 curl ca-certificates gnupg
-      curl -sS https://pkg.authzed.com/apt/gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/authzed.gpg
-      echo "deb [signed-by=/etc/apt/keyrings/authzed.gpg] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
-      apt-get update && apt-get install -y --no-install-recommends zed && rm -rf /var/lib/apt/lists/*
+      mkdir -p .bin
+      export PATH="$PWD/.bin:$PATH"
+      apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 curl ca-certificates && rm -rf /var/lib/apt/lists/*
+      if [ ! -x .bin/zed ]; then
+        curl -fsSL "https://github.com/authzed/zed/releases/latest/download/zed-linux-$(dpkg --print-architecture)" -o .bin/zed
+        chmod +x .bin/zed
+      fi
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
     - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
+    - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
     - ZED_ENDPOINT=spicedb:50051 ZED_TOKEN="$SPICEDB_GRPC_PRESHARED_KEY" ZED_INSECURE=true zed backup restore local_db/backup.zed
   script:
     - cd airial_api
-    - uv sync --locked
+    - |
+      if [ ! -d .venv ]; then
+        uv sync --frozen --no-install-project
+      fi
     - mkdir -p reports
-    - uv run coverage run -m pytest -v --junitxml=reports/junit.xml testing/
-    - uv run coverage report -m --include="app/routers/*"
-    - uv run coverage xml --include="app/routers/*" -o reports/coverage.xml
+    - uv run --no-sync coverage run -m pytest -v --junitxml=reports/junit.xml testing/
+    - uv run --no-sync coverage report -m --include="app/routers/*"
+    - uv run --no-sync coverage xml --include="app/routers/*" -o reports/coverage.xml
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
   artifacts:
     when: always
