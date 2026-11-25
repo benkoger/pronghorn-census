@@ -85,6 +85,28 @@ class CreateProposalReq(BaseModel):
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+class CreateTermsReq(BaseModel):
+    """What a survey's terms need that the database does not hold.
+
+    The surveyed area, the area of each transect, the overlap factor and the
+    representation are computed from the footprints, the metadata and the
+    detector's boxes.
+
+    Attributes:
+        habitable_area_m2: Habitable area of the herd unit, in square meters.
+        area_sigma_m2: Standard deviation of the surveyed area, from the
+            georeferencing.
+        area_draws: Draws of the surveyed area, from the georeferencing.
+    """
+
+    habitable_area_m2: float
+    area_sigma_m2: float = 0.0
+    area_draws: list[float] = []
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+
+
 class UpdateActiveMeasurement(BaseModel):
     """Request schema for updating an active measurement."""
 
@@ -114,7 +136,7 @@ class ActiveMeasurement(DBbase):
     final_count: float | None = None
     final_ci_upper: float | None = None
     final_ci_lower: float | None = None
-    # The survey terms of the abundance (ais.SurveyTerms.as_dict), once stored.
+    # The survey terms of the abundance (ais.SurveyTerms.as_dict), once posted.
     terms: dict[str, Any] | None = None
 
     __table__: ClassVar[sql.Identifier] = sql.Identifier("projectmanagement", "active_measurements")

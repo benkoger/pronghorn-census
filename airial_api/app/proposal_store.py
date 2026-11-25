@@ -10,7 +10,7 @@
 #                                 the serving order and the latest expected
 #                                 counts. Rebuilt from the rows on a miss.
 #   am_terms_<measurement uuid>   msgpacked SurveyTerms of the abundance, once
-#                                 stored. The measurement row holds them;
+#                                 posted. The measurement row holds them;
 #                                 rebuilt from it on a miss.
 #   am_area_<measurement uuid>    msgpacked float: the ground area of the
 #                                 units' images, the union of their
@@ -20,6 +20,9 @@
 #                                 msgpacked float: the detector score the
 #                                 current generation drafts boxes at. Dropped
 #                                 when a generation is posted.
+#   am_boxes_<measurement uuid>   msgpacked PlacedBoxes: the detector's boxes
+#                                 at that score, placed on the ground. Seconds
+#                                 to place, so placed once per generation.
 #
 # Nothing is held in the process: every worker reads the same keys and the
 # same rows.
@@ -28,7 +31,7 @@
 import numpy as np
 from msgpack import packb, unpackb
 
-from ais import MeasurementState, Proposal, SurveyTerms
+from ais import MeasurementState, PlacedBoxes, Proposal, SurveyTerms
 from app.extensions import base, cache
 from database.modules import abundance, activemeasurement
 from database.object_models.project_management.active_measurements import (
@@ -55,6 +58,10 @@ def _area_key(measurement: ActiveMeasurement) -> str:
 
 def _threshold_key(measurement: ActiveMeasurement) -> str:
     return f"am_threshold_{measurement.uuid}"
+
+
+def _boxes_key(measurement: ActiveMeasurement) -> str:
+    return f"am_boxes_{measurement.uuid}"
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -92,12 +99,13 @@ def save(measurement: ActiveMeasurement, proposal: Proposal) -> Proposal:
     base.execute(activemeasurement.create_generation, measurement, proposal)
     cache.delete(_state_key(measurement))
     cache.delete(_threshold_key(measurement))
+    cache.delete(_boxes_key(measurement))
     load(measurement)
     return proposal
 
 
 def load_terms(measurement: ActiveMeasurement) -> SurveyTerms | None:
-    """Returns the survey terms of the abundance, or None when not stored.
+    """Returns the survey terms of the abundance, or None when not posted.
 
     Reads the cache first and the measurement row on a miss, writing the
     terms back for the next request.
@@ -121,6 +129,24 @@ def save_terms(
     return terms
 
 
+def load_boxes(
+    measurement: ActiveMeasurement, state: MeasurementState
+) -> PlacedBoxes:
+    """Returns the detector's boxes at the draft threshold, on the ground.
+
+    Placed on a miss and kept until the next generation is posted, since the
+    threshold changes with it.
+    """
+    if (cached := cache.get(_boxes_key(measurement))) is not None:
+        return PlacedBoxes.from_cache(cached)
+
+    boxes = base.execute(
+        abundance.place_boxes, measurement, load_threshold(measurement, state)
+    )
+    cache.set(_boxes_key(measurement), boxes.to_cache(), timeout=NO_EXPIRY)
+    return boxes
+
+
 def load_area(
     measurement: ActiveMeasurement, state: MeasurementState
 ) -> float | None:
@@ -139,6 +165,19 @@ def load_area(
     if area is not None:
         cache.set(_area_key(measurement), packb(area), timeout=NO_EXPIRY)
     return area
+
+
+def load_surveyed_area(
+    measurement: ActiveMeasurement, state: MeasurementState
+) -> float | None:
+    """Returns the area the estimate's density is over, in square meters.
+
+    The surveyed area of the terms once they are posted, else the cached
+    union of the units' footprints (`load_area`).
+    """
+    if (terms := load_terms(measurement)) is not None:
+        return terms.surveyed_area_m2
+    return load_area(measurement, state)
 
 
 def load_threshold(
@@ -161,8 +200,9 @@ def load_threshold(
 
 
 def release(measurement: ActiveMeasurement) -> None:
-    """Drop the cached state, terms, area, and threshold once the measurement has finished."""
+    """Drop the cached state, terms, area, threshold, and boxes once the measurement has finished."""
     cache.delete(_state_key(measurement))
     cache.delete(_terms_key(measurement))
     cache.delete(_area_key(measurement))
     cache.delete(_threshold_key(measurement))
+    cache.delete(_boxes_key(measurement))

@@ -12,7 +12,7 @@ from app import proposal_store, tile_crops
 from app.decorators import permission_required
 from app.extensions import base
 from database.errors import MeasurementBlocked, ObjectNotFound
-from database.modules import activemeasurement
+from database.modules import abundance, activemeasurement
 from database.object_models.base import Keyring
 from database.object_models.core.am_units import AmUnit
 from database.object_models.core.images import ReviewedArea
@@ -21,6 +21,7 @@ from database.object_models.project_management.active_measurements import (
     ActiveMeasurementQuery,
     CreateActiveMeasurement,
     CreateProposalReq,
+    CreateTermsReq,
     CreateTilesReq,
     UpdateActiveMeasurement,
 )
@@ -138,8 +139,10 @@ def get_estimate(query: ActiveMeasurementQuery):
       200:
         description: >
           Running count, 95% interval, progress, and density over the measured
-          area. A survey without a measurement answers with status
-          'not prepared' and null figures.
+          area, and the abundance over the habitable area with its uncertainty
+          by source once the survey terms are posted and a tile is reviewed.
+          A survey without a measurement answers with status 'not prepared'
+          and null figures.
       401:
         description: Unauthorized.
       404:
@@ -157,15 +160,11 @@ def get_estimate(query: ActiveMeasurementQuery):
 
     state = proposal_store.load(measurement)
     terms = proposal_store.load_terms(measurement)
-
-    # The surveyed area from the terms when the survey map has produced
-    # them, else the cached union of the units' footprints.
-    if terms:
-        area = terms.surveyed_area_m2
-    elif state is not None:
-        area = proposal_store.load_area(measurement, state)
-    else:
-        area = None
+    area = (
+        proposal_store.load_surveyed_area(measurement, state)
+        if state is not None
+        else None
+    )
 
     estimate = base.execute(
         activemeasurement.live_estimate,
@@ -174,6 +173,18 @@ def get_estimate(query: ActiveMeasurementQuery):
         lambda: proposal_store.vectors(measurement, cast(MeasurementState, state)),
         area,
     )
+
+    # The abundance needs the terms, a reviewed tile, and the detector's boxes
+    # on the ground, which are placed once per generation.
+    if terms and state is not None and estimate["count"] is not None:
+        estimate["abundance"] = base.execute(
+            abundance.live_abundance,
+            measurement,
+            state,
+            estimate,
+            terms,
+            proposal_store.load_boxes(measurement, state),
+        )
     return estimate, 200
 
 
@@ -200,8 +211,9 @@ def get_status(query: ActiveMeasurementQuery):
         description: >
           Counts of images, predictions, footprints and tiles, the measurement
           if one exists with its label, the detector, the proposal's
-          generations and expected total, and the steps with their state and
-          provenance.
+          generations and expected total, the survey terms, and the steps with
+          their state and provenance. The terms step is optional: `ready`
+          does not wait for it.
       401:
         description: Unauthorized.
       404:
@@ -227,12 +239,23 @@ def get_status(query: ActiveMeasurementQuery):
             "images": images,
         }
 
-    state = None
+    state, terms = None, None
     if status["measurement"]:
         measurement = base.get(
             ActiveMeasurement, status["measurement"]["active_measurement_id"]
         )
         state = proposal_store.load(measurement)
+        terms = proposal_store.load_terms(measurement)
+
+    status["terms"] = None
+    if terms is not None:
+        status["terms"] = {
+            "habitable_area_m2": terms.habitable_area_m2,
+            "surveyed_area_m2": terms.surveyed_area_m2,
+            "transects": len(terms.transects),
+            "overlap_factor": terms.overlap_factor,
+            "representation_sigma": terms.representation_sigma,
+        }
 
     status["proposal"] = None
     if state is not None and state.generations:
@@ -247,7 +270,9 @@ def get_status(query: ActiveMeasurementQuery):
         }
     status["proposal_generations"] = len(state.generations) if state else 0
     status["steps"] = activemeasurement.preparation_steps(status)
-    status["ready"] = all(step["done"] for step in status["steps"])
+    status["ready"] = all(
+        step["done"] for step in status["steps"] if not step["optional"]
+    )
 
     return status, 200
 
@@ -565,6 +590,114 @@ def create_proposal(body: CreateProposalReq, active_measurement_id: int | UUID):
     return {
         "generation": proposal.generation,
         "n_labels": proposal.n_labels,
+    }, 201
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+@activeMeasBp.post("/<int:active_measurement_id>/terms")
+@activeMeasBp.post("/<uuid:active_measurement_id>/terms")
+@login_required
+@permission_required("access")
+@validate()
+def create_terms(body: CreateTermsReq, active_measurement_id: int | UUID):
+    """Compute and store the survey terms of a measurement's abundance.
+
+    The surveyed area, each transect's area, and the overlap factor and
+    representation of the detector's boxes at the draft threshold are computed
+    from what is stored; the request carries what is not. Terms posted before
+    are replaced.
+
+    Args:
+        body: The habitable area, and the surveyed area's standard deviation
+            and draws from the georeferencing.
+        active_measurement_id: Primary key of the active measurement (integer
+            ID or UUID).
+
+    Returns:
+        Tuple of the terms' summary and HTTP status 201.
+
+    Raises:
+        MeasurementBlocked: No proposal is posted, the images have no
+            transect, or a term is out of range.
+
+    ---
+    parameters:
+      - name: active_measurement_id
+        in: path
+        required: true
+        schema:
+          oneOf:
+            - type: integer
+              example: 1
+            - type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+        description: Primary key of the active measurement (integer ID or UUID).
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required: [habitable_area_m2]
+          properties:
+            habitable_area_m2:
+              type: number
+              description: Habitable area of the herd unit, in square meters.
+            area_sigma_m2:
+              type: number
+              description: Standard deviation of the surveyed area.
+            area_draws:
+              type: array
+              items:
+                type: number
+              description: Draws of the surveyed area from the georeferencing.
+    responses:
+      201:
+        description: >
+          The terms stored: habitable and surveyed area, transects, overlap
+          factor, representation, and the boxes they were taken from.
+      400:
+        description: Validation error.
+      401:
+        description: Unauthorized.
+      404:
+        description: Active measurement not found.
+      409:
+        description: >
+          No proposal posted yet, the images have no transect, or a term is
+          out of range.
+      500:
+        description: Database error.
+    """
+    measurement = base.get(ActiveMeasurement, active_measurement_id)
+
+    if (state := proposal_store.load(measurement)) is None:
+        raise MeasurementBlocked(
+            f"Active measurement {measurement.uuid} has no proposal; "
+            "post generation 0 first."
+        )
+
+    boxes = proposal_store.load_boxes(measurement, state)
+    terms = base.execute(
+        abundance.prepare_terms,
+        measurement,
+        boxes,
+        body.habitable_area_m2,
+        body.area_sigma_m2,
+        body.area_draws,
+    )
+    proposal_store.save_terms(measurement, terms)
+
+    return {
+        "habitable_area_m2": terms.habitable_area_m2,
+        "surveyed_area_m2": terms.surveyed_area_m2,
+        "transects": len(terms.transects),
+        "overlap_factor": terms.overlap_factor,
+        "representation_sigma": terms.representation_sigma,
+        "n_units": terms.n_units,
+        "boxes_placed": len(boxes),
     }, 201
 
 

@@ -39,7 +39,7 @@ Manages survey organizational hierarchies, geographic herd units, models, and ta
 * **`models`**: Computer vision models deployed for assisted labeling (`name`, `schema_id`, `model_type`, `uuid`).
 * **`schemas`**: Classification taxonomies defining valid categories for a model (`name`, `uuid`).
 * **`labels`**: Class definitions (`name`, numeric `label`, `schema_id`, `color`, `image_link`, `uuid`).
-* **`active_measurements`**: Abundance measurement definitions (`survey_id`, `label_id`, `target_percentage`, `final_count`, `final_ci_upper`, `final_ci_lower`, `random_seed`, `retraining_cadence`, `terms` JSONB holding the survey terms of the abundance once stored, `uuid`).
+* **`active_measurements`**: Abundance measurement definitions (`survey_id`, `label_id`, `target_percentage`, `final_count`, `final_ci_upper`, `final_ci_lower`, `random_seed`, `retraining_cadence`, `terms` JSONB holding the survey terms of the abundance once posted, `uuid`).
 * **Relationship / Junction Tables**:
   * `projects_users` (`project_id`, `user_id`, `role_id`)
   * `projects_schemas` (`project_id`, `schema_id`)
@@ -141,13 +141,14 @@ platform (root)
 
 Python objects are stored msgpack-serialised (`packb` / `unpackb`), never pickled. The API keeps no state in the process: it runs under several gunicorn workers, so anything one request needs from another lives here or in PostgreSQL.
 
-**Active measurement keys** (`app/proposal_store.py`, behind the `/api/v1/active-measurements` routes). The durable record of a measurement is its row, with its terms, and its rows in `core.proposal_generations` and `core.am_units`; the cache only saves rebuilding them on every request.
+**Active measurement keys** (`app/proposal_store.py`, behind the `/api/v1/active-measurements` and `/api/v1/survey-maps` routes). The durable record of a measurement is its row, with its terms, and its rows in `core.proposal_generations` and `core.am_units`; the cache only saves rebuilding them on every request.
 
 | Key | Holds | Written by | Dropped by |
 | :--- | :--- | :--- | :--- |
 | `am_state_<measurement uuid>` | msgpacked `MeasurementState`: unit order, serving order, latest expected counts | `load` on a miss, `save` after a new generation | finish, delete, the reset tool |
-| `am_terms_<measurement uuid>` | msgpacked `SurveyTerms` of the abundance, from the measurement row | `save_terms`, and `load_terms` on a miss | finish, delete, the reset tool |
+| `am_terms_<measurement uuid>` | msgpacked `SurveyTerms` of the abundance, from the measurement row | `POST /terms`, and `load_terms` on a miss | finish, delete, the reset tool |
 | `am_area_<measurement uuid>` | msgpacked float: the ground area of the units' images, the union of their footprints | the first estimate that needs it | finish, delete, the reset tool |
 | `am_threshold_<measurement uuid>` | msgpacked float: the detector score the current generation drafts boxes at | the first served unit of a generation | a posted generation, finish, delete, the reset tool |
+| `am_boxes_<measurement uuid>` | msgpacked `PlacedBoxes`: the detector's boxes at that score, placed on the ground | the first estimate, map or terms request of a generation | a posted generation, finish, delete, the reset tool |
 
-Neither key expires. Losing them (a Valkey restart, no persistence in production) costs one rebuild from the rows on the next request.
+No key expires. Losing them (a Valkey restart, no persistence in production) costs one rebuild from the rows on the next request.
