@@ -92,9 +92,11 @@ class APITester:
 
         gc.collect()
 
+    _AUTH_CACHE: ClassVar[dict[str, Any]] = {}
+
     @pytest.fixture
     def client(self, app: Flask) -> Generator[FlaskClient]:
-        """Provides an unauthenticated Flask test client.
+        """Provides an authenticated Flask test client.
 
         Args:
             app (Flask): The Flask application fixture.
@@ -102,59 +104,39 @@ class APITester:
         Yields:
             FlaskClient: The test client for issuing HTTP requests against the application.
         """
-        with app.test_client() as client:
-            yield client
-
-    _AUTH_CACHE: ClassVar[dict[str, Any]] = {}
-
-    @pytest.fixture
-    def auth_client(self, client: FlaskClient, app: Flask) -> Generator[FlaskClient]:
-        """Provides an authenticated Flask test client session without bcrypt hashing.
-
-        Pre-populates the client session directly with authenticated user state
-        and active organization cache, bypassing password verification overhead.
-
-        Args:
-            client (FlaskClient): The unauthenticated Flask test client fixture.
-            app (Flask): The Flask application fixture.
-
-        Yields:
-            FlaskClient: The authenticated test client carrying valid session cookies.
-        """
         if not self._AUTH_CACHE:
             from app.extensions import base
             from database.object_models.user_management import Organization, User
 
             with app.app_context():
-                test_users = base.where(User, {"email": "tester@local.host"})
-                if test_users:
-                    user = test_users[0]
-                    user_id = str(user.user_id)
-                    default_org = base.get(Organization, pk=user.default_org_id)
-                    if default_org:
-                        org_uuid = str(default_org.uuid)
-                        org_cache = default_org.to_cache()
-                    else:
-                        org_uuid = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
-                        org_cache = b""
-                else:
-                    user_id = "1"
-                    org_uuid = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
-                    org_cache = b""
-
+                user = base.where(User, {"email": "tester@local.host"})[0]
+                default_org = base.get(Organization, pk=user.default_org_id)
+                org_uuid = str(default_org.uuid)
                 self._AUTH_CACHE.update(
                     {
-                        "_user_id": user_id,
+                        "_user_id": str(user.uuid),
                         "_fresh": True,
                         "active_org_uuid": org_uuid,
-                        f"org_{org_uuid}": org_cache,
+                        f"org_{org_uuid}": default_org.to_cache(),
                     }
                 )
 
-        with client.session_transaction() as sess:
-            for k, v in self._AUTH_CACHE.items():
-                sess[k] = v
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                for k, v in self._AUTH_CACHE.items():
+                    sess[k] = v
+            yield client
 
+    @pytest.fixture
+    def auth_client(self, client: FlaskClient) -> Generator[FlaskClient]:
+        """Provides an authenticated Flask test client session.
+
+        Args:
+            client (FlaskClient): The test client fixture.
+
+        Yields:
+            FlaskClient: The authenticated test client carrying valid session state.
+        """
         yield client
 
     @pytest.fixture

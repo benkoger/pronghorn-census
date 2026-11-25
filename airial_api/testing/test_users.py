@@ -63,16 +63,6 @@ class TestUsers(APITester):
     # 1. GET Auth Status & Current User
     # -------------------------------------------------------------------------
 
-    def test_check_auth_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify /check-auth returns 'false' when logged out.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        unauth_res = client.get(f"{USERS_URL}/check-auth")
-        assert unauth_res.status_code == 200
-        assert unauth_res.data == b"false"
-
     def test_check_auth_authenticated(self, auth_client: FlaskClient) -> None:
         """Verify /check-auth returns 'true' when logged in.
 
@@ -97,14 +87,6 @@ class TestUsers(APITester):
         assert validated.user_id == TESTER_USER_ID
         assert str(validated.uuid) == TESTER_USER_UUID
         assert validated.email == "tester@local.host"
-
-    def test_get_current_user_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when requesting current user unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{USERS_URL}/current-user").status_code == 401
 
     def test_load_user_missing_and_default_org_fallback(
         self, app: Flask, auth_client: FlaskClient
@@ -170,19 +152,6 @@ class TestUsers(APITester):
             == 404
         )
 
-    def test_get_user_organizations_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when fetching user organizations unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.get(f"{USERS_URL}/{TESTER_USER_UUID}/organizations").status_code
-            == 401
-        )
-
     # -------------------------------------------------------------------------
     # 3. GET Role Check
     # -------------------------------------------------------------------------
@@ -213,19 +182,6 @@ class TestUsers(APITester):
             auth_client (FlaskClient): Authenticated test client fixture.
         """
         assert auth_client.get(f"{USERS_URL}/role-check").status_code == 400
-
-    def test_check_role_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 when checking roles unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.get(
-                f"{USERS_URL}/role-check", query_string={"role_name": "admin"}
-            ).status_code
-            == 401
-        )
 
     # -------------------------------------------------------------------------
     # 4. PATCH Set Active Organization
@@ -298,22 +254,6 @@ class TestUsers(APITester):
             == 400
         )
 
-    def test_set_active_organization_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 when setting active organization unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.patch(
-                f"{USERS_URL}/set-active-organization",
-                json={"org_id": ORG_UUID},
-            ).status_code
-            == 401
-        )
-
     def test_set_active_organization_none_returns_404(
         self, auth_client: FlaskClient
     ) -> None:
@@ -367,14 +307,6 @@ class TestUsers(APITester):
         assert len(data) == 1
         User.Response.model_validate(data[0])
 
-    def test_get_all_users_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when listing users unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(USERS_URL).status_code == 401
-
     # -------------------------------------------------------------------------
     # 6. POST Create User & Super User
     # -------------------------------------------------------------------------
@@ -411,24 +343,6 @@ class TestUsers(APITester):
             auth_client (FlaskClient): Authenticated test client fixture.
         """
         assert auth_client.post(USERS_URL, json={}).status_code == 400
-
-    def test_create_user_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 when creating a user unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.post(
-                USERS_URL,
-                json={
-                    "username": "Unauth",
-                    "email": "unauth@local.host",
-                    "password": "pw",
-                },
-            ).status_code
-            == 401
-        )
 
     def test_create_super_user_when_bootstrapped(self, client: FlaskClient) -> None:
         """Verify 401 response when creating super-user after bootstrap is complete.

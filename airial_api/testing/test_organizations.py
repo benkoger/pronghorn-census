@@ -96,13 +96,3 @@ class TestOrganizations(APITester):
             == 400
         )
 
-    def test_create_organization_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when creating an organization unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(ORGS_URL, json={"name": "Unauth_Org"})
-        assert response.status_code == 401

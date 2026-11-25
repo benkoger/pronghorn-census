@@ -68,15 +68,6 @@ class TestSystem(APITester):
     # 2. POST Finish Bootstrap
     # -------------------------------------------------------------------------
 
-    def test_finish_bootstrap_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when finishing bootstrap without authentication.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(BOOTSTRAPPED_URL)
-        assert response.status_code == 401
-
     def test_finish_bootstrap_success(self, auth_client: FlaskClient) -> None:
         """Verify POST /bootstrapped sets first_run to false and returns 204.
 

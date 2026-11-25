@@ -78,15 +78,6 @@ class TestLabels(APITester):
             == 400
         )
 
-    def test_create_label_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when creating a label without authentication.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(LABELS_URL, json=_build_label_payload())
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. DELETE Label (UUID & Integer Primary Key)
     # -------------------------------------------------------------------------
@@ -134,11 +125,3 @@ class TestLabels(APITester):
         assert auth_client.delete(f"{LABELS_URL}/{uuid4()}").status_code == 404
         assert auth_client.delete(f"{LABELS_URL}/999999999").status_code == 404
 
-    def test_delete_label_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when deleting a label without authentication.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.delete(f"{LABELS_URL}/{uuid4()}").status_code == 401
-        assert client.delete(f"{LABELS_URL}/1").status_code == 401

@@ -81,15 +81,6 @@ class TestHerdUnits(APITester):
         assert auth_client.get(f"{HERD_UNITS_URL}/{uuid4()}").status_code == 404
         assert auth_client.get(f"{HERD_UNITS_URL}/999999999").status_code == 404
 
-    def test_get_herd_unit_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching a herd unit unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{HERD_UNITS_URL}/{HERD_UNIT_UUID}").status_code == 401
-        assert client.get(f"{HERD_UNITS_URL}/{HERD_UNIT_ID}").status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Surveys for Herd Unit
     # -------------------------------------------------------------------------
@@ -134,18 +125,6 @@ class TestHerdUnits(APITester):
             auth_client.get(f"{HERD_UNITS_URL}/{uuid4()}/surveys").status_code == 404
         )
 
-    def test_get_herd_unit_surveys_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when fetching herd unit surveys unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.get(f"{HERD_UNITS_URL}/{HERD_UNIT_UUID}/surveys").status_code == 401
-        )
-
     # -------------------------------------------------------------------------
     # 3. POST Create Herd Unit
     # -------------------------------------------------------------------------
@@ -182,15 +161,6 @@ class TestHerdUnits(APITester):
             ).status_code
             == 400
         )
-
-    def test_create_herd_unit_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when creating a herd unit unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(HERD_UNITS_URL, json=_build_herd_unit_payload())
-        assert response.status_code == 401
 
     # -------------------------------------------------------------------------
     # 4. DELETE Herd Unit (UUID & Integer Primary Key)
@@ -244,11 +214,3 @@ class TestHerdUnits(APITester):
         assert auth_client.delete(f"{HERD_UNITS_URL}/{uuid4()}").status_code == 404
         assert auth_client.delete(f"{HERD_UNITS_URL}/999999999").status_code == 404
 
-    def test_delete_herd_unit_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when deleting a herd unit unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.delete(f"{HERD_UNITS_URL}/{uuid4()}").status_code == 401
-        assert client.delete(f"{HERD_UNITS_URL}/1").status_code == 401

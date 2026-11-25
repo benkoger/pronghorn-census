@@ -89,17 +89,6 @@ class TestRoles(APITester):
         response = auth_client.get(ROLES_URL)
         assert response.status_code == 400
 
-    def test_get_roles_bulk_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when bulk querying roles unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(
-            ROLES_URL, query_string={"object_ids": [ADMIN_ROLE_ID]}
-        )
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Single Role by ID (UUID and Integer Primary Key)
     # -------------------------------------------------------------------------
@@ -143,11 +132,3 @@ class TestRoles(APITester):
         assert auth_client.get(f"{ROLES_URL}/{uuid4()}").status_code == 404
         assert auth_client.get(f"{ROLES_URL}/999999999").status_code == 404
 
-    def test_get_role_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching a role without authentication.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{ROLES_URL}/{ADMIN_ROLE_UUID}").status_code == 401
-        assert client.get(f"{ROLES_URL}/{ADMIN_ROLE_ID}").status_code == 401

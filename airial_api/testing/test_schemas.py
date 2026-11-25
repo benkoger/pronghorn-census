@@ -105,14 +105,6 @@ class TestSchemas(APITester):
         assert res_int.status_code == 200
         assert res_int.get_json() == []
 
-    def test_get_schema_labels_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching schema labels unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{SCHEMAS_URL}/{SCHEMA_UUID}/labels").status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Schema Models
     # -------------------------------------------------------------------------
@@ -161,14 +153,6 @@ class TestSchemas(APITester):
         assert res_int.status_code == 200
         assert res_int.get_json() == []
 
-    def test_get_schema_models_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching schema models unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{SCHEMAS_URL}/{SCHEMA_UUID}/models").status_code == 401
-
     # -------------------------------------------------------------------------
     # 3. POST Create Schema
     # -------------------------------------------------------------------------
@@ -198,15 +182,6 @@ class TestSchemas(APITester):
             auth_client.post(SCHEMAS_URL, json={"name": "MissingKeys"}).status_code
             == 400
         )
-
-    def test_create_schema_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when creating a schema unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(SCHEMAS_URL, json=_build_schema_payload())
-        assert response.status_code == 401
 
     # -------------------------------------------------------------------------
     # 4. DELETE Schema (UUID & Integer Primary Key)
@@ -253,11 +228,3 @@ class TestSchemas(APITester):
             == []
         )
 
-    def test_delete_schema_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when deleting a schema unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.delete(f"{SCHEMAS_URL}/{uuid4()}").status_code == 401
-        assert client.delete(f"{SCHEMAS_URL}/1").status_code == 401

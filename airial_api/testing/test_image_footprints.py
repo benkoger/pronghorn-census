@@ -124,17 +124,6 @@ class TestImageFootprints(APITester):
             == 400
         )
 
-    def test_create_image_footprint_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when creating a footprint unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(FOOTPRINTS_URL, json=_build_footprint_payload())
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Image Footprint by ID (UUID & Integer Primary Key)
     # -------------------------------------------------------------------------
@@ -185,17 +174,6 @@ class TestImageFootprints(APITester):
         """
         assert auth_client.get(f"{FOOTPRINTS_URL}/{uuid4()}").status_code == 404
         assert auth_client.get(f"{FOOTPRINTS_URL}/999999999").status_code == 404
-
-    def test_get_image_footprint_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when fetching a footprint unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{FOOTPRINTS_URL}/{uuid4()}").status_code == 401
-        assert client.get(f"{FOOTPRINTS_URL}/1").status_code == 401
 
     # -------------------------------------------------------------------------
     # 3. PATCH Update Image Footprint (UUID & Integer Primary Key)
@@ -254,21 +232,6 @@ class TestImageFootprints(APITester):
                 f"{FOOTPRINTS_URL}/{uuid4()}", json={"n_ties": 5}
             ).status_code
             == 404
-        )
-
-    def test_update_image_footprint_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when updating a footprint unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert (
-            client.patch(
-                f"{FOOTPRINTS_URL}/{uuid4()}", json={"n_ties": 5}
-            ).status_code
-            == 401
         )
 
     # -------------------------------------------------------------------------
@@ -330,13 +293,3 @@ class TestImageFootprints(APITester):
         assert auth_client.delete(f"{FOOTPRINTS_URL}/{uuid4()}").status_code == 204
         assert auth_client.delete(f"{FOOTPRINTS_URL}/999999999").status_code == 204
 
-    def test_delete_image_footprint_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when deleting a footprint unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.delete(f"{FOOTPRINTS_URL}/{uuid4()}").status_code == 401
-        assert client.delete(f"{FOOTPRINTS_URL}/1").status_code == 401

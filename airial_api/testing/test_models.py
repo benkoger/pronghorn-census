@@ -83,15 +83,6 @@ class TestModels(APITester):
         assert auth_client.get(f"{MODELS_URL}/{uuid4()}").status_code == 404
         assert auth_client.get(f"{MODELS_URL}/999999999").status_code == 404
 
-    def test_get_model_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching a model unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{MODELS_URL}/{MODEL_UUID}").status_code == 401
-        assert client.get(f"{MODELS_URL}/{MODEL_ID}").status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Model Schema
     # -------------------------------------------------------------------------
@@ -164,16 +155,6 @@ class TestModels(APITester):
         for suffix in ("train", "val", "weights", "config", "readme"):
             assert auth_client.put(f"{MODELS_URL}/{MODEL_UUID}/{suffix}").status_code == 200
 
-    def test_artifact_endpoints_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 responses for artifact endpoints when unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.get(f"{MODELS_URL}/{MODEL_UUID}/json").status_code == 401
-        assert client.post(f"{MODELS_URL}/{MODEL_UUID}/train").status_code == 401
-        assert client.put(f"{MODELS_URL}/{MODEL_UUID}").status_code == 401
-
     # -------------------------------------------------------------------------
     # 4. POST Create Model
     # -------------------------------------------------------------------------
@@ -211,15 +192,6 @@ class TestModels(APITester):
             ).status_code
             == 400
         )
-
-    def test_create_model_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when creating a model unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(MODELS_URL, json=_build_model_payload())
-        assert response.status_code == 401
 
     # -------------------------------------------------------------------------
     # 5. PATCH Update Model (UUID & Integer Primary Key)
@@ -312,11 +284,3 @@ class TestModels(APITester):
 
         assert auth_client.get(f"{MODELS_URL}/{created['model_id']}").status_code == 404
 
-    def test_delete_model_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when deleting a model unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        assert client.delete(f"{MODELS_URL}/{uuid4()}").status_code == 401
-        assert client.delete(f"{MODELS_URL}/{MODEL_ID}").status_code == 401

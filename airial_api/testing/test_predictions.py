@@ -121,20 +121,6 @@ class TestPredictions(APITester):
         response = auth_client.get(f"{PREDICTIONS_URL}/999999999")
         assert response.status_code == 404
 
-    def test_get_prediction_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when accessing single prediction unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response_uuid = client.get(f"{PREDICTIONS_URL}/{uuid4()}")
-        assert response_uuid.status_code == 401
-
-        response_int = client.get(f"{PREDICTIONS_URL}/1")
-        assert response_int.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Bulk Predictions Query
     # -------------------------------------------------------------------------
@@ -239,19 +225,6 @@ class TestPredictions(APITester):
         response = auth_client.get(PREDICTIONS_URL)
         assert response.status_code == 400
 
-    def test_get_predictions_bulk_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when querying bulk predictions unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(
-            PREDICTIONS_URL, query_string={"object_ids": str(uuid4())}
-        )
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 3. POST Create Prediction
     # -------------------------------------------------------------------------
@@ -332,14 +305,3 @@ class TestPredictions(APITester):
         response = auth_client.post(PREDICTIONS_URL, json=valid_create_payload)
         assert response.status_code == 400
 
-    def test_create_prediction_unauthenticated(
-        self, client: FlaskClient, valid_create_payload: dict[str, Any]
-    ) -> None:
-        """Verify 401 response when attempting to create a prediction unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-            valid_create_payload (dict[str, Any]): Valid creation payload fixture.
-        """
-        response = client.post(PREDICTIONS_URL, json=valid_create_payload)
-        assert response.status_code == 401

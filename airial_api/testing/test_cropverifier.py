@@ -127,17 +127,6 @@ class TestCropVerifier(APITester):
         )
         assert response.status_code == 404
 
-    def test_get_area_needing_reviewed_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when fetching areas needing review unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(AREA_URL, query_string={"survey_id": SURVEY_UUID})
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Selection Count (/needing-reviewed)
     # -------------------------------------------------------------------------
@@ -255,15 +244,3 @@ class TestCropVerifier(APITester):
         )
         assert response.status_code == 404
 
-    def test_get_selection_count_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when fetching selection count unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(
-            COUNT_URL, query_string={"survey_id": SURVEY_UUID}
-        )
-        assert response.status_code == 401

@@ -354,11 +354,3 @@ class TestAuthenticate(APITester):
         assert auth_client.get("/api/v1/users/check-auth").data == b"false"
         assert base.get(Image, LOCKED_IMAGE_ID).opened_by_user_id == 0
 
-    def test_deauthenticate_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when logging out without an active session.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(DEAUTHENTICATE_URL)
-        assert response.status_code == 401

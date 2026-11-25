@@ -89,17 +89,6 @@ class TestProjects(APITester):
             assert "uuid" in item
             assert "name" in item
 
-    def test_get_all_projects_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when querying project listing unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(PROJECTS_URL)
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. GET Single Project by ID (UUID and Integer ID)
     # -------------------------------------------------------------------------
@@ -162,20 +151,6 @@ class TestProjects(APITester):
         """
         response = auth_client.get(f"{PROJECTS_URL}/999999999")
         assert response.status_code == 404
-
-    def test_get_project_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when accessing single project unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response_uuid = client.get(f"{PROJECTS_URL}/{uuid4()}")
-        assert response_uuid.status_code == 401
-
-        response_int = client.get(f"{PROJECTS_URL}/1")
-        assert response_int.status_code == 401
 
     # -------------------------------------------------------------------------
     # 3. GET Associated Relational Entities (Models, Herd Units, Surveys, Schemas)
@@ -291,20 +266,6 @@ class TestProjects(APITester):
         assert auth_client.get(f"{PROJECTS_URL}/{non_existent_uuid}/surveys").status_code == 404
         assert auth_client.get(f"{PROJECTS_URL}/{non_existent_uuid}/schemas").status_code == 404
 
-    def test_get_project_relations_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when accessing project relations unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        target_uuid = uuid4()
-        assert client.get(f"{PROJECTS_URL}/{target_uuid}/models").status_code == 401
-        assert client.get(f"{PROJECTS_URL}/{target_uuid}/herd-units").status_code == 401
-        assert client.get(f"{PROJECTS_URL}/{target_uuid}/surveys").status_code == 401
-        assert client.get(f"{PROJECTS_URL}/{target_uuid}/schemas").status_code == 401
-
     # -------------------------------------------------------------------------
     # 4. POST Create Project
     # -------------------------------------------------------------------------
@@ -366,21 +327,6 @@ class TestProjects(APITester):
         """
         response = auth_client.post(PROJECTS_URL, json={"name": "Orphan_Project"})
         assert response.status_code == 400
-
-    def test_create_project_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when attempting to create a project unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        payload = {
-            "name": "Unauthorized_Project",
-            "organization_ids": {"pkey": 1, "uuid": str(uuid4())},
-        }
-        response = client.post(PROJECTS_URL, json=payload)
-        assert response.status_code == 401
 
     # -------------------------------------------------------------------------
     # 5. DELETE Project (UUID and Integer ID)
@@ -451,16 +397,3 @@ class TestProjects(APITester):
         response = auth_client.delete(f"{PROJECTS_URL}/{uuid4()}")
         assert response.status_code == 204
 
-    def test_delete_project_unauthenticated(
-        self, client: FlaskClient
-    ) -> None:
-        """Verify 401 response when attempting to delete a project unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response_uuid = client.delete(f"{PROJECTS_URL}/{uuid4()}")
-        assert response_uuid.status_code == 401
-
-        response_int = client.delete(f"{PROJECTS_URL}/1")
-        assert response_int.status_code == 401

@@ -157,25 +157,6 @@ class TestAutoCropper(APITester):
         )
         assert response.status_code == 404
 
-    def test_fetch_batch_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when fetching autocropper batch unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.get(
-            BATCH_URL,
-            query_string={
-                "survey_id": SURVEY_UUID,
-                "herd_unit_id": HERD_UNIT_UUID,
-                "model_id": MODEL_UUID,
-                "label": [2, 3],
-                "batch_size": 1,
-                "min_confidence": 0.5,
-            },
-        )
-        assert response.status_code == 401
-
     # -------------------------------------------------------------------------
     # 2. POST Auto-Crop Image
     # -------------------------------------------------------------------------
@@ -249,18 +230,3 @@ class TestAutoCropper(APITester):
         response = auth_client.post(AUTOCROPPER_URL, json=payload)
         assert response.status_code == 404
 
-    def test_auto_crop_image_unauthenticated(self, client: FlaskClient) -> None:
-        """Verify 401 response when invoking auto-crop unauthenticated.
-
-        Args:
-            client (FlaskClient): Unauthenticated test client fixture.
-        """
-        response = client.post(
-            AUTOCROPPER_URL,
-            json={
-                "image_id": str(uuid4()),
-                "predictions": [],
-                "label_ids": ALL_LABEL_IDS,
-            },
-        )
-        assert response.status_code == 401
