@@ -10,6 +10,11 @@ default:
   tags:
     - airial-runner
 
+variables:
+  FF_USE_FASTZIP: "true"
+  ARTIFACT_COMPRESSION_LEVEL: "fastest"
+  CACHE_COMPRESSION_LEVEL: "fastest"
+
 stages:
   - lint
   - test
@@ -91,12 +96,22 @@ test:api:
         - airial_api/pyproject.toml
         - airial_api/uv.lock
     paths:
-      - .uv-cache/
       - airial_api/.venv/
+      - .apt-cache/
   before_script:
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 && rm -rf /var/lib/apt/lists/*
+    - |
+      if ! command -v pg_restore >/dev/null 2>&1; then
+        if [ -d .apt-cache ] && ls .apt-cache/*.deb >/dev/null 2>&1; then
+          dpkg -i .apt-cache/*.deb || (apt-get update -qq && apt-get install -y -qq -f)
+        else
+          mkdir -p .apt-cache
+          apt-get update -qq && apt-get install -y -qq -d --no-install-recommends postgresql-client-17
+          cp -n /var/cache/apt/archives/*.deb .apt-cache/ 2>/dev/null || true
+          dpkg -i .apt-cache/*.deb || (apt-get update -qq && apt-get install -y -qq -f)
+        fi
+      fi
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
-    - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
+    - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" -j 4 local_db/pct_b
     - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
   script:
     - cd airial_api
