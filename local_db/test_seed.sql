@@ -154,6 +154,7 @@ COPY core.images (image_id, survey_id, herd_unit_id, name, in_training, crops_ge
 171	1	1	pr527_by2023_survey1_flight1_00139_20240627_120054.JPG	f	0	0	2025-10-14 19:40:14.659239+00	2025-10-14 19:40:14.659239+00	5504	8256	b3b52b8c-b2d4-4866-9bad-ac67e09a0095	images/survey/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd_unit/4317a307-9595-4116-be11-c7584561dd8d/image/pr527_by2023_survey1_flight1_00139_20240627_120054.JPG
 1783	1	1	pr527_by2023_survey1_flight1_01751_20240627_125759.JPG	f	0	0	2025-10-14 20:15:17.875197+00	2025-10-14 20:15:17.875197+00	5504	8256	4c73ae17-42d5-4709-9f0e-b3da7c7f55bd	images/survey/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd_unit/4317a307-9595-4116-be11-c7584561dd8d/image/pr527_by2023_survey1_flight1_01751_20240627_125759.JPG
 1790	1	1	pr527_by2023_survey1_flight1_01758_20240627_125811.JPG	f	0	0	2025-10-14 20:15:26.929338+00	2025-10-14 20:15:26.929338+00	5504	8256	5efdca7b-5d52-42f2-b47a-c3fc43020046	images/survey/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd_unit/4317a307-9595-4116-be11-c7584561dd8d/image/pr527_by2023_survey1_flight1_01758_20240627_125811.JPG
+0	0	0	NO_IMAGE	f	0	0	2025-10-30 17:39:21.524674+00	2025-10-30 17:39:21.524674+00	0	0	74cf4104-f65f-4880-95db-f157b4c8f598	NONE
 1047	1	1	pr527_by2023_survey1_flight1_01015_20240627_123542.JPG	f	0	0	2025-10-14 19:59:08.273173+00	2026-04-28 19:30:12.55058+00	5504	8256	26be495e-3ec2-41c8-ba14-d0b65726bb67	images/survey/f4c0b5e0-af30-46fa-a276-6169932b6a34/herd_unit/4317a307-9595-4116-be11-c7584561dd8d/image/pr527_by2023_survey1_flight1_01015_20240627_123542.JPG
 \.
 
@@ -668,6 +669,7 @@ COPY core.predictions (pred_id, image_id, model_id, reviewed_by_user_id, label, 
 36841	4398	2	1	2	0.9973178505897522	3374	1589	3393	1626	2025-10-17 04:25:11.396632+00	ecfece49-5b97-44b8-b161-48e20a11e0bb
 37185	4397	2	1	2	0.9991346001625061	4494	1785	4517	1818	2025-10-17 04:28:32.760145+00	857ae662-ead7-4bda-bb91-762bee39dde5
 37186	4397	2	1	2	0.9991102814674377	2254	1288	2296	1303	2025-10-17 04:28:32.769961+00	d16bba04-b043-418a-bdfb-b3f853087b15
+0	0	0	0	0	0	0	0	0	0	2025-10-30 17:39:56.879121+00	899ff069-b644-4ce4-b9f4-ccf513f1d0b2
 1971	254	2	0	2	0.14303937554359436	8160	3643	8183	3705	2025-10-16 18:59:36.09915+00	48a67c89-ad32-47c7-aa06-fe801fca15fb
 1974	254	2	0	2	0.08271326124668121	20	80	39	99	2025-10-16 18:59:36.124456+00	5d5a072f-603f-40c2-8296-ced9176a1756
 1972	254	2	0	2	0.13475459814071655	3444	1415	3461	1431	2025-10-16 18:59:36.107814+00	33d760b0-852e-4ca0-bc58-92ae355c92a0
@@ -1061,6 +1063,8 @@ COPY core.proposal_generations (proposal_generation_id, active_measurement_id, g
 -- Synchronize Sequences
 --
 SELECT setval('core.images_image_id_seq', COALESCE((SELECT MAX(image_id) FROM core.images), 1));
+SELECT setval('core.image_metadata_metadata_id_seq', COALESCE((SELECT MAX(metadata_id) FROM core.image_metadata), 1));
+SELECT setval('core.image_footprints_footprint_id_seq', COALESCE((SELECT MAX(footprint_id) FROM core.image_footprints), 1));
 SELECT setval('core.annotations_annotation_id_seq', COALESCE((SELECT MAX(annotation_id) FROM core.annotations), 1));
 SELECT setval('core.predictions_pred_id_seq', COALESCE((SELECT MAX(pred_id) FROM core.predictions), 1));
 SELECT setval('core.reviewed_area_reviewed_area_id_seq', COALESCE((SELECT MAX(reviewed_area_id) FROM core.reviewed_area), 1));
