@@ -4,7 +4,6 @@ import os
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import patch
-from uuid import UUID
 
 import fakeredis
 import pytest
@@ -153,8 +152,7 @@ def shared_app(database_pool: None) -> Generator[Flask]:
 
     with mock_aws(), patch("config.s3_config", None):
         from app import create_app
-        from app.extensions import base, login_manager
-        from database.object_models.user_management import User
+        from app.extensions import base
 
         app_instance = create_app()
 
@@ -170,20 +168,6 @@ def shared_app(database_pool: None) -> Generator[Flask]:
 
         with app_instance.app_context():
             base._spice_client = MockSpiceClient()
-
-            test_users = base.where(User, {"email": "tester@local.host"})
-            if test_users:
-                test_user = test_users[0]
-                test_user.roles = ["admin", "root", "annotator"]
-                test_user.active_org_uuid = UUID("f383aa1c-1bdf-46fb-87f5-ed37effe17bd")
-                login_manager.request_loader(lambda req: test_user)
-
-            @app_instance.before_request
-            def set_test_session():
-                from flask import session
-
-                if "active_org_uuid" not in session:
-                    session["active_org_uuid"] = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
 
             s3_client: Any = app_instance.s3
             bucket_name = app_instance.config.get("BUCKET_NAME", "airial-bucket")

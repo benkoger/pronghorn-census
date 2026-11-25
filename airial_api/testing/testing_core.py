@@ -107,14 +107,22 @@ class APITester:
 
     @pytest.fixture
     def auth_client(self, client: FlaskClient) -> Generator[FlaskClient]:
-        """Provides an authenticated Flask test client session decoupled from the auth endpoint.
+        """Provides an authenticated Flask test client session.
+
+        Logs into the application using predefined test credentials via the
+        authentication endpoint prior to yielding the client session.
 
         Args:
-            client (FlaskClient): The test client fixture.
+            client (FlaskClient): The unauthenticated Flask test client fixture.
 
         Yields:
-            FlaskClient: The test client carrying pre-authenticated session state.
+            FlaskClient: The authenticated test client carrying valid session cookies.
         """
+        client.post(
+            "/api/v1/authenticate",
+            json={"email": "tester@local.host", "password": "Learning2Count"},
+            follow_redirects=True,
+        )
         yield client
 
     @pytest.fixture
