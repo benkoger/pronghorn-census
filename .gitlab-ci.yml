@@ -105,16 +105,10 @@ test:api:
     paths:
       - .uv-cache/
       - airial_api/.venv/
-      - .bin/
   before_script:
     - |
-      mkdir -p .bin
-      export PATH="$PWD/.bin:$PATH"
-      apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 curl ca-certificates && rm -rf /var/lib/apt/lists/*
-      if [ ! -x .bin/zed ]; then
-        curl -fsSL "https://github.com/authzed/zed/releases/latest/download/zed-linux-$(dpkg --print-architecture)" -o .bin/zed
-        chmod +x .bin/zed
-      fi
+      echo "deb [trusted=yes] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
+      apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 zed && rm -rf /var/lib/apt/lists/*
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
     - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
     - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
