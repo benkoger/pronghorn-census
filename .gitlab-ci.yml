@@ -104,6 +104,7 @@ test:api:
     paths:
       - airial_api/.venv/
       - .pg-client/
+    policy: pull
   before_script:
     - |
       if [ ! -x .pg-client/usr/lib/postgresql/17/bin/pg_restore ]; then
