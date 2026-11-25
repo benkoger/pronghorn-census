@@ -107,7 +107,7 @@ test:api:
     policy: pull
   before_script:
     - |
-      if [ ! -x .pg-client/usr/lib/postgresql/17/bin/pg_restore ]; then
+      if [ ! -x .pg-client/usr/lib/postgresql/17/bin/psql ]; then
         mkdir -p .pg-client
         apt-get update -qq && apt-get install -y -qq -d --no-install-recommends postgresql-client-17
         for deb in /var/cache/apt/archives/*.deb; do
