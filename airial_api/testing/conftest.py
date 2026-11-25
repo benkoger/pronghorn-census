@@ -1,15 +1,101 @@
 """Pytest configuration and session-wide fixtures for Airial API testing."""
 
+import os
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import patch
+from uuid import UUID
 
+import fakeredis
 import pytest
+import redis
+from authzed.api.v1 import (
+    BulkCheckPermissionPair,
+    BulkCheckPermissionResponse,
+    BulkCheckPermissionResponseItem,
+    CheckPermissionResponse,
+    WriteRelationshipsResponse,
+)
 from dotenv import load_dotenv
 from flask import Flask
 from moto import mock_aws
 
-load_dotenv(".env.test")
+# Patch redis.from_url to in-memory fakeredis instances so Valkey is not needed
+_fake_server = fakeredis.FakeServer()
+_fake_redis_instances: dict[str, fakeredis.FakeRedis] = {}
+
+
+def _fake_from_url(url: str, **kwargs):
+    if url not in _fake_redis_instances:
+        _fake_redis_instances[url] = fakeredis.FakeRedis(server=_fake_server)
+    return _fake_redis_instances[url]
+
+
+redis.from_url = _fake_from_url
+
+
+class MockSpiceClient:
+    """Mock SpiceDB client providing in-memory authorized responses."""
+
+    def CheckPermission(self, request):
+        """Checks if a subject has permission on a resource.
+
+        Args:
+            request: CheckPermissionRequest containing subject and resource.
+
+        Returns:
+            CheckPermissionResponse with PERMISSIONSHIP_HAS_PERMISSION.
+        """
+        return CheckPermissionResponse(
+            permissionship=CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
+        )
+
+    def BulkCheckPermission(self, request):
+        """Performs bulk permission checks for multiple resource-subject pairs.
+
+        Args:
+            request: BulkCheckPermissionRequest containing items to verify.
+
+        Returns:
+            BulkCheckPermissionResponse containing granted permissions for all items.
+        """
+        pairs = [
+            BulkCheckPermissionPair(
+                request=item,
+                item=BulkCheckPermissionResponseItem(
+                    permissionship=CheckPermissionResponse.PERMISSIONSHIP_HAS_PERMISSION
+                ),
+            )
+            for item in request.items
+        ]
+        return BulkCheckPermissionResponse(pairs=pairs)
+
+    def WriteRelationships(self, request):
+        """Simulates writing relationships to SpiceDB.
+
+        Args:
+            request: WriteRelationshipsRequest containing relationship updates.
+
+        Returns:
+            WriteRelationshipsResponse indicating success.
+        """
+        return WriteRelationshipsResponse()
+
+    def LookupResources(self, request):
+        """Simulates looking up resources accessible by a subject.
+
+        Args:
+            request: LookupResourcesRequest specifying permissions and subjects.
+
+        Returns:
+            list: Empty list of matching resource IDs.
+        """
+        return []
+
+
+# support running on runner or locally with .env.test
+if not os.getenv("CI"):
+    load_dotenv(".env.test", override=True)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -29,61 +115,91 @@ def global_env() -> bool:
 
 @pytest.fixture(scope="session", autouse=True)
 def database_pool() -> Generator[None]:
-    """Open the database connection pool once for the entire test session.
+    """Opens the database connection pool once for the session.
 
-    Opening and closing a pool for every test adds overhead and retains extra
-    resources; every test rolls its transaction back, so one pool is shared.
+    Opening and closing a pool for each test costs about a second; every test
+    rolls its transaction back, so they can share one.
 
     Yields:
-        None: Active session connection pool lifetime.
+        None: The session's tests, run on the open pool.
     """
+    # Imported here so the environment above is loaded before the app reads it.
     from app.extensions import base
 
+    base._spice_client = MockSpiceClient()
     base.create_pool()
     yield
     base.close_pool()
 
 
 @pytest.fixture(scope="session")
-def app(database_pool: None) -> Generator[Flask]:
-    """Create and configure a single Flask application instance per session.
+def shared_app(database_pool: None) -> Generator[Flask]:
+    """Instantiates and configures a shared Flask application for the test session.
 
-    Configures mock AWS S3 credentials and endpoint overrides, instantiates the
-    application once under a session-wide moto S3 mock, and creates the test
-    bucket so individual tests do not repeatedly allocate app/S3 state.
+    Creates the application once per worker session, pre-authenticates the test
+    user, initializes mock S3 buckets, and sets up session defaults.
 
     Args:
-        database_pool (None): Ensures the session DB pool is initialized first.
+        database_pool: The session database connection pool fixture.
 
     Yields:
         Flask: The configured Flask application instance.
     """
-    from app import create_app
+    os.environ["AWS_ACCESS_KEY_ID"] = "foobar_key"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "foobar_secret"
+    os.environ["AWS_SECURITY_TOKEN"] = "foobar_token"
+    os.environ["AWS_SESSION_TOKEN"] = "foobar_token"
+    os.environ.pop("AWS_ENDPOINT_URL_S3", None)
 
-    with pytest.MonkeyPatch.context() as mp:
-        mp.delenv("AWS_ENDPOINT_URL_S3", raising=False)
-        mp.setenv("AWS_ACCESS_KEY_ID", "foobar_key")
-        mp.setenv("AWS_SECRET_ACCESS_KEY", "foobar_secret")
-        mp.setenv("AWS_SECURITY_TOKEN", "foobar_token")
-        mp.setenv("AWS_SESSION_TOKEN", "foobar_token")
+    with mock_aws(), patch("config.s3_config", None):
+        from app import create_app
+        from app.extensions import base, login_manager
+        from database.object_models.user_management import User
 
-        with mock_aws():
-            with patch("config.s3_config", None):
-                flask_app = create_app()
+        app_instance = create_app()
 
-            flask_app.config.update(
-                {
-                    "TESTING": True,
-                    "SESSION_COOKIE_SECURE": False,
-                    "SESSION_COOKIE_DOMAIN": None,
-                    "SESSION_COOKIE_HTTPONLY": False,
-                    "SERVER_NAME": "localhost",
-                }
-            )
+        app_instance.config.update(
+            {
+                "TESTING": True,
+                "SESSION_COOKIE_SECURE": False,
+                "SESSION_COOKIE_DOMAIN": None,
+                "SESSION_COOKIE_HTTPONLY": False,
+                "SERVER_NAME": "localhost",
+            }
+        )
 
-            with flask_app.app_context():
-                s3_client: Any = flask_app.s3
-                bucket_name = flask_app.config.get("BUCKET_NAME", "airial-bucket")
-                s3_client.create_bucket(Bucket=bucket_name)
+        with app_instance.app_context():
+            base._spice_client = MockSpiceClient()
 
-            yield flask_app
+            test_users = base.where(User, {"email": "tester@local.host"})
+            if test_users:
+                test_user = test_users[0]
+                test_user.roles = ["admin", "root", "annotator"]
+                test_user.active_org_uuid = UUID("f383aa1c-1bdf-46fb-87f5-ed37effe17bd")
+                login_manager.request_loader(lambda req: test_user)
+
+            @app_instance.before_request
+            def set_test_session():
+                from flask import session
+
+                if "active_org_uuid" not in session:
+                    session["active_org_uuid"] = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
+
+            s3_client: Any = app_instance.s3
+            bucket_name = app_instance.config.get("BUCKET_NAME", "airial-bucket")
+            s3_client.create_bucket(Bucket=bucket_name)
+
+            yield app_instance
+
+
+@pytest.fixture
+def app(shared_app: Flask) -> Generator[Flask]:
+    """Provides the shared Flask application instance for the test.
+
+    Args:
+        shared_app (Flask): The session-scoped Flask application fixture.
+
+    Yields:
+        Flask: The configured Flask application instance.
+    """
+    yield shared_app

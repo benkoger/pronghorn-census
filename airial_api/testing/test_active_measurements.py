@@ -46,6 +46,7 @@ CACHE_KEYS = (
     "am_terms_{uuid}",
     "am_area_{uuid}",
     "am_threshold_{uuid}",
+    "am_boxes_{uuid}",
 )
 
 
@@ -56,12 +57,11 @@ def _sql(statement: str, params: dict | None = None) -> None:
     base.execute(run)
 
 
-class TestActiveMeasurements(APITester):
-    """Test suite for the active measurements API endpoints and state lifecycle."""
+class MeasurementFixtures(APITester):
+    """The survey without a measurement, then with one, its tiles and its first generation.
 
-    # -------------------------------------------------------------------------
-    # Fixtures: the survey without a measurement, then one with
-    # -------------------------------------------------------------------------
+    Shared with the survey map's tests; pytest collects only the classes named Test*.
+    """
 
     @pytest.fixture
     def bare_survey(self, auth_client):
@@ -129,6 +129,10 @@ class TestActiveMeasurements(APITester):
         self.s3.put_object(Bucket=self.bucket_name, Key=img["img_key"], Body=buf.getvalue())
         return img
 
+
+class TestActiveMeasurements(MeasurementFixtures):
+    """Test suite for the active measurements API endpoints and state lifecycle."""
+
     # -------------------------------------------------------------------------
     # 1. Status and estimate before anything exists
     # -------------------------------------------------------------------------
@@ -141,8 +145,10 @@ class TestActiveMeasurements(APITester):
         assert status["measurement"] is None
         assert status["ready"] is False
         assert [s["key"] for s in status["steps"]] == [
-            "detections", "footprints", "tiles", "measurement", "proposal"
+            "detections", "footprints", "tiles", "measurement", "proposal", "terms"
         ]
+        assert [s["key"] for s in status["steps"] if s["optional"]] == ["terms"]
+        assert status["terms"] is None
 
     def test_estimate_not_prepared(self, auth_client, bare_survey):
         """Verify estimate response when survey is not prepared."""
@@ -626,7 +632,18 @@ class TestActiveMeasurements(APITester):
             "tiles": False,
             "measurement": False,
             "proposal": False,
+            "terms": False,
         }
+
+        # The terms step reports the habitable area and the transects.
+        terms = {"habitable_area_m2": 2.5e9, "transects": 12}
+        steps = am.preparation_steps(
+            {"images_with_predictions": 0, "images_with_footprints": 0, "tiles": 0,
+             "georeferenced_images_without_tiles": 0, "measurement": None,
+             "proposal_generations": 0, "terms": terms}
+        )
+        assert steps[-1]["done"] is True
+        assert steps[-1]["detail"] == "habitable area 2,500 km², 12 transects"
 
     def test_coverage_weights(self):
         """Verify an animal weighs 1 / (1 + the other images covering it)."""

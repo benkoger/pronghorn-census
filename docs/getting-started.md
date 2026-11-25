@@ -153,7 +153,24 @@ Web app runs at `http://localhost:5173`.
 
 ---
 
-## 4. Helpful Commands
+## 4. Running the API Tests
+
+The tests run against the sample PostgreSQL database restored from `local_db/pct_b`. S3, Valkey, and SpiceDB are mocked in memory.
+
+Start the database container:
+```bash
+podman compose -f development.compose.yml up -d db
+```
+
+Run the tests directly on the host using uv:
+```bash
+cd airial_api
+uv run pytest testing
+```
+
+---
+
+## 5. Helpful Commands
 
 ```bash
 # View running containers

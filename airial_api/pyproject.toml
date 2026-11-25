@@ -123,7 +123,7 @@ include = ["app*", "database*"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -q -n auto --dist loadfile"
 testpaths = ["testing"]
 pythonpath = ["."]
 
@@ -145,8 +145,10 @@ exclude_lines = [
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.41.0",
     "pytest-cov>=7.1.0",
     "pytest-env>=1.2.0",
+    "pytest-xdist>=3.6.1",
 ]
 
 [tool.ruff.lint]

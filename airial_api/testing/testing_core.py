@@ -39,6 +39,20 @@ class APITester:
         PILImage.new("RGB", (width, height), color=color).save(buf, format="JPEG")
         return buf.getvalue()
 
+    @pytest.fixture
+    def app(self, shared_app: Flask) -> Generator[Flask]:
+        """Provides the shared Flask application instance for the test.
+
+        Args:
+            shared_app (Flask): The session-scoped Flask application fixture.
+
+        Yields:
+            Flask: The configured Flask application instance.
+        """
+        self.s3 = shared_app.s3
+        self.bucket_name = shared_app.config.get("BUCKET_NAME", "airial-bucket")
+        yield shared_app
+
     @pytest.fixture(scope="function", autouse=True)
     def isolate_s3_and_gc(self, app: Flask) -> Generator[None]:
         """Bind mocked S3 helpers and purge test artifacts after each test.
@@ -93,22 +107,14 @@ class APITester:
 
     @pytest.fixture
     def auth_client(self, client: FlaskClient) -> Generator[FlaskClient]:
-        """Provides an authenticated Flask test client session.
-
-        Logs into the application using predefined test credentials via the
-        authentication endpoint prior to yielding the client session.
+        """Provides an authenticated Flask test client session decoupled from the auth endpoint.
 
         Args:
-            client (FlaskClient): The unauthenticated Flask test client fixture.
+            client (FlaskClient): The test client fixture.
 
         Yields:
-            FlaskClient: The authenticated test client carrying valid session cookies.
+            FlaskClient: The test client carrying pre-authenticated session state.
         """
-        client.post(
-            "/api/v1/authenticate",
-            json={"email": "tester@local.host", "password": "Learning2Count"},
-            follow_redirects=True,
-        )
         yield client
 
     @pytest.fixture
