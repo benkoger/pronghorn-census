@@ -2,6 +2,9 @@
 
 import os
 from collections.abc import Generator
+from typing import Any
+from unittest.mock import patch
+from uuid import UUID
 
 import fakeredis
 import pytest
@@ -14,6 +17,8 @@ from authzed.api.v1 import (
     WriteRelationshipsResponse,
 )
 from dotenv import load_dotenv
+from flask import Flask
+from moto import mock_aws
 
 # Patch redis.from_url to in-memory fakeredis instances so Valkey is not needed
 _fake_server = fakeredis.FakeServer()
@@ -125,3 +130,63 @@ def database_pool() -> Generator[None]:
     base.create_pool()
     yield
     base.close_pool()
+
+
+@pytest.fixture(scope="session")
+def shared_app(database_pool: None) -> Generator[Flask]:
+    """Instantiates and configures a shared Flask application for the test session.
+
+    Creates the application once per worker session, pre-authenticates the test
+    user, initializes mock S3 buckets, and sets up session defaults.
+
+    Args:
+        database_pool: The session database connection pool fixture.
+
+    Yields:
+        Flask: The configured Flask application instance.
+    """
+    os.environ["AWS_ACCESS_KEY_ID"] = "foobar_key"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "foobar_secret"
+    os.environ["AWS_SECURITY_TOKEN"] = "foobar_token"
+    os.environ["AWS_SESSION_TOKEN"] = "foobar_token"
+    os.environ.pop("AWS_ENDPOINT_URL_S3", None)
+
+    with mock_aws(), patch("config.s3_config", None):
+        from app import create_app
+        from app.extensions import base, login_manager
+        from database.object_models.user_management import User
+
+        app = create_app()
+
+        app.config.update(
+            {
+                "TESTING": True,
+                "SESSION_COOKIE_SECURE": False,
+                "SESSION_COOKIE_DOMAIN": None,
+                "SESSION_COOKIE_HTTPONLY": False,
+                "SERVER_NAME": "localhost",
+            }
+        )
+
+        with app.app_context():
+            base._spice_client = MockSpiceClient()
+
+            test_users = base.where(User, {"email": "tester@local.host"})
+            if test_users:
+                test_user = test_users[0]
+                test_user.roles = ["admin", "root", "annotator"]
+                test_user.active_org_uuid = UUID("f383aa1c-1bdf-46fb-87f5-ed37effe17bd")
+                login_manager.request_loader(lambda req: test_user)
+
+            @app.before_request
+            def set_test_session():
+                from flask import session
+
+                if "active_org_uuid" not in session:
+                    session["active_org_uuid"] = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
+
+            s3_client: Any = app.s3
+            bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
+            s3_client.create_bucket(Bucket=bucket_name)
+
+            yield app

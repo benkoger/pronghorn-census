@@ -3,17 +3,12 @@
 import io
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any
 from unittest.mock import patch
-from uuid import UUID
 
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
-from moto import mock_aws
 from PIL import Image as PILImage
-
-from app import create_app
 
 
 class APITester:
@@ -43,70 +38,18 @@ class APITester:
         return buf.getvalue()
 
     @pytest.fixture
-    def app(self, monkeypatch: pytest.MonkeyPatch) -> Generator[Flask]:
-        """Creates and configures a Flask application instance for testing.
-
-        Configures mock AWS S3 credentials and endpoint overrides, instantiates the
-        application with mocked S3 configurations, and creates the designated test
-        bucket. The connection pool is the session's, opened in conftest.py.
+    def app(self, shared_app: Flask) -> Generator[Flask]:
+        """Provides the shared Flask application instance for the test.
 
         Args:
-            monkeypatch (pytest.MonkeyPatch): Pytest fixture used to override AWS
-                environment variables.
+            shared_app (Flask): The session-scoped Flask application fixture.
 
         Yields:
             Flask: The configured Flask application instance.
         """
-        monkeypatch.delenv("AWS_ENDPOINT_URL_S3", raising=False)
-        monkeypatch.setenv("AWS_ACCESS_KEY_ID", "foobar_key")
-        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "foobar_secret")
-        monkeypatch.setenv("AWS_SECURITY_TOKEN", "foobar_token")
-        monkeypatch.setenv("AWS_SESSION_TOKEN", "foobar_token")
-
-        with mock_aws():
-            with patch("config.s3_config", None):
-                app = create_app()
-
-            app.config.update(
-                {
-                    "TESTING": True,
-                    "SESSION_COOKIE_SECURE": False,
-                    "SESSION_COOKIE_DOMAIN": None,
-                    "SESSION_COOKIE_HTTPONLY": False,
-                    "SERVER_NAME": "localhost",
-                }
-            )
-
-            with app.app_context():
-                from conftest import MockSpiceClient
-
-                from app.extensions import base, login_manager
-                from database.object_models.user_management import User
-
-                base._spice_client = MockSpiceClient()
-
-                test_users = base.where(User, {"email": "tester@local.host"})
-                if test_users:
-                    test_user = test_users[0]
-                    test_user.roles = ["admin", "root", "annotator"]
-                    test_user.active_org_uuid = UUID("f383aa1c-1bdf-46fb-87f5-ed37effe17bd")
-                    login_manager.request_loader(lambda req: test_user)
-
-                @app.before_request
-                def set_test_session():
-                    from flask import session
-
-                    if "active_org_uuid" not in session:
-                        session["active_org_uuid"] = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
-
-                s3_client: Any = app.s3
-                bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
-                s3_client.create_bucket(Bucket=bucket_name)
-
-                self.s3 = s3_client
-                self.bucket_name = bucket_name
-
-            yield app
+        self.s3 = shared_app.s3
+        self.bucket_name = shared_app.config.get("BUCKET_NAME", "airial-bucket")
+        yield shared_app
 
     @pytest.fixture
     def client(self, app: Flask) -> Generator[FlaskClient]:
