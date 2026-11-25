@@ -155,11 +155,11 @@ Web app runs at `http://localhost:5173`.
 
 ## 4. Running the API Tests
 
-The tests run against the sample dataset of Option A: the database restored from `local_db/pct_b` and the permissions from `local_db/backup.zed`. They use its survey, model, image and login. S3 is mocked.
+The tests run against the sample PostgreSQL database restored from `local_db/pct_b`. S3, Valkey, and SpiceDB are mocked in memory.
 
-Start the infrastructure containers:
+Start the database container:
 ```bash
-podman compose -f development.compose.yml up -d db valkey spicedb spicedb-restore
+podman compose -f development.compose.yml up -d db
 ```
 
 Run the tests directly on the host using uv:

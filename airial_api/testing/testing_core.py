@@ -78,8 +78,12 @@ class APITester:
             )
 
             with app.app_context():
+                from conftest import MockSpiceClient
+
                 from app.extensions import base, login_manager
                 from database.object_models.user_management import User
+
+                base._spice_client = MockSpiceClient()
 
                 test_users = base.where(User, {"email": "tester@local.host"})
                 if test_users:

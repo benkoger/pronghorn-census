@@ -45,22 +45,6 @@ test:api:
         - "maintenance_work_mem=32MB"
         - "-c"
         - "max_connections=25"
-    - name: docker.io/valkey/valkey:8.1.1
-      alias: valkey
-      command:
-        - "valkey-server"
-        - "--requirepass"
-        - "test_valkey_password"
-        - "--maxmemory"
-        - "64mb"
-        - "--maxmemory-policy"
-        - "allkeys-lru"
-        - "--save"
-        - ""
-    - name: authzed/spicedb:latest
-      alias: spicedb
-      command:
-        - "serve"
   variables:
     POSTGRES_USER: pronghorn_count
     POSTGRES_PASSWORD: test_db_password
@@ -106,13 +90,10 @@ test:api:
       - .uv-cache/
       - airial_api/.venv/
   before_script:
-    - |
-      echo "deb [trusted=yes] https://pkg.authzed.com/apt/ * *" > /etc/apt/sources.list.d/authzed.list
-      apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 zed && rm -rf /var/lib/apt/lists/*
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client-17 && rm -rf /var/lib/apt/lists/*
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
     - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" local_db/pct_b
     - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
-    - ZED_ENDPOINT=spicedb:50051 ZED_TOKEN="$SPICEDB_GRPC_PRESHARED_KEY" ZED_INSECURE=true zed backup restore local_db/backup.zed
   script:
     - cd airial_api
     - |
