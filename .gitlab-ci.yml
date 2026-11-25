@@ -47,11 +47,17 @@ test:api:
         - "-c"
         - "listen_addresses=*"
         - "-c"
-        - "shared_buffers=64MB"
+        - "fsync=off"
         - "-c"
-        - "work_mem=4MB"
+        - "synchronous_commit=off"
         - "-c"
-        - "maintenance_work_mem=32MB"
+        - "full_page_writes=off"
+        - "-c"
+        - "shared_buffers=512MB"
+        - "-c"
+        - "work_mem=64MB"
+        - "-c"
+        - "maintenance_work_mem=256MB"
         - "-c"
         - "max_connections=25"
   variables:
@@ -97,19 +103,19 @@ test:api:
         - airial_api/uv.lock
     paths:
       - airial_api/.venv/
-      - .apt-cache/
+      - .pg-client/
   before_script:
     - |
-      if ! command -v pg_restore >/dev/null 2>&1; then
-        if [ -d .apt-cache ] && ls .apt-cache/*.deb >/dev/null 2>&1; then
-          dpkg -i .apt-cache/*.deb || (apt-get update -qq && apt-get install -y -qq -f)
-        else
-          mkdir -p .apt-cache
-          apt-get update -qq && apt-get install -y -qq -d --no-install-recommends postgresql-client-17
-          cp -n /var/cache/apt/archives/*.deb .apt-cache/ 2>/dev/null || true
-          dpkg -i .apt-cache/*.deb || (apt-get update -qq && apt-get install -y -qq -f)
-        fi
+      if [ ! -x .pg-client/usr/lib/postgresql/17/bin/pg_restore ]; then
+        mkdir -p .pg-client
+        apt-get update -qq && apt-get install -y -qq -d --no-install-recommends postgresql-client-17
+        for deb in /var/cache/apt/archives/*.deb; do
+          dpkg -x "$deb" .pg-client/
+        done
+        rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*
       fi
+      export PATH="$PWD/.pg-client/usr/lib/postgresql/17/bin:$PATH"
+      export LD_LIBRARY_PATH="$PWD/.pg-client/usr/lib/x86_64-linux-gnu:$PWD/.pg-client/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
     - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" -j 4 local_db/pct_b
     - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
