@@ -5,6 +5,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 from flask import Flask
@@ -77,6 +78,23 @@ class APITester:
             )
 
             with app.app_context():
+                from app.extensions import base, login_manager
+                from database.object_models.user_management import User
+
+                test_users = base.where(User, {"email": "tester@local.host"})
+                if test_users:
+                    test_user = test_users[0]
+                    test_user.roles = ["admin", "root", "annotator"]
+                    test_user.active_org_uuid = UUID("f383aa1c-1bdf-46fb-87f5-ed37effe17bd")
+                    login_manager.request_loader(lambda req: test_user)
+
+                @app.before_request
+                def set_test_session():
+                    from flask import session
+
+                    if "active_org_uuid" not in session:
+                        session["active_org_uuid"] = "f383aa1c-1bdf-46fb-87f5-ed37effe17bd"
+
                 s3_client: Any = app.s3
                 bucket_name = app.config.get("BUCKET_NAME", "airial-bucket")
                 s3_client.create_bucket(Bucket=bucket_name)
@@ -101,22 +119,14 @@ class APITester:
 
     @pytest.fixture
     def auth_client(self, client: FlaskClient) -> Generator[FlaskClient]:
-        """Provides an authenticated Flask test client session.
-
-        Logs into the application using predefined test credentials via the
-        authentication endpoint prior to yielding the client session.
+        """Provides an authenticated Flask test client session decoupled from the auth endpoint.
 
         Args:
-            client (FlaskClient): The unauthenticated Flask test client fixture.
+            client (FlaskClient): The test client fixture.
 
         Yields:
-            FlaskClient: The authenticated test client carrying valid session cookies.
+            FlaskClient: The test client carrying pre-authenticated session state.
         """
-        client.post(
-            "/api/v1/authenticate",
-            json={"email": "tester@local.host", "password": "Learning2Count"},
-            follow_redirects=True,
-        )
         yield client
 
     @pytest.fixture
