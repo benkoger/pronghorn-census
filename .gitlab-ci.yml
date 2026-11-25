@@ -118,8 +118,8 @@ test:api:
       export PATH="$PWD/.pg-client/usr/lib/postgresql/17/bin:$PATH"
       export LD_LIBRARY_PATH="$PWD/.pg-client/usr/lib/x86_64-linux-gnu:$PWD/.pg-client/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
     - pg_isready -h db -U "$DB_USER" -d "$DB_NAME" -t 10
-    - PGPASSWORD="$DB_PASS" pg_restore -h db -U "$DB_USER" -d "$DB_NAME" -j 4 local_db/pct_b
-    - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -c "ANALYZE;"
+    - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -q -f docs/database/schemas/airial1-2.sql
+    - PGPASSWORD="$DB_PASS" psql -h db -U "$DB_USER" -d "$DB_NAME" -q -f local_db/test_seed.sql
   script:
     - cd airial_api
     - |
