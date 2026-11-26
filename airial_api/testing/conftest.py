@@ -152,7 +152,7 @@ def shared_app(database_pool: None) -> Generator[Flask]:
 
     with mock_aws(), patch("config.s3_config", None):
         from app import create_app
-        from app.extensions import base
+        from app.extensions import base, login_manager
 
         app_instance = create_app()
 
@@ -163,8 +163,10 @@ def shared_app(database_pool: None) -> Generator[Flask]:
                 "SESSION_COOKIE_DOMAIN": None,
                 "SESSION_COOKIE_HTTPONLY": False,
                 "SERVER_NAME": "localhost",
+                "SESSION_PROTECTION": None,
             }
         )
+        login_manager.session_protection = None
 
         with app_instance.app_context():
             base._spice_client = MockSpiceClient()
