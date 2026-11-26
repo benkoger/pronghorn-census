@@ -22,6 +22,7 @@ COPY usermanagement.users (user_id, username, external_auth_id, external_auth_pr
 0	NO_USER	\N	\N	\N	2025-10-15 20:25:38.800639+00	2025-10-15 20:25:38.800639+00	\N	\N	41b27420-292e-4301-835b-d007bbc4533e	\N	\N	0
 3	Mlance	107773624645030566024	google	active	2026-03-04 16:06:37.602435+00	2026-04-07 15:47:34.387219+00	2026-04-07 21:47:34+00	\N	87419fa1-eb56-4f11-af48-e737580c65d8	michaelbraydenlance@gmail.com	\N	1
 1	Tuser	\N	manual-token	active	2025-10-17 19:17:04.832213+00	2026-05-07 18:02:18.147225+00	2026-09-21 15:00:26.170425+00	en-us	c1b7cceb-56ab-49a3-aac4-196ac278bdf3	tester@local.host	scrypt:32768:8:1$q5Y9NMLsG0sBNASo$30c67d5eb5e6d327ccdc893274a7fbd2f8fa4c531f97e23b074e20b6f8e2f30af23de885e0b81cf9b7de8aae33428027245cc056314534a5fd7e83d1c846d7ba	1
+999	StubUser	\N	manual-token	active	2025-10-17 19:17:04.832213+00	2026-05-07 18:02:18.147225+00	2026-09-21 15:00:26.170425+00	en-us	00000000-0000-0000-0000-000000000999	stub@local.host	\N	1
 \.
 
 COPY usermanagement.organizations (organization_id, name, logo_url, created, modified, uuid) FROM stdin;
@@ -45,6 +46,7 @@ COPY usermanagement.organizations_users (user_id, organization_id, role_id) FROM
 1	1	1
 1	2	2
 3	1	2
+999	1	1
 \.
 
 COPY projectmanagement.schemas (schema_id, name, created, modified, uuid) FROM stdin;
@@ -173,8 +175,10 @@ COPY core.annotations_reviewed_area (annotation_id, reviewed_area_id) FROM stdin
 \.
 
 COPY core.predictions (pred_id, image_id, model_id, reviewed_by_user_id, label, score, box_tx, box_ty, box_bx, box_by, created, uuid) FROM stdin;
+0	0	0	0	0	0	0	0	0	0	2025-10-30 17:39:56.879121+00	899ff069-b644-4ce4-b9f4-ccf513f1d0b2
 8837	1047	2	1	2	0.9989665746688843	3299	2303	3343	2322	2025-10-16 21:08:52.837948+00	8a50321b-0c6f-4ad3-bc23-7396530e6b4b
 8838	1047	2	1	2	0.9976924657821655	485	3194	521	3211	2025-10-16 21:08:52.847226+00	9e6eefa1-c0a5-475f-95a9-eb79f85c84e3
+8841	1047	2	1	2	0.9887240529060364	3358	2307	3381	2317	2025-10-16 21:08:52.873782+00	46c50556-8d4e-48b9-b456-acfe5f6abf5a
 36838	4398	2	1	2	0.9991787075996399	3417	1527	3460	1546	2025-10-17 04:25:11.371497+00	1d5aaef8-051e-4848-8deb-c8f54aa4b130
 36839	4398	2	1	2	0.998616099357605	3436	1450	3462	1483	2025-10-17 04:25:11.380486+00	86f16519-4ce0-4642-818c-88293f60ce69
 \.
