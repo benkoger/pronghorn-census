@@ -1,6 +1,12 @@
 --
 -- Airial Test Fixture Seed Data
 --
+DROP SCHEMA IF EXISTS "core" CASCADE;
+DROP SCHEMA IF EXISTS "projectmanagement" CASCADE;
+DROP SCHEMA IF EXISTS "usermanagement" CASCADE;
+
+\ir ../docs/database/schemas/airial1-2.sql
+
 SET statement_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
@@ -10,18 +16,21 @@ COPY usermanagement.roles (role_id, name, created, modified, uuid) FROM stdin;
 0	NO_ROLE	2025-10-15 20:25:38.800639+00	2025-10-15 20:25:38.800639+00	704240aa-0f52-4922-ba82-5eb7ffb59ceb
 1	admin	2026-03-26 21:36:29.153451+00	2026-03-26 21:36:29.153451+00	c147d407-0254-4b2d-ad74-c780e31cdfb7
 2	annotator	2026-03-26 21:40:32.462807+00	2026-03-26 21:40:32.462807+00	a443310d-f431-4f60-b6af-1454c39f94a2
+3	root	2026-03-26 21:40:32.462807+00	2026-03-26 21:40:32.462807+00	e2b7a421-3965-4d7a-b51c-7f51b6a18d19
 \.
 
 COPY usermanagement.users (user_id, username, external_auth_id, external_auth_provider, status, created, modified, last_login, locale, uuid, email, password_hash, default_org_id) FROM stdin;
 0	NO_USER	\N	\N	\N	2025-10-15 20:25:38.800639+00	2025-10-15 20:25:38.800639+00	\N	\N	41b27420-292e-4301-835b-d007bbc4533e	\N	\N	0
 3	Mlance	107773624645030566024	google	active	2026-03-04 16:06:37.602435+00	2026-04-07 15:47:34.387219+00	2026-04-07 21:47:34+00	\N	87419fa1-eb56-4f11-af48-e737580c65d8	michaelbraydenlance@gmail.com	\N	1
 1	Tuser	\N	manual-token	active	2025-10-17 19:17:04.832213+00	2026-05-07 18:02:18.147225+00	2026-09-21 15:00:26.170425+00	en-us	c1b7cceb-56ab-49a3-aac4-196ac278bdf3	tester@local.host	scrypt:32768:8:1$q5Y9NMLsG0sBNASo$30c67d5eb5e6d327ccdc893274a7fbd2f8fa4c531f97e23b074e20b6f8e2f30af23de885e0b81cf9b7de8aae33428027245cc056314534a5fd7e83d1c846d7ba	1
+999	StubUser	\N	manual-token	active	2025-10-17 19:17:04.832213+00	2026-05-07 18:02:18.147225+00	2026-09-21 15:00:26.170425+00	en-us	00000000-0000-0000-0000-000000000999	stub@local.host	\N	1
 \.
 
 COPY usermanagement.organizations (organization_id, name, logo_url, created, modified, uuid) FROM stdin;
 0	NO_ORGANIZATION	\N	2025-10-15 20:25:38.800639+00	2025-10-15 20:25:38.800639+00	65e247dd-ba2e-4430-b130-57b866695d14
 1	Uwyo Testing	\N	2026-03-26 21:36:53.408308+00	2026-03-26 21:36:53.408308+00	f383aa1c-1bdf-46fb-87f5-ed37effe17bd
 2	The Other Org™	\N	2026-03-26 21:39:59.05703+00	2026-03-26 21:39:59.05703+00	3181ef6f-114f-41e2-8dd4-c33d86d7cf31
+3	Root	\N	2026-03-26 21:39:59.05703+00	2026-03-26 21:39:59.05703+00	8b19379e-f63b-4589-9a64-07d4b4a1b873
 \.
 
 COPY usermanagement.initialization (init_id, first_run) FROM stdin;
@@ -39,6 +48,7 @@ COPY usermanagement.organizations_users (user_id, organization_id, role_id) FROM
 1	1	1
 1	2	2
 3	1	2
+999	1	1
 \.
 
 COPY projectmanagement.schemas (schema_id, name, created, modified, uuid) FROM stdin;
@@ -218,7 +228,6 @@ COPY core.reviewed_area (reviewed_area_id, image_id, area_tx, area_ty, area_bx, 
 204	1047	2295	1262	4395	3362	2100	2100	1	2026-04-28 14:56:29.099876+00	2026-04-28 14:57:46.348492+00	3c0daf27-9798-4f09-a731-ede9bc58e4b6	pr527_by2023_survey1_flight1_01015_20240627_123542_crop_1.JPG	images/26be495e-3ec2-41c8-ba14-d0b65726bb67/reviewed_area/pr527_by2023_survey1_flight1_01015_20240627_123542_crop_1.JPG	auto cropper
 205	505	4772	1465	6872	3565	2100	2100	1	2026-04-28 14:57:03.549646+00	2026-04-28 14:57:57.784547+00	fd2ac505-9f3a-4f5b-8acf-93a48e603506	pr527_by2023_survey1_flight1_00473_20240627_121801_crop_0.JPG	images/bb1592c6-1898-4437-b0aa-f97ff4d519fd/reviewed_area/pr527_by2023_survey1_flight1_00473_20240627_121801_crop_0.JPG	auto cropper
 209	418	2158	3404	4258	5504	2100	2100	0	2026-04-28 15:25:37.753875+00	2026-04-28 15:25:37.753875+00	060a51fb-0c33-40e5-a7d4-2c85e09c1a55	pr527_by2023_survey1_flight1_00386_20240627_121523_crop_1.JPG	images/602db2a3-0958-497e-9075-19d858213d90/reviewed_area/pr527_by2023_survey1_flight1_00386_20240627_121523_crop_1.JPG	auto cropper
-210	441	3911	2075	6011	4175	2100	2100	1	2026-04-28 15:41:06.779464+00	2026-04-28 19:22:08.731308+00	f9729dc7-3472-4c0b-b641-59cde892083e	pr527_by2023_survey1_flight1_00409_20240627_121606_crop_0.JPG	images/3f4b25f1-72c7-4333-a9c0-07dd978b461d/reviewed_area/pr527_by2023_survey1_flight1_00409_20240627_121606_crop_0.JPG	auto cropper
 208	418	3832	1196	5932	3296	2100	2100	1	2026-04-28 15:25:37.540772+00	2026-04-28 18:05:48.576434+00	484fcbae-0a34-4ea7-8a88-258ec8401223	pr527_by2023_survey1_flight1_00386_20240627_121523_crop_0.JPG	images/602db2a3-0958-497e-9075-19d858213d90/reviewed_area/pr527_by2023_survey1_flight1_00386_20240627_121523_crop_0.JPG	auto cropper
 213	1408	2742	428	4842	2528	2100	2100	1	2026-04-28 16:04:24.788774+00	2026-04-28 18:01:09.851169+00	49f0ee31-7c87-4acc-a5c6-800a6bb6ff59	pr527_by2023_survey1_flight1_01376_20240627_124821_crop_0.JPG	images/d65613b9-8a7c-4a82-8947-a9286381fb38/reviewed_area/pr527_by2023_survey1_flight1_01376_20240627_124821_crop_0.JPG	auto cropper
 223	1887	6156	0	8256	2100	2100	2100	0	2026-04-28 20:49:20.87141+00	2026-04-28 20:49:20.87141+00	b2de6c32-7687-455e-b65d-097d6d9ceb45	pr527_by2023_survey1_flight1_01855_20240627_130304_crop_0.JPG	images/ff586037-5f64-4ac4-90d6-32e26c84aa91/reviewed_area/pr527_by2023_survey1_flight1_01855_20240627_130304_crop_0.JPG	auto cropper
@@ -443,7 +452,6 @@ COPY core.annotations (annotation_id, label_id, image_id, herd_unit_id, box_tx, 
 464	3	418	1	5544	2588	5583	2615	1	2026-04-28 15:25:37.574951+00	2026-04-28 15:25:37.574951+00	30d79ff3-2739-4082-9348-85b2c9cf954d	2881	auto cropper
 465	3	418	1	4192	1884	4212	1900	1	2026-04-28 15:25:37.596441+00	2026-04-28 15:25:37.596441+00	69364a0d-9edf-4989-a1b9-b6dcaca14eaa	2882	auto cropper
 466	3	418	1	3187	5456	3230	5474	1	2026-04-28 15:25:37.767754+00	2026-04-28 15:25:37.767754+00	262207f5-40d5-412f-8e70-dadd914e227b	2880	auto cropper
-467	3	441	1	4946	3109	4976	3141	1	2026-04-28 15:41:06.799903+00	2026-04-28 15:41:06.799903+00	1341dd4b-d098-4e5e-9207-79734c5cb32a	3192	auto cropper
 468	3	1296	1	4943	5348	4977	5363	1	2026-04-28 16:02:40.142287+00	2026-04-28 16:02:40.142287+00	f09a61e9-ec0c-4334-bf46-70555d9a602b	403	auto cropper
 469	3	1313	1	284	4368	322	4398	1	2026-04-28 16:04:13.486725+00	2026-04-28 16:04:13.486725+00	2ba082a1-78b8-42a6-8aba-13fde354310b	275	auto cropper
 470	3	1313	1	105	4564	119	4584	1	2026-04-28 16:04:13.507166+00	2026-04-28 16:04:13.507166+00	4fdd129b-3735-45e9-8a8c-a0e0c59df48d	277	auto cropper
@@ -604,7 +612,6 @@ COPY core.annotations_reviewed_area (annotation_id, reviewed_area_id) FROM stdin
 464	208
 465	208
 466	209
-467	210
 474	213
 475	213
 476	213
@@ -1069,13 +1076,17 @@ SELECT setval('core.annotations_annotation_id_seq', COALESCE((SELECT MAX(annotat
 SELECT setval('core.predictions_pred_id_seq', COALESCE((SELECT MAX(pred_id) FROM core.predictions), 1));
 SELECT setval('core.reviewed_area_reviewed_area_id_seq', COALESCE((SELECT MAX(reviewed_area_id) FROM core.reviewed_area), 1));
 SELECT setval('core.am_units_am_unit_id_seq', COALESCE((SELECT MAX(am_unit_id) FROM core.am_units), 1));
+SELECT setval('core.proposal_generations_proposal_generation_id_seq', COALESCE((SELECT MAX(proposal_generation_id) FROM core.proposal_generations), 1));
 SELECT setval('projectmanagement.active_measurements_active_measurement_id_seq', COALESCE((SELECT MAX(active_measurement_id) FROM projectmanagement.active_measurements), 1));
 SELECT setval('projectmanagement.models_model_id_seq', COALESCE((SELECT MAX(model_id) FROM projectmanagement.models), 1));
 SELECT setval('projectmanagement.surveys_survey_id_seq', COALESCE((SELECT MAX(survey_id) FROM projectmanagement.surveys), 1));
 SELECT setval('projectmanagement.herd_units_herd_unit_id_seq', COALESCE((SELECT MAX(herd_unit_id) FROM projectmanagement.herd_units), 1));
 SELECT setval('projectmanagement.labels_label_id_seq', COALESCE((SELECT MAX(label_id) FROM projectmanagement.labels), 1));
+SELECT setval('projectmanagement.schemas_schema_id_seq', COALESCE((SELECT MAX(schema_id) FROM projectmanagement.schemas), 1));
 SELECT setval('projectmanagement.projects_project_id_seq', COALESCE((SELECT MAX(project_id) FROM projectmanagement.projects), 1));
 SELECT setval('usermanagement.users_user_id_seq', COALESCE((SELECT MAX(user_id) FROM usermanagement.users), 1));
+SELECT setval('usermanagement.roles_role_id_seq', COALESCE((SELECT MAX(role_id) FROM usermanagement.roles), 1));
 SELECT setval('usermanagement.organizations_organization_id_seq', COALESCE((SELECT MAX(organization_id) FROM usermanagement.organizations), 1));
+SELECT setval('usermanagement.initialization_init_id_seq', COALESCE((SELECT MAX(init_id) FROM usermanagement.initialization), 1));
 
 SET session_replication_role = 'origin';
